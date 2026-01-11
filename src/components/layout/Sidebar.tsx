@@ -1,0 +1,187 @@
+import { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  LayoutDashboard, 
+  TrendingUp, 
+  Truck, 
+  FileText, 
+  BarChart3, 
+  Users, 
+  Settings, 
+  Plug, 
+  HelpCircle,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Package
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
+const navItems = [
+  { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/comercial', icon: TrendingUp, label: 'Comercial' },
+  { path: '/operacional', icon: Truck, label: 'Operação' },
+  { path: '/documentos', icon: FileText, label: 'Documentos' },
+  { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
+  { path: '/clientes', icon: Users, label: 'Clientes' },
+];
+
+const bottomNavItems = [
+  { path: '/configuracoes', icon: Settings, label: 'Configurações' },
+  { path: '/integracoes', icon: Plug, label: 'Integrações' },
+  { path: '/ajuda', icon: HelpCircle, label: 'Ajuda' },
+];
+
+export function Sidebar() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const location = useLocation();
+
+  return (
+    <motion.aside
+      initial={false}
+      animate={{ width: isCollapsed ? 72 : 256 }}
+      transition={{ duration: 0.2, ease: [0.22, 0.9, 0.32, 1] }}
+      className="fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border flex flex-col"
+    >
+      {/* Logo */}
+      <div className="h-16 flex items-center px-4 border-b border-sidebar-border">
+        <motion.div 
+          className="flex items-center gap-3"
+          animate={{ justifyContent: isCollapsed ? 'center' : 'flex-start' }}
+        >
+          <div className="w-10 h-10 rounded-lg bg-sidebar-primary flex items-center justify-center">
+            <Package className="w-6 h-6 text-sidebar-primary-foreground" />
+          </div>
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.15 }}
+              >
+                <span className="font-bold text-lg text-sidebar-foreground">Vectra</span>
+                <span className="font-bold text-lg text-sidebar-muted"> Cargo</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+
+      {/* Main Navigation */}
+      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+        {navItems.map((item) => (
+          <NavItem 
+            key={item.path}
+            {...item}
+            isCollapsed={isCollapsed}
+            isActive={location.pathname === item.path}
+          />
+        ))}
+      </nav>
+
+      {/* Bottom Navigation */}
+      <div className="py-4 px-3 border-t border-sidebar-border space-y-1">
+        {bottomNavItems.map((item) => (
+          <NavItem 
+            key={item.path}
+            {...item}
+            isCollapsed={isCollapsed}
+            isActive={location.pathname === item.path}
+          />
+        ))}
+        
+        {/* Logout Button */}
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start gap-3 text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent",
+                isCollapsed && "justify-center px-2"
+              )}
+            >
+              <LogOut className="w-5 h-5 shrink-0" />
+              {!isCollapsed && <span>Sair</span>}
+            </Button>
+          </TooltipTrigger>
+          {isCollapsed && (
+            <TooltipContent side="right">Sair</TooltipContent>
+          )}
+        </Tooltip>
+      </div>
+
+      {/* Collapse Toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-sidebar border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent shadow-md"
+      >
+        {isCollapsed ? (
+          <ChevronRight className="w-4 h-4" />
+        ) : (
+          <ChevronLeft className="w-4 h-4" />
+        )}
+      </Button>
+    </motion.aside>
+  );
+}
+
+interface NavItemProps {
+  path: string;
+  icon: React.ElementType;
+  label: string;
+  isCollapsed: boolean;
+  isActive: boolean;
+}
+
+function NavItem({ path, icon: Icon, label, isCollapsed, isActive }: NavItemProps) {
+  return (
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger asChild>
+        <NavLink to={path}>
+          <motion.div
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative",
+              "text-sidebar-muted hover:text-sidebar-foreground",
+              isActive && "bg-sidebar-accent text-sidebar-foreground",
+              isCollapsed && "justify-center px-2"
+            )}
+            whileHover={{ x: isCollapsed ? 0 : 4 }}
+            transition={{ duration: 0.15 }}
+          >
+            {isActive && (
+              <motion.div
+                layoutId="activeIndicator"
+                className="absolute left-0 w-1 h-6 bg-sidebar-primary rounded-r-full"
+                initial={false}
+                transition={{ duration: 0.2, ease: [0.22, 0.9, 0.32, 1] }}
+              />
+            )}
+            <Icon className="w-5 h-5 shrink-0" />
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="font-medium"
+                >
+                  {label}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </NavLink>
+      </TooltipTrigger>
+      {isCollapsed && (
+        <TooltipContent side="right">{label}</TooltipContent>
+      )}
+    </Tooltip>
+  );
+}
