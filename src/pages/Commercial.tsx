@@ -9,29 +9,35 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
 import { motion } from 'framer-motion';
-import { Plus, Filter, Search } from 'lucide-react';
+import { Plus, Filter, Search, Loader2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { KanbanColumn } from '@/components/boards/KanbanColumn';
 import { QuoteCard } from '@/components/boards/QuoteCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Quote, QuoteStage, QUOTE_STAGES } from '@/types';
-import { mockQuotes } from '@/data/mockData';
+import { useQuotes, useUpdateQuoteStage } from '@/hooks/useQuotes';
+import { useAuth } from '@/hooks/useAuth';
+import { Database } from '@/integrations/supabase/types';
+import { toast } from 'sonner';
 
-const stageColors: Record<QuoteStage, string> = {
-  novo_pedido: 'bg-muted-foreground',
-  qualificacao: 'bg-accent-foreground',
-  precificacao: 'bg-primary',
-  enviado: 'bg-warning',
-  negociacao: 'bg-warning',
-  ganho: 'bg-success',
-  perdido: 'bg-destructive',
-};
+type Quote = Database['public']['Tables']['quotes']['Row'];
+type QuoteStage = Database['public']['Enums']['quote_stage'];
+
+const QUOTE_STAGES: { id: QuoteStage; label: string; color: string }[] = [
+  { id: 'novo_pedido', label: 'Novo Pedido', color: 'bg-muted-foreground' },
+  { id: 'qualificacao', label: 'Qualificação', color: 'bg-accent-foreground' },
+  { id: 'precificacao', label: 'Precificação', color: 'bg-primary' },
+  { id: 'enviado', label: 'Enviado', color: 'bg-warning' },
+  { id: 'negociacao', label: 'Negociação', color: 'bg-warning' },
+  { id: 'ganho', label: 'Ganho', color: 'bg-success' },
+  { id: 'perdido', label: 'Perdido', color: 'bg-destructive' },
+];
 
 export default function Commercial() {
-  const [quotes, setQuotes] = useState<Quote[]>(mockQuotes);
+  const { user } = useAuth();
+  const { data: quotes, isLoading } = useQuotes();
+  const updateStageMutation = useUpdateQuoteStage();
   const [activeQuote, setActiveQuote] = useState<Quote | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -44,11 +50,12 @@ export default function Commercial() {
   );
 
   const filteredQuotes = useMemo(() => {
+    if (!quotes) return [];
     if (!searchTerm) return quotes;
     const term = searchTerm.toLowerCase();
     return quotes.filter(
       (q) =>
-        q.clientName.toLowerCase().includes(term) ||
+        q.client_name.toLowerCase().includes(term) ||
         q.origin.toLowerCase().includes(term) ||
         q.destination.toLowerCase().includes(term)
     );
@@ -73,58 +80,54 @@ export default function Commercial() {
   }, [filteredQuotes]);
 
   const handleDragStart = (event: DragStartEvent) => {
-    const quote = quotes.find((q) => q.id === event.active.id);
+    const quote = quotes?.find((q) => q.id === event.active.id);
     if (quote) setActiveQuote(quote);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveQuote(null);
 
-    if (!over) return;
+    if (!over || !quotes) return;
 
     const activeQuote = quotes.find((q) => q.id === active.id);
     if (!activeQuote) return;
 
     // Check if dropped on a column
     const targetStage = QUOTE_STAGES.find((s) => s.id === over.id);
-    if (targetStage) {
-      setQuotes((prev) =>
-        prev.map((q) =>
-          q.id === active.id ? { ...q, stage: targetStage.id } : q
-        )
-      );
+    if (targetStage && targetStage.id !== activeQuote.stage) {
+      try {
+        await updateStageMutation.mutateAsync({ 
+          id: activeQuote.id, 
+          stage: targetStage.id 
+        });
+        toast.success(`Cotação movida para ${targetStage.label}`);
+      } catch (error) {
+        toast.error('Erro ao mover cotação');
+      }
       return;
     }
 
-    // Check if dropped on another card
+    // Check if dropped on another card (same stage)
     const overQuote = quotes.find((q) => q.id === over.id);
-    if (overQuote && activeQuote.stage === overQuote.stage) {
-      const stageQuotes = quotes.filter((q) => q.stage === activeQuote.stage);
-      const oldIndex = stageQuotes.findIndex((q) => q.id === active.id);
-      const newIndex = stageQuotes.findIndex((q) => q.id === over.id);
-
-      if (oldIndex !== newIndex) {
-        const newStageQuotes = arrayMove(stageQuotes, oldIndex, newIndex);
-        setQuotes((prev) => {
-          const otherQuotes = prev.filter((q) => q.stage !== activeQuote.stage);
-          return [...otherQuotes, ...newStageQuotes];
+    if (overQuote && activeQuote.stage !== overQuote.stage) {
+      try {
+        await updateStageMutation.mutateAsync({ 
+          id: activeQuote.id, 
+          stage: overQuote.stage 
         });
+        toast.success(`Cotação movida para ${QUOTE_STAGES.find(s => s.id === overQuote.stage)?.label}`);
+      } catch (error) {
+        toast.error('Erro ao mover cotação');
       }
-    } else if (overQuote) {
-      // Move to different column at specific position
-      setQuotes((prev) =>
-        prev.map((q) =>
-          q.id === active.id ? { ...q, stage: overQuote.stage } : q
-        )
-      );
     }
   };
 
   const totalPipelineValue = useMemo(() => {
+    if (!quotes) return 0;
     return quotes
       .filter((q) => q.stage !== 'perdido' && q.stage !== 'ganho')
-      .reduce((acc, q) => acc + q.value, 0);
+      .reduce((acc, q) => acc + Number(q.value), 0);
   }, [quotes]);
 
   const formatCurrency = (value: number) => {
@@ -133,6 +136,19 @@ export default function Commercial() {
       currency: 'BRL',
     }).format(value);
   };
+
+  if (!user) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-foreground mb-2">Acesso Restrito</h2>
+            <p className="text-muted-foreground">Faça login para acessar o board comercial</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -176,34 +192,41 @@ export default function Commercial() {
         </div>
       </div>
 
-      {/* Kanban Board */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
-          {QUOTE_STAGES.map((stage) => (
-            <KanbanColumn
-              key={stage.id}
-              id={stage.id}
-              title={stage.label}
-              count={quotesByStage[stage.id].length}
-              color={stageColors[stage.id]}
-              items={quotesByStage[stage.id].map((q) => q.id)}
-            >
-              {quotesByStage[stage.id].map((quote) => (
-                <QuoteCard key={quote.id} quote={quote} />
-              ))}
-            </KanbanColumn>
-          ))}
+      {/* Loading State */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
+      ) : (
+        /* Kanban Board */
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
+            {QUOTE_STAGES.map((stage) => (
+              <KanbanColumn
+                key={stage.id}
+                id={stage.id}
+                title={stage.label}
+                count={quotesByStage[stage.id].length}
+                color={stage.color}
+                items={quotesByStage[stage.id].map((q) => q.id)}
+              >
+                {quotesByStage[stage.id].map((quote) => (
+                  <QuoteCard key={quote.id} quote={quote} />
+                ))}
+              </KanbanColumn>
+            ))}
+          </div>
 
-        <DragOverlay>
-          {activeQuote && <QuoteCard quote={activeQuote} />}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activeQuote && <QuoteCard quote={activeQuote} />}
+          </DragOverlay>
+        </DndContext>
+      )}
     </MainLayout>
   );
 }

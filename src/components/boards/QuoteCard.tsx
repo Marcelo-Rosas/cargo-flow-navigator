@@ -2,7 +2,6 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import { GripVertical, MoreHorizontal, Mail, Copy, Calendar, MapPin } from 'lucide-react';
-import { Quote, QUOTE_STAGES } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +12,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { Database } from '@/integrations/supabase/types';
+
+type Quote = Database['public']['Tables']['quotes']['Row'];
 
 interface QuoteCardProps {
   quote: Quote;
@@ -42,12 +44,14 @@ export function QuoteCard({ quote, onClick, onConvert }: QuoteCardProps) {
     }).format(value);
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: string) => {
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
       month: 'short',
-    }).format(date);
+    }).format(new Date(date));
   };
+
+  const tags = quote.tags || [];
 
   return (
     <motion.div
@@ -75,7 +79,7 @@ export function QuoteCard({ quote, onClick, onConvert }: QuoteCardProps) {
             <GripVertical className="w-4 h-4 text-muted-foreground" />
           </button>
           <h4 className="font-semibold text-foreground truncate max-w-[160px]">
-            {quote.clientName}
+            {quote.client_name}
           </h4>
         </div>
         
@@ -116,9 +120,9 @@ export function QuoteCard({ quote, onClick, onConvert }: QuoteCardProps) {
       </div>
 
       {/* Tags */}
-      {quote.tags.length > 0 && (
+      {tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
-          {quote.tags.map((tag) => (
+          {tags.map((tag) => (
             <Badge 
               key={tag} 
               variant="secondary" 
@@ -138,11 +142,11 @@ export function QuoteCard({ quote, onClick, onConvert }: QuoteCardProps) {
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-border">
         <span className="text-lg font-bold text-foreground">
-          {formatCurrency(quote.value)}
+          {formatCurrency(Number(quote.value))}
         </span>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Calendar className="w-3 h-3" />
-          {formatDate(quote.createdAt)}
+          {formatDate(quote.created_at)}
         </div>
       </div>
     </motion.div>

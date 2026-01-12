@@ -5,13 +5,15 @@ import {
   FileText, 
   AlertTriangle,
   DollarSign,
-  Target
+  Target,
+  Loader2
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { RecentOrdersList } from '@/components/dashboard/RecentOrdersList';
 import { AlertsWidget } from '@/components/dashboard/AlertsWidget';
-import { mockOrders, mockKPIs } from '@/data/mockData';
+import { useDashboardStats, useRecentOrders, useConversionChartData, useRevenueByClientData } from '@/hooks/useDashboardStats';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   AreaChart, 
   Area, 
@@ -24,23 +26,6 @@ import {
   Bar
 } from 'recharts';
 
-const conversionData = [
-  { name: 'Jan', value: 28 },
-  { name: 'Fev', value: 32 },
-  { name: 'Mar', value: 29 },
-  { name: 'Abr', value: 35 },
-  { name: 'Mai', value: 38 },
-  { name: 'Jun', value: 42 },
-];
-
-const revenueByClientData = [
-  { name: 'Loja Virtual', value: 45000 },
-  { name: 'Tech Solutions', value: 38000 },
-  { name: 'Agro Brasil', value: 32000 },
-  { name: 'Móveis Premium', value: 28000 },
-  { name: 'Química Ind.', value: 24000 },
-];
-
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -50,7 +35,40 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
+// Fallback data for empty states
+const emptyConversionData = [
+  { name: 'Jan', value: 0 },
+  { name: 'Fev', value: 0 },
+  { name: 'Mar', value: 0 },
+];
+
+const emptyRevenueData = [
+  { name: 'Sem dados', value: 0 },
+];
+
 export default function Dashboard() {
+  const { user } = useAuth();
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
+  const { data: recentOrders, isLoading: ordersLoading } = useRecentOrders(5);
+  const { data: conversionData } = useConversionChartData();
+  const { data: revenueData } = useRevenueByClientData();
+
+  const chartConversionData = conversionData?.length ? conversionData : emptyConversionData;
+  const chartRevenueData = revenueData?.length ? revenueData : emptyRevenueData;
+
+  if (!user) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-foreground mb-2">Bem-vindo ao Vectra Cargo</h2>
+            <p className="text-muted-foreground">Faça login para acessar o dashboard</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       {/* Page Header */}
@@ -74,54 +92,62 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-        <KPICard
-          title="Pipeline Total"
-          value={formatCurrency(mockKPIs.pipelineValue)}
-          icon={DollarSign}
-          trend={{ value: 12, isPositive: true }}
-          variant="primary"
-          delay={0}
-        />
-        <KPICard
-          title="Taxa de Conversão"
-          value={`${mockKPIs.conversionRate}%`}
-          icon={Target}
-          trend={{ value: 5, isPositive: true }}
-          variant="success"
-          delay={0.05}
-        />
-        <KPICard
-          title="OS Ativas"
-          value={mockKPIs.activeOrders}
-          subtitle="Em operação"
-          icon={Truck}
-          variant="default"
-          delay={0.1}
-        />
-        <KPICard
-          title="Entregas Hoje"
-          value={mockKPIs.deliveriesToday}
-          subtitle="Previstas"
-          icon={TrendingUp}
-          variant="default"
-          delay={0.15}
-        />
-        <KPICard
-          title="Docs Pendentes"
-          value={mockKPIs.pendingDocuments}
-          subtitle="Aguardando"
-          icon={FileText}
-          variant="warning"
-          delay={0.2}
-        />
-        <KPICard
-          title="Alertas Críticos"
-          value={mockKPIs.criticalAlerts}
-          subtitle="Requer ação"
-          icon={AlertTriangle}
-          variant="destructive"
-          delay={0.25}
-        />
+        {statsLoading ? (
+          <div className="col-span-full flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <>
+            <KPICard
+              title="Pipeline Total"
+              value={formatCurrency(stats?.pipelineValue || 0)}
+              icon={DollarSign}
+              trend={{ value: 12, isPositive: true }}
+              variant="primary"
+              delay={0}
+            />
+            <KPICard
+              title="Taxa de Conversão"
+              value={`${stats?.conversionRate || 0}%`}
+              icon={Target}
+              trend={{ value: 5, isPositive: true }}
+              variant="success"
+              delay={0.05}
+            />
+            <KPICard
+              title="OS Ativas"
+              value={stats?.activeOrders || 0}
+              subtitle="Em operação"
+              icon={Truck}
+              variant="default"
+              delay={0.1}
+            />
+            <KPICard
+              title="Entregas Hoje"
+              value={stats?.deliveriesToday || 0}
+              subtitle="Previstas"
+              icon={TrendingUp}
+              variant="default"
+              delay={0.15}
+            />
+            <KPICard
+              title="Docs Pendentes"
+              value={stats?.pendingDocuments || 0}
+              subtitle="Aguardando"
+              icon={FileText}
+              variant="warning"
+              delay={0.2}
+            />
+            <KPICard
+              title="Alertas Críticos"
+              value={stats?.criticalAlerts || 0}
+              subtitle="Requer ação"
+              icon={AlertTriangle}
+              variant="destructive"
+              delay={0.25}
+            />
+          </>
+        )}
       </div>
 
       {/* Charts Row */}
@@ -137,7 +163,7 @@ export default function Dashboard() {
             Taxa de Conversão
           </h3>
           <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={conversionData}>
+            <AreaChart data={chartConversionData}>
               <defs>
                 <linearGradient id="colorConversion" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(203, 82%, 26%)" stopOpacity={0.3} />
@@ -186,7 +212,7 @@ export default function Dashboard() {
             Faturamento por Cliente
           </h3>
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={revenueByClientData} layout="vertical">
+            <BarChart data={chartRevenueData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis 
                 type="number"
@@ -222,7 +248,13 @@ export default function Dashboard() {
       {/* Bottom Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <RecentOrdersList orders={mockOrders} />
+          {ordersLoading ? (
+            <div className="bg-card rounded-xl border border-border shadow-card p-6 flex items-center justify-center h-64">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <RecentOrdersList orders={recentOrders || []} />
+          )}
         </div>
         <div>
           <AlertsWidget />

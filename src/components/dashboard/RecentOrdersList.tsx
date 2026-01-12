@@ -1,16 +1,33 @@
 import { motion } from 'framer-motion';
 import { ArrowRight, Truck, AlertTriangle, CheckCircle } from 'lucide-react';
-import { ServiceOrder, ORDER_STAGES } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Database } from '@/integrations/supabase/types';
 
-interface RecentOrdersListProps {
-  orders: ServiceOrder[];
-  onViewOrder?: (order: ServiceOrder) => void;
+type Order = Database['public']['Tables']['orders']['Row'];
+type Occurrence = Database['public']['Tables']['occurrences']['Row'];
+type OrderStage = Database['public']['Enums']['order_stage'];
+
+interface OrderWithOccurrences extends Order {
+  occurrences: Occurrence[];
 }
 
-const stageColors: Record<string, string> = {
+const ORDER_STAGES: { id: OrderStage; label: string }[] = [
+  { id: 'ordem_criada', label: 'Ordem Criada' },
+  { id: 'busca_motorista', label: 'Busca Motorista' },
+  { id: 'documentacao', label: 'Documentação' },
+  { id: 'coleta_realizada', label: 'Coleta Realizada' },
+  { id: 'em_transito', label: 'Em Trânsito' },
+  { id: 'entregue', label: 'Entregue' },
+];
+
+interface RecentOrdersListProps {
+  orders: OrderWithOccurrences[];
+  onViewOrder?: (order: OrderWithOccurrences) => void;
+}
+
+const stageColors: Record<OrderStage, string> = {
   ordem_criada: 'bg-muted text-muted-foreground',
   busca_motorista: 'bg-accent text-accent-foreground',
   documentacao: 'bg-primary/20 text-primary',
@@ -20,6 +37,24 @@ const stageColors: Record<string, string> = {
 };
 
 export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps) {
+  if (!orders || orders.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.3, ease: [0.22, 0.9, 0.32, 1] }}
+        className="bg-card rounded-xl border border-border shadow-card p-6"
+      >
+        <h3 className="text-lg font-semibold text-foreground mb-4">Ordens Recentes</h3>
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <Truck className="w-12 h-12 text-muted-foreground/50 mb-3" />
+          <p className="text-muted-foreground">Nenhuma ordem de serviço encontrada</p>
+          <p className="text-sm text-muted-foreground/70">Crie sua primeira OS no board operacional</p>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -37,6 +72,7 @@ export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps)
       <div className="space-y-3">
         {orders.slice(0, 5).map((order, index) => {
           const stage = ORDER_STAGES.find(s => s.id === order.stage);
+          const occurrences = order.occurrences || [];
           
           return (
             <motion.div
@@ -54,7 +90,7 @@ export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps)
                 )}>
                   {order.stage === 'entregue' ? (
                     <CheckCircle className="w-5 h-5 text-success" />
-                  ) : order.occurrences.length > 0 ? (
+                  ) : occurrences.length > 0 ? (
                     <AlertTriangle className="w-5 h-5 text-warning" />
                   ) : (
                     <Truck className="w-5 h-5 text-primary" />
@@ -62,7 +98,7 @@ export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps)
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground">{order.osNumber}</span>
+                    <span className="font-medium text-foreground">{order.os_number}</span>
                     <Badge 
                       variant="secondary" 
                       className={cn("text-xs", stageColors[order.stage])}
@@ -79,29 +115,29 @@ export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps)
               <div className="flex items-center gap-4">
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-medium text-foreground">
-                    {order.clientName}
+                    {order.client_name}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {order.driverName || 'Motorista não atribuído'}
+                    {order.driver_name || 'Motorista não atribuído'}
                   </p>
                 </div>
                 
                 <div className="flex gap-1">
                   <Badge 
-                    variant={order.hasNfe ? "default" : "outline"} 
-                    className={cn("text-xs", order.hasNfe && "bg-success text-success-foreground")}
+                    variant={order.has_nfe ? "default" : "outline"} 
+                    className={cn("text-xs", order.has_nfe && "bg-success text-success-foreground")}
                   >
                     NF-e
                   </Badge>
                   <Badge 
-                    variant={order.hasCte ? "default" : "outline"} 
-                    className={cn("text-xs", order.hasCte && "bg-success text-success-foreground")}
+                    variant={order.has_cte ? "default" : "outline"} 
+                    className={cn("text-xs", order.has_cte && "bg-success text-success-foreground")}
                   >
                     CT-e
                   </Badge>
                   <Badge 
-                    variant={order.hasPod ? "default" : "outline"} 
-                    className={cn("text-xs", order.hasPod && "bg-success text-success-foreground")}
+                    variant={order.has_pod ? "default" : "outline"} 
+                    className={cn("text-xs", order.has_pod && "bg-success text-success-foreground")}
                   >
                     POD
                   </Badge>
