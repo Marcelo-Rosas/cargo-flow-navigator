@@ -12,7 +12,6 @@ import {
   CheckCircle,
   FileText
 } from 'lucide-react';
-import { ServiceOrder, ORDER_STAGES } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,9 +22,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { Database } from '@/integrations/supabase/types';
+
+type Order = Database['public']['Tables']['orders']['Row'];
+type Occurrence = Database['public']['Tables']['occurrences']['Row'];
+
+interface OrderWithOccurrences extends Order {
+  occurrences: Occurrence[];
+}
 
 interface OrderCardProps {
-  order: ServiceOrder;
+  order: OrderWithOccurrences;
   onClick?: () => void;
 }
 
@@ -51,16 +58,17 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
     }).format(value);
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: string) => {
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
       month: 'short',
-    }).format(date);
+    }).format(new Date(date));
   };
 
-  const hasOccurrences = order.occurrences.length > 0;
-  const hasCriticalDocs = !order.hasNfe || !order.hasCte;
-  const needsPod = order.stage === 'entregue' && !order.hasPod;
+  const occurrences = order.occurrences || [];
+  const hasOccurrences = occurrences.length > 0;
+  const hasCriticalDocs = !order.has_nfe || !order.has_cte;
+  const needsPod = order.stage === 'entregue' && !order.has_pod;
 
   return (
     <motion.div
@@ -90,9 +98,9 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
             <GripVertical className="w-4 h-4 text-muted-foreground" />
           </button>
           <div>
-            <h4 className="font-semibold text-foreground">{order.osNumber}</h4>
+            <h4 className="font-semibold text-foreground">{order.os_number}</h4>
             <p className="text-sm text-muted-foreground truncate max-w-[140px]">
-              {order.clientName}
+              {order.client_name}
             </p>
           </div>
         </div>
@@ -132,16 +140,16 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
       </div>
 
       {/* Driver Info */}
-      {order.driverName && (
+      {order.driver_name && (
         <div className="flex items-center gap-2 mb-3 p-2 rounded-md bg-muted/50">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
             <Truck className="w-4 h-4 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">
-              {order.driverName}
+              {order.driver_name}
             </p>
-            <p className="text-xs text-muted-foreground">{order.vehiclePlate}</p>
+            <p className="text-xs text-muted-foreground">{order.vehicle_plate}</p>
           </div>
         </div>
       )}
@@ -152,7 +160,7 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
           {hasOccurrences && (
             <Badge variant="secondary" className="text-xs bg-warning/10 text-warning-foreground gap-1">
               <AlertTriangle className="w-3 h-3" />
-              {order.occurrences.length} ocorrência(s)
+              {occurrences.length} ocorrência(s)
             </Badge>
           )}
           {needsPod && (
@@ -166,33 +174,33 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
       {/* Document Status */}
       <div className="flex gap-1 mb-3">
         <Badge 
-          variant={order.hasNfe ? "default" : "outline"} 
+          variant={order.has_nfe ? "default" : "outline"} 
           className={cn(
             "text-xs",
-            order.hasNfe ? "bg-success/20 text-success border-success/30" : "border-muted-foreground/30"
+            order.has_nfe ? "bg-success/20 text-success border-success/30" : "border-muted-foreground/30"
           )}
         >
-          {order.hasNfe && <CheckCircle className="w-3 h-3 mr-1" />}
+          {order.has_nfe && <CheckCircle className="w-3 h-3 mr-1" />}
           NF-e
         </Badge>
         <Badge 
-          variant={order.hasCte ? "default" : "outline"} 
+          variant={order.has_cte ? "default" : "outline"} 
           className={cn(
             "text-xs",
-            order.hasCte ? "bg-success/20 text-success border-success/30" : "border-muted-foreground/30"
+            order.has_cte ? "bg-success/20 text-success border-success/30" : "border-muted-foreground/30"
           )}
         >
-          {order.hasCte && <CheckCircle className="w-3 h-3 mr-1" />}
+          {order.has_cte && <CheckCircle className="w-3 h-3 mr-1" />}
           CT-e
         </Badge>
         <Badge 
-          variant={order.hasPod ? "default" : "outline"} 
+          variant={order.has_pod ? "default" : "outline"} 
           className={cn(
             "text-xs",
-            order.hasPod ? "bg-success/20 text-success border-success/30" : "border-muted-foreground/30"
+            order.has_pod ? "bg-success/20 text-success border-success/30" : "border-muted-foreground/30"
           )}
         >
-          {order.hasPod && <CheckCircle className="w-3 h-3 mr-1" />}
+          {order.has_pod && <CheckCircle className="w-3 h-3 mr-1" />}
           POD
         </Badge>
       </div>
@@ -200,7 +208,7 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-border">
         <span className="text-lg font-bold text-foreground">
-          {formatCurrency(order.value)}
+          {formatCurrency(Number(order.value))}
         </span>
         {order.eta && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
