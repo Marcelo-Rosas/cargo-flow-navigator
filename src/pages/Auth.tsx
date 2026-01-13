@@ -1,35 +1,142 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { Package, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Package, Mail, Lock, Eye, EyeOff, ArrowRight, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { z } from 'zod';
+
+// Validation schemas
+const loginSchema = z.object({
+  email: z.string().email('E-mail inválido'),
+  password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
+});
+
+const signupSchema = z.object({
+  firstName: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
+  lastName: z.string().min(2, 'Sobrenome deve ter no mínimo 2 caracteres'),
+  email: z.string().email('E-mail inválido'),
+  password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
+});
 
 export default function Auth() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, loading, signIn, signUp } = useAuth();
+  
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Login form state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginErrors, setLoginErrors] = useState<{ email?: string; password?: string }>({});
+  
+  // Signup form state
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupErrors, setSignupErrors] = useState<{ firstName?: string; lastName?: string; email?: string; password?: string }>({});
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!loading && user) {
+      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+      navigate(from, { replace: true });
+    }
+  }, [user, loading, navigate, location]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginErrors({});
+    
+    // Validate
+    const result = loginSchema.safeParse({ email: loginEmail, password: loginPassword });
+    if (!result.success) {
+      const errors: { email?: string; password?: string } = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0] === 'email') errors.email = err.message;
+        if (err.path[0] === 'password') errors.password = err.message;
+      });
+      setLoginErrors(errors);
+      return;
+    }
+    
     setIsLoading(true);
-    // Simulate login
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const { error } = await signIn(loginEmail, loginPassword);
     setIsLoading(false);
-    navigate('/');
+    
+    if (error) {
+      if (error.message.includes('Invalid login credentials')) {
+        toast.error('E-mail ou senha incorretos');
+      } else if (error.message.includes('Email not confirmed')) {
+        toast.error('E-mail não confirmado. Verifique sua caixa de entrada.');
+      } else {
+        toast.error('Erro ao fazer login. Tente novamente.');
+      }
+      return;
+    }
+    
+    toast.success('Login realizado com sucesso!');
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSignupErrors({});
+    
+    // Validate
+    const result = signupSchema.safeParse({
+      firstName,
+      lastName,
+      email: signupEmail,
+      password: signupPassword,
+    });
+    
+    if (!result.success) {
+      const errors: { firstName?: string; lastName?: string; email?: string; password?: string } = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0] === 'firstName') errors.firstName = err.message;
+        if (err.path[0] === 'lastName') errors.lastName = err.message;
+        if (err.path[0] === 'email') errors.email = err.message;
+        if (err.path[0] === 'password') errors.password = err.message;
+      });
+      setSignupErrors(errors);
+      return;
+    }
+    
     setIsLoading(true);
-    // Simulate signup
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const fullName = `${firstName} ${lastName}`;
+    const { error } = await signUp(signupEmail, signupPassword, fullName);
     setIsLoading(false);
-    navigate('/');
+    
+    if (error) {
+      if (error.message.includes('User already registered')) {
+        toast.error('Este e-mail já está cadastrado. Tente fazer login.');
+      } else if (error.message.includes('Password')) {
+        toast.error('Senha muito fraca. Use letras, números e caracteres especiais.');
+      } else {
+        toast.error('Erro ao criar conta. Tente novamente.');
+      }
+      return;
+    }
+    
+    toast.success('Conta criada com sucesso! Você já está logado.');
   };
+
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -166,16 +273,21 @@ export default function Auth() {
                         id="email"
                         type="email"
                         placeholder="seu@email.com.br"
-                        className="pl-10"
+                        className={`pl-10 ${loginErrors.email ? 'border-destructive' : ''}`}
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
                         required
                       />
                     </div>
+                    {loginErrors.email && (
+                      <p className="text-sm text-destructive">{loginErrors.email}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="password">Senha</Label>
-                      <Button variant="link" className="p-0 h-auto text-sm">
+                      <Button variant="link" className="p-0 h-auto text-sm" type="button">
                         Esqueceu a senha?
                       </Button>
                     </div>
@@ -185,7 +297,9 @@ export default function Auth() {
                         id="password"
                         type={showPassword ? 'text' : 'password'}
                         placeholder="••••••••"
-                        className="pl-10 pr-10"
+                        className={`pl-10 pr-10 ${loginErrors.password ? 'border-destructive' : ''}`}
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
                         required
                       />
                       <Button
@@ -202,6 +316,9 @@ export default function Auth() {
                         )}
                       </Button>
                     </div>
+                    {loginErrors.password && (
+                      <p className="text-sm text-destructive">{loginErrors.password}</p>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -236,17 +353,35 @@ export default function Auth() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">Nome</Label>
-                      <Input id="firstName" placeholder="João" required />
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input 
+                          id="firstName" 
+                          placeholder="João" 
+                          className={`pl-10 ${signupErrors.firstName ? 'border-destructive' : ''}`}
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          required 
+                        />
+                      </div>
+                      {signupErrors.firstName && (
+                        <p className="text-sm text-destructive">{signupErrors.firstName}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Sobrenome</Label>
-                      <Input id="lastName" placeholder="Silva" required />
+                      <Input 
+                        id="lastName" 
+                        placeholder="Silva" 
+                        className={signupErrors.lastName ? 'border-destructive' : ''}
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        required 
+                      />
+                      {signupErrors.lastName && (
+                        <p className="text-sm text-destructive">{signupErrors.lastName}</p>
+                      )}
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="company">Empresa</Label>
-                    <Input id="company" placeholder="Transportadora ABC" required />
                   </div>
 
                   <div className="space-y-2">
@@ -257,10 +392,15 @@ export default function Auth() {
                         id="signupEmail"
                         type="email"
                         placeholder="seu@email.com.br"
-                        className="pl-10"
+                        className={`pl-10 ${signupErrors.email ? 'border-destructive' : ''}`}
+                        value={signupEmail}
+                        onChange={(e) => setSignupEmail(e.target.value)}
                         required
                       />
                     </div>
+                    {signupErrors.email && (
+                      <p className="text-sm text-destructive">{signupErrors.email}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -270,8 +410,10 @@ export default function Auth() {
                       <Input
                         id="signupPassword"
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Mínimo 8 caracteres"
-                        className="pl-10 pr-10"
+                        placeholder="Mínimo 6 caracteres"
+                        className={`pl-10 pr-10 ${signupErrors.password ? 'border-destructive' : ''}`}
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
                         required
                       />
                       <Button
@@ -288,17 +430,20 @@ export default function Auth() {
                         )}
                       </Button>
                     </div>
+                    {signupErrors.password && (
+                      <p className="text-sm text-destructive">{signupErrors.password}</p>
+                    )}
                   </div>
 
                   <div className="flex items-start gap-2">
                     <Checkbox id="terms" className="mt-0.5" required />
                     <Label htmlFor="terms" className="text-sm font-normal">
                       Concordo com os{' '}
-                      <Button variant="link" className="p-0 h-auto text-sm">
+                      <Button variant="link" className="p-0 h-auto text-sm" type="button">
                         Termos de Uso
                       </Button>{' '}
                       e{' '}
-                      <Button variant="link" className="p-0 h-auto text-sm">
+                      <Button variant="link" className="p-0 h-auto text-sm" type="button">
                         Política de Privacidade
                       </Button>
                     </Label>
