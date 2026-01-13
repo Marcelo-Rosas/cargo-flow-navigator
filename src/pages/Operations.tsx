@@ -21,6 +21,7 @@ import { useOrders, useUpdateOrderStage, OrderWithOccurrences } from '@/hooks/us
 import { useAuth } from '@/hooks/useAuth';
 import { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
+import { OrderForm } from '@/components/forms/OrderForm';
 
 type OrderStage = Database['public']['Enums']['order_stage'];
 
@@ -49,6 +50,7 @@ export default function Operations() {
   const [activeOrder, setActiveOrder] = useState<OrderWithOccurrences | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -208,7 +210,7 @@ export default function Operations() {
           <Button variant="outline" size="icon">
             <Filter className="w-4 h-4" />
           </Button>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
             <Plus className="w-4 h-4" />
             Nova OS
           </Button>
@@ -317,6 +319,9 @@ export default function Operations() {
           )}
         </>
       )}
+
+      {/* Order Form Modal */}
+      <OrderForm open={isFormOpen} onClose={() => setIsFormOpen(false)} />
     </MainLayout>
   );
 }

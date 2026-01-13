@@ -20,6 +20,8 @@ import { useQuotes, useUpdateQuoteStage } from '@/hooks/useQuotes';
 import { useAuth } from '@/hooks/useAuth';
 import { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
+import { QuoteForm } from '@/components/forms/QuoteForm';
+import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -40,6 +42,8 @@ export default function Commercial() {
   const updateStageMutation = useUpdateQuoteStage();
   const [activeQuote, setActiveQuote] = useState<Quote | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -96,6 +100,12 @@ export default function Commercial() {
     // Check if dropped on a column
     const targetStage = QUOTE_STAGES.find((s) => s.id === over.id);
     if (targetStage && targetStage.id !== activeQuote.stage) {
+      // If moving to "ganho", open convert modal
+      if (targetStage.id === 'ganho') {
+        setConvertingQuote(activeQuote);
+        return;
+      }
+      
       try {
         await updateStageMutation.mutateAsync({ 
           id: activeQuote.id, 
@@ -185,7 +195,7 @@ export default function Commercial() {
           <Button variant="outline" size="icon">
             <Filter className="w-4 h-4" />
           </Button>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
             <Plus className="w-4 h-4" />
             Nova Cotação
           </Button>
@@ -227,6 +237,16 @@ export default function Commercial() {
           </DragOverlay>
         </DndContext>
       )}
+
+      {/* Quote Form Modal */}
+      <QuoteForm open={isFormOpen} onClose={() => setIsFormOpen(false)} />
+      
+      {/* Convert Quote Modal */}
+      <ConvertQuoteModal 
+        open={!!convertingQuote} 
+        onClose={() => setConvertingQuote(null)} 
+        quote={convertingQuote}
+      />
     </MainLayout>
   );
 }
