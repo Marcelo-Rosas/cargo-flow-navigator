@@ -1,151 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Package, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAuth } from '@/hooks/useAuth';
-import { z } from 'zod';
-
-const emailSchema = z.string().email('E-mail inválido');
-const passwordSchema = z.string().min(8, 'A senha deve ter no mínimo 8 caracteres');
 
 export default function Auth() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { user, loading, signIn, signUp } = useAuth();
-  
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  
-  // Login form state
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  
-  // Signup form state
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [company, setCompany] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  const [termsAccepted, setTermsAccepted] = useState(false);
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (!loading && user) {
-      const from = (location.state as { from?: Location })?.from?.pathname || '/';
-      navigate(from, { replace: true });
-    }
-  }, [user, loading, navigate, location.state]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
-
-    // Validate inputs
-    const emailResult = emailSchema.safeParse(loginEmail);
-    if (!emailResult.success) {
-      setError(emailResult.error.errors[0].message);
-      return;
-    }
-
-    const passwordResult = passwordSchema.safeParse(loginPassword);
-    if (!passwordResult.success) {
-      setError(passwordResult.error.errors[0].message);
-      return;
-    }
-
     setIsLoading(true);
-    
-    const { error } = await signIn(loginEmail, loginPassword);
-    
-    if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        setError('E-mail ou senha incorretos');
-      } else if (error.message.includes('Email not confirmed')) {
-        setError('Por favor, confirme seu e-mail antes de entrar');
-      } else {
-        setError(error.message);
-      }
-      setIsLoading(false);
-      return;
-    }
-    
+    // Simulate login
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     setIsLoading(false);
+    navigate('/');
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
-
-    // Validate inputs
-    if (!firstName.trim() || !lastName.trim()) {
-      setError('Nome e sobrenome são obrigatórios');
-      return;
-    }
-
-    const emailResult = emailSchema.safeParse(signupEmail);
-    if (!emailResult.success) {
-      setError(emailResult.error.errors[0].message);
-      return;
-    }
-
-    const passwordResult = passwordSchema.safeParse(signupPassword);
-    if (!passwordResult.success) {
-      setError(passwordResult.error.errors[0].message);
-      return;
-    }
-
-    if (!termsAccepted) {
-      setError('Você precisa aceitar os termos de uso');
-      return;
-    }
-
     setIsLoading(true);
-    
-    const fullName = `${firstName.trim()} ${lastName.trim()}`;
-    const { error } = await signUp(signupEmail, signupPassword, fullName);
-    
-    if (error) {
-      if (error.message.includes('User already registered')) {
-        setError('Este e-mail já está cadastrado. Tente fazer login.');
-      } else if (error.message.includes('Password should be at least')) {
-        setError('A senha deve ter no mínimo 8 caracteres');
-      } else {
-        setError(error.message);
-      }
-      setIsLoading(false);
-      return;
-    }
-    
-    setSuccess('Conta criada! Verifique seu e-mail para confirmar o cadastro.');
+    // Simulate signup
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     setIsLoading(false);
-    
-    // Clear form
-    setFirstName('');
-    setLastName('');
-    setCompany('');
-    setSignupEmail('');
-    setSignupPassword('');
-    setTermsAccepted(false);
+    navigate('/');
   };
-
-  // Show loading while checking auth state
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex">
@@ -254,22 +138,7 @@ export default function Auth() {
             </div>
           </div>
 
-          {/* Error/Success Alerts */}
-          {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          {success && (
-            <Alert className="mb-6 border-green-500 bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200">
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>{success}</AlertDescription>
-            </Alert>
-          )}
-
-          <Tabs defaultValue="login" className="w-full" onValueChange={() => { setError(null); setSuccess(null); }}>
+          <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
               <TabsTrigger value="login">Entrar</TabsTrigger>
               <TabsTrigger value="signup">Cadastrar</TabsTrigger>
@@ -298,8 +167,6 @@ export default function Auth() {
                         type="email"
                         placeholder="seu@email.com.br"
                         className="pl-10"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
                         required
                       />
                     </div>
@@ -319,8 +186,6 @@ export default function Auth() {
                         type={showPassword ? 'text' : 'password'}
                         placeholder="••••••••"
                         className="pl-10 pr-10"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
                         required
                       />
                       <Button
@@ -371,34 +236,17 @@ export default function Auth() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">Nome</Label>
-                      <Input 
-                        id="firstName" 
-                        placeholder="João" 
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        required 
-                      />
+                      <Input id="firstName" placeholder="João" required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Sobrenome</Label>
-                      <Input 
-                        id="lastName" 
-                        placeholder="Silva" 
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        required 
-                      />
+                      <Input id="lastName" placeholder="Silva" required />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="company">Empresa</Label>
-                    <Input 
-                      id="company" 
-                      placeholder="Transportadora ABC" 
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                    />
+                    <Input id="company" placeholder="Transportadora ABC" required />
                   </div>
 
                   <div className="space-y-2">
@@ -410,8 +258,6 @@ export default function Auth() {
                         type="email"
                         placeholder="seu@email.com.br"
                         className="pl-10"
-                        value={signupEmail}
-                        onChange={(e) => setSignupEmail(e.target.value)}
                         required
                       />
                     </div>
@@ -426,8 +272,6 @@ export default function Auth() {
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Mínimo 8 caracteres"
                         className="pl-10 pr-10"
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
                         required
                       />
                       <Button
@@ -447,12 +291,7 @@ export default function Auth() {
                   </div>
 
                   <div className="flex items-start gap-2">
-                    <Checkbox 
-                      id="terms" 
-                      className="mt-0.5" 
-                      checked={termsAccepted}
-                      onCheckedChange={(checked) => setTermsAccepted(checked === true)}
-                    />
+                    <Checkbox id="terms" className="mt-0.5" required />
                     <Label htmlFor="terms" className="text-sm font-normal">
                       Concordo com os{' '}
                       <Button variant="link" className="p-0 h-auto text-sm">
