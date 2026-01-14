@@ -18,11 +18,11 @@ type Quote = Database['public']['Tables']['quotes']['Row'];
 
 interface QuoteCardProps {
   quote: Quote;
-  onClick?: () => void;
+  onEdit?: () => void;
   onConvert?: () => void;
 }
 
-export function QuoteCard({ quote, onClick, onConvert }: QuoteCardProps) {
+export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
   const {
     attributes,
     listeners,
@@ -65,7 +65,7 @@ export function QuoteCard({ quote, onClick, onConvert }: QuoteCardProps) {
         "hover:shadow-card-hover hover:border-primary/30 transition-all duration-200",
         isDragging && "opacity-90 rotate-2 scale-[1.02] shadow-lg z-50"
       )}
-      onClick={onClick}
+      onClick={onEdit}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">

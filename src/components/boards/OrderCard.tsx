@@ -33,10 +33,12 @@ interface OrderWithOccurrences extends Order {
 
 interface OrderCardProps {
   order: OrderWithOccurrences;
-  onClick?: () => void;
+  onEdit?: () => void;
+  onRegisterOccurrence?: () => void;
+  onUploadDocument?: () => void;
 }
 
-export function OrderCard({ order, onClick }: OrderCardProps) {
+export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocument }: OrderCardProps) {
   const {
     attributes,
     listeners,
@@ -84,7 +86,7 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
         hasOccurrences && "border-warning/50",
         needsPod && "border-destructive/50"
       )}
-      onClick={onClick}
+      onClick={onEdit}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
@@ -117,14 +119,22 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUploadDocument?.(); }}>
               <FileText className="w-4 h-4 mr-2" /> Anexar Documento
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Phone className="w-4 h-4 mr-2" /> Contatar Motorista
-            </DropdownMenuItem>
+            {order.driver_phone && (
+              <DropdownMenuItem asChild>
+                <a href={`tel:${order.driver_phone}`} onClick={(e) => e.stopPropagation()}>
+                  <Phone className="w-4 h-4 mr-2" /> Contatar Motorista
+                </a>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem 
+              className="text-warning"
+              onClick={(e) => { e.stopPropagation(); onRegisterOccurrence?.(); }}
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
               Registrar Ocorrência
             </DropdownMenuItem>
           </DropdownMenuContent>
