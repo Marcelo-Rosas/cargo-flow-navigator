@@ -22,6 +22,7 @@ import { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
+import { QuoteDetailModal } from '@/components/modals/QuoteDetailModal';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -44,6 +45,7 @@ export default function Commercial() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -226,7 +228,11 @@ export default function Commercial() {
                 items={quotesByStage[stage.id].map((q) => q.id)}
               >
                 {quotesByStage[stage.id].map((quote) => (
-                  <QuoteCard key={quote.id} quote={quote} />
+                  <QuoteCard 
+                    key={quote.id} 
+                    quote={quote} 
+                    onEdit={() => setSelectedQuote(quote)}
+                  />
                 ))}
               </KanbanColumn>
             ))}
@@ -240,6 +246,13 @@ export default function Commercial() {
 
       {/* Quote Form Modal */}
       <QuoteForm open={isFormOpen} onClose={() => setIsFormOpen(false)} />
+      
+      {/* Quote Detail Modal */}
+      <QuoteDetailModal 
+        open={!!selectedQuote} 
+        onClose={() => setSelectedQuote(null)} 
+        quote={selectedQuote}
+      />
       
       {/* Convert Quote Modal */}
       <ConvertQuoteModal 

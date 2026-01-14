@@ -22,6 +22,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 import { OrderForm } from '@/components/forms/OrderForm';
+import { OrderDetailModal } from '@/components/modals/OrderDetailModal';
+import { OccurrenceForm } from '@/components/forms/OccurrenceForm';
 
 type OrderStage = Database['public']['Enums']['order_stage'];
 
@@ -51,6 +53,8 @@ export default function Operations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithOccurrences | null>(null);
+  const [occurrenceOrder, setOccurrenceOrder] = useState<OrderWithOccurrences | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -243,7 +247,12 @@ export default function Operations() {
                     items={ordersByStage[stage.id].map((o) => o.id)}
                   >
                     {ordersByStage[stage.id].map((order) => (
-                      <OrderCard key={order.id} order={order} />
+                      <OrderCard 
+                        key={order.id} 
+                        order={order} 
+                        onEdit={() => setSelectedOrder(order)}
+                        onRegisterOccurrence={() => setOccurrenceOrder(order)}
+                      />
                     ))}
                   </KanbanColumn>
                 ))}
@@ -322,6 +331,23 @@ export default function Operations() {
 
       {/* Order Form Modal */}
       <OrderForm open={isFormOpen} onClose={() => setIsFormOpen(false)} />
+      
+      {/* Order Detail Modal */}
+      <OrderDetailModal 
+        open={!!selectedOrder} 
+        onClose={() => setSelectedOrder(null)} 
+        order={selectedOrder}
+      />
+      
+      {/* Occurrence Form */}
+      {occurrenceOrder && (
+        <OccurrenceForm
+          open={!!occurrenceOrder}
+          onClose={() => setOccurrenceOrder(null)}
+          orderId={occurrenceOrder.id}
+          osNumber={occurrenceOrder.os_number}
+        />
+      )}
     </MainLayout>
   );
 }

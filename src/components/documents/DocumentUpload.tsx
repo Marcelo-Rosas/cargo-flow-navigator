@@ -1,0 +1,261 @@
+import { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { Upload, X, FileText, Loader2, CheckCircle2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+import { useCreateDocument } from '@/hooks/useDocuments';
+import { useUpdateOrder } from '@/hooks/useOrders';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { Database } from '@/integrations/supabase/types';
+import { cn } from '@/lib/utils';
+
+type DocumentType = Database['public']['Enums']['document_type'];
+
+interface DocumentUploadProps {
+  orderId?: string;
+  quoteId?: string;
+  onSuccess?: () => void;
+}
+
+interface UploadingFile {
+  file: File;
+  progress: number;
+  status: 'uploading' | 'success' | 'error';
+  type: DocumentType;
+}
+
+const DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
+  { value: 'nfe', label: 'NF-e' },
+  { value: 'cte', label: 'CT-e' },
+  { value: 'pod', label: 'POD (Comprovante de Entrega)' },
+  { value: 'outros', label: 'Outros' },
+];
+
+export function DocumentUpload({ orderId, quoteId, onSuccess }: DocumentUploadProps) {
+  const { user } = useAuth();
+  const createDocumentMutation = useCreateDocument();
+  const updateOrderMutation = useUpdateOrder();
+  const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
+  const [selectedType, setSelectedType] = useState<DocumentType>('outros');
+
+  const uploadFile = async (file: File, type: DocumentType) => {
+    if (!user) {
+      toast.error('Você precisa estar logado para enviar documentos');
+      return;
+    }
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    // Update progress
+    setUploadingFiles(prev => 
+      prev.map(f => 
+        f.file === file ? { ...f, progress: 30 } : f
+      )
+    );
+
+    // Upload to storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      setUploadingFiles(prev => 
+        prev.map(f => 
+          f.file === file ? { ...f, status: 'error' } : f
+        )
+      );
+      throw uploadError;
+    }
+
+    setUploadingFiles(prev => 
+      prev.map(f => 
+        f.file === file ? { ...f, progress: 70 } : f
+      )
+    );
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('documents')
+      .getPublicUrl(uploadData.path);
+
+    // Create document record
+    await createDocumentMutation.mutateAsync({
+      file_name: file.name,
+      file_url: urlData.publicUrl,
+      file_size: file.size,
+      type,
+      order_id: orderId || null,
+      quote_id: quoteId || null,
+      uploaded_by: user.id,
+    });
+
+    // Update order document flags if applicable
+    if (orderId && (type === 'nfe' || type === 'cte' || type === 'pod')) {
+      const updateField = type === 'nfe' ? 'has_nfe' : type === 'cte' ? 'has_cte' : 'has_pod';
+      await updateOrderMutation.mutateAsync({
+        id: orderId,
+        updates: { [updateField]: true },
+      });
+    }
+
+    setUploadingFiles(prev => 
+      prev.map(f => 
+        f.file === file ? { ...f, progress: 100, status: 'success' } : f
+      )
+    );
+  };
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const newFiles: UploadingFile[] = acceptedFiles.map(file => ({
+      file,
+      progress: 0,
+      status: 'uploading' as const,
+      type: selectedType,
+    }));
+
+    setUploadingFiles(prev => [...prev, ...newFiles]);
+
+    for (const uploadingFile of newFiles) {
+      try {
+        await uploadFile(uploadingFile.file, uploadingFile.type);
+        toast.success(`${uploadingFile.file.name} enviado com sucesso`);
+      } catch (error) {
+        toast.error(`Erro ao enviar ${uploadingFile.file.name}`);
+      }
+    }
+
+    onSuccess?.();
+  }, [selectedType, orderId, quoteId, user]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'image/webp': ['.webp'],
+      'application/xml': ['.xml'],
+      'text/xml': ['.xml'],
+    },
+    maxSize: 52428800, // 50MB
+  });
+
+  const removeFile = (file: File) => {
+    setUploadingFiles(prev => prev.filter(f => f.file !== file));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Document Type Selector */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-medium text-foreground">Tipo de documento:</span>
+        <Select value={selectedType} onValueChange={(v) => setSelectedType(v as DocumentType)}>
+          <SelectTrigger className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {DOCUMENT_TYPES.map(type => (
+              <SelectItem key={type.value} value={type.value}>
+                {type.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Dropzone */}
+      <div
+        {...getRootProps()}
+        className={cn(
+          "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
+          isDragActive 
+            ? "border-primary bg-primary/5" 
+            : "border-border hover:border-primary/50 hover:bg-muted/30"
+        )}
+      >
+        <input {...getInputProps()} />
+        <Upload className={cn(
+          "w-10 h-10 mx-auto mb-3 transition-colors",
+          isDragActive ? "text-primary" : "text-muted-foreground"
+        )} />
+        <p className="text-foreground font-medium mb-1">
+          {isDragActive ? 'Solte os arquivos aqui' : 'Arraste arquivos ou clique para selecionar'}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          PDF, imagens (JPG, PNG, WebP) ou XML • Máximo 50MB
+        </p>
+      </div>
+
+      {/* Upload Progress */}
+      {uploadingFiles.length > 0 && (
+        <div className="space-y-2">
+          {uploadingFiles.map((uploadingFile, index) => (
+            <div 
+              key={index}
+              className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border"
+            >
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {uploadingFile.file.name}
+                  </p>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {formatFileSize(uploadingFile.file.size)}
+                  </span>
+                </div>
+                {uploadingFile.status === 'uploading' && (
+                  <Progress value={uploadingFile.progress} className="h-1.5" />
+                )}
+                {uploadingFile.status === 'success' && (
+                  <div className="flex items-center gap-1 text-success text-xs">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Enviado com sucesso
+                  </div>
+                )}
+                {uploadingFile.status === 'error' && (
+                  <div className="flex items-center gap-1 text-destructive text-xs">
+                    Erro ao enviar
+                  </div>
+                )}
+              </div>
+              {uploadingFile.status === 'uploading' ? (
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => removeFile(uploadingFile.file)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
