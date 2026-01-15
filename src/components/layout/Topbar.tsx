@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Bell, Plus, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +10,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { useGlobalSearch } from '@/hooks/useGlobalSearch';
+import { GlobalSearchDialog } from '@/components/layout/GlobalSearchDialog';
+import { useAuth } from '@/hooks/useAuth';
 
 interface TopbarProps {
   onNewQuote?: () => void;
@@ -19,27 +20,29 @@ interface TopbarProps {
 }
 
 export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
-  const [searchFocused, setSearchFocused] = useState(false);
+  const { setIsOpen } = useGlobalSearch();
+  const { user, signOut } = useAuth();
 
   return (
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
-      {/* Search */}
-      <motion.div 
+      {/* Global Search Dialog */}
+      <GlobalSearchDialog />
+      
+      {/* Search Trigger */}
+      <motion.button 
         className="relative flex-1 max-w-md"
-        animate={{ scale: searchFocused ? 1.02 : 1 }}
-        transition={{ duration: 0.15 }}
+        onClick={() => setIsOpen(true)}
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
       >
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar cotações, OS, clientes..."
-          className="pl-10 bg-background"
-          onFocus={() => setSearchFocused(true)}
-          onBlur={() => setSearchFocused(false)}
-        />
-        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-          ⌘K
-        </kbd>
-      </motion.div>
+        <div className="flex items-center w-full h-10 px-3 text-sm bg-background border border-input rounded-md text-muted-foreground hover:bg-accent transition-colors">
+          <Search className="w-4 h-4 mr-2" />
+          <span>Buscar cotações, OS, clientes...</span>
+          <kbd className="ml-auto text-xs bg-muted px-1.5 py-0.5 rounded">
+            ⌘K
+          </kbd>
+        </div>
+      </motion.button>
 
       {/* Actions */}
       <div className="flex items-center gap-3">
@@ -118,9 +121,9 @@ export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col">
-                <span>Admin Vectra</span>
+                <span>{user?.email?.split('@')[0] || 'Usuário'}</span>
                 <span className="text-sm font-normal text-muted-foreground">
-                  admin@vectra.com.br
+                  {user?.email || ''}
                 </span>
               </div>
             </DropdownMenuLabel>
@@ -128,7 +131,10 @@ export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
             <DropdownMenuItem>Meu Perfil</DropdownMenuItem>
             <DropdownMenuItem>Configurações</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem 
+              className="text-destructive"
+              onClick={() => signOut()}
+            >
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>

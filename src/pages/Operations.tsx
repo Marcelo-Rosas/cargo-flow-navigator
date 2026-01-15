@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOrders, useUpdateOrderStage, OrderWithOccurrences } from '@/hooks/useOrders';
 import { useAuth } from '@/hooks/useAuth';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 import { OrderForm } from '@/components/forms/OrderForm';
@@ -55,6 +56,9 @@ export default function Operations() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderWithOccurrences | null>(null);
   const [occurrenceOrder, setOccurrenceOrder] = useState<OrderWithOccurrences | null>(null);
+
+  // Enable realtime updates
+  useRealtimeSubscription(['orders', 'occurrences']);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

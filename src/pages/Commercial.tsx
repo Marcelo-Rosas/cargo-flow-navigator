@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useQuotes, useUpdateQuoteStage } from '@/hooks/useQuotes';
 import { useAuth } from '@/hooks/useAuth';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 import { QuoteForm } from '@/components/forms/QuoteForm';
@@ -46,6 +47,9 @@ export default function Commercial() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+
+  // Enable realtime updates
+  useRealtimeSubscription(['quotes']);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
