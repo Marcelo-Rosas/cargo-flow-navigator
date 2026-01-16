@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { ClientForm } from '@/components/forms/ClientForm';
 import { Database } from '@/integrations/supabase/types';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,12 +26,16 @@ type Client = Database['public']['Tables']['clients']['Row'];
 export default function Clients() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: clients, isLoading } = useClients(searchTerm);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  
+  // Only fetch when user is authenticated
+  const { data: clients, isLoading } = useClients(debouncedSearchTerm, { enabled: !!user });
   const deleteClientMutation = useDeleteClient();
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleEdit = (client: Client) => {
     setEditingClient(client);
@@ -38,14 +43,18 @@ export default function Clients() {
   };
 
   const handleDelete = async () => {
-    if (!deletingClient) return;
+    if (!deletingClient || isDeleting) return;
     
+    setIsDeleting(true);
     try {
       await deleteClientMutation.mutateAsync(deletingClient.id);
       toast.success('Cliente excluído com sucesso');
       setDeletingClient(null);
     } catch (error) {
       toast.error('Erro ao excluir cliente');
+      // Keep dialog open on error so user can retry
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -224,7 +233,12 @@ export default function Clients() {
       />
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deletingClient} onOpenChange={() => setDeletingClient(null)}>
+      <AlertDialog 
+        open={!!deletingClient} 
+        onOpenChange={(open) => { 
+          if (!open && !isDeleting) setDeletingClient(null); 
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir cliente?</AlertDialogTitle>
@@ -233,12 +247,23 @@ export default function Clients() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleDelete}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                'Excluir'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

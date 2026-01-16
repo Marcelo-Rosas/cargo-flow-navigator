@@ -6,7 +6,13 @@ type Client = Database['public']['Tables']['clients']['Row'];
 type ClientInsert = Database['public']['Tables']['clients']['Insert'];
 type ClientUpdate = Database['public']['Tables']['clients']['Update'];
 
-export function useClients(searchTerm?: string) {
+interface UseClientsOptions {
+  enabled?: boolean;
+}
+
+export function useClients(searchTerm?: string, options: UseClientsOptions = {}) {
+  const { enabled = true } = options;
+
   return useQuery({
     queryKey: ['clients', searchTerm],
     queryFn: async () => {
@@ -24,6 +30,7 @@ export function useClients(searchTerm?: string) {
       if (error) throw error;
       return data as Client[];
     },
+    enabled,
   });
 }
 
