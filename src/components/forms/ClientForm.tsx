@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -51,6 +51,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
   const createClientMutation = useCreateClient();
   const updateClientMutation = useUpdateClient();
   const isEditing = !!client;
+  const [isLookingUp, setIsLookingUp] = useState(false);
 
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
@@ -91,6 +92,54 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
       });
     }
   }, [client, form]);
+
+  // CNPJ auto-lookup functions
+  const sanitizeCnpj = (v: string) => v.replace(/\D/g, '');
+
+  const safeSet = (key: keyof ClientFormData, value?: string | null) => {
+    if (!value) return;
+    const current = form.getValues(key);
+    if (current && current.trim().length > 0) return; // não sobrescreve se usuário já preencheu
+    form.setValue(key, value, { shouldValidate: true, shouldDirty: true });
+  };
+
+  const handleCnpjLookup = async () => {
+    const raw = form.getValues('cnpj') || '';
+    const cnpj = sanitizeCnpj(raw);
+    if (cnpj.length !== 14) return;
+
+    setIsLookingUp(true);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      if (!res.ok) {
+        setIsLookingUp(false);
+        return;
+      }
+      const data: any = await res.json();
+
+      // Mapeamento "tolerante" a variações de chave
+      safeSet('name', data.razao_social || data.nome_fantasia || data.name);
+      safeSet('email', data.email || data.email_contato);
+      safeSet('phone', data.ddd_telefone_1 || data.telefone || data.phone);
+
+      const street = data.logradouro || data.endereco || data.street;
+      const number = data.numero || data.number;
+      const district = data.bairro || data.distrito || data.neighborhood;
+      const composedAddress = [street, number, district].filter(Boolean).join(', ');
+      safeSet('address', composedAddress);
+
+      safeSet('city', data.municipio || data.cidade || data.city);
+
+      const uf = (data.uf || data.estado || data.state || '').toString().toUpperCase();
+      safeSet('state', uf?.slice(0, 2));
+
+      toast.success('Dados preenchidos automaticamente pelo CNPJ');
+    } catch {
+      // Silently fail - API might be unavailable
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
 
   const onSubmit = async (data: ClientFormData) => {
     if (!user) {
@@ -166,7 +215,27 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                 <FormItem>
                   <FormLabel>CNPJ</FormLabel>
                   <FormControl>
-                    <Input placeholder="00.000.000/0000-00" {...field} />
+                    <div className="relative">
+                      <Input
+                        placeholder="00.000.000/0000-00"
+                        {...field}
+                        onBlur={async (e) => {
+                          field.onBlur();
+                          await handleCnpjLookup();
+                        }}
+                        className="pr-10"
+                      />
+                      {isLookingUp && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+                      {!isLookingUp && field.value && sanitizeCnpj(field.value).length === 14 && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Search className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
