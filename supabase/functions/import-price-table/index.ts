@@ -85,6 +85,84 @@ function validateRow(row: PriceTableRowInput, index: number): string[] {
   return errors;
 }
 
+interface RangeWithIndex {
+  km_from: number;
+  km_to: number;
+  index: number;
+}
+
+function detectDuplicateRanges(rows: PriceTableRowInput[]): string[] {
+  const errors: string[] = [];
+  const seen = new Map<string, number[]>();
+  
+  rows.forEach((row, index) => {
+    if (row.km_from === undefined || row.km_to === undefined) return;
+    const key = `${row.km_from}-${row.km_to}`;
+    if (!seen.has(key)) {
+      seen.set(key, []);
+    }
+    seen.get(key)!.push(index + 1); // 1-indexed for user display
+  });
+  
+  for (const [key, indices] of seen.entries()) {
+    if (indices.length > 1) {
+      const [kmFrom, kmTo] = key.split('-');
+      errors.push(`Faixa duplicada km_from=${kmFrom} km_to=${kmTo} (linhas ${indices.join(', ')})`);
+    }
+  }
+  
+  return errors;
+}
+
+function detectOverlappingRanges(rows: PriceTableRowInput[]): string[] {
+  const errors: string[] = [];
+  
+  // Filter valid rows and add original index
+  const validRanges: RangeWithIndex[] = rows
+    .map((row, index) => ({
+      km_from: row.km_from,
+      km_to: row.km_to,
+      index: index + 1 // 1-indexed for user display
+    }))
+    .filter(r => r.km_from !== undefined && r.km_to !== undefined && r.km_to >= r.km_from);
+  
+  if (validRanges.length < 2) return errors;
+  
+  // Sort by km_from, then by km_to
+  validRanges.sort((a, b) => {
+    if (a.km_from !== b.km_from) return a.km_from - b.km_from;
+    return a.km_to - b.km_to;
+  });
+  
+  // Check for overlaps (after deduplication check, so we only look at distinct ranges)
+  // Two ranges overlap if: prev.km_to >= next.km_from (for inclusive ranges)
+  // But we want gaps, so valid means: next.km_from > prev.km_to (no overlap)
+  // Overlap exists when: next.km_from <= prev.km_to
+  
+  // First deduplicate for overlap check (same range is a duplicate, not overlap)
+  const uniqueRanges: RangeWithIndex[] = [];
+  const seenKeys = new Set<string>();
+  for (const range of validRanges) {
+    const key = `${range.km_from}-${range.km_to}`;
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      uniqueRanges.push(range);
+    }
+  }
+  
+  for (let i = 1; i < uniqueRanges.length; i++) {
+    const prev = uniqueRanges[i - 1];
+    const curr = uniqueRanges[i];
+    
+    // Overlap if current starts before or at previous end
+    if (curr.km_from <= prev.km_to) {
+      errors.push(`Faixas sobrepostas: ${prev.km_from}-${prev.km_to} (linha ${prev.index}) e ${curr.km_from}-${curr.km_to} (linha ${curr.index})`);
+    }
+  }
+  
+  return errors;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -167,7 +245,7 @@ serve(async (req) => {
     } else if (rows.length === 0) {
       errors.push('rows não pode estar vazio');
     } else {
-      // Validate each row
+      // Validate each row individually
       rows.forEach((row, index) => {
         const rowErrors = validateRow(row, index);
         errors.push(...rowErrors);
@@ -178,8 +256,9 @@ serve(async (req) => {
       errors.push('importMode deve ser "replace" ou "upsert"');
     }
 
+    // Return early if basic validation fails
     if (errors.length > 0) {
-      console.error('[import-price-table] Validation errors:', errors);
+      console.error('[import-price-table] Basic validation errors:', errors);
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -187,6 +266,30 @@ serve(async (req) => {
           rowsInserted: 0, 
           rowsUpdated: 0, 
           errors 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // GLOBAL VALIDATIONS: Check for duplicates and overlaps BEFORE any DB changes
+    const duplicateErrors = detectDuplicateRanges(rows);
+    const overlapErrors = detectOverlappingRanges(rows);
+    
+    const duplicateCount = duplicateErrors.length;
+    const overlapCount = overlapErrors.length;
+    
+    console.log(`[import-price-table] Global validation: ${rows.length} linhas, ${duplicateCount} duplicatas, ${overlapCount} sobreposições`);
+    
+    if (duplicateCount > 0 || overlapCount > 0) {
+      const globalErrors = [...duplicateErrors, ...overlapErrors];
+      console.error('[import-price-table] Global validation errors:', globalErrors);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          rowsTotal: rows.length, 
+          rowsInserted: 0, 
+          rowsUpdated: 0, 
+          errors: globalErrors
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
