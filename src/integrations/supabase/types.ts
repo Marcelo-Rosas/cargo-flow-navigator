@@ -253,6 +253,42 @@ export type Database = {
           },
         ]
       }
+      icms_rates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          destination_state: string
+          id: string
+          origin_state: string
+          rate_percent: number
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          destination_state: string
+          id?: string
+          origin_state: string
+          rate_percent: number
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          destination_state?: string
+          id?: string
+          origin_state?: string
+          rate_percent?: number
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       occurrences: {
         Row: {
           created_at: string
@@ -454,6 +490,98 @@ export type Database = {
         }
         Relationships: []
       }
+      price_table_rows: {
+        Row: {
+          ad_valorem_percent: number | null
+          cost_per_kg: number | null
+          cost_per_ton: number | null
+          cost_value_percent: number | null
+          created_at: string
+          gris_percent: number | null
+          id: string
+          km_from: number
+          km_to: number
+          price_table_id: string
+          toll_percent: number | null
+          tso_percent: number | null
+        }
+        Insert: {
+          ad_valorem_percent?: number | null
+          cost_per_kg?: number | null
+          cost_per_ton?: number | null
+          cost_value_percent?: number | null
+          created_at?: string
+          gris_percent?: number | null
+          id?: string
+          km_from: number
+          km_to: number
+          price_table_id: string
+          toll_percent?: number | null
+          tso_percent?: number | null
+        }
+        Update: {
+          ad_valorem_percent?: number | null
+          cost_per_kg?: number | null
+          cost_per_ton?: number | null
+          cost_value_percent?: number | null
+          created_at?: string
+          gris_percent?: number | null
+          id?: string
+          km_from?: number
+          km_to?: number
+          price_table_id?: string
+          toll_percent?: number | null
+          tso_percent?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_table_rows_price_table_id_fkey"
+            columns: ["price_table_id"]
+            isOneToOne: false
+            referencedRelation: "price_tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      price_tables: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          modality: string
+          name: string
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+          version: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          modality: string
+          name: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          version?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          modality?: string
+          name?: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          version?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -491,6 +619,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           cargo_type: string | null
+          cargo_value: number | null
           client_email: string | null
           client_id: string | null
           client_name: string
@@ -498,11 +627,15 @@ export type Database = {
           created_by: string
           destination: string
           destination_cep: string | null
+          freight_modality: string | null
           freight_type: string
           id: string
+          km_distance: number | null
           notes: string | null
           origin: string
           origin_cep: string | null
+          price_table_id: string | null
+          pricing_breakdown: Json | null
           shipper_email: string | null
           shipper_id: string | null
           shipper_name: string | null
@@ -517,6 +650,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           cargo_type?: string | null
+          cargo_value?: number | null
           client_email?: string | null
           client_id?: string | null
           client_name: string
@@ -524,11 +658,15 @@ export type Database = {
           created_by: string
           destination: string
           destination_cep?: string | null
+          freight_modality?: string | null
           freight_type?: string
           id?: string
+          km_distance?: number | null
           notes?: string | null
           origin: string
           origin_cep?: string | null
+          price_table_id?: string | null
+          pricing_breakdown?: Json | null
           shipper_email?: string | null
           shipper_id?: string | null
           shipper_name?: string | null
@@ -543,6 +681,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           cargo_type?: string | null
+          cargo_value?: number | null
           client_email?: string | null
           client_id?: string | null
           client_name?: string
@@ -550,11 +689,15 @@ export type Database = {
           created_by?: string
           destination?: string
           destination_cep?: string | null
+          freight_modality?: string | null
           freight_type?: string
           id?: string
+          km_distance?: number | null
           notes?: string | null
           origin?: string
           origin_cep?: string | null
+          price_table_id?: string | null
+          pricing_breakdown?: Json | null
           shipper_email?: string | null
           shipper_id?: string | null
           shipper_name?: string | null
@@ -572,6 +715,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_price_table_id_fkey"
+            columns: ["price_table_id"]
+            isOneToOne: false
+            referencedRelation: "price_tables"
             referencedColumns: ["id"]
           },
           {
