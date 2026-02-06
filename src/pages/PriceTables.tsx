@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,12 +24,16 @@ import {
   useIcmsRates, 
   useCreateIcmsRate, 
   useUpdateIcmsRate, 
-  useDeleteIcmsRate 
+  useDeleteIcmsRate,
+  useUpsertIcmsRates
 } from '@/hooks/useIcmsRates';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Check, Loader2, TableIcon, Activity, Receipt } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, Loader2, TableIcon, Activity, Receipt, Upload, FileSpreadsheet } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { PriceTableImportModal } from '@/components/pricing/PriceTableImportModal';
+import { parseIcmsFile, ParsedIcmsRow } from '@/lib/priceTableParser';
+import { cn } from '@/lib/utils';
 
 const BRAZILIAN_STATES = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 
@@ -89,8 +94,9 @@ function PriceTablesTab() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<any>(null);
   const [filterModality, setFilterModality] = useState<string>('all');
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
-  const filteredTables = tables?.filter(t => 
+  const filteredTables = tables?.filter(t =>
     filterModality === 'all' || t.modality === filterModality
   ) || [];
 
@@ -166,6 +172,11 @@ function PriceTablesTab() {
               <SelectItem value="fracionado">Fracionado</SelectItem>
             </SelectContent>
           </Select>
+
+          <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Importar Faixas
+          </Button>
 
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
@@ -288,6 +299,13 @@ function PriceTablesTab() {
           </Table>
         )}
       </CardContent>
+
+      {/* Import Modal */}
+      <PriceTableImportModal
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        defaultModality={filterModality !== 'all' ? filterModality as 'lotacao' | 'fracionado' : 'lotacao'}
+      />
     </Card>
   );
 }
@@ -463,10 +481,14 @@ function IcmsRatesTab() {
   const createRate = useCreateIcmsRate();
   const updateRate = useUpdateIcmsRate();
   const deleteRate = useDeleteIcmsRate();
+  const upsertRates = useUpsertIcmsRates();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingRate, setEditingRate] = useState<any>(null);
   const [filterOrigin, setFilterOrigin] = useState<string>('all');
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importParsedRows, setImportParsedRows] = useState<ParsedIcmsRow[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
 
   const filteredRates = rates?.filter(r => 
     filterOrigin === 'all' || r.origin_state === filterOrigin
@@ -505,6 +527,55 @@ function IcmsRatesTab() {
     }
   };
 
+  const onDropIcms = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    try {
+      const result = await parseIcmsFile(file);
+      if (result.rows.length === 0) {
+        toast.error('Nenhuma linha válida encontrada');
+        return;
+      }
+      setImportParsedRows(result.rows);
+      if (result.invalidRows > 0) {
+        toast.warning(`${result.invalidRows} linha(s) inválida(s) serão ignoradas`);
+      }
+    } catch (error) {
+      toast.error('Erro ao processar arquivo');
+    }
+  }, []);
+
+  const { getRootProps: getIcmsRootProps, getInputProps: getIcmsInputProps, isDragActive: isIcmsDragActive } = useDropzone({
+    onDrop: onDropIcms,
+    accept: { 'text/csv': ['.csv'] },
+    maxFiles: 1,
+  });
+
+  const handleImportIcms = async () => {
+    const validRows = importParsedRows.filter(r => r.isValid);
+    if (validRows.length === 0) {
+      toast.error('Nenhuma linha válida para importar');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      await upsertRates.mutateAsync(validRows.map(r => ({
+        origin_state: r.origin_state,
+        destination_state: r.destination_state,
+        rate_percent: r.rate_percent,
+      })));
+      toast.success(`${validRows.length} alíquota(s) importada(s)`);
+      setIsImportOpen(false);
+      setImportParsedRows([]);
+    } catch (error) {
+      toast.error('Erro ao importar alíquotas');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -532,6 +603,101 @@ function IcmsRatesTab() {
               ))}
             </SelectContent>
           </Select>
+
+          <Dialog open={isImportOpen} onOpenChange={(open) => {
+            setIsImportOpen(open);
+            if (!open) setImportParsedRows([]);
+          }}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="h-4 w-4 mr-2" />
+                Importar CSV
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-5 w-5" />
+                  Importar Alíquotas ICMS
+                </DialogTitle>
+                <DialogDescription>
+                  Faça upload de um arquivo CSV com colunas: uf_origem, uf_destino, aliquota
+                </DialogDescription>
+              </DialogHeader>
+              
+              {importParsedRows.length === 0 ? (
+                <div
+                  {...getIcmsRootProps()}
+                  className={cn(
+                    "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
+                    isIcmsDragActive 
+                      ? "border-primary bg-primary/5" 
+                      : "border-border hover:border-primary/50"
+                  )}
+                >
+                  <input {...getIcmsInputProps()} />
+                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-foreground">
+                    {isIcmsDragActive ? 'Solte aqui' : 'Arraste ou clique para selecionar'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">CSV com separador ;</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="default">{importParsedRows.length} linhas</Badge>
+                    <Badge variant="secondary">
+                      {importParsedRows.filter(r => r.isValid).length} válidas
+                    </Badge>
+                    {importParsedRows.filter(r => !r.isValid).length > 0 && (
+                      <Badge variant="destructive">
+                        {importParsedRows.filter(r => !r.isValid).length} inválidas
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="max-h-48 overflow-auto border rounded text-sm">
+                    <table className="w-full">
+                      <thead className="bg-muted sticky top-0">
+                        <tr>
+                          <th className="p-2 text-left">Origem</th>
+                          <th className="p-2 text-left">Destino</th>
+                          <th className="p-2 text-left">%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importParsedRows.slice(0, 20).map((row, idx) => (
+                          <tr key={idx} className={cn(!row.isValid && "bg-destructive/10")}>
+                            <td className="p-2">{row.origin_state}</td>
+                            <td className="p-2">{row.destination_state}</td>
+                            <td className="p-2">{row.rate_percent}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {importParsedRows.length > 20 && (
+                      <p className="p-2 text-center text-muted-foreground bg-muted">
+                        +{importParsedRows.length - 20} linhas
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter>
+                {importParsedRows.length > 0 && (
+                  <>
+                    <Button variant="outline" onClick={() => setImportParsedRows([])}>
+                      Limpar
+                    </Button>
+                    <Button onClick={handleImportIcms} disabled={isImporting}>
+                      {isImporting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Importar {importParsedRows.filter(r => r.isValid).length} alíquotas
+                    </Button>
+                  </>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
