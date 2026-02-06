@@ -366,6 +366,20 @@ serve(async (req) => {
       // Upsert mode
       console.log('[import-price-table] Upsert mode: checking existing rows');
 
+      // IMPORTANT: Deduplicate rows by km_from/km_to to avoid "ON CONFLICT DO UPDATE cannot affect row a second time" error
+      // Keep the last occurrence of each duplicate key
+      const deduplicatedRowsMap = new Map<string, PriceTableRowInput>();
+      for (const row of rows) {
+        const key = `${row.km_from}-${row.km_to}`;
+        deduplicatedRowsMap.set(key, row);
+      }
+      const deduplicatedRows = Array.from(deduplicatedRowsMap.values());
+      
+      const duplicatesRemoved = rows.length - deduplicatedRows.length;
+      if (duplicatesRemoved > 0) {
+        console.log(`[import-price-table] Removed ${duplicatesRemoved} duplicate rows from input`);
+      }
+
       // Get existing row keys to calculate counts
       const { data: existingRows, error: fetchError } = await supabase
         .from('price_table_rows')
@@ -382,18 +396,24 @@ serve(async (req) => {
         (existingRows || []).map(r => `${r.km_from}-${r.km_to}`)
       );
 
-      // Count how many incoming rows match existing keys
-      const matchingKeys = rows.filter(r => 
+      // Count how many incoming rows match existing keys (using deduplicated rows)
+      const matchingKeys = deduplicatedRows.filter(r => 
         existingKeys.has(`${r.km_from}-${r.km_to}`)
       ).length;
 
       rowsUpdated = matchingKeys;
-      rowsInserted = rowsTotal - matchingKeys;
+      rowsInserted = deduplicatedRows.length - matchingKeys;
 
-      console.log('[import-price-table] Upsert counts:', { rowsUpdated, rowsInserted, existingCount: existingKeys.size });
+      console.log('[import-price-table] Upsert counts:', { 
+        rowsUpdated, 
+        rowsInserted, 
+        existingCount: existingKeys.size,
+        originalRows: rows.length,
+        deduplicatedRows: deduplicatedRows.length
+      });
 
-      // Upsert all rows
-      const rowsToUpsert = rows.map(row => ({
+      // Upsert deduplicated rows
+      const rowsToUpsert = deduplicatedRows.map(row => ({
         price_table_id: priceTableId,
         km_from: row.km_from,
         km_to: row.km_to,
