@@ -1,0 +1,734 @@
+import { useState } from 'react';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { 
+  usePriceTables, 
+  useCreatePriceTable, 
+  useUpdatePriceTable, 
+  useDeletePriceTable,
+  useSetActivePriceTable,
+  useActivePriceTable
+} from '@/hooks/usePriceTables';
+import { usePriceTableRows } from '@/hooks/usePriceTableRows';
+import { 
+  useIcmsRates, 
+  useCreateIcmsRate, 
+  useUpdateIcmsRate, 
+  useDeleteIcmsRate 
+} from '@/hooks/useIcmsRates';
+import { toast } from 'sonner';
+import { Plus, Pencil, Trash2, Check, Loader2, TableIcon, Activity, Receipt } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+const BRAZILIAN_STATES = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 
+  'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 
+  'SP', 'SE', 'TO'
+];
+
+export default function PriceTables() {
+  return (
+    <MainLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Tabelas de Preço</h1>
+          <p className="text-muted-foreground">Gerencie tabelas de preço, vigências e alíquotas de ICMS</p>
+        </div>
+
+        <Tabs defaultValue="tabelas" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="tabelas" className="gap-2">
+              <TableIcon className="h-4 w-4" />
+              Tabelas
+            </TabsTrigger>
+            <TabsTrigger value="vigentes" className="gap-2">
+              <Activity className="h-4 w-4" />
+              Vigentes
+            </TabsTrigger>
+            <TabsTrigger value="icms" className="gap-2">
+              <Receipt className="h-4 w-4" />
+              ICMS
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tabelas">
+            <PriceTablesTab />
+          </TabsContent>
+
+          <TabsContent value="vigentes">
+            <ActiveTablesTab />
+          </TabsContent>
+
+          <TabsContent value="icms">
+            <IcmsRatesTab />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </MainLayout>
+  );
+}
+
+// ======================== TABELAS TAB ========================
+function PriceTablesTab() {
+  const { data: tables, isLoading } = usePriceTables();
+  const createTable = useCreatePriceTable();
+  const updateTable = useUpdatePriceTable();
+  const deleteTable = useDeletePriceTable();
+  const setActive = useSetActivePriceTable();
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingTable, setEditingTable] = useState<any>(null);
+  const [filterModality, setFilterModality] = useState<string>('all');
+
+  const filteredTables = tables?.filter(t => 
+    filterModality === 'all' || t.modality === filterModality
+  ) || [];
+
+  const handleCreate = async (data: { name: string; modality: string }) => {
+    try {
+      await createTable.mutateAsync({
+        name: data.name,
+        modality: data.modality,
+        active: false,
+        version: 1,
+      });
+      toast.success('Tabela criada com sucesso');
+      setIsCreateOpen(false);
+    } catch (error) {
+      toast.error('Erro ao criar tabela');
+    }
+  };
+
+  const handleUpdate = async (id: string, data: { name: string }) => {
+    try {
+      await updateTable.mutateAsync({ id, updates: { name: data.name } });
+      toast.success('Tabela atualizada');
+      setEditingTable(null);
+    } catch (error) {
+      toast.error('Erro ao atualizar tabela');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteTable.mutateAsync(id);
+      toast.success('Tabela excluída');
+    } catch (error) {
+      toast.error('Erro ao excluir tabela');
+    }
+  };
+
+  const handleActivate = async (table: any) => {
+    try {
+      await setActive.mutateAsync({ 
+        modality: table.modality as 'lotacao' | 'fracionado', 
+        id: table.id 
+      });
+      toast.success(`Tabela "${table.name}" ativada para ${table.modality}`);
+    } catch (error) {
+      toast.error('Erro ao ativar tabela');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <div>
+          <CardTitle>Tabelas de Preço</CardTitle>
+          <CardDescription>Gerencie as tabelas de preço por modalidade</CardDescription>
+        </div>
+        <div className="flex items-center gap-3">
+          <Select value={filterModality} onValueChange={setFilterModality}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Filtrar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="lotacao">Lotação</SelectItem>
+              <SelectItem value="fracionado">Fracionado</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Tabela
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <PriceTableForm 
+                onSubmit={handleCreate} 
+                isLoading={createTable.isPending}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {filteredTables.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Nenhuma tabela encontrada
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Modalidade</TableHead>
+                <TableHead>Versão</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Criado em</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredTables.map((table) => (
+                <TableRow key={table.id}>
+                  <TableCell className="font-medium">{table.name}</TableCell>
+                  <TableCell>
+                    <Badge variant={table.modality === 'lotacao' ? 'default' : 'secondary'}>
+                      {table.modality === 'lotacao' ? 'Lotação' : 'Fracionado'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>v{table.version}</TableCell>
+                  <TableCell>
+                    {table.active ? (
+                      <Badge variant="default">Ativa</Badge>
+                    ) : (
+                      <Badge variant="outline">Inativa</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {format(new Date(table.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {!table.active && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleActivate(table)}
+                          disabled={setActive.isPending}
+                        >
+                          <Check className="h-4 w-4 mr-1" />
+                          Ativar
+                        </Button>
+                      )}
+                      
+                      <Dialog 
+                        open={editingTable?.id === table.id} 
+                        onOpenChange={(open) => !open && setEditingTable(null)}
+                      >
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => setEditingTable(table)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <PriceTableForm 
+                            initialData={table}
+                            onSubmit={(data) => handleUpdate(table.id, data)} 
+                            isLoading={updateTable.isPending}
+                          />
+                        </DialogContent>
+                      </Dialog>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir tabela?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. A tabela "{table.name}" e todas as suas faixas serão excluídas permanentemente.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(table.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface PriceTableFormProps {
+  initialData?: { name: string; modality: string };
+  onSubmit: (data: { name: string; modality: string }) => void;
+  isLoading: boolean;
+}
+
+function PriceTableForm({ initialData, onSubmit, isLoading }: PriceTableFormProps) {
+  const [name, setName] = useState(initialData?.name || '');
+  const [modality, setModality] = useState(initialData?.modality || 'lotacao');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast.error('Nome é obrigatório');
+      return;
+    }
+    onSubmit({ name, modality });
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <DialogHeader>
+        <DialogTitle>{initialData ? 'Editar Tabela' : 'Nova Tabela de Preço'}</DialogTitle>
+        <DialogDescription>
+          {initialData 
+            ? 'Atualize as informações da tabela de preço'
+            : 'Preencha os dados para criar uma nova tabela'
+          }
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Nome</Label>
+          <Input 
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex: Tabela Sul 2025"
+          />
+        </div>
+        {!initialData && (
+          <div className="space-y-2">
+            <Label htmlFor="modality">Modalidade</Label>
+            <Select value={modality} onValueChange={setModality}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lotacao">Lotação</SelectItem>
+                <SelectItem value="fracionado">Fracionado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+      <DialogFooter>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          {initialData ? 'Salvar' : 'Criar'}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+// ======================== VIGENTES TAB ========================
+function ActiveTablesTab() {
+  const { data: activeLotacao, isLoading: loadingLotacao } = useActivePriceTable('lotacao');
+  const { data: activeFracionado, isLoading: loadingFracionado } = useActivePriceTable('fracionado');
+
+  const isLoading = loadingLotacao || loadingFracionado;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      <ActiveTableCard 
+        title="Lotação" 
+        table={activeLotacao} 
+        variant="default"
+      />
+      <ActiveTableCard 
+        title="Fracionado" 
+        table={activeFracionado} 
+        variant="secondary"
+      />
+    </div>
+  );
+}
+
+interface ActiveTableCardProps {
+  title: string;
+  table: any;
+  variant: 'default' | 'secondary';
+}
+
+function ActiveTableCard({ title, table, variant }: ActiveTableCardProps) {
+  const { data: rows, isLoading } = usePriceTableRows(table?.id || '');
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">{title}</CardTitle>
+          <Badge variant={variant}>{title}</Badge>
+        </div>
+        <CardDescription>
+          Tabela de preço ativa para a modalidade {title.toLowerCase()}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!table ? (
+          <div className="text-center py-6 text-muted-foreground">
+            Nenhuma tabela ativa
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Nome</p>
+                <p className="font-medium">{table.name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Versão</p>
+                <p className="font-medium">v{table.version}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Criada em</p>
+                <p className="font-medium">
+                  {format(new Date(table.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Faixas de KM</p>
+                <p className="font-medium">
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    `${rows?.length || 0} faixas`
+                  )}
+                </p>
+              </div>
+            </div>
+            {table.valid_from && (
+              <div className="pt-2 border-t">
+                <p className="text-sm text-muted-foreground">Vigência</p>
+                <p className="font-medium">
+                  {format(new Date(table.valid_from), 'dd/MM/yyyy', { locale: ptBR })}
+                  {table.valid_until && ` até ${format(new Date(table.valid_until), 'dd/MM/yyyy', { locale: ptBR })}`}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ======================== ICMS TAB ========================
+function IcmsRatesTab() {
+  const { data: rates, isLoading } = useIcmsRates();
+  const createRate = useCreateIcmsRate();
+  const updateRate = useUpdateIcmsRate();
+  const deleteRate = useDeleteIcmsRate();
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingRate, setEditingRate] = useState<any>(null);
+  const [filterOrigin, setFilterOrigin] = useState<string>('all');
+
+  const filteredRates = rates?.filter(r => 
+    filterOrigin === 'all' || r.origin_state === filterOrigin
+  ) || [];
+
+  const handleCreate = async (data: { origin_state: string; destination_state: string; rate_percent: number }) => {
+    try {
+      await createRate.mutateAsync(data);
+      toast.success('Alíquota criada com sucesso');
+      setIsCreateOpen(false);
+    } catch (error: any) {
+      if (error.message?.includes('duplicate')) {
+        toast.error('Já existe uma alíquota para esta combinação UF');
+      } else {
+        toast.error('Erro ao criar alíquota');
+      }
+    }
+  };
+
+  const handleUpdate = async (id: string, data: { rate_percent: number }) => {
+    try {
+      await updateRate.mutateAsync({ id, updates: data });
+      toast.success('Alíquota atualizada');
+      setEditingRate(null);
+    } catch (error) {
+      toast.error('Erro ao atualizar alíquota');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteRate.mutateAsync(id);
+      toast.success('Alíquota excluída');
+    } catch (error) {
+      toast.error('Erro ao excluir alíquota');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <div>
+          <CardTitle>Alíquotas de ICMS</CardTitle>
+          <CardDescription>Gerencie as alíquotas por UF de origem e destino</CardDescription>
+        </div>
+        <div className="flex items-center gap-3">
+          <Select value={filterOrigin} onValueChange={setFilterOrigin}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="UF Origem" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {BRAZILIAN_STATES.map(state => (
+                <SelectItem key={state} value={state}>{state}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Alíquota
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <IcmsRateForm 
+                onSubmit={handleCreate} 
+                isLoading={createRate.isPending}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {filteredRates.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Nenhuma alíquota encontrada
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>UF Origem</TableHead>
+                <TableHead>UF Destino</TableHead>
+                <TableHead>Alíquota (%)</TableHead>
+                <TableHead>Vigência</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredRates.map((rate) => (
+                <TableRow key={rate.id}>
+                  <TableCell className="font-medium">{rate.origin_state}</TableCell>
+                  <TableCell>{rate.destination_state}</TableCell>
+                  <TableCell>{rate.rate_percent}%</TableCell>
+                  <TableCell>
+                    {rate.valid_from 
+                      ? `${format(new Date(rate.valid_from), 'dd/MM/yy')}${rate.valid_until ? ` - ${format(new Date(rate.valid_until), 'dd/MM/yy')}` : ''}`
+                      : 'Indefinida'
+                    }
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Dialog 
+                        open={editingRate?.id === rate.id} 
+                        onOpenChange={(open) => !open && setEditingRate(null)}
+                      >
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => setEditingRate(rate)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <IcmsRateForm 
+                            initialData={rate}
+                            onSubmit={(data) => handleUpdate(rate.id, data)} 
+                            isLoading={updateRate.isPending}
+                          />
+                        </DialogContent>
+                      </Dialog>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir alíquota?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. A alíquota {rate.origin_state} → {rate.destination_state} será excluída permanentemente.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(rate.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface IcmsRateFormProps {
+  initialData?: { origin_state: string; destination_state: string; rate_percent: number };
+  onSubmit: (data: { origin_state: string; destination_state: string; rate_percent: number }) => void;
+  isLoading: boolean;
+}
+
+function IcmsRateForm({ initialData, onSubmit, isLoading }: IcmsRateFormProps) {
+  const [originState, setOriginState] = useState(initialData?.origin_state || '');
+  const [destinationState, setDestinationState] = useState(initialData?.destination_state || '');
+  const [ratePercent, setRatePercent] = useState(initialData?.rate_percent?.toString() || '');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!initialData && (!originState || !destinationState)) {
+      toast.error('Selecione origem e destino');
+      return;
+    }
+    if (!ratePercent || isNaN(Number(ratePercent))) {
+      toast.error('Alíquota inválida');
+      return;
+    }
+    onSubmit({ 
+      origin_state: originState, 
+      destination_state: destinationState, 
+      rate_percent: Number(ratePercent) 
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <DialogHeader>
+        <DialogTitle>{initialData ? 'Editar Alíquota' : 'Nova Alíquota de ICMS'}</DialogTitle>
+        <DialogDescription>
+          {initialData 
+            ? `Atualize a alíquota para ${initialData.origin_state} → ${initialData.destination_state}`
+            : 'Defina a alíquota de ICMS para a rota interestadual'
+          }
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        {!initialData && (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>UF Origem</Label>
+                <Select value={originState} onValueChange={setOriginState}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BRAZILIAN_STATES.map(state => (
+                      <SelectItem key={state} value={state}>{state}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>UF Destino</Label>
+                <Select value={destinationState} onValueChange={setDestinationState}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BRAZILIAN_STATES.map(state => (
+                      <SelectItem key={state} value={state}>{state}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </>
+        )}
+        <div className="space-y-2">
+          <Label htmlFor="rate">Alíquota (%)</Label>
+          <Input 
+            id="rate"
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={ratePercent}
+            onChange={(e) => setRatePercent(e.target.value)}
+            placeholder="Ex: 12"
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          {initialData ? 'Salvar' : 'Criar'}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}

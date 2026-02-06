@@ -27,6 +27,7 @@ const navItems = [
   { path: '/documentos', icon: FileText, label: 'Documentos' },
   { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
   { path: '/clientes', icon: Users, label: 'Clientes' },
+  { path: '/tabelas-preco', icon: Package, label: 'Tabelas de Preço' },
 ];
 
 const bottomNavItems = [
