@@ -152,6 +152,107 @@ export type Database = {
           },
         ]
       }
+      drivers: {
+        Row: {
+          active: boolean
+          address: string | null
+          birth_date: string | null
+          city: string | null
+          cnh: string | null
+          cnh_category: string | null
+          cnh_validity: string | null
+          cpf: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          father_name: string | null
+          has_accident_history: boolean
+          has_robbery_history: boolean
+          id: string
+          mother_name: string | null
+          name: string
+          notes: string | null
+          owner_id: string | null
+          phone: string | null
+          phone_secondary: string | null
+          rg: string | null
+          rg_emitter: string | null
+          state: string | null
+          transported_before: boolean
+          transported_details: string | null
+          updated_at: string
+          zip_code: string | null
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          birth_date?: string | null
+          city?: string | null
+          cnh?: string | null
+          cnh_category?: string | null
+          cnh_validity?: string | null
+          cpf?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          father_name?: string | null
+          has_accident_history?: boolean
+          has_robbery_history?: boolean
+          id?: string
+          mother_name?: string | null
+          name: string
+          notes?: string | null
+          owner_id?: string | null
+          phone?: string | null
+          phone_secondary?: string | null
+          rg?: string | null
+          rg_emitter?: string | null
+          state?: string | null
+          transported_before?: boolean
+          transported_details?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          birth_date?: string | null
+          city?: string | null
+          cnh?: string | null
+          cnh_category?: string | null
+          cnh_validity?: string | null
+          cpf?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          father_name?: string | null
+          has_accident_history?: boolean
+          has_robbery_history?: boolean
+          id?: string
+          mother_name?: string | null
+          name?: string
+          notes?: string | null
+          owner_id?: string | null
+          phone?: string | null
+          phone_secondary?: string | null
+          rg?: string | null
+          rg_emitter?: string | null
+          state?: string | null
+          transported_before?: boolean
+          transported_details?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drivers_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       occurrences: {
         Row: {
           created_at: string
@@ -204,6 +305,7 @@ export type Database = {
           created_at: string
           created_by: string
           destination: string
+          driver_id: string | null
           driver_name: string | null
           driver_phone: string | null
           eta: string | null
@@ -216,6 +318,7 @@ export type Database = {
           os_number: string
           quote_id: string | null
           stage: Database["public"]["Enums"]["order_stage"]
+          ui_last_tab: string | null
           updated_at: string
           value: number
           vehicle_plate: string | null
@@ -227,6 +330,7 @@ export type Database = {
           created_at?: string
           created_by: string
           destination: string
+          driver_id?: string | null
           driver_name?: string | null
           driver_phone?: string | null
           eta?: string | null
@@ -239,6 +343,7 @@ export type Database = {
           os_number: string
           quote_id?: string | null
           stage?: Database["public"]["Enums"]["order_stage"]
+          ui_last_tab?: string | null
           updated_at?: string
           value?: number
           vehicle_plate?: string | null
@@ -250,6 +355,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           destination?: string
+          driver_id?: string | null
           driver_name?: string | null
           driver_phone?: string | null
           eta?: string | null
@@ -262,6 +368,7 @@ export type Database = {
           os_number?: string
           quote_id?: string | null
           stage?: Database["public"]["Enums"]["order_stage"]
+          ui_last_tab?: string | null
           updated_at?: string
           value?: number
           vehicle_plate?: string | null
@@ -275,6 +382,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "orders_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orders_quote_id_fkey"
             columns: ["quote_id"]
             isOneToOne: false
@@ -282,6 +396,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      owners: {
+        Row: {
+          active: boolean
+          address: string | null
+          city: string | null
+          cpf_cnpj: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          rg: string | null
+          rg_emitter: string | null
+          state: string | null
+          updated_at: string
+          zip_code: string | null
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          city?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          rg?: string | null
+          rg_emitter?: string | null
+          state?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          city?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          rg?: string | null
+          rg_emitter?: string | null
+          state?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -326,9 +497,15 @@ export type Database = {
           created_at: string
           created_by: string
           destination: string
+          destination_cep: string | null
+          freight_type: string
           id: string
           notes: string | null
           origin: string
+          origin_cep: string | null
+          shipper_email: string | null
+          shipper_id: string | null
+          shipper_name: string | null
           stage: Database["public"]["Enums"]["quote_stage"]
           tags: string[] | null
           updated_at: string
@@ -346,9 +523,15 @@ export type Database = {
           created_at?: string
           created_by: string
           destination: string
+          destination_cep?: string | null
+          freight_type?: string
           id?: string
           notes?: string | null
           origin: string
+          origin_cep?: string | null
+          shipper_email?: string | null
+          shipper_id?: string | null
+          shipper_name?: string | null
           stage?: Database["public"]["Enums"]["quote_stage"]
           tags?: string[] | null
           updated_at?: string
@@ -366,9 +549,15 @@ export type Database = {
           created_at?: string
           created_by?: string
           destination?: string
+          destination_cep?: string | null
+          freight_type?: string
           id?: string
           notes?: string | null
           origin?: string
+          origin_cep?: string | null
+          shipper_email?: string | null
+          shipper_id?: string | null
+          shipper_name?: string | null
           stage?: Database["public"]["Enums"]["quote_stage"]
           tags?: string[] | null
           updated_at?: string
@@ -383,6 +572,132 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_shipper_id_fkey"
+            columns: ["shipper_id"]
+            isOneToOne: false
+            referencedRelation: "shippers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shippers: {
+        Row: {
+          address: string | null
+          city: string | null
+          cnpj: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          cnpj?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          cnpj?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      trailers: {
+        Row: {
+          active: boolean
+          brand: string | null
+          capacity_kg: number | null
+          chassis: string | null
+          city: string | null
+          color: string | null
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          id: string
+          model: string | null
+          notes: string | null
+          plate: string
+          renavam: string | null
+          state: string | null
+          trailer_type: string | null
+          updated_at: string
+          year_manufacture: number | null
+          year_model: number | null
+        }
+        Insert: {
+          active?: boolean
+          brand?: string | null
+          capacity_kg?: number | null
+          chassis?: string | null
+          city?: string | null
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          model?: string | null
+          notes?: string | null
+          plate: string
+          renavam?: string | null
+          state?: string | null
+          trailer_type?: string | null
+          updated_at?: string
+          year_manufacture?: number | null
+          year_model?: number | null
+        }
+        Update: {
+          active?: boolean
+          brand?: string | null
+          capacity_kg?: number | null
+          chassis?: string | null
+          city?: string | null
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          model?: string | null
+          notes?: string | null
+          plate?: string
+          renavam?: string | null
+          state?: string | null
+          trailer_type?: string | null
+          updated_at?: string
+          year_manufacture?: number | null
+          year_model?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trailers_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
             referencedColumns: ["id"]
           },
         ]
@@ -407,6 +722,80 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      vehicles: {
+        Row: {
+          active: boolean
+          brand: string | null
+          capacity_kg: number | null
+          chassis: string | null
+          city: string | null
+          color: string | null
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          id: string
+          model: string | null
+          notes: string | null
+          plate: string
+          renavam: string | null
+          state: string | null
+          updated_at: string
+          vehicle_type: string | null
+          year_manufacture: number | null
+          year_model: number | null
+        }
+        Insert: {
+          active?: boolean
+          brand?: string | null
+          capacity_kg?: number | null
+          chassis?: string | null
+          city?: string | null
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          model?: string | null
+          notes?: string | null
+          plate: string
+          renavam?: string | null
+          state?: string | null
+          updated_at?: string
+          vehicle_type?: string | null
+          year_manufacture?: number | null
+          year_model?: number | null
+        }
+        Update: {
+          active?: boolean
+          brand?: string | null
+          capacity_kg?: number | null
+          chassis?: string | null
+          city?: string | null
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          model?: string | null
+          notes?: string | null
+          plate?: string
+          renavam?: string | null
+          state?: string | null
+          updated_at?: string
+          vehicle_type?: string | null
+          year_manufacture?: number | null
+          year_model?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicles_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
