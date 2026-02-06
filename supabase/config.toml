@@ -1,1 +1,4 @@
 project_id = "dsbjxfnlduigycomkfbp"
+
+[functions.import-price-table]
+verify_jwt = false

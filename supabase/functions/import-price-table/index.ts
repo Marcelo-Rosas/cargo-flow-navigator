@@ -1,0 +1,463 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+interface PriceTableInput {
+  id?: string | 'new';
+  name: string;
+  modality: 'lotacao' | 'fracionado';
+  valid_from?: string | null;
+  valid_until?: string | null;
+  active?: boolean;
+}
+
+interface PriceTableRowInput {
+  km_from: number;
+  km_to: number;
+  cost_per_ton?: number | null;
+  cost_per_kg?: number | null;
+  cost_value_percent?: number | null;
+  gris_percent?: number | null;
+  tso_percent?: number | null;
+  toll_percent?: number | null;
+  ad_valorem_percent?: number | null;
+}
+
+interface ImportRequest {
+  priceTable: PriceTableInput;
+  rows: PriceTableRowInput[];
+  importMode: 'replace' | 'upsert';
+}
+
+interface ImportResponse {
+  success: boolean;
+  priceTableId?: string;
+  rowsTotal: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  errors: string[];
+}
+
+function validatePercentage(value: number | null | undefined, fieldName: string): string | null {
+  if (value === null || value === undefined) return null;
+  if (value < 0 || value > 100) {
+    return `${fieldName} deve estar entre 0 e 100 (valor recebido: ${value})`;
+  }
+  return null;
+}
+
+function validateRow(row: PriceTableRowInput, index: number): string[] {
+  const errors: string[] = [];
+  
+  if (row.km_from === undefined || row.km_from === null) {
+    errors.push(`Linha ${index + 1}: km_from é obrigatório`);
+  }
+  if (row.km_to === undefined || row.km_to === null) {
+    errors.push(`Linha ${index + 1}: km_to é obrigatório`);
+  }
+  if (row.km_from !== undefined && row.km_to !== undefined && row.km_to < row.km_from) {
+    errors.push(`Linha ${index + 1}: km_to (${row.km_to}) deve ser >= km_from (${row.km_from})`);
+  }
+  if (row.km_from !== undefined && row.km_from < 0) {
+    errors.push(`Linha ${index + 1}: km_from deve ser >= 0`);
+  }
+  
+  // Validate percentages
+  const percentFields = [
+    { value: row.cost_value_percent, name: 'cost_value_percent' },
+    { value: row.gris_percent, name: 'gris_percent' },
+    { value: row.tso_percent, name: 'tso_percent' },
+    { value: row.toll_percent, name: 'toll_percent' },
+    { value: row.ad_valorem_percent, name: 'ad_valorem_percent' },
+  ];
+  
+  for (const field of percentFields) {
+    const error = validatePercentage(field.value, field.name);
+    if (error) {
+      errors.push(`Linha ${index + 1}: ${error}`);
+    }
+  }
+  
+  return errors;
+}
+
+serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  console.log('[import-price-table] Request received');
+
+  try {
+    // Get authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('[import-price-table] Missing Authorization header');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          rowsTotal: 0, 
+          rowsInserted: 0, 
+          rowsUpdated: 0, 
+          errors: ['Não autorizado: token ausente'] 
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create Supabase client with user's JWT (respects RLS)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader }
+      }
+    });
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('[import-price-table] Auth error:', authError?.message);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          rowsTotal: 0, 
+          rowsInserted: 0, 
+          rowsUpdated: 0, 
+          errors: ['Não autorizado: usuário inválido'] 
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('[import-price-table] User authenticated:', user.id);
+
+    // Parse request body
+    const body: ImportRequest = await req.json();
+    console.log('[import-price-table] Request body:', JSON.stringify({
+      priceTable: body.priceTable,
+      rowsCount: body.rows?.length,
+      importMode: body.importMode
+    }));
+
+    const { priceTable, rows, importMode } = body;
+
+    // Validate required fields
+    const errors: string[] = [];
+
+    if (!priceTable) {
+      errors.push('priceTable é obrigatório');
+    } else {
+      if (!priceTable.name?.trim()) {
+        errors.push('priceTable.name é obrigatório');
+      }
+      if (!priceTable.modality || !['lotacao', 'fracionado'].includes(priceTable.modality)) {
+        errors.push('priceTable.modality deve ser "lotacao" ou "fracionado"');
+      }
+    }
+
+    if (!rows || !Array.isArray(rows)) {
+      errors.push('rows deve ser um array');
+    } else if (rows.length === 0) {
+      errors.push('rows não pode estar vazio');
+    } else {
+      // Validate each row
+      rows.forEach((row, index) => {
+        const rowErrors = validateRow(row, index);
+        errors.push(...rowErrors);
+      });
+    }
+
+    if (!importMode || !['replace', 'upsert'].includes(importMode)) {
+      errors.push('importMode deve ser "replace" ou "upsert"');
+    }
+
+    if (errors.length > 0) {
+      console.error('[import-price-table] Validation errors:', errors);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          rowsTotal: rows?.length || 0, 
+          rowsInserted: 0, 
+          rowsUpdated: 0, 
+          errors 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const rowsTotal = rows.length;
+    let rowsInserted = 0;
+    let rowsUpdated = 0;
+    let priceTableId: string;
+
+    // Step 1: Create or update price_table
+    const isNewTable = !priceTable.id || priceTable.id === 'new';
+    
+    if (isNewTable) {
+      console.log('[import-price-table] Creating new price table');
+      
+      const { data: newTable, error: insertError } = await supabase
+        .from('price_tables')
+        .insert({
+          name: priceTable.name.trim(),
+          modality: priceTable.modality,
+          valid_from: priceTable.valid_from || null,
+          valid_until: priceTable.valid_until || null,
+          active: false, // Will set active later if needed
+          created_by: user.id,
+        })
+        .select('id')
+        .single();
+
+      if (insertError) {
+        console.error('[import-price-table] Error creating price table:', insertError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            rowsTotal, 
+            rowsInserted: 0, 
+            rowsUpdated: 0, 
+            errors: [`Erro ao criar tabela de preço: ${insertError.message}`] 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      priceTableId = newTable.id;
+      console.log('[import-price-table] Created price table:', priceTableId);
+    } else {
+      priceTableId = priceTable.id as string;
+      console.log('[import-price-table] Updating existing price table:', priceTableId);
+
+      const { error: updateError } = await supabase
+        .from('price_tables')
+        .update({
+          name: priceTable.name.trim(),
+          modality: priceTable.modality,
+          valid_from: priceTable.valid_from || null,
+          valid_until: priceTable.valid_until || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', priceTableId);
+
+      if (updateError) {
+        console.error('[import-price-table] Error updating price table:', updateError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            rowsTotal, 
+            rowsInserted: 0, 
+            rowsUpdated: 0, 
+            errors: [`Erro ao atualizar tabela de preço: ${updateError.message}`] 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Step 2: Handle active flag (deactivate others first)
+    if (priceTable.active === true) {
+      console.log('[import-price-table] Setting table as active, deactivating others');
+      
+      // Deactivate other tables with same modality
+      const { error: deactivateError } = await supabase
+        .from('price_tables')
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .eq('modality', priceTable.modality)
+        .neq('id', priceTableId);
+
+      if (deactivateError) {
+        console.error('[import-price-table] Error deactivating other tables:', deactivateError);
+        // Continue anyway, might still work
+      }
+
+      // Activate the target table
+      const { error: activateError } = await supabase
+        .from('price_tables')
+        .update({ active: true, updated_at: new Date().toISOString() })
+        .eq('id', priceTableId);
+
+      if (activateError) {
+        console.error('[import-price-table] Error activating table:', activateError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            priceTableId,
+            rowsTotal, 
+            rowsInserted: 0, 
+            rowsUpdated: 0, 
+            errors: [`Erro ao ativar tabela: ${activateError.message}`] 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Step 3: Handle rows based on importMode
+    if (importMode === 'replace') {
+      console.log('[import-price-table] Replace mode: deleting existing rows');
+      
+      // Delete all existing rows for this table
+      const { error: deleteError } = await supabase
+        .from('price_table_rows')
+        .delete()
+        .eq('price_table_id', priceTableId);
+
+      if (deleteError) {
+        console.error('[import-price-table] Error deleting existing rows:', deleteError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            priceTableId,
+            rowsTotal, 
+            rowsInserted: 0, 
+            rowsUpdated: 0, 
+            errors: [`Erro ao remover linhas existentes: ${deleteError.message}`] 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Insert all new rows
+      const rowsToInsert = rows.map(row => ({
+        price_table_id: priceTableId,
+        km_from: row.km_from,
+        km_to: row.km_to,
+        cost_per_ton: row.cost_per_ton ?? null,
+        cost_per_kg: row.cost_per_kg ?? null,
+        cost_value_percent: row.cost_value_percent ?? null,
+        gris_percent: row.gris_percent ?? null,
+        tso_percent: row.tso_percent ?? null,
+        toll_percent: row.toll_percent ?? null,
+        ad_valorem_percent: row.ad_valorem_percent ?? null,
+      }));
+
+      const { error: insertRowsError } = await supabase
+        .from('price_table_rows')
+        .insert(rowsToInsert);
+
+      if (insertRowsError) {
+        console.error('[import-price-table] Error inserting rows:', insertRowsError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            priceTableId,
+            rowsTotal, 
+            rowsInserted: 0, 
+            rowsUpdated: 0, 
+            errors: [`Erro ao inserir linhas: ${insertRowsError.message}`] 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      rowsInserted = rowsTotal;
+      rowsUpdated = 0;
+      console.log('[import-price-table] Replace complete:', { rowsInserted });
+
+    } else {
+      // Upsert mode
+      console.log('[import-price-table] Upsert mode: checking existing rows');
+
+      // Get existing row keys to calculate counts
+      const { data: existingRows, error: fetchError } = await supabase
+        .from('price_table_rows')
+        .select('km_from, km_to')
+        .eq('price_table_id', priceTableId);
+
+      if (fetchError) {
+        console.error('[import-price-table] Error fetching existing rows:', fetchError);
+        // Continue anyway, counts might be off
+      }
+
+      // Create a set of existing keys for quick lookup
+      const existingKeys = new Set(
+        (existingRows || []).map(r => `${r.km_from}-${r.km_to}`)
+      );
+
+      // Count how many incoming rows match existing keys
+      const matchingKeys = rows.filter(r => 
+        existingKeys.has(`${r.km_from}-${r.km_to}`)
+      ).length;
+
+      rowsUpdated = matchingKeys;
+      rowsInserted = rowsTotal - matchingKeys;
+
+      console.log('[import-price-table] Upsert counts:', { rowsUpdated, rowsInserted, existingCount: existingKeys.size });
+
+      // Upsert all rows
+      const rowsToUpsert = rows.map(row => ({
+        price_table_id: priceTableId,
+        km_from: row.km_from,
+        km_to: row.km_to,
+        cost_per_ton: row.cost_per_ton ?? null,
+        cost_per_kg: row.cost_per_kg ?? null,
+        cost_value_percent: row.cost_value_percent ?? null,
+        gris_percent: row.gris_percent ?? null,
+        tso_percent: row.tso_percent ?? null,
+        toll_percent: row.toll_percent ?? null,
+        ad_valorem_percent: row.ad_valorem_percent ?? null,
+      }));
+
+      const { error: upsertError } = await supabase
+        .from('price_table_rows')
+        .upsert(rowsToUpsert, {
+          onConflict: 'price_table_id,km_from,km_to',
+          ignoreDuplicates: false
+        });
+
+      if (upsertError) {
+        console.error('[import-price-table] Error upserting rows:', upsertError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            priceTableId,
+            rowsTotal, 
+            rowsInserted: 0, 
+            rowsUpdated: 0, 
+            errors: [`Erro ao inserir/atualizar linhas: ${upsertError.message}`] 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('[import-price-table] Upsert complete');
+    }
+
+    const response: ImportResponse = {
+      success: true,
+      priceTableId,
+      rowsTotal,
+      rowsInserted,
+      rowsUpdated,
+      errors: []
+    };
+
+    console.log('[import-price-table] Success:', response);
+
+    return new Response(
+      JSON.stringify(response),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('[import-price-table] Unexpected error:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        rowsTotal: 0, 
+        rowsInserted: 0, 
+        rowsUpdated: 0, 
+        errors: [`Erro inesperado: ${error.message}`] 
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
