@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
-import { 
-  TrendingUp, 
-  Truck, 
-  FileText, 
+import {
+  TrendingUp,
+  Truck,
+  FileText,
   AlertTriangle,
   DollarSign,
   Target,
@@ -18,43 +18,23 @@ import { MonthlyTrendsChart } from '@/components/dashboard/MonthlyTrendsChart';
 import { PerformanceCards } from '@/components/dashboard/PerformanceCards';
 import { StageDistributionChart } from '@/components/dashboard/StageDistributionChart';
 import { ExportReports } from '@/components/dashboard/ExportReports';
+import { ConversionChart } from '@/components/dashboard/ConversionChart';
+import { RevenueByClientChart } from '@/components/dashboard/RevenueByClientChart';
 import { useDashboardStats, useRecentOrders, useConversionChartData, useRevenueByClientData } from '@/hooks/useDashboardStats';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQueryClient } from '@tanstack/react-query';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  BarChart,
-  Bar
-} from 'recharts';
+import { formatCurrency } from '@/lib/utils';
 
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(value);
-};
-
-// Fallback data for empty states
 const emptyConversionData = [
   { name: 'Jan', value: 0 },
   { name: 'Fev', value: 0 },
   { name: 'Mar', value: 0 },
 ];
 
-const emptyRevenueData = [
-  { name: 'Sem dados', value: 0 },
-];
+const emptyRevenueData = [{ name: 'Sem dados', value: 0 }];
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -64,7 +44,6 @@ export default function Dashboard() {
   const { data: conversionData } = useConversionChartData();
   const { data: revenueData } = useRevenueByClientData();
 
-  // Enable realtime updates
   useRealtimeSubscription(['quotes', 'orders', 'occurrences']);
 
   const chartConversionData = conversionData?.length ? conversionData : emptyConversionData;
@@ -100,14 +79,14 @@ export default function Dashboard() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <motion.h1 
+          <motion.h1
             className="text-3xl font-bold text-foreground"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
           >
             Dashboard
           </motion.h1>
-          <motion.p 
+          <motion.p
             className="text-muted-foreground mt-1"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -189,7 +168,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Tabs for different views */}
+      {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
@@ -198,108 +177,12 @@ export default function Dashboard() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Performance Cards */}
           <PerformanceCards />
-
-          {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Conversion Chart */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.2 }}
-              className="bg-card rounded-xl border border-border shadow-card p-6"
-            >
-              <h3 className="text-lg font-semibold text-foreground mb-4">
-                Taxa de Conversão
-              </h3>
-              <ResponsiveContainer width="100%" height={240}>
-                <AreaChart data={chartConversionData}>
-                  <defs>
-                    <linearGradient id="colorConversion" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(203, 82%, 26%)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(203, 82%, 26%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis 
-                    dataKey="name" 
-                    className="text-muted-foreground"
-                    tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-                  />
-                  <YAxis 
-                    className="text-muted-foreground"
-                    tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-                    tickFormatter={(value) => `${value}%`}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(0, 0%, 100%)',
-                      border: '1px solid hsl(210, 20%, 88%)',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value) => [`${value}%`, 'Conversão']}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="hsl(203, 82%, 26%)" 
-                    strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorConversion)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </motion.div>
-
-            {/* Revenue by Client Chart */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.25 }}
-              className="bg-card rounded-xl border border-border shadow-card p-6"
-            >
-              <h3 className="text-lg font-semibold text-foreground mb-4">
-                Faturamento por Cliente
-              </h3>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={chartRevenueData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis 
-                    type="number"
-                    className="text-muted-foreground"
-                    tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-                    tickFormatter={(value) => formatCurrency(value)}
-                  />
-                  <YAxis 
-                    type="category"
-                    dataKey="name"
-                    width={100}
-                    className="text-muted-foreground"
-                    tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(0, 0%, 100%)',
-                      border: '1px solid hsl(210, 20%, 88%)',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value) => [formatCurrency(value as number), 'Faturamento']}
-                  />
-                  <Bar 
-                    dataKey="value" 
-                    fill="hsl(142, 60%, 40%)" 
-                    radius={[0, 4, 4, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </motion.div>
+            <ConversionChart data={chartConversionData} />
+            <RevenueByClientChart data={chartRevenueData} />
           </div>
-
-          {/* Monthly Trends */}
           <MonthlyTrendsChart />
-
-          {/* Bottom Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               {ordersLoading ? (
@@ -310,113 +193,21 @@ export default function Dashboard() {
                 <RecentOrdersList orders={recentOrders || []} />
               )}
             </div>
-            <div>
-              <AlertsWidget />
-            </div>
+            <AlertsWidget />
           </div>
         </TabsContent>
 
         <TabsContent value="commercial" className="space-y-6">
-          {/* Sales Funnel and Distribution */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <SalesFunnel />
             <StageDistributionChart />
           </div>
-
-          {/* Conversion Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
-            className="bg-card rounded-xl border border-border shadow-card p-6"
-          >
-            <h3 className="text-lg font-semibold text-foreground mb-4">
-              Evolução da Taxa de Conversão
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={chartConversionData}>
-                <defs>
-                  <linearGradient id="colorConversion2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(203, 82%, 26%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(203, 82%, 26%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis 
-                  dataKey="name" 
-                  tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-                />
-                <YAxis 
-                  tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-                  tickFormatter={(value) => `${value}%`}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(0, 0%, 100%)',
-                    border: '1px solid hsl(210, 20%, 88%)',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value) => [`${value}%`, 'Conversão']}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="hsl(203, 82%, 26%)" 
-                  strokeWidth={2}
-                  fillOpacity={1} 
-                  fill="url(#colorConversion2)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </motion.div>
-
-          {/* Top Clients */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.25 }}
-            className="bg-card rounded-xl border border-border shadow-card p-6"
-          >
-            <h3 className="text-lg font-semibold text-foreground mb-4">
-              Top Clientes por Faturamento
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartRevenueData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis 
-                  type="number"
-                  tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-                  tickFormatter={(value) => formatCurrency(value)}
-                />
-                <YAxis 
-                  type="category"
-                  dataKey="name"
-                  width={120}
-                  tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(0, 0%, 100%)',
-                    border: '1px solid hsl(210, 20%, 88%)',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value) => [formatCurrency(value as number), 'Faturamento']}
-                />
-                <Bar 
-                  dataKey="value" 
-                  fill="hsl(142, 60%, 40%)" 
-                  radius={[0, 4, 4, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </motion.div>
+          <ConversionChart data={chartConversionData} height={300} gradientId="colorConversion2" />
+          <RevenueByClientChart data={chartRevenueData} height={300} yAxisWidth={120} />
         </TabsContent>
 
         <TabsContent value="operations" className="space-y-6">
-          {/* Monthly Trends */}
           <MonthlyTrendsChart />
-
-          {/* Stage Distribution and Recent Orders */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <StageDistributionChart />
             <div>
@@ -429,8 +220,6 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-
-          {/* Alerts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <AlertsWidget />
             <motion.div
