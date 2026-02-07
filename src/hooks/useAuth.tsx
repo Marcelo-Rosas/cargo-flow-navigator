@@ -44,7 +44,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+    // Enforce HTTPS on the redirect URL to avoid OAuth discovery errors.
+    // In production, the origin should already be HTTPS; this guards against
+    // misconfigured proxies or environment variables that produce http:// URLs.
+    const origin = window.location.origin.replace(/^http:\/\//, 'https://');
+    const redirectUrl = `${origin}/`;
     const { error } = await supabase.auth.signUp({
       email,
       password,
