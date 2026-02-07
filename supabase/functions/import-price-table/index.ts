@@ -213,11 +213,7 @@ serve(async (req) => {
 
     // Parse request body
     const body: ImportRequest = await req.json();
-    console.log('[import-price-table] Request body:', JSON.stringify({
-      priceTable: body.priceTable,
-      rowsCount: body.rows?.length,
-      importMode: body.importMode
-    }));
+    console.log('[import-price-table] Importing table:', body.priceTable?.name, 'with', body.rows?.length, 'rows, mode:', body.importMode);
 
     const { priceTable, rows, importMode } = body;
 

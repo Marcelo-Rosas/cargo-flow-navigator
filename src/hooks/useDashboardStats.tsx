@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface TrendData {
+  value: number;
+  isPositive: boolean;
+}
+
 export interface DashboardStats {
   pipelineValue: number;
   conversionRate: number;
@@ -8,12 +13,26 @@ export interface DashboardStats {
   deliveriesToday: number;
   pendingDocuments: number;
   criticalAlerts: number;
+  // Trends calculated from real data
+  pipelineTrend: TrendData | null;
+  conversionTrend: TrendData | null;
+}
+
+// Helper to get start/end of a month
+function getMonthRange(monthsAgo: number) {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() - monthsAgo + 1, 0, 23, 59, 59, 999);
+  return { start, end };
 }
 
 export function useDashboardStats() {
   return useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
+      const currentMonth = getMonthRange(0);
+      const lastMonth = getMonthRange(1);
+
       // Get pipeline value (quotes not lost or won)
       const { data: quotes } = await supabase
         .from('quotes')
@@ -22,14 +41,72 @@ export function useDashboardStats() {
 
       const pipelineValue = quotes?.reduce((acc, q) => acc + Number(q.value), 0) || 0;
 
-      // Get conversion rate
+      // Get conversion rate for all time
       const { data: allQuotes } = await supabase
         .from('quotes')
-        .select('stage');
+        .select('stage, created_at');
 
       const totalQuotes = allQuotes?.length || 0;
       const wonQuotes = allQuotes?.filter(q => q.stage === 'ganho').length || 0;
       const conversionRate = totalQuotes > 0 ? Math.round((wonQuotes / totalQuotes) * 100) : 0;
+
+      // Calculate pipeline trend (current month quotes vs last month)
+      const { data: currentMonthQuotes } = await supabase
+        .from('quotes')
+        .select('value')
+        .gte('created_at', currentMonth.start.toISOString())
+        .lte('created_at', currentMonth.end.toISOString())
+        .not('stage', 'in', '("perdido","ganho")');
+
+      const { data: lastMonthQuotes } = await supabase
+        .from('quotes')
+        .select('value')
+        .gte('created_at', lastMonth.start.toISOString())
+        .lte('created_at', lastMonth.end.toISOString())
+        .not('stage', 'in', '("perdido","ganho")');
+
+      const currentMonthPipeline = currentMonthQuotes?.reduce((acc, q) => acc + Number(q.value), 0) || 0;
+      const lastMonthPipeline = lastMonthQuotes?.reduce((acc, q) => acc + Number(q.value), 0) || 0;
+
+      let pipelineTrend: TrendData | null = null;
+      if (lastMonthPipeline > 0) {
+        const pipelineChange = ((currentMonthPipeline - lastMonthPipeline) / lastMonthPipeline) * 100;
+        pipelineTrend = {
+          value: Math.abs(Math.round(pipelineChange)),
+          isPositive: pipelineChange >= 0,
+        };
+      }
+
+      // Calculate conversion trend (current month vs last month)
+      const currentMonthTotal = allQuotes?.filter(q => {
+        const date = new Date(q.created_at);
+        return date >= currentMonth.start && date <= currentMonth.end;
+      }).length || 0;
+      const currentMonthWon = allQuotes?.filter(q => {
+        const date = new Date(q.created_at);
+        return date >= currentMonth.start && date <= currentMonth.end && q.stage === 'ganho';
+      }).length || 0;
+
+      const lastMonthTotal = allQuotes?.filter(q => {
+        const date = new Date(q.created_at);
+        return date >= lastMonth.start && date <= lastMonth.end;
+      }).length || 0;
+      const lastMonthWon = allQuotes?.filter(q => {
+        const date = new Date(q.created_at);
+        return date >= lastMonth.start && date <= lastMonth.end && q.stage === 'ganho';
+      }).length || 0;
+
+      const currentConversionRate = currentMonthTotal > 0 ? (currentMonthWon / currentMonthTotal) * 100 : 0;
+      const lastConversionRate = lastMonthTotal > 0 ? (lastMonthWon / lastMonthTotal) * 100 : 0;
+
+      let conversionTrend: TrendData | null = null;
+      if (lastMonthTotal > 0 && currentMonthTotal > 0) {
+        const conversionChange = currentConversionRate - lastConversionRate;
+        conversionTrend = {
+          value: Math.abs(Math.round(conversionChange)),
+          isPositive: conversionChange >= 0,
+        };
+      }
 
       // Get active orders (not delivered)
       const { data: activeOrdersData } = await supabase
@@ -78,6 +155,8 @@ export function useDashboardStats() {
         deliveriesToday,
         pendingDocuments,
         criticalAlerts,
+        pipelineTrend,
+        conversionTrend,
       } as DashboardStats;
     },
   });
