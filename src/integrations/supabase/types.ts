@@ -92,6 +92,63 @@ export type Database = {
         }
         Relationships: []
       }
+      conditional_fees: {
+        Row: {
+          active: boolean
+          applies_to: string
+          code: string
+          conditions: Json | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          fee_type: string
+          fee_value: number
+          id: string
+          max_value: number | null
+          min_value: number | null
+          name: string
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          active?: boolean
+          applies_to?: string
+          code: string
+          conditions?: Json | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fee_type: string
+          fee_value: number
+          id?: string
+          max_value?: number | null
+          min_value?: number | null
+          name: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          active?: boolean
+          applies_to?: string
+          code?: string
+          conditions?: Json | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fee_type?: string
+          fee_value?: number
+          id?: string
+          max_value?: number | null
+          min_value?: number | null
+          name?: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           created_at: string
@@ -358,6 +415,8 @@ export type Database = {
           updated_at: string
           value: number
           vehicle_plate: string | null
+          waiting_time_cost: number | null
+          waiting_time_hours: number | null
         }
         Insert: {
           assigned_to?: string | null
@@ -383,6 +442,8 @@ export type Database = {
           updated_at?: string
           value?: number
           vehicle_plate?: string | null
+          waiting_time_cost?: number | null
+          waiting_time_hours?: number | null
         }
         Update: {
           assigned_to?: string | null
@@ -408,6 +469,8 @@ export type Database = {
           updated_at?: string
           value?: number
           vehicle_plate?: string | null
+          waiting_time_cost?: number | null
+          waiting_time_hours?: number | null
         }
         Relationships: [
           {
@@ -487,6 +550,42 @@ export type Database = {
           state?: string | null
           updated_at?: string
           zip_code?: string | null
+        }
+        Relationships: []
+      }
+      payment_terms: {
+        Row: {
+          active: boolean
+          adjustment_percent: number
+          code: string
+          created_at: string
+          created_by: string | null
+          days: number
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          adjustment_percent?: number
+          code: string
+          created_at?: string
+          created_by?: string | null
+          days: number
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          adjustment_percent?: number
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          days?: number
+          id?: string
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -582,6 +681,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pricing_parameters: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          key: string
+          unit: string | null
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          key: string
+          unit?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          value: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          key?: string
+          unit?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -618,13 +756,16 @@ export type Database = {
       quotes: {
         Row: {
           assigned_to: string | null
+          billable_weight: number | null
           cargo_type: string | null
           cargo_value: number | null
           client_email: string | null
           client_id: string | null
           client_name: string
+          conditional_fees_breakdown: Json | null
           created_at: string
           created_by: string
+          cubage_weight: number | null
           destination: string
           destination_cep: string | null
           freight_modality: string | null
@@ -634,28 +775,36 @@ export type Database = {
           notes: string | null
           origin: string
           origin_cep: string | null
+          payment_term_id: string | null
           price_table_id: string | null
           pricing_breakdown: Json | null
           shipper_email: string | null
           shipper_id: string | null
           shipper_name: string | null
           stage: Database["public"]["Enums"]["quote_stage"]
+          tac_percent: number | null
           tags: string[] | null
+          toll_value: number | null
           updated_at: string
           validity_date: string | null
           value: number
+          vehicle_type_id: string | null
           volume: number | null
+          waiting_time_cost: number | null
           weight: number | null
         }
         Insert: {
           assigned_to?: string | null
+          billable_weight?: number | null
           cargo_type?: string | null
           cargo_value?: number | null
           client_email?: string | null
           client_id?: string | null
           client_name: string
+          conditional_fees_breakdown?: Json | null
           created_at?: string
           created_by: string
+          cubage_weight?: number | null
           destination: string
           destination_cep?: string | null
           freight_modality?: string | null
@@ -665,28 +814,36 @@ export type Database = {
           notes?: string | null
           origin: string
           origin_cep?: string | null
+          payment_term_id?: string | null
           price_table_id?: string | null
           pricing_breakdown?: Json | null
           shipper_email?: string | null
           shipper_id?: string | null
           shipper_name?: string | null
           stage?: Database["public"]["Enums"]["quote_stage"]
+          tac_percent?: number | null
           tags?: string[] | null
+          toll_value?: number | null
           updated_at?: string
           validity_date?: string | null
           value?: number
+          vehicle_type_id?: string | null
           volume?: number | null
+          waiting_time_cost?: number | null
           weight?: number | null
         }
         Update: {
           assigned_to?: string | null
+          billable_weight?: number | null
           cargo_type?: string | null
           cargo_value?: number | null
           client_email?: string | null
           client_id?: string | null
           client_name?: string
+          conditional_fees_breakdown?: Json | null
           created_at?: string
           created_by?: string
+          cubage_weight?: number | null
           destination?: string
           destination_cep?: string | null
           freight_modality?: string | null
@@ -696,17 +853,22 @@ export type Database = {
           notes?: string | null
           origin?: string
           origin_cep?: string | null
+          payment_term_id?: string | null
           price_table_id?: string | null
           pricing_breakdown?: Json | null
           shipper_email?: string | null
           shipper_id?: string | null
           shipper_name?: string | null
           stage?: Database["public"]["Enums"]["quote_stage"]
+          tac_percent?: number | null
           tags?: string[] | null
+          toll_value?: number | null
           updated_at?: string
           validity_date?: string | null
           value?: number
+          vehicle_type_id?: string | null
           volume?: number | null
+          waiting_time_cost?: number | null
           weight?: number | null
         }
         Relationships: [
@@ -715,6 +877,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_payment_term_id_fkey"
+            columns: ["payment_term_id"]
+            isOneToOne: false
+            referencedRelation: "payment_terms"
             referencedColumns: ["id"]
           },
           {
@@ -729,6 +898,13 @@ export type Database = {
             columns: ["shipper_id"]
             isOneToOne: false
             referencedRelation: "shippers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_vehicle_type_id_fkey"
+            columns: ["vehicle_type_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_types"
             referencedColumns: ["id"]
           },
         ]
@@ -777,6 +953,104 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      tac_rates: {
+        Row: {
+          adjustment_percent: number
+          created_at: string
+          created_by: string | null
+          diesel_price_base: number
+          diesel_price_current: number
+          id: string
+          reference_date: string
+          source_description: string | null
+          updated_at: string
+          variation_percent: number | null
+        }
+        Insert: {
+          adjustment_percent?: number
+          created_at?: string
+          created_by?: string | null
+          diesel_price_base: number
+          diesel_price_current: number
+          id?: string
+          reference_date: string
+          source_description?: string | null
+          updated_at?: string
+          variation_percent?: number | null
+        }
+        Update: {
+          adjustment_percent?: number
+          created_at?: string
+          created_by?: string | null
+          diesel_price_base?: number
+          diesel_price_current?: number
+          id?: string
+          reference_date?: string
+          source_description?: string | null
+          updated_at?: string
+          variation_percent?: number | null
+        }
+        Relationships: []
+      }
+      toll_routes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          destination_city: string | null
+          destination_state: string
+          distance_km: number | null
+          id: string
+          origin_city: string | null
+          origin_state: string
+          toll_value: number
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+          vehicle_type_id: string | null
+          via_description: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          destination_city?: string | null
+          destination_state: string
+          distance_km?: number | null
+          id?: string
+          origin_city?: string | null
+          origin_state: string
+          toll_value: number
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          vehicle_type_id?: string | null
+          via_description?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          destination_city?: string | null
+          destination_state?: string
+          distance_km?: number | null
+          id?: string
+          origin_city?: string | null
+          origin_state?: string
+          toll_value?: number
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          vehicle_type_id?: string | null
+          via_description?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toll_routes_vehicle_type_id_fkey"
+            columns: ["vehicle_type_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_types"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trailers: {
         Row: {
@@ -873,6 +1147,42 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_types: {
+        Row: {
+          active: boolean
+          axes_count: number | null
+          capacity_kg: number | null
+          capacity_m3: number | null
+          code: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          axes_count?: number | null
+          capacity_kg?: number | null
+          capacity_m3?: number | null
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          axes_count?: number | null
+          capacity_kg?: number | null
+          capacity_m3?: number | null
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vehicles: {
         Row: {
           active: boolean
@@ -943,6 +1253,59 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      waiting_time_rules: {
+        Row: {
+          context: string
+          created_at: string
+          created_by: string | null
+          free_hours: number
+          id: string
+          min_charge: number | null
+          rate_per_day: number | null
+          rate_per_hour: number | null
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+          vehicle_type_id: string | null
+        }
+        Insert: {
+          context?: string
+          created_at?: string
+          created_by?: string | null
+          free_hours?: number
+          id?: string
+          min_charge?: number | null
+          rate_per_day?: number | null
+          rate_per_hour?: number | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          vehicle_type_id?: string | null
+        }
+        Update: {
+          context?: string
+          created_at?: string
+          created_by?: string | null
+          free_hours?: number
+          id?: string
+          min_charge?: number | null
+          rate_per_day?: number | null
+          rate_per_hour?: number | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          vehicle_type_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waiting_time_rules_vehicle_type_id_fkey"
+            columns: ["vehicle_type_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_types"
             referencedColumns: ["id"]
           },
         ]

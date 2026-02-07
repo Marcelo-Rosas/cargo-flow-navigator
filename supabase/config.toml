@@ -2,3 +2,6 @@ project_id = "dsbjxfnlduigycomkfbp"
 
 [functions.import-price-table]
 verify_jwt = false
+
+[functions.calculate-freight]
+verify_jwt = false
