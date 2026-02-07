@@ -1,73 +1,111 @@
-# Welcome to your Lovable project
+# Cargo Flow Navigator
 
-## Project info
+CRM logistico da **Vectra Cargo** para gestao de cotacoes, ordens de servico e precificacao de frete.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Stack
 
-## How can I edit this code?
+| Camada | Tecnologia |
+|--------|-----------|
+| Frontend | React 18 + TypeScript + Vite |
+| UI | Tailwind CSS + shadcn/ui |
+| Estado | TanStack React Query + React Context |
+| Backend | Supabase (PostgreSQL + Auth + Realtime + Edge Functions) |
+| Edge Functions | Deno |
 
-There are several ways of editing your application.
+## Setup Local
 
-**Use Lovable**
+### Pre-requisitos
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- Node.js 22+ (recomendado via [nvm](https://github.com/nvm-sh/nvm))
+- [Supabase CLI](https://supabase.com/docs/guides/cli/getting-started) (opcional, para backend local)
 
-Changes made via Lovable will be committed automatically to this repo.
+### Instalacao
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+git clone https://github.com/Marcelo-Rosas/cargo-flow-navigator.git
+cd cargo-flow-navigator
+cp .env.example .env   # preencha com suas chaves do Supabase
+npm install
+npm run dev            # http://localhost:8080
 ```
 
-**Edit a file directly in GitHub**
+### Variaveis de Ambiente
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Veja `.env.example` para as variaveis necessarias:
 
-**Use GitHub Codespaces**
+| Variavel | Descricao |
+|----------|-----------|
+| `VITE_SUPABASE_URL` | URL do projeto Supabase |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Anon key (publica) |
+| `VITE_SUPABASE_PROJECT_ID` | ID do projeto |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Supabase Local (opcional)
 
-## What technologies are used for this project?
+```bash
+supabase start          # inicia containers locais
+supabase db reset       # aplica migrations + seed data
+supabase functions serve # roda Edge Functions localmente
+```
 
-This project is built with:
+## Scripts
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+| Comando | Descricao |
+|---------|-----------|
+| `npm run dev` | Servidor de desenvolvimento (porta 8080) |
+| `npm run build` | Build de producao |
+| `npm run lint` | ESLint |
+| `npm run test` | Testes com Vitest (watch mode) |
+| `npm run test:run` | Testes (single run) |
+| `npm run format` | Formata codigo com Prettier |
+| `npm run format:check` | Verifica formatacao |
 
-## How can I deploy this project?
+## Estrutura do Projeto
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```
+src/
+  pages/           # Paginas da aplicacao (Dashboard, Commercial, etc.)
+  components/
+    ui/            # Componentes shadcn/ui
+    layout/        # MainLayout, Sidebar, Topbar
+    dashboard/     # Widgets do dashboard
+    boards/        # Kanban (cotacoes e ordens)
+    forms/         # Formularios (Quote, Order, Client, Occurrence)
+    modals/        # Modais de detalhe e conversao
+    pricing/       # Gestao de tabelas de preco
+    documents/     # Upload e listagem de documentos
+    auth/          # ProtectedRoute
+  hooks/           # Custom hooks (dados, auth, realtime)
+  types/           # Tipos TypeScript do dominio
+  lib/             # Utilitarios
+  integrations/    # Cliente e tipos do Supabase
+supabase/
+  migrations/      # Schema SQL (5 migracoes)
+  functions/       # Edge Functions (calculate-freight, import-price-table)
+```
 
-## Can I connect a custom domain to my Lovable project?
+## Rotas
 
-Yes, you can!
+| Rota | Pagina | Protegida |
+|------|--------|-----------|
+| `/auth` | Login / Cadastro | Nao |
+| `/` | Dashboard | Sim |
+| `/comercial` | Kanban de Cotacoes | Sim |
+| `/operacional` | Kanban de Ordens de Servico | Sim |
+| `/documentos` | Gestao de Documentos | Sim |
+| `/clientes` | Cadastro de Clientes | Sim |
+| `/tabelas-preco` | Tabelas de Preco + Simulador | Sim |
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Edge Functions
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### `calculate-freight`
+Calcula frete completo com breakdown (peso cubado, GRIS, ad valorem, pedagio, TAC, ICMS, estadia, taxas condicionais, prazo de pagamento).
+
+### `import-price-table`
+Importa tabelas de preco via upload de planilha (CSV/XLSX), com deduplicacao e validacao.
+
+## Contribuindo
+
+1. Crie uma branch a partir de `main`
+2. Faca suas alteracoes
+3. Garanta que `npm run lint`, `npm run test:run` e `npm run build` passam
+4. Abra um Pull Request
