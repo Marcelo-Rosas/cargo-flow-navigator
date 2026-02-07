@@ -101,7 +101,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const input: CalculateFreightInput = await req.json();
-    console.log('[calculate-freight] Input:', JSON.stringify(input));
+    console.log('[calculate-freight] Request received for route:', input.origin, '→', input.destination);
 
     // Validate required fields
     const errors: string[] = [];
@@ -433,7 +433,7 @@ serve(async (req) => {
       errors: [],
     };
 
-    console.log('[calculate-freight] Response:', JSON.stringify(response));
+    console.log('[calculate-freight] Calculation complete, total:', response.breakdown.total);
 
     return new Response(
       JSON.stringify(response),

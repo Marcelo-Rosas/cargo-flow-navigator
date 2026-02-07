@@ -141,7 +141,7 @@ export default function Dashboard() {
               title="Pipeline Total"
               value={formatCurrency(stats?.pipelineValue || 0)}
               icon={DollarSign}
-              trend={{ value: 12, isPositive: true }}
+              trend={stats?.pipelineTrend || undefined}
               variant="primary"
               delay={0}
             />
@@ -149,7 +149,7 @@ export default function Dashboard() {
               title="Taxa de Conversão"
               value={`${stats?.conversionRate || 0}%`}
               icon={Target}
-              trend={{ value: 5, isPositive: true }}
+              trend={stats?.conversionTrend || undefined}
               variant="success"
               delay={0.05}
             />
