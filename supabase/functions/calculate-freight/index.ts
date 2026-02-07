@@ -442,10 +442,11 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('[calculate-freight] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(
       JSON.stringify({ 
         success: false, 
-        errors: [`Erro interno: ${error.message}`],
+        errors: [`Erro interno: ${errorMessage}`],
         breakdown: null,
         parameters_used: null,
         fallbacks_applied: []
