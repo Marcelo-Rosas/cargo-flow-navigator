@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { usePerformanceMetrics } from '@/hooks/useAdvancedDashboardStats';
-import { TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const formatCurrency = (value: number) => {

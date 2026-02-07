@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import { useCalculateFreight } from '@/hooks/useCalculateFreight';
 import { usePriceTables } from '@/hooks/usePriceTables';
 import { useVehicleTypes, usePaymentTerms, useConditionalFees } from '@/hooks/usePricingRules';
-import type { CalculateFreightResponse, FreightBreakdown } from '@/types/pricing';
+import type { CalculateFreightResponse } from '@/types/pricing';
 
 export function FreightSimulator() {
   const calculateFreight = useCalculateFreight();
