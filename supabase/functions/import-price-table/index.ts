@@ -564,13 +564,14 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('[import-price-table] Unexpected error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(
       JSON.stringify({ 
         success: false, 
         rowsTotal: 0, 
         rowsInserted: 0, 
         rowsUpdated: 0, 
-        errors: [`Erro inesperado: ${error.message}`] 
+        errors: [`Erro inesperado: ${errorMessage}`] 
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
