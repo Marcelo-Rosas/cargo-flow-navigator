@@ -1,8 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const allowedOrigin = Deno.env.get('ALLOWED_ORIGIN') || '*';
+
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': allowedOrigin,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
@@ -97,11 +99,15 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const authHeader = req.headers.get('Authorization') || '';
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
     const input: CalculateFreightInput = await req.json();
-    console.log('[calculate-freight] Input:', JSON.stringify(input));
+    console.log('[calculate-freight] Route:', input.origin, '→', input.destination);
 
     // Validate required fields
     const errors: string[] = [];
@@ -433,7 +439,7 @@ serve(async (req) => {
       errors: [],
     };
 
-    console.log('[calculate-freight] Response:', JSON.stringify(response));
+    console.log('[calculate-freight] Total:', response.breakdown.total);
 
     return new Response(
       JSON.stringify(response),
