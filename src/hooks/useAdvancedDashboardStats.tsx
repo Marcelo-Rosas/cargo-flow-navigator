@@ -4,6 +4,9 @@ import { Database } from '@/integrations/supabase/types';
 
 type QuoteStage = Database['public']['Enums']['quote_stage'];
 type OrderStage = Database['public']['Enums']['order_stage'];
+type Quote = Database['public']['Tables']['quotes']['Row'];
+type Order = Database['public']['Tables']['orders']['Row'];
+type Client = Database['public']['Tables']['clients']['Row'];
 
 export interface FunnelData {
   stage: string;
@@ -62,11 +65,12 @@ export function useSalesFunnel() {
   return useQuery({
     queryKey: ['sales-funnel'],
     queryFn: async () => {
-      const { data: quotes } = await supabase
+      const { data, error } = await supabase
         .from('quotes')
         .select('stage, value');
 
-      if (!quotes) return [];
+      if (error) throw error;
+      const quotes = (data || []) as Pick<Quote, 'stage' | 'value'>[];
 
       const stageOrder: QuoteStage[] = [
         'novo_pedido',
@@ -103,15 +107,21 @@ export function useMonthlyTrends() {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-      const { data: quotes } = await supabase
+      const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
         .select('stage, value, created_at')
         .gte('created_at', sixMonthsAgo.toISOString());
 
-      const { data: orders } = await supabase
+      if (quotesError) throw quotesError;
+      const quotes = (quotesData || []) as Pick<Quote, 'stage' | 'value' | 'created_at'>[];
+
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('value, created_at, stage')
         .gte('created_at', sixMonthsAgo.toISOString());
+
+      if (ordersError) throw ordersError;
+      const orders = (ordersData || []) as Pick<Order, 'value' | 'created_at' | 'stage'>[];
 
       const monthlyData: Record<string, MonthlyTrend> = {};
 
@@ -130,10 +140,10 @@ export function useMonthlyTrends() {
       }
 
       // Count quotes
-      let wonQuotesPerMonth: Record<string, number> = {};
-      let totalQuotesPerMonth: Record<string, number> = {};
+      const wonQuotesPerMonth: Record<string, number> = {};
+      const totalQuotesPerMonth: Record<string, number> = {};
 
-      quotes?.forEach((quote) => {
+      quotes.forEach((quote) => {
         const monthKey = new Date(quote.created_at).toLocaleDateString('pt-BR', { 
           month: 'short', 
           year: '2-digit' 
@@ -148,7 +158,7 @@ export function useMonthlyTrends() {
       });
 
       // Count orders and revenue
-      orders?.forEach((order) => {
+      orders.forEach((order) => {
         const monthKey = new Date(order.created_at).toLocaleDateString('pt-BR', { 
           month: 'short', 
           year: '2-digit' 
@@ -180,48 +190,53 @@ export function usePerformanceMetrics() {
       const now = new Date();
       const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
       // This month data
-      const { data: quotesThisMonth } = await supabase
+      const { data: quotesThisMonthData, error: q1Error } = await supabase
         .from('quotes')
         .select('value')
         .gte('created_at', thisMonthStart.toISOString());
+      if (q1Error) throw q1Error;
+      const quotesThisMonth = (quotesThisMonthData || []) as Pick<Quote, 'value'>[];
 
-      const { data: ordersThisMonth } = await supabase
+      const { data: ordersThisMonthData, error: o1Error } = await supabase
         .from('orders')
         .select('value, stage')
         .gte('created_at', thisMonthStart.toISOString());
+      if (o1Error) throw o1Error;
+      const ordersThisMonth = (ordersThisMonthData || []) as Pick<Order, 'value' | 'stage'>[];
 
       // Last month data
-      const { data: quotesLastMonth } = await supabase
+      const { data: quotesLastMonthData, error: q2Error } = await supabase
         .from('quotes')
         .select('value')
         .gte('created_at', lastMonthStart.toISOString())
         .lt('created_at', thisMonthStart.toISOString());
+      if (q2Error) throw q2Error;
+      const quotesLastMonth = (quotesLastMonthData || []) as Pick<Quote, 'value'>[];
 
-      const { data: ordersLastMonth } = await supabase
+      const { data: ordersLastMonthData, error: o2Error } = await supabase
         .from('orders')
         .select('value, stage')
         .gte('created_at', lastMonthStart.toISOString())
         .lt('created_at', thisMonthStart.toISOString());
+      if (o2Error) throw o2Error;
+      const ordersLastMonth = (ordersLastMonthData || []) as Pick<Order, 'value' | 'stage'>[];
 
       // Calculate averages
-      const allQuotes = quotesThisMonth || [];
-      const allOrders = ordersThisMonth || [];
-      const avgQuoteValue = allQuotes.length > 0 
-        ? allQuotes.reduce((acc, q) => acc + Number(q.value), 0) / allQuotes.length 
+      const avgQuoteValue = quotesThisMonth.length > 0 
+        ? quotesThisMonth.reduce((acc, q) => acc + Number(q.value), 0) / quotesThisMonth.length 
         : 0;
-      const avgOrderValue = allOrders.length > 0 
-        ? allOrders.reduce((acc, o) => acc + Number(o.value), 0) / allOrders.length 
+      const avgOrderValue = ordersThisMonth.length > 0 
+        ? ordersThisMonth.reduce((acc, o) => acc + Number(o.value), 0) / ordersThisMonth.length 
         : 0;
 
       // Revenue calculations
-      const revenueThisMonth = (ordersThisMonth || [])
+      const revenueThisMonth = ordersThisMonth
         .filter((o) => o.stage === 'entregue')
         .reduce((acc, o) => acc + Number(o.value), 0);
 
-      const revenueLastMonth = (ordersLastMonth || [])
+      const revenueLastMonth = ordersLastMonth
         .filter((o) => o.stage === 'entregue')
         .reduce((acc, o) => acc + Number(o.value), 0);
 
@@ -229,11 +244,11 @@ export function usePerformanceMetrics() {
         avgDeliveryTime: 3.5, // Placeholder - would need delivery date tracking
         avgQuoteValue,
         avgOrderValue,
-        quotesThisMonth: quotesThisMonth?.length || 0,
-        ordersThisMonth: ordersThisMonth?.length || 0,
+        quotesThisMonth: quotesThisMonth.length,
+        ordersThisMonth: ordersThisMonth.length,
         revenueThisMonth,
-        quotesLastMonth: quotesLastMonth?.length || 0,
-        ordersLastMonth: ordersLastMonth?.length || 0,
+        quotesLastMonth: quotesLastMonth.length,
+        ordersLastMonth: ordersLastMonth.length,
         revenueLastMonth,
       } as PerformanceMetrics;
     },
@@ -244,11 +259,12 @@ export function useQuoteStageDistribution() {
   return useQuery({
     queryKey: ['quote-stage-distribution'],
     queryFn: async () => {
-      const { data: quotes } = await supabase
+      const { data, error } = await supabase
         .from('quotes')
         .select('stage');
 
-      if (!quotes) return [];
+      if (error) throw error;
+      const quotes = (data || []) as Pick<Quote, 'stage'>[];
 
       const stageCounts: Record<string, number> = {};
       quotes.forEach((q) => {
@@ -279,11 +295,12 @@ export function useOrderStageDistribution() {
   return useQuery({
     queryKey: ['order-stage-distribution'],
     queryFn: async () => {
-      const { data: orders } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select('stage');
 
-      if (!orders) return [];
+      if (error) throw error;
+      const orders = (data || []) as Pick<Order, 'stage'>[];
 
       const stageCounts: Record<string, number> = {};
       orders.forEach((o) => {
@@ -310,35 +327,38 @@ export function useOrderStageDistribution() {
 }
 
 export interface ExportData {
-  quotes: any[];
-  orders: any[];
-  clients: any[];
+  quotes: Quote[];
+  orders: Order[];
+  clients: Client[];
 }
 
 export function useExportData() {
   return useQuery({
     queryKey: ['export-data'],
     queryFn: async () => {
-      const { data: quotes } = await supabase
+      const { data: quotesData, error: qError } = await supabase
         .from('quotes')
         .select('*')
         .order('created_at', { ascending: false });
+      if (qError) throw qError;
 
-      const { data: orders } = await supabase
+      const { data: ordersData, error: oError } = await supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
+      if (oError) throw oError;
 
-      const { data: clients } = await supabase
+      const { data: clientsData, error: cError } = await supabase
         .from('clients')
         .select('*')
         .order('created_at', { ascending: false });
+      if (cError) throw cError;
 
       return {
-        quotes: quotes || [],
-        orders: orders || [],
-        clients: clients || [],
-      } as ExportData;
+        quotes: (quotesData as unknown as Quote[]) || [],
+        orders: (ordersData as unknown as Order[]) || [],
+        clients: (clientsData as unknown as Client[]) || [],
+      };
     },
     enabled: false, // Only fetch when needed
   });
