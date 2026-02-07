@@ -39,6 +39,7 @@ interface ImportResponse {
   rowsTotal: number;
   rowsInserted: number;
   rowsUpdated: number;
+  duplicatesRemoved: number;
   errors: string[];
 }
 
@@ -91,27 +92,21 @@ interface RangeWithIndex {
   index: number;
 }
 
-function detectDuplicateRanges(rows: PriceTableRowInput[]): string[] {
-  const errors: string[] = [];
-  const seen = new Map<string, number[]>();
-  
-  rows.forEach((row, index) => {
-    if (row.km_from === undefined || row.km_to === undefined) return;
+// Deduplicates rows by km_from-km_to key using "last-wins" strategy
+function deduplicateRows(rows: PriceTableRowInput[]): { 
+  uniqueRows: PriceTableRowInput[]; 
+  duplicatesRemoved: number 
+} {
+  const map = new Map<string, PriceTableRowInput>();
+  for (const row of rows) {
+    if (row.km_from === undefined || row.km_to === undefined) continue;
     const key = `${row.km_from}-${row.km_to}`;
-    if (!seen.has(key)) {
-      seen.set(key, []);
-    }
-    seen.get(key)!.push(index + 1); // 1-indexed for user display
-  });
-  
-  for (const [key, indices] of seen.entries()) {
-    if (indices.length > 1) {
-      const [kmFrom, kmTo] = key.split('-');
-      errors.push(`Faixa duplicada km_from=${kmFrom} km_to=${kmTo} (linhas ${indices.join(', ')})`);
-    }
+    map.set(key, row); // last occurrence wins
   }
-  
-  return errors;
+  return {
+    uniqueRows: Array.from(map.values()),
+    duplicatesRemoved: rows.length - map.size
+  };
 }
 
 function detectOverlappingRanges(rows: PriceTableRowInput[]): string[] {
@@ -271,25 +266,28 @@ serve(async (req) => {
       );
     }
 
-    // GLOBAL VALIDATIONS: Check for duplicates and overlaps BEFORE any DB changes
-    const duplicateErrors = detectDuplicateRanges(rows);
-    const overlapErrors = detectOverlappingRanges(rows);
+    // DEDUPLICATION: Remove duplicates using "last-wins" strategy
+    const { uniqueRows, duplicatesRemoved } = deduplicateRows(rows);
     
-    const duplicateCount = duplicateErrors.length;
-    const overlapCount = overlapErrors.length;
+    if (duplicatesRemoved > 0) {
+      console.log(`[import-price-table] Deduplicação: ${duplicatesRemoved} linhas duplicadas removidas (last-wins)`);
+    }
+
+    // OVERLAP VALIDATION: Check for overlapping ranges AFTER deduplication
+    const overlapErrors = detectOverlappingRanges(uniqueRows);
     
-    console.log(`[import-price-table] Global validation: ${rows.length} linhas, ${duplicateCount} duplicatas, ${overlapCount} sobreposições`);
+    console.log(`[import-price-table] Validação global: ${rows.length} linhas originais, ${uniqueRows.length} após deduplicação, ${overlapErrors.length} sobreposições`);
     
-    if (duplicateCount > 0 || overlapCount > 0) {
-      const globalErrors = [...duplicateErrors, ...overlapErrors];
-      console.error('[import-price-table] Global validation errors:', globalErrors);
+    if (overlapErrors.length > 0) {
+      console.error('[import-price-table] Faixas sobrepostas detectadas:', overlapErrors);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          rowsTotal: rows.length, 
+          rowsTotal: rows.length,
+          duplicatesRemoved,
           rowsInserted: 0, 
           rowsUpdated: 0, 
-          errors: globalErrors
+          errors: overlapErrors
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -324,7 +322,8 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             success: false, 
-            rowsTotal, 
+            rowsTotal,
+            duplicatesRemoved,
             rowsInserted: 0, 
             rowsUpdated: 0, 
             errors: [`Erro ao criar tabela de preço: ${insertError.message}`] 
@@ -355,7 +354,8 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             success: false, 
-            rowsTotal, 
+            rowsTotal,
+            duplicatesRemoved,
             rowsInserted: 0, 
             rowsUpdated: 0, 
             errors: [`Erro ao atualizar tabela de preço: ${updateError.message}`] 
@@ -393,7 +393,8 @@ serve(async (req) => {
           JSON.stringify({ 
             success: false, 
             priceTableId,
-            rowsTotal, 
+            rowsTotal,
+            duplicatesRemoved,
             rowsInserted: 0, 
             rowsUpdated: 0, 
             errors: [`Erro ao ativar tabela: ${activateError.message}`] 
@@ -419,7 +420,8 @@ serve(async (req) => {
           JSON.stringify({ 
             success: false, 
             priceTableId,
-            rowsTotal, 
+            rowsTotal,
+            duplicatesRemoved,
             rowsInserted: 0, 
             rowsUpdated: 0, 
             errors: [`Erro ao remover linhas existentes: ${deleteError.message}`] 
@@ -428,8 +430,8 @@ serve(async (req) => {
         );
       }
 
-      // Insert all new rows
-      const rowsToInsert = rows.map(row => ({
+      // Insert deduplicated rows
+      const rowsToInsert = uniqueRows.map(row => ({
         price_table_id: priceTableId,
         km_from: row.km_from,
         km_to: row.km_to,
@@ -452,7 +454,8 @@ serve(async (req) => {
           JSON.stringify({ 
             success: false, 
             priceTableId,
-            rowsTotal, 
+            rowsTotal,
+            duplicatesRemoved,
             rowsInserted: 0, 
             rowsUpdated: 0, 
             errors: [`Erro ao inserir linhas: ${insertRowsError.message}`] 
@@ -461,27 +464,13 @@ serve(async (req) => {
         );
       }
 
-      rowsInserted = rowsTotal;
+      rowsInserted = uniqueRows.length;
       rowsUpdated = 0;
-      console.log('[import-price-table] Replace complete:', { rowsInserted });
+      console.log('[import-price-table] Replace complete:', { rowsInserted, duplicatesRemoved });
 
     } else {
-      // Upsert mode
+      // Upsert mode - use already deduplicated uniqueRows
       console.log('[import-price-table] Upsert mode: checking existing rows');
-
-      // IMPORTANT: Deduplicate rows by km_from/km_to to avoid "ON CONFLICT DO UPDATE cannot affect row a second time" error
-      // Keep the last occurrence of each duplicate key
-      const deduplicatedRowsMap = new Map<string, PriceTableRowInput>();
-      for (const row of rows) {
-        const key = `${row.km_from}-${row.km_to}`;
-        deduplicatedRowsMap.set(key, row);
-      }
-      const deduplicatedRows = Array.from(deduplicatedRowsMap.values());
-      
-      const duplicatesRemoved = rows.length - deduplicatedRows.length;
-      if (duplicatesRemoved > 0) {
-        console.log(`[import-price-table] Removed ${duplicatesRemoved} duplicate rows from input`);
-      }
 
       // Get existing row keys to calculate counts
       const { data: existingRows, error: fetchError } = await supabase
@@ -500,23 +489,24 @@ serve(async (req) => {
       );
 
       // Count how many incoming rows match existing keys (using deduplicated rows)
-      const matchingKeys = deduplicatedRows.filter(r => 
+      const matchingKeys = uniqueRows.filter(r => 
         existingKeys.has(`${r.km_from}-${r.km_to}`)
       ).length;
 
       rowsUpdated = matchingKeys;
-      rowsInserted = deduplicatedRows.length - matchingKeys;
+      rowsInserted = uniqueRows.length - matchingKeys;
 
       console.log('[import-price-table] Upsert counts:', { 
         rowsUpdated, 
         rowsInserted, 
         existingCount: existingKeys.size,
         originalRows: rows.length,
-        deduplicatedRows: deduplicatedRows.length
+        uniqueRows: uniqueRows.length,
+        duplicatesRemoved
       });
 
       // Upsert deduplicated rows
-      const rowsToUpsert = deduplicatedRows.map(row => ({
+      const rowsToUpsert = uniqueRows.map(row => ({
         price_table_id: priceTableId,
         km_from: row.km_from,
         km_to: row.km_to,
@@ -542,7 +532,8 @@ serve(async (req) => {
           JSON.stringify({ 
             success: false, 
             priceTableId,
-            rowsTotal, 
+            rowsTotal,
+            duplicatesRemoved,
             rowsInserted: 0, 
             rowsUpdated: 0, 
             errors: [`Erro ao inserir/atualizar linhas: ${upsertError.message}`] 
@@ -560,6 +551,7 @@ serve(async (req) => {
       rowsTotal,
       rowsInserted,
       rowsUpdated,
+      duplicatesRemoved,
       errors: []
     };
 
