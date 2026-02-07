@@ -28,10 +28,12 @@ import {
   useUpsertIcmsRates
 } from '@/hooks/useIcmsRates';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Check, Loader2, TableIcon, Activity, Receipt, Upload, FileSpreadsheet } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, Loader2, TableIcon, Activity, Receipt, Upload, FileSpreadsheet, Settings2, Calculator } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PriceTableImportModal } from '@/components/pricing/PriceTableImportModal';
+import { PricingRulesTab } from '@/components/pricing/PricingRulesTab';
+import { FreightSimulator } from '@/components/pricing/FreightSimulator';
 import { parseIcmsFile, ParsedIcmsRow } from '@/lib/priceTableParser';
 import { cn } from '@/lib/utils';
 
@@ -64,6 +66,14 @@ export default function PriceTables() {
               <Receipt className="h-4 w-4" />
               ICMS
             </TabsTrigger>
+            <TabsTrigger value="regras" className="gap-2">
+              <Settings2 className="h-4 w-4" />
+              Regras
+            </TabsTrigger>
+            <TabsTrigger value="simulador" className="gap-2">
+              <Calculator className="h-4 w-4" />
+              Simulador
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="tabelas">
@@ -76,6 +86,14 @@ export default function PriceTables() {
 
           <TabsContent value="icms">
             <IcmsRatesTab />
+          </TabsContent>
+
+          <TabsContent value="regras">
+            <PricingRulesTab />
+          </TabsContent>
+
+          <TabsContent value="simulador">
+            <FreightSimulator />
           </TabsContent>
         </Tabs>
       </div>
