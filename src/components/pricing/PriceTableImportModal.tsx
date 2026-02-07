@@ -150,8 +150,11 @@ export function PriceTableImportModal({
 
       if (result.success) {
         setStep('done');
+        const duplicateMsg = result.duplicatesRemoved > 0 
+          ? `, ${result.duplicatesRemoved} duplicata(s) removida(s)` 
+          : '';
         toast.success(
-          `Importação concluída: ${result.rowsInserted} inserida(s), ${result.rowsUpdated} atualizada(s)`
+          `Importação concluída: ${result.rowsInserted} inserida(s), ${result.rowsUpdated} atualizada(s)${duplicateMsg}`
         );
         setTimeout(() => {
           handleClose();

@@ -23,6 +23,7 @@ export interface ImportPriceTableResult {
   rowsTotal: number;
   rowsInserted: number;
   rowsUpdated: number;
+  duplicatesRemoved: number;
   errors: string[];
 }
 
@@ -52,6 +53,7 @@ export function useImportPriceTable() {
           rowsTotal: 0,
           rowsInserted: 0,
           rowsUpdated: 0,
+          duplicatesRemoved: 0,
           errors: ['Nenhuma linha válida para importar'],
         };
       }
