@@ -219,7 +219,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                       <Input
                         placeholder="00.000.000/0000-00"
                         {...field}
-                        onBlur={async () => {
+                        onBlur={async (e) => {
                           field.onBlur();
                           await handleCnpjLookup();
                         }}

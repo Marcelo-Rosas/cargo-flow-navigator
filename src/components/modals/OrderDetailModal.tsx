@@ -10,7 +10,8 @@ import {
   CheckCircle2,
   Clock,
   DollarSign,
-  Pencil
+  Pencil,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

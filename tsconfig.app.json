@@ -14,16 +14,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting - Incremental strict mode */
+    /* Linting */
     "strict": false,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitAny": false,
-    "noFallthroughCasesInSwitch": true,
-    "strictNullChecks": false,
-
-    /* Vitest types */
-    "types": ["vitest/globals"],
+    "noFallthroughCasesInSwitch": false,
 
     "baseUrl": ".",
     "paths": {

@@ -25,7 +25,7 @@ export function useAuditLogs(tableName?: string, recordId?: string) {
       const { data, error } = await query;
 
       if (error) throw error;
-      return (data || []) as AuditLog[];
+      return data as AuditLog[];
     },
   });
 }
@@ -42,7 +42,7 @@ export function useRecordHistory(tableName: string, recordId: string) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as AuditLog[];
+      return data as AuditLog[];
     },
     enabled: !!tableName && !!recordId,
   });

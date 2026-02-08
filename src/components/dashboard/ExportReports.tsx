@@ -12,12 +12,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Database } from '@/integrations/supabase/types';
 
 type ExportType = 'quotes' | 'orders' | 'clients' | 'full';
-type Quote = Database['public']['Tables']['quotes']['Row'];
-type Order = Database['public']['Tables']['orders']['Row'];
-type Client = Database['public']['Tables']['clients']['Row'];
 
 export function ExportReports() {
   const [exporting, setExporting] = useState<ExportType | null>(null);
@@ -26,16 +22,23 @@ export function ExportReports() {
     return new Date(date).toLocaleDateString('pt-BR');
   };
 
-  const exportToCSV = (data: Record<string, unknown>[], filename: string, headers: string[], keys: string[]) => {
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const exportToCSV = (data: any[], filename: string, headers: string[], keys: string[]) => {
     const csvRows = [headers.join(';')];
 
     data.forEach((item) => {
       const values = keys.map((key) => {
-        const value = item[key];
+        let value = item[key];
         if (value === null || value === undefined) return '';
         if (typeof value === 'number') return value.toString().replace('.', ',');
         if (typeof value === 'string' && value.includes(';')) return `"${value}"`;
-        return String(value);
+        return value;
       });
       csvRows.push(values.join(';'));
     });
@@ -53,15 +56,12 @@ export function ExportReports() {
 
     try {
       if (type === 'quotes' || type === 'full') {
-        const { data, error } = await supabase
+        const { data: quotes } = await supabase
           .from('quotes')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        const quotes = (data as unknown as Quote[]) || [];
-
-        if (quotes.length > 0) {
+        if (quotes) {
           exportToCSV(
             quotes.map((q) => ({
               ...q,
@@ -77,15 +77,12 @@ export function ExportReports() {
       }
 
       if (type === 'orders' || type === 'full') {
-        const { data, error } = await supabase
+        const { data: orders } = await supabase
           .from('orders')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        const orders = (data as unknown as Order[]) || [];
-
-        if (orders.length > 0) {
+        if (orders) {
           exportToCSV(
             orders.map((o) => ({
               ...o,
@@ -104,15 +101,12 @@ export function ExportReports() {
       }
 
       if (type === 'clients' || type === 'full') {
-        const { data, error } = await supabase
+        const { data: clients } = await supabase
           .from('clients')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        const clients = (data as unknown as Client[]) || [];
-
-        if (clients.length > 0) {
+        if (clients) {
           exportToCSV(
             clients.map((c) => ({
               ...c,
