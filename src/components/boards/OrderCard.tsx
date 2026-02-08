@@ -219,39 +219,53 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
         </div>
       )}
 
-      {/* Document Status */}
-      <div className="flex gap-1 mb-3">
-        <Badge 
-          variant={order.has_nfe ? "default" : "outline"} 
-          className={cn(
-            "text-xs",
-            order.has_nfe ? "bg-success/20 text-success border-success/30" : "border-muted-foreground/30"
+      {/* Documentos - Agrupados por Categoria */}
+      {hasDocumentsToShow && (
+        <div className="space-y-2 mb-3">
+          {Object.entries(documentsByGroup).map(([group, docs]) => (
+            <div key={group} className="space-y-1">
+              <div className="flex flex-wrap gap-1.5">
+                {docs.map(doc => {
+                  const hasDoc = order[doc.key as keyof Order];
+                  return (
+                    <Badge 
+                      key={doc.key}
+                      variant={hasDoc ? "default" : "outline"} 
+                      className={cn(
+                        "text-xs font-medium transition-all",
+                        hasDoc 
+                          ? "bg-success/15 text-success border-success/40 hover:bg-success/20" 
+                          : "border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 bg-background"
+                      )}
+                    >
+                      {hasDoc && <CheckCircle className="w-3 h-3 mr-1" />}
+                      {doc.label}
+                    </Badge>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          
+          {/* Barra de Progresso */}
+          {totalDocs > 0 && (
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={cn(
+                    "h-full transition-all duration-300 rounded-full",
+                    progressPercentage === 100 ? "bg-success" : "bg-primary"
+                  )}
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
+              <span className="text-xs text-muted-foreground font-medium min-w-[45px] text-right">
+                {Math.round(progressPercentage)}%
+              </span>
+            </div>
           )}
-        >
-          {order.has_nfe && <CheckCircle className="w-3 h-3 mr-1" />}
-          NF-e
-        </Badge>
-        <Badge 
-          variant={order.has_cte ? "default" : "outline"} 
-          className={cn(
-            "text-xs",
-            order.has_cte ? "bg-success/20 text-success border-success/30" : "border-muted-foreground/30"
-          )}
-        >
-          {order.has_cte && <CheckCircle className="w-3 h-3 mr-1" />}
-          CT-e
-        </Badge>
-        <Badge 
-          variant={order.has_pod ? "default" : "outline"} 
-          className={cn(
-            "text-xs",
-            order.has_pod ? "bg-success/20 text-success border-success/30" : "border-muted-foreground/30"
-          )}
-        >
-          {order.has_pod && <CheckCircle className="w-3 h-3 mr-1" />}
-          POD
-        </Badge>
-      </div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-border">
