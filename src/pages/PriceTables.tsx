@@ -579,16 +579,36 @@ function IcmsRatesTab() {
 
     setIsImporting(true);
     try {
-      await upsertRates.mutateAsync(validRows.map(r => ({
+      const result = await upsertRates.mutateAsync(validRows.map(r => ({
         origin_state: r.origin_state,
         destination_state: r.destination_state,
         rate_percent: r.rate_percent,
       })));
-      toast.success(`${validRows.length} alíquota(s) importada(s)`);
+      
+      // Show detailed result
+      if (result.success) {
+        toast.success(`Importação concluída: ${result.inserted} inseridas, ${result.updated} atualizadas`);
+      } else {
+        toast.warning(
+          `Importação parcial: ${result.inserted} inseridas, ${result.updated} atualizadas, ${result.failed} com erro`,
+          { duration: 6000 }
+        );
+        // Log first 5 errors
+        result.errors.slice(0, 5).forEach(err => {
+          toast.error(err, { duration: 5000 });
+        });
+        if (result.errors.length > 5) {
+          toast.info(`+ ${result.errors.length - 5} erros adicionais (ver console)`);
+          console.error('[ICMS Import Errors]', result.errors);
+        }
+      }
+      
       setIsImportOpen(false);
       setImportParsedRows([]);
     } catch (error) {
-      toast.error('Erro ao importar alíquotas');
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error(`Erro ao importar: ${msg}`);
+      console.error('[ICMS Import]', error);
     } finally {
       setIsImporting(false);
     }

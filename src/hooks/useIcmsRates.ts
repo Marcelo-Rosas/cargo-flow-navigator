@@ -126,67 +126,111 @@ export function useDeleteIcmsRate() {
   });
 }
 
+export interface UpsertResult {
+  success: boolean;
+  inserted: number;
+  updated: number;
+  failed: number;
+  errors: string[];
+}
+
+const BATCH_SIZE = 500;
+
 export function useUpsertIcmsRates() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (rates: Omit<IcmsRateInsert, 'id'>[]) => {
-      const results = [];
+    mutationFn: async (rates: Omit<IcmsRateInsert, 'id'>[]): Promise<UpsertResult> => {
+      const result: UpsertResult = {
+        success: true,
+        inserted: 0,
+        updated: 0,
+        failed: 0,
+        errors: [],
+      };
 
-      for (const rate of rates) {
-        const originState = rate.origin_state.toUpperCase();
-        const destState = rate.destination_state.toUpperCase();
+      // Process in batches to avoid payload limits
+      for (let batchStart = 0; batchStart < rates.length; batchStart += BATCH_SIZE) {
+        const batch = rates.slice(batchStart, batchStart + BATCH_SIZE);
+        const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
         
-        // Normalize rate_percent: if value is between 0 and 1, multiply by 100
-        // This ensures values like 0.12 become 12 (percent scale)
-        let normalizedRate = Number(rate.rate_percent);
-        if (normalizedRate > 0 && normalizedRate < 1) {
-          normalizedRate = normalizedRate * 100;
-        }
+        for (let i = 0; i < batch.length; i++) {
+          const rate = batch[i];
+          const rowNum = batchStart + i + 1;
+          
+          try {
+            const originState = rate.origin_state.toUpperCase().trim();
+            const destState = rate.destination_state.toUpperCase().trim();
+            
+            // Validate state format
+            if (!/^[A-Z]{2}$/.test(originState) || !/^[A-Z]{2}$/.test(destState)) {
+              result.failed++;
+              result.errors.push(`Linha ${rowNum}: UF inválida (${originState} → ${destState})`);
+              continue;
+            }
+            
+            // Validate rate_percent is in expected range (0-25)
+            const ratePercent = Number(rate.rate_percent);
+            if (isNaN(ratePercent) || (ratePercent !== 0 && (ratePercent < 3 || ratePercent > 25))) {
+              result.failed++;
+              result.errors.push(`Linha ${rowNum}: Alíquota ${ratePercent} fora do intervalo 3-25%`);
+              continue;
+            }
 
-        // Check if record exists
-        const { data: existing } = await supabase
-          .from('icms_rates')
-          .select('id')
-          .eq('origin_state', originState)
-          .eq('destination_state', destState)
-          .maybeSingle();
+            // Check if record exists
+            const { data: existing } = await supabase
+              .from('icms_rates')
+              .select('id')
+              .eq('origin_state', originState)
+              .eq('destination_state', destState)
+              .maybeSingle();
 
-        if (existing) {
-          // Update existing record
-          const { data, error } = await supabase
-            .from('icms_rates')
-            .update({
-              rate_percent: normalizedRate,
-              valid_from: rate.valid_from,
-              valid_until: rate.valid_until,
-            })
-            .eq('id', existing.id)
-            .select()
-            .single();
+            if (existing) {
+              // Update existing record
+              const { error } = await supabase
+                .from('icms_rates')
+                .update({
+                  rate_percent: ratePercent,
+                  valid_from: rate.valid_from,
+                  valid_until: rate.valid_until,
+                })
+                .eq('id', existing.id);
 
-          if (error) throw error;
-          results.push(data);
-        } else {
-          // Insert new record
-          const { data, error } = await supabase
-            .from('icms_rates')
-            .insert({
-              origin_state: originState,
-              destination_state: destState,
-              rate_percent: normalizedRate,
-              valid_from: rate.valid_from,
-              valid_until: rate.valid_until,
-            })
-            .select()
-            .single();
+              if (error) {
+                result.failed++;
+                result.errors.push(`Linha ${rowNum} (batch ${batchNum}): ${error.message}`);
+              } else {
+                result.updated++;
+              }
+            } else {
+              // Insert new record
+              const { error } = await supabase
+                .from('icms_rates')
+                .insert({
+                  origin_state: originState,
+                  destination_state: destState,
+                  rate_percent: ratePercent,
+                  valid_from: rate.valid_from,
+                  valid_until: rate.valid_until,
+                });
 
-          if (error) throw error;
-          results.push(data);
+              if (error) {
+                result.failed++;
+                result.errors.push(`Linha ${rowNum} (batch ${batchNum}): ${error.message}`);
+              } else {
+                result.inserted++;
+              }
+            }
+          } catch (err) {
+            result.failed++;
+            const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+            result.errors.push(`Linha ${rowNum} (batch ${batchNum}): ${msg}`);
+          }
         }
       }
 
-      return results;
+      result.success = result.failed === 0;
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['icms_rates'] });
