@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
+import { STAGE_DOCUMENTS } from '@/lib/order-documents';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -71,6 +72,34 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
   const hasOccurrences = occurrences.length > 0;
   const hasCriticalDocs = !order.has_nfe || !order.has_cte;
   const needsPod = order.stage === 'entregue' && !order.has_pod;
+
+  // Documentos visíveis para o estágio atual
+  const visibleDocuments = STAGE_DOCUMENTS[order.stage] || [];
+  const hasDocumentsToShow = visibleDocuments.length > 0;
+
+  // Agrupa documentos por categoria
+  const documentsByGroup = visibleDocuments.reduce((acc, doc) => {
+    if (!acc[doc.group]) acc[doc.group] = [];
+    acc[doc.group].push(doc);
+    return acc;
+  }, {} as Record<string, typeof visibleDocuments>);
+
+  // Calcula progresso
+  const totalDocs = visibleDocuments.length;
+  const completedDocs = visibleDocuments.filter(doc => order[doc.key as keyof Order]).length;
+  const progressPercentage = totalDocs > 0 ? (completedDocs / totalDocs) * 100 : 0;
+  const hasPendingDocs = visibleDocuments.some(doc => !order[doc.key as keyof Order]);
+
+  // Debug checkpoint
+  console.log('OrderCard Debug:', {
+    osNumber: order.os_number,
+    stage: order.stage,
+    totalDocs,
+    completedDocs,
+    progressPercentage,
+    hasPendingDocs,
+    documentsByGroup
+  });
 
   return (
     <motion.div
