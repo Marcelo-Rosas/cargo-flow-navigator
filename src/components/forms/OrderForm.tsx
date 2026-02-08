@@ -30,6 +30,8 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { useCreateOrder, useUpdateOrder, OrderWithOccurrences } from '@/hooks/useOrders';
 import { useClients } from '@/hooks/useClients';
+import { useDrivers } from '@/hooks/useDrivers';
+import { useVehicles } from '@/hooks/useVehicles';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -39,6 +41,7 @@ const orderSchema = z.object({
   origin: z.string().min(2, 'Origem obrigatória'),
   destination: z.string().min(2, 'Destino obrigatório'),
   value: z.number().min(0, 'Valor inválido'),
+  driver_id: z.string().optional(),
   driver_name: z.string().optional(),
   driver_phone: z.string().optional(),
   vehicle_plate: z.string().optional(),
@@ -57,6 +60,9 @@ interface OrderFormProps {
 export function OrderForm({ open, onClose, order }: OrderFormProps) {
   const { user } = useAuth();
   const { data: clients } = useClients();
+  const { data: drivers } = useDrivers();
+  const [selectedDriverId, setSelectedDriverId] = useState<string | undefined>(undefined);
+  const { data: vehicles } = useVehicles(selectedDriverId);
   const createOrderMutation = useCreateOrder();
   const updateOrderMutation = useUpdateOrder();
   const isEditing = !!order;
@@ -69,6 +75,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
       origin: '',
       destination: '',
       value: 0,
+      driver_id: '',
       driver_name: '',
       driver_phone: '',
       vehicle_plate: '',
@@ -79,12 +86,14 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
 
   useEffect(() => {
     if (order) {
+      setSelectedDriverId(order.driver_id || undefined);
       form.reset({
         client_id: order.client_id || '',
         client_name: order.client_name,
         origin: order.origin,
         destination: order.destination,
         value: Number(order.value) || 0,
+        driver_id: order.driver_id || '',
         driver_name: order.driver_name || '',
         driver_phone: order.driver_phone || '',
         vehicle_plate: order.vehicle_plate || '',
@@ -92,12 +101,14 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         notes: order.notes || '',
       });
     } else {
+      setSelectedDriverId(undefined);
       form.reset({
         client_id: '',
         client_name: '',
         origin: '',
         destination: '',
         value: 0,
+        driver_id: '',
         driver_name: '',
         driver_phone: '',
         vehicle_plate: '',
@@ -115,6 +126,25 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
     }
   };
 
+  const handleDriverSelect = (driverId: string) => {
+    const selectedDriver = drivers?.find(d => d.id === driverId);
+    if (selectedDriver) {
+      setSelectedDriverId(driverId);
+      form.setValue('driver_id', driverId);
+      form.setValue('driver_name', selectedDriver.name);
+      form.setValue('driver_phone', selectedDriver.phone || '');
+      // Clear vehicle when driver changes
+      form.setValue('vehicle_plate', '');
+    }
+  };
+
+  const handleVehicleSelect = (vehicleId: string) => {
+    const selectedVehicle = vehicles?.find(v => v.id === vehicleId);
+    if (selectedVehicle) {
+      form.setValue('vehicle_plate', selectedVehicle.plate);
+    }
+  };
+
   const onSubmit = async (data: OrderFormData) => {
     if (!user) {
       toast.error('Você precisa estar logado');
@@ -128,6 +158,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         origin: data.origin,
         destination: data.destination,
         value: data.value,
+        driver_id: data.driver_id || null,
         driver_name: data.driver_name || null,
         driver_phone: data.driver_phone || null,
         vehicle_plate: data.vehicle_plate || null,
@@ -300,13 +331,27 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="driver_name"
+                  name="driver_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nome do Motorista</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Nome completo" {...field} />
-                      </FormControl>
+                      <FormLabel>Motorista</FormLabel>
+                      <Select 
+                        onValueChange={(value) => handleDriverSelect(value)}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecionar motorista..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {drivers?.map((driver) => (
+                            <SelectItem key={driver.id} value={driver.id}>
+                              {driver.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -319,7 +364,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                     <FormItem>
                       <FormLabel>Telefone do Motorista</FormLabel>
                       <FormControl>
-                        <Input placeholder="(11) 99999-9999" {...field} />
+                        <Input placeholder="(11) 99999-9999" {...field} readOnly className="bg-muted/50" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -327,19 +372,29 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="vehicle_plate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Placa do Veículo</FormLabel>
-                    <FormControl>
-                      <Input placeholder="ABC-1234" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <FormItem>
+                <FormLabel>Veículo</FormLabel>
+                <Select 
+                  onValueChange={(value) => handleVehicleSelect(value)}
+                  disabled={!selectedDriverId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedDriverId ? "Selecionar veículo..." : "Selecione um motorista primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehicles?.map((vehicle) => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.plate} {vehicle.brand && vehicle.model ? `- ${vehicle.brand} ${vehicle.model}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.watch('vehicle_plate') && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Placa selecionada: <span className="font-mono font-medium">{form.watch('vehicle_plate')}</span>
+                  </p>
                 )}
-              />
+              </FormItem>
             </div>
 
             <Separator />

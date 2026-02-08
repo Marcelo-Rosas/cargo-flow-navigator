@@ -11,7 +11,6 @@ import {
   Clock,
   DollarSign,
   Pencil,
-  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +46,29 @@ interface OrderDetailModalProps {
   order: OrderWithOccurrences | null;
 }
 
+// Stage visibility constants
+const STAGES_WITH_DRIVER: OrderStage[] = ['busca_motorista', 'documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
+const STAGES_WITH_FISCAL_DOCS: OrderStage[] = ['documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
+const STAGE_WITH_POD: OrderStage = 'entregue';
+const STAGE_WITH_DOCS_TAB: OrderStage = 'documentacao';
+
+// Document status mappings
+const DRIVER_DOCS: Array<{ key: keyof Order; label: string }> = [
+  { key: 'has_crlv', label: 'CRLV' },
+  { key: 'has_cnh', label: 'CNH' },
+  { key: 'has_comp_residencia', label: 'Comp.Res.' },
+  { key: 'has_antt', label: 'ANTT' },
+];
+
+const FISCAL_DOCS: Array<{ key: keyof Order; label: string }> = [
+  { key: 'has_nfe', label: 'NF-e' },
+  { key: 'has_cte', label: 'CT-e' },
+  { key: 'has_mdf', label: 'MDF-e' },
+  { key: 'has_gr', label: 'GR' },
+];
+
+const POD_DOC = { key: 'has_pod' as keyof Order, label: 'POD' };
+
 const STAGE_LABELS: Record<OrderStage, { label: string; color: string }> = {
   ordem_criada: { label: 'Ordem Criada', color: 'bg-muted text-muted-foreground' },
   busca_motorista: { label: 'Busca Motorista', color: 'bg-accent text-accent-foreground' },
@@ -55,6 +77,27 @@ const STAGE_LABELS: Record<OrderStage, { label: string; color: string }> = {
   em_transito: { label: 'Em Trânsito', color: 'bg-warning/10 text-warning-foreground' },
   entregue: { label: 'Entregue', color: 'bg-success/10 text-success' },
 };
+
+function DocumentStatusBadge({ hasDoc, label }: { hasDoc: boolean; label: string }) {
+  return (
+    <div className={cn(
+      "flex-1 p-3 rounded-lg border flex items-center gap-2 min-w-0",
+      hasDoc ? "bg-success/10 border-success/30" : "bg-muted/30 border-border"
+    )}>
+      {hasDoc ? (
+        <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+      ) : (
+        <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+      )}
+      <span className={cn(
+        "text-sm truncate",
+        hasDoc ? "text-success" : "text-muted-foreground"
+      )}>
+        {label}
+      </span>
+    </div>
+  );
+}
 
 export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps) {
   const { user } = useAuth();
@@ -66,6 +109,13 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
   if (!order) return null;
 
   const stageInfo = STAGE_LABELS[order.stage];
+  
+  // Stage-based visibility flags
+  const showDriverSection = STAGES_WITH_DRIVER.includes(order.stage);
+  const showDriverDocs = STAGES_WITH_DRIVER.includes(order.stage);
+  const showFiscalDocs = STAGES_WITH_FISCAL_DOCS.includes(order.stage);
+  const showPodDoc = order.stage === STAGE_WITH_POD;
+  const showDocsTab = order.stage === STAGE_WITH_DOCS_TAB;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -118,10 +168,12 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
           <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
             <TabsList className="flex-shrink-0">
               <TabsTrigger value="details">Detalhes</TabsTrigger>
-              <TabsTrigger value="documents" className="gap-2">
-                <FileText className="w-4 h-4" />
-                Documentos
-              </TabsTrigger>
+              {showDocsTab && (
+                <TabsTrigger value="documents" className="gap-2">
+                  <FileText className="w-4 h-4" />
+                  Documentos
+                </TabsTrigger>
+              )}
               <TabsTrigger value="occurrences" className="gap-2">
                 <AlertTriangle className="w-4 h-4" />
                 Ocorrências
@@ -141,7 +193,7 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                   <p className="text-lg text-foreground">{order.client_name}</p>
                 </div>
 
-                {/* Route */}
+                {/* Route - Always visible */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-lg bg-muted/30 border border-border">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -159,8 +211,8 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                   </div>
                 </div>
 
-                {/* Driver Info */}
-                {order.driver_name && (
+                {/* Driver Info - Visible from busca_motorista onwards */}
+                {showDriverSection && order.driver_name && (
                   <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -208,33 +260,58 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                   )}
                 </div>
 
-                {/* Document Status */}
-                <div>
-                  <h4 className="font-semibold text-foreground mb-3">Status dos Documentos</h4>
-                  <div className="flex gap-3">
-                    <div className={cn(
-                      "flex-1 p-3 rounded-lg border flex items-center gap-2",
-                      order.has_nfe ? "bg-success/10 border-success/30" : "bg-muted/30 border-border"
-                    )}>
-                      {order.has_nfe ? <CheckCircle2 className="w-5 h-5 text-success" /> : <Clock className="w-5 h-5 text-muted-foreground" />}
-                      <span className={order.has_nfe ? "text-success" : "text-muted-foreground"}>NF-e</span>
-                    </div>
-                    <div className={cn(
-                      "flex-1 p-3 rounded-lg border flex items-center gap-2",
-                      order.has_cte ? "bg-success/10 border-success/30" : "bg-muted/30 border-border"
-                    )}>
-                      {order.has_cte ? <CheckCircle2 className="w-5 h-5 text-success" /> : <Clock className="w-5 h-5 text-muted-foreground" />}
-                      <span className={order.has_cte ? "text-success" : "text-muted-foreground"}>CT-e</span>
-                    </div>
-                    <div className={cn(
-                      "flex-1 p-3 rounded-lg border flex items-center gap-2",
-                      order.has_pod ? "bg-success/10 border-success/30" : "bg-muted/30 border-border"
-                    )}>
-                      {order.has_pod ? <CheckCircle2 className="w-5 h-5 text-success" /> : <Clock className="w-5 h-5 text-muted-foreground" />}
-                      <span className={order.has_pod ? "text-success" : "text-muted-foreground"}>POD</span>
+                {/* Document Status - Stage-gated */}
+                {(showDriverDocs || showFiscalDocs || showPodDoc) && (
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-3">Status dos Documentos</h4>
+                    <div className="space-y-3">
+                      {/* Driver Documents - Visible from busca_motorista */}
+                      {showDriverDocs && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Documentos do Motorista</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {DRIVER_DOCS.map((doc) => (
+                              <DocumentStatusBadge 
+                                key={doc.key} 
+                                hasDoc={Boolean(order[doc.key])} 
+                                label={doc.label} 
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Fiscal Documents - Visible from documentacao */}
+                      {showFiscalDocs && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Documentos Fiscais</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {FISCAL_DOCS.map((doc) => (
+                              <DocumentStatusBadge 
+                                key={doc.key} 
+                                hasDoc={Boolean(order[doc.key])} 
+                                label={doc.label} 
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* POD - Visible only in entregue */}
+                      {showPodDoc && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Comprovante de Entrega</p>
+                          <div className="flex gap-2">
+                            <DocumentStatusBadge 
+                              hasDoc={Boolean(order[POD_DOC.key])} 
+                              label={POD_DOC.label} 
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Notes */}
                 {order.notes && (
@@ -252,11 +329,13 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                 </div>
               </TabsContent>
 
-              <TabsContent value="documents" className="m-0 space-y-6">
-                <DocumentUpload orderId={order.id} />
-                <Separator />
-                <DocumentList orderId={order.id} />
-              </TabsContent>
+              {showDocsTab && (
+                <TabsContent value="documents" className="m-0 space-y-6">
+                  <DocumentUpload orderId={order.id} />
+                  <Separator />
+                  <DocumentList orderId={order.id} />
+                </TabsContent>
+              )}
 
               <TabsContent value="occurrences" className="m-0 space-y-4">
                 <div className="flex justify-between items-center">
