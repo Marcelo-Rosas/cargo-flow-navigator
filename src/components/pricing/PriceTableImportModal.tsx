@@ -274,7 +274,7 @@ export function PriceTableImportModal({
 
             <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
               <p className="font-medium mb-1">Colunas esperadas:</p>
-              <p>km_from, km_to (ou faixa), cost_per_ton, cost_per_kg, gris_percent, tso_percent, toll_percent, ad_valorem_percent</p>
+              <p>km_from, km_to (ou faixa), cost_per_ton, cost_per_kg, gris_percent, tso_percent (ou ad_valorem_percent), toll_percent</p>
             </div>
           </div>
         )}
@@ -341,7 +341,6 @@ export function PriceTableImportModal({
                     <TableHead>GRIS %</TableHead>
                     <TableHead>TSO %</TableHead>
                     <TableHead>Pedágio %</TableHead>
-                    <TableHead>Ad Valorem %</TableHead>
                     <TableHead className="w-20">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -356,7 +355,6 @@ export function PriceTableImportModal({
                       <TableCell>{row.gris_percent?.toFixed(2) ?? '-'}</TableCell>
                       <TableCell>{row.tso_percent?.toFixed(2) ?? '-'}</TableCell>
                       <TableCell>{row.toll_percent?.toFixed(2) ?? '-'}</TableCell>
-                      <TableCell>{row.ad_valorem_percent?.toFixed(2) ?? '-'}</TableCell>
                       <TableCell>
                         {row.isValid ? (
                           <CheckCircle2 className="h-4 w-4 text-success" />
