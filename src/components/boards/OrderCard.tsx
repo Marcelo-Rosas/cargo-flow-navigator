@@ -109,11 +109,12 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className={cn(
-        "bg-card rounded-lg border border-border shadow-card p-4 cursor-pointer group",
-        "hover:shadow-card-hover hover:border-primary/30 transition-all duration-200",
-        isDragging && "opacity-90 rotate-2 scale-[1.02] shadow-lg z-50",
-        hasOccurrences && "border-warning/50",
-        needsPod && "border-destructive/50"
+        "bg-card rounded-lg border shadow-sm p-4 cursor-pointer group",
+        "hover:shadow-md hover:border-primary/40 transition-all duration-200",
+        isDragging && "opacity-90 rotate-1 scale-[1.02] shadow-xl z-50",
+        hasOccurrences && "border-l-4 border-l-warning",
+        hasPendingDocs && hasDocumentsToShow && "border-l-4 border-l-amber-400",
+        !hasPendingDocs && hasDocumentsToShow && "border-l-4 border-l-success"
       )}
       onClick={onEdit}
     >
@@ -129,7 +130,15 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
             <GripVertical className="w-4 h-4 text-muted-foreground" />
           </button>
           <div>
-            <h4 className="font-semibold text-foreground">{order.os_number}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="font-semibold text-foreground">{order.os_number}</h4>
+              {hasDocumentsToShow && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <FileText className="w-3 h-3" />
+                  <span className="font-medium">{completedDocs}/{totalDocs}</span>
+                </div>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground truncate max-w-[140px]">
               {order.client_name}
             </p>
