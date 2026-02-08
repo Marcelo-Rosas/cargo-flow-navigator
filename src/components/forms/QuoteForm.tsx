@@ -48,15 +48,15 @@ const quoteSchema = z.object({
   origin: z.string().min(2, 'Origem obrigatória'),
   destination: z.string().min(2, 'Destino obrigatório'),
   cargo_type: z.string().optional(),
-  weight: z.number().min(0, 'Peso inválido').optional(),
-  volume: z.number().min(0, 'Volume inválido').optional(),
-  // Pricing components
-  base_freight: z.number().min(0, 'Valor inválido'),
-  toll: z.number().min(0, 'Valor inválido'),
-  gris_percent: z.number().min(0).max(100, 'Percentual inválido'),
-  ad_valorem_percent: z.number().min(0).max(100, 'Percentual inválido'),
-  icms_percent: z.number().min(0).max(100, 'Percentual inválido'),
-  cargo_value: z.number().min(0, 'Valor inválido'),
+  weight: z.number().min(0, 'Peso inválido').optional().default(0),
+  volume: z.number().min(0, 'Volume inválido').optional().default(0),
+  // Pricing components - all optional with defaults
+  base_freight: z.number().min(0, 'Valor inválido').optional().default(0),
+  toll: z.number().min(0, 'Valor inválido').optional().default(0),
+  gris_percent: z.number().min(0).max(100, 'Percentual inválido').optional().default(0.3),
+  ad_valorem_percent: z.number().min(0).max(100, 'Percentual inválido').optional().default(0.1),
+  icms_percent: z.number().min(0).max(100, 'Percentual inválido').optional().default(12),
+  cargo_value: z.number().min(0, 'Valor inválido').optional().default(0),
   notes: z.string().max(500, 'Observações muito longas').optional(),
 });
 
