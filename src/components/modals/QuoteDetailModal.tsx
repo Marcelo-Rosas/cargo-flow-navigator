@@ -54,15 +54,13 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
 
-  if (!quote) return null;
-
-  // Fetch related data for display
-  const { data: priceTable } = usePriceTable(quote.price_table_id || '');
+  // All hooks MUST be called before any conditional returns
+  const { data: priceTable } = usePriceTable(quote?.price_table_id || '');
   
   const { data: vehicleType } = useQuery({
-    queryKey: ['vehicle-type', quote.vehicle_type_id],
+    queryKey: ['vehicle-type', quote?.vehicle_type_id],
     queryFn: async () => {
-      if (!quote.vehicle_type_id) return null;
+      if (!quote?.vehicle_type_id) return null;
       const { data } = await supabase
         .from('vehicle_types')
         .select('name, code')
@@ -70,13 +68,13 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
         .maybeSingle();
       return data;
     },
-    enabled: !!quote.vehicle_type_id,
+    enabled: !!quote?.vehicle_type_id,
   });
 
   const { data: paymentTerm } = useQuery({
-    queryKey: ['payment-term', quote.payment_term_id],
+    queryKey: ['payment-term', quote?.payment_term_id],
     queryFn: async () => {
-      if (!quote.payment_term_id) return null;
+      if (!quote?.payment_term_id) return null;
       const { data } = await supabase
         .from('payment_terms')
         .select('name, code, adjustment_percent')
@@ -84,8 +82,11 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
         .maybeSingle();
       return data;
     },
-    enabled: !!quote.payment_term_id,
+    enabled: !!quote?.payment_term_id,
   });
+
+  // Early return AFTER all hooks
+  if (!quote) return null;
 
   const stageInfo = STAGE_LABELS[quote.stage];
   const canConvert = quote.stage !== 'ganho' && quote.stage !== 'perdido';
