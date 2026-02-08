@@ -131,23 +131,62 @@ export function useUpsertIcmsRates() {
 
   return useMutation({
     mutationFn: async (rates: Omit<IcmsRateInsert, 'id'>[]) => {
-      // Normalize state codes to uppercase
-      const normalizedRates = rates.map(rate => ({
-        ...rate,
-        origin_state: rate.origin_state.toUpperCase(),
-        destination_state: rate.destination_state.toUpperCase(),
-      }));
+      const results = [];
 
-      const { data, error } = await supabase
-        .from('icms_rates')
-        .upsert(normalizedRates, {
-          onConflict: 'origin_state,destination_state',
-          ignoreDuplicates: false,
-        })
-        .select();
+      for (const rate of rates) {
+        const originState = rate.origin_state.toUpperCase();
+        const destState = rate.destination_state.toUpperCase();
+        
+        // Normalize rate_percent: if value is between 0 and 1, multiply by 100
+        // This ensures values like 0.12 become 12 (percent scale)
+        let normalizedRate = Number(rate.rate_percent);
+        if (normalizedRate > 0 && normalizedRate < 1) {
+          normalizedRate = normalizedRate * 100;
+        }
 
-      if (error) throw error;
-      return data;
+        // Check if record exists
+        const { data: existing } = await supabase
+          .from('icms_rates')
+          .select('id')
+          .eq('origin_state', originState)
+          .eq('destination_state', destState)
+          .maybeSingle();
+
+        if (existing) {
+          // Update existing record
+          const { data, error } = await supabase
+            .from('icms_rates')
+            .update({
+              rate_percent: normalizedRate,
+              valid_from: rate.valid_from,
+              valid_until: rate.valid_until,
+            })
+            .eq('id', existing.id)
+            .select()
+            .single();
+
+          if (error) throw error;
+          results.push(data);
+        } else {
+          // Insert new record
+          const { data, error } = await supabase
+            .from('icms_rates')
+            .insert({
+              origin_state: originState,
+              destination_state: destState,
+              rate_percent: normalizedRate,
+              valid_from: rate.valid_from,
+              valid_until: rate.valid_until,
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+          results.push(data);
+        }
+      }
+
+      return results;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['icms_rates'] });
