@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   Loader2,
   CheckCircle2,
-  Clock,
   DollarSign,
   Pencil,
 } from 'lucide-react';
@@ -48,26 +47,7 @@ interface OrderDetailModalProps {
 
 // Stage visibility constants
 const STAGES_WITH_DRIVER: OrderStage[] = ['busca_motorista', 'documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
-const STAGES_WITH_FISCAL_DOCS: OrderStage[] = ['documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
-const STAGE_WITH_POD: OrderStage = 'entregue';
 const STAGE_WITH_DOCS_TAB: OrderStage = 'documentacao';
-
-// Document status mappings
-const DRIVER_DOCS: Array<{ key: keyof Order; label: string }> = [
-  { key: 'has_crlv', label: 'CRLV' },
-  { key: 'has_cnh', label: 'CNH' },
-  { key: 'has_comp_residencia', label: 'Comp.Res.' },
-  { key: 'has_antt', label: 'ANTT' },
-];
-
-const FISCAL_DOCS: Array<{ key: keyof Order; label: string }> = [
-  { key: 'has_nfe', label: 'NF-e' },
-  { key: 'has_cte', label: 'CT-e' },
-  { key: 'has_mdf', label: 'MDF-e' },
-  { key: 'has_gr', label: 'GR' },
-];
-
-const POD_DOC = { key: 'has_pod' as keyof Order, label: 'POD' };
 
 const STAGE_LABELS: Record<OrderStage, { label: string; color: string }> = {
   ordem_criada: { label: 'Ordem Criada', color: 'bg-muted text-muted-foreground' },
@@ -77,27 +57,6 @@ const STAGE_LABELS: Record<OrderStage, { label: string; color: string }> = {
   em_transito: { label: 'Em Trânsito', color: 'bg-warning/10 text-warning-foreground' },
   entregue: { label: 'Entregue', color: 'bg-success/10 text-success' },
 };
-
-function DocumentStatusBadge({ hasDoc, label }: { hasDoc: boolean; label: string }) {
-  return (
-    <div className={cn(
-      "flex-1 p-3 rounded-lg border flex items-center gap-2 min-w-0",
-      hasDoc ? "bg-success/10 border-success/30" : "bg-muted/30 border-border"
-    )}>
-      {hasDoc ? (
-        <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
-      ) : (
-        <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-      )}
-      <span className={cn(
-        "text-sm truncate",
-        hasDoc ? "text-success" : "text-muted-foreground"
-      )}>
-        {label}
-      </span>
-    </div>
-  );
-}
 
 export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps) {
   const { user } = useAuth();
@@ -112,9 +71,6 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
   
   // Stage-based visibility flags
   const showDriverSection = STAGES_WITH_DRIVER.includes(order.stage);
-  const showDriverDocs = STAGES_WITH_DRIVER.includes(order.stage);
-  const showFiscalDocs = STAGES_WITH_FISCAL_DOCS.includes(order.stage);
-  const showPodDoc = order.stage === STAGE_WITH_POD;
   const showDocsTab = order.stage === STAGE_WITH_DOCS_TAB;
 
   const formatCurrency = (value: number) => {
@@ -260,58 +216,6 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                   )}
                 </div>
 
-                {/* Document Status - Stage-gated */}
-                {(showDriverDocs || showFiscalDocs || showPodDoc) && (
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-3">Status dos Documentos</h4>
-                    <div className="space-y-3">
-                      {/* Driver Documents - Visible from busca_motorista */}
-                      {showDriverDocs && (
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-2">Documentos do Motorista</p>
-                          <div className="flex gap-2 flex-wrap">
-                            {DRIVER_DOCS.map((doc) => (
-                              <DocumentStatusBadge 
-                                key={doc.key} 
-                                hasDoc={Boolean(order[doc.key])} 
-                                label={doc.label} 
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Fiscal Documents - Visible from documentacao */}
-                      {showFiscalDocs && (
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-2">Documentos Fiscais</p>
-                          <div className="flex gap-2 flex-wrap">
-                            {FISCAL_DOCS.map((doc) => (
-                              <DocumentStatusBadge 
-                                key={doc.key} 
-                                hasDoc={Boolean(order[doc.key])} 
-                                label={doc.label} 
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* POD - Visible only in entregue */}
-                      {showPodDoc && (
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-2">Comprovante de Entrega</p>
-                          <div className="flex gap-2">
-                            <DocumentStatusBadge 
-                              hasDoc={Boolean(order[POD_DOC.key])} 
-                              label={POD_DOC.label} 
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 {/* Notes */}
                 {order.notes && (
