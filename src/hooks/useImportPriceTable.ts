@@ -44,7 +44,6 @@ export function useImportPriceTable() {
           gris_percent: row.gris_percent,
           tso_percent: row.tso_percent,
           toll_percent: row.toll_percent,
-          ad_valorem_percent: row.ad_valorem_percent,
         }));
 
       if (validRows.length === 0) {

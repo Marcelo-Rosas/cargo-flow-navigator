@@ -333,7 +333,7 @@ export function FreightSimulator() {
                 <div className="space-y-2">
                   <BreakdownRow label="Frete Base" value={result.breakdown.base_freight} />
                   <BreakdownRow label="GRIS" value={result.breakdown.gris} />
-                  <BreakdownRow label="Ad Valorem" value={result.breakdown.ad_valorem} />
+                  <BreakdownRow label="TSO (Seguro Obrigatório)" value={result.breakdown.tso} />
                   <BreakdownRow label="Pedágio" value={result.breakdown.toll} />
                   <BreakdownRow 
                     label={`TAC (${result.parameters_used.tac_percent}%)`} 

@@ -139,7 +139,7 @@ export interface FreightBreakdown {
   weight_billable: number;
   base_freight: number;
   gris: number;
-  ad_valorem: number;
+  tso: number;
   toll: number;
   tac_adjustment: number;
   icms: number;

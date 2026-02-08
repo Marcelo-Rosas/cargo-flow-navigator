@@ -30,7 +30,7 @@ interface FreightBreakdown {
   weight_billable: number;
   base_freight: number;
   gris: number;
-  ad_valorem: number;
+  tso: number;
   toll: number;
   tac_adjustment: number;
   icms: number;
@@ -146,7 +146,7 @@ serve(async (req) => {
     // =====================================================
     let baseFreight = 0;
     let grisPercent = 0;
-    let adValoremPercent = 0;
+    let tsoPercent = 0;
 
     if (input.price_table_id && input.km_distance !== undefined) {
       const { data: priceRow } = await supabase
@@ -166,7 +166,10 @@ serve(async (req) => {
         }
 
         grisPercent = priceRow.gris_percent ? Number(priceRow.gris_percent) : 0;
-        adValoremPercent = priceRow.ad_valorem_percent ? Number(priceRow.ad_valorem_percent) : 0;
+        // TSO (Seguro Obrigatório) - percentual variável por faixa de distância
+        tsoPercent = priceRow.tso_percent ? Number(priceRow.tso_percent) : 0;
+        
+        console.log(`[calculate-freight] Faixa encontrada: ${priceRow.km_from}-${priceRow.km_to} km, TSO: ${tsoPercent}%`);
       } else {
         fallbacksApplied.push(`price_table_row: nenhuma faixa encontrada para ${input.km_distance} km`);
       }
@@ -174,9 +177,9 @@ serve(async (req) => {
       fallbacksApplied.push('price_table: não informada ou km_distance ausente');
     }
 
-    // Calculate GRIS and Ad Valorem
+    // Calculate GRIS and TSO (Seguro Obrigatório)
     const grisValue = (input.cargo_value * grisPercent) / 100;
-    const adValoremValue = (input.cargo_value * adValoremPercent) / 100;
+    const tsoValue = (input.cargo_value * tsoPercent) / 100;
 
     // =====================================================
     // 3. GET TOLL VALUE
@@ -384,7 +387,7 @@ serve(async (req) => {
     // =====================================================
     
     // Subtotal before ICMS and payment adjustment
-    const subtotalBeforeICMS = baseFreight + grisValue + adValoremValue + tollValue + waitingTimeCost + conditionalFeesTotal;
+    const subtotalBeforeICMS = baseFreight + grisValue + tsoValue + tollValue + waitingTimeCost + conditionalFeesTotal;
     
     // Apply TAC adjustment
     const tacAdjustment = (subtotalBeforeICMS * tacPercent) / 100;
@@ -406,7 +409,7 @@ serve(async (req) => {
       weight_billable: Math.round(weightBillable * 100) / 100,
       base_freight: Math.round(baseFreight * 100) / 100,
       gris: Math.round(grisValue * 100) / 100,
-      ad_valorem: Math.round(adValoremValue * 100) / 100,
+      tso: Math.round(tsoValue * 100) / 100,
       toll: Math.round(tollValue * 100) / 100,
       tac_adjustment: Math.round(tacAdjustment * 100) / 100,
       icms: Math.round(icmsValue * 100) / 100,

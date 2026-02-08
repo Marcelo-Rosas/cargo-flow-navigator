@@ -7,9 +7,8 @@ export interface ParsedPriceRow {
   cost_per_kg?: number | null;
   cost_value_percent?: number | null;
   gris_percent?: number | null;
-  tso_percent?: number | null;
+  tso_percent?: number | null;  // TSO (Seguro Obrigatório) - novo nome para ad_valorem
   toll_percent?: number | null;
-  ad_valorem_percent?: number | null;
   isValid: boolean;
   errors: string[];
 }
@@ -118,9 +117,9 @@ const COLUMN_MAPPINGS: Record<string, string[]> = {
   cost_per_kg: ['cost_per_kg', 'custo_kg', 'r$/kg', 'valor_kg', 'kg'],
   cost_value_percent: ['cost_value_percent', 'percent_valor', 'valor%', '%valor', 'valor_percent'],
   gris_percent: ['gris_percent', 'gris', 'gris%', '%gris'],
-  tso_percent: ['tso_percent', 'tso', 'tso%', '%tso'],
+  // TSO aceita ambos: tso_percent (novo) e ad_valorem_percent (legado)
+  tso_percent: ['tso_percent', 'tso', 'tso%', '%tso', 'ad_valorem_percent', 'ad_valorem', 'advalorem', 'ad valorem', '%ad_valorem'],
   toll_percent: ['toll_percent', 'pedagio', 'pedagio%', 'toll', '%pedagio'],
-  ad_valorem_percent: ['ad_valorem_percent', 'ad_valorem', 'advalorem', 'ad valorem', '%ad_valorem'],
 };
 
 function findColumnIndex(headers: string[], fieldName: string): number {
@@ -150,7 +149,7 @@ function validatePriceRow(row: Partial<ParsedPriceRow>, index: number): { isVali
   }
   
   // Validate percentages (0-100)
-  const percentFields: (keyof ParsedPriceRow)[] = ['cost_value_percent', 'gris_percent', 'tso_percent', 'toll_percent', 'ad_valorem_percent'];
+  const percentFields: (keyof ParsedPriceRow)[] = ['cost_value_percent', 'gris_percent', 'tso_percent', 'toll_percent'];
   for (const field of percentFields) {
     const value = row[field] as number | null | undefined;
     if (value !== null && value !== undefined && (value < 0 || value > 100)) {
@@ -181,9 +180,8 @@ export function parseCSVPriceTable(content: string, delimiter: string = ';'): Pa
   const costPerKgIdx = findColumnIndex(headers, 'cost_per_kg');
   const costValuePercentIdx = findColumnIndex(headers, 'cost_value_percent');
   const grisIdx = findColumnIndex(headers, 'gris_percent');
-  const tsoIdx = findColumnIndex(headers, 'tso_percent');
+  const tsoIdx = findColumnIndex(headers, 'tso_percent');  // Também encontra ad_valorem_percent por alias
   const tollIdx = findColumnIndex(headers, 'toll_percent');
-  const adValoremIdx = findColumnIndex(headers, 'ad_valorem_percent');
   
   const hasKmRange = kmRangeIdx !== -1;
   const hasKmSeparate = kmFromIdx !== -1 && kmToIdx !== -1;
@@ -230,7 +228,6 @@ export function parseCSVPriceTable(content: string, delimiter: string = ';'): Pa
       gris_percent: grisIdx !== -1 ? normalizeBrazilianNumber(values[grisIdx]) : null,
       tso_percent: tsoIdx !== -1 ? normalizeBrazilianNumber(values[tsoIdx]) : null,
       toll_percent: tollIdx !== -1 ? normalizeBrazilianNumber(values[tollIdx]) : null,
-      ad_valorem_percent: adValoremIdx !== -1 ? normalizeBrazilianNumber(values[adValoremIdx]) : null,
     };
     
     const validation = validatePriceRow(row, rows.length);
@@ -306,9 +303,8 @@ export async function parseXLSXPriceTable(file: File): Promise<ParseResult<Parse
         const costPerKgIdx = findColumnIndex(headers, 'cost_per_kg');
         const costValuePercentIdx = findColumnIndex(headers, 'cost_value_percent');
         const grisIdx = findColumnIndex(headers, 'gris_percent');
-        const tsoIdx = findColumnIndex(headers, 'tso_percent');
+        const tsoIdx = findColumnIndex(headers, 'tso_percent');  // Também encontra ad_valorem_percent por alias
         const tollIdx = findColumnIndex(headers, 'toll_percent');
-        const adValoremIdx = findColumnIndex(headers, 'ad_valorem_percent');
         
         const hasKmRange = kmRangeIdx !== -1;
         const hasKmSeparate = kmFromIdx !== -1 && kmToIdx !== -1;
@@ -361,7 +357,6 @@ export async function parseXLSXPriceTable(file: File): Promise<ParseResult<Parse
             gris_percent: grisIdx !== -1 ? normalizeBrazilianNumber(values[grisIdx]) : null,
             tso_percent: tsoIdx !== -1 ? normalizeBrazilianNumber(values[tsoIdx]) : null,
             toll_percent: tollIdx !== -1 ? normalizeBrazilianNumber(values[tollIdx]) : null,
-            ad_valorem_percent: adValoremIdx !== -1 ? normalizeBrazilianNumber(values[adValoremIdx]) : null,
           };
           
           const validation = validatePriceRow(row, rows.length);
