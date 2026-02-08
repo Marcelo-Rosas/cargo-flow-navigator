@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -28,10 +28,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { MaskedInput } from '@/components/ui/masked-input';
 import { useCreateQuote, useUpdateQuote } from '@/hooks/useQuotes';
 import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 
@@ -45,6 +47,8 @@ const quoteSchema = z.object({
   shipper_name: z.string().optional(),
   shipper_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   freight_type: z.enum(['CIF', 'FOB']).default('CIF'),
+  origin_cep: z.string().optional(),
+  destination_cep: z.string().optional(),
   origin: z.string().min(2, 'Origem obrigatória'),
   destination: z.string().min(2, 'Destino obrigatório'),
   cargo_type: z.string().optional(),
@@ -68,6 +72,9 @@ interface QuoteFormProps {
   quote?: Quote | null;
 }
 
+// Utility: sanitize CEP to 8 digits
+const sanitizeCep = (value: string) => value.replace(/\D/g, '').slice(0, 8);
+
 export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { user } = useAuth();
   const { data: clients } = useClients();
@@ -75,6 +82,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const createQuoteMutation = useCreateQuote();
   const updateQuoteMutation = useUpdateQuote();
   const isEditing = !!quote;
+
+  // Track if user manually edited origin/destination
+  const userEditedOrigin = useRef(false);
+  const userEditedDestination = useRef(false);
+  
+  // Loading states for CEP lookups
+  const [isLoadingOriginCep, setIsLoadingOriginCep] = useState(false);
+  const [isLoadingDestinationCep, setIsLoadingDestinationCep] = useState(false);
 
   const form = useForm<QuoteFormData>({
     resolver: zodResolver(quoteSchema),
@@ -86,6 +101,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       shipper_name: '',
       shipper_email: '',
       freight_type: 'CIF',
+      origin_cep: '',
+      destination_cep: '',
       origin: '',
       destination: '',
       cargo_type: '',
@@ -122,6 +139,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   }, [watchedValues]);
 
   useEffect(() => {
+    // Reset user edit flags when form opens/closes
+    userEditedOrigin.current = false;
+    userEditedDestination.current = false;
+    
     if (quote) {
       form.reset({
         client_id: quote.client_id || '',
@@ -131,6 +152,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         shipper_name: quote.shipper_name || '',
         shipper_email: quote.shipper_email || '',
         freight_type: (quote.freight_type as 'CIF' | 'FOB') || 'CIF',
+        origin_cep: quote.origin_cep || '',
+        destination_cep: quote.destination_cep || '',
         origin: quote.origin,
         destination: quote.destination,
         cargo_type: quote.cargo_type || '',
@@ -153,6 +176,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         shipper_name: '',
         shipper_email: '',
         freight_type: 'CIF',
+        origin_cep: '',
+        destination_cep: '',
         origin: '',
         destination: '',
         cargo_type: '',
@@ -187,6 +212,59 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     }
   };
 
+  // CEP Lookup handlers
+  const handleOriginCepBlur = async () => {
+    const cep = sanitizeCep(form.getValues('origin_cep') || '');
+    if (cep.length !== 8) return;
+
+    setIsLoadingOriginCep(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('lookup-cep', {
+        body: { cep },
+      });
+
+      if (error || !data?.success) {
+        toast.error('CEP de origem não encontrado');
+        return;
+      }
+
+      // SafeSet: only update if user hasn't manually edited
+      if (!userEditedOrigin.current) {
+        form.setValue('origin', data.data.formatted);
+      }
+    } catch {
+      toast.error('Erro ao buscar CEP de origem');
+    } finally {
+      setIsLoadingOriginCep(false);
+    }
+  };
+
+  const handleDestinationCepBlur = async () => {
+    const cep = sanitizeCep(form.getValues('destination_cep') || '');
+    if (cep.length !== 8) return;
+
+    setIsLoadingDestinationCep(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('lookup-cep', {
+        body: { cep },
+      });
+
+      if (error || !data?.success) {
+        toast.error('CEP de destino não encontrado');
+        return;
+      }
+
+      // SafeSet: only update if user hasn't manually edited
+      if (!userEditedDestination.current) {
+        form.setValue('destination', data.data.formatted);
+      }
+    } catch {
+      toast.error('Erro ao buscar CEP de destino');
+    } finally {
+      setIsLoadingDestinationCep(false);
+    }
+  };
+
   const onSubmit = async (data: QuoteFormData) => {
     if (!user) {
       toast.error('Você precisa estar logado');
@@ -202,6 +280,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         shipper_name: data.shipper_name || null,
         shipper_email: data.shipper_email || null,
         freight_type: data.freight_type,
+        origin_cep: sanitizeCep(data.origin_cep || '') || null,
+        destination_cep: sanitizeCep(data.destination_cep || '') || null,
         origin: data.origin,
         destination: data.destination,
         cargo_type: data.cargo_type || null,
@@ -407,6 +487,68 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             <div className="space-y-4">
               <h3 className="font-semibold text-foreground">Rota e Carga</h3>
               
+              {/* CEP Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="origin_cep"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CEP Origem</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <MaskedInput
+                            mask="cep"
+                            placeholder="00000-000"
+                            value={field.value || ''}
+                            onValueChange={(rawValue) => field.onChange(rawValue)}
+                            onBlur={() => {
+                              field.onBlur();
+                              handleOriginCepBlur();
+                            }}
+                            disabled={isLoadingOriginCep}
+                          />
+                          {isLoadingOriginCep && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="destination_cep"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CEP Destino</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <MaskedInput
+                            mask="cep"
+                            placeholder="00000-000"
+                            value={field.value || ''}
+                            onValueChange={(rawValue) => field.onChange(rawValue)}
+                            onBlur={() => {
+                              field.onBlur();
+                              handleDestinationCepBlur();
+                            }}
+                            disabled={isLoadingDestinationCep}
+                          />
+                          {isLoadingDestinationCep && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* City/State Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -415,7 +557,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     <FormItem>
                       <FormLabel>Origem *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Cidade - UF" {...field} />
+                        <Input 
+                          placeholder="Cidade - UF" 
+                          {...field} 
+                          onChange={(e) => {
+                            field.onChange(e);
+                            userEditedOrigin.current = true;
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -429,7 +578,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     <FormItem>
                       <FormLabel>Destino *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Cidade - UF" {...field} />
+                        <Input 
+                          placeholder="Cidade - UF" 
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            userEditedDestination.current = true;
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

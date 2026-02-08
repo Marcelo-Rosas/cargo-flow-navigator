@@ -161,6 +161,9 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                   <span className="text-sm">Origem</span>
                 </div>
                 <p className="font-medium text-foreground">{quote.origin}</p>
+                {quote.origin_cep && (
+                  <p className="text-xs text-muted-foreground mt-1">CEP: {quote.origin_cep.replace(/(\d{5})(\d{3})/, '$1-$2')}</p>
+                )}
               </div>
               <div className="p-4 rounded-lg bg-muted/30 border border-border">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -168,6 +171,9 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                   <span className="text-sm">Destino</span>
                 </div>
                 <p className="font-medium text-foreground">{quote.destination}</p>
+                {quote.destination_cep && (
+                  <p className="text-xs text-muted-foreground mt-1">CEP: {quote.destination_cep.replace(/(\d{5})(\d{3})/, '$1-$2')}</p>
+                )}
               </div>
             </div>
 
