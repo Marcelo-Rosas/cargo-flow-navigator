@@ -402,7 +402,13 @@ export type Database = {
           driver_name: string | null
           driver_phone: string | null
           eta: string | null
+          has_antt: boolean | null
+          has_cnh: boolean | null
+          has_comp_residencia: boolean | null
+          has_crlv: boolean | null
           has_cte: boolean
+          has_gr: boolean | null
+          has_mdf: boolean | null
           has_nfe: boolean
           has_pod: boolean
           id: string
@@ -429,7 +435,13 @@ export type Database = {
           driver_name?: string | null
           driver_phone?: string | null
           eta?: string | null
+          has_antt?: boolean | null
+          has_cnh?: boolean | null
+          has_comp_residencia?: boolean | null
+          has_crlv?: boolean | null
           has_cte?: boolean
+          has_gr?: boolean | null
+          has_mdf?: boolean | null
           has_nfe?: boolean
           has_pod?: boolean
           id?: string
@@ -456,7 +468,13 @@ export type Database = {
           driver_name?: string | null
           driver_phone?: string | null
           eta?: string | null
+          has_antt?: boolean | null
+          has_cnh?: boolean | null
+          has_comp_residencia?: boolean | null
+          has_crlv?: boolean | null
           has_cte?: boolean
+          has_gr?: boolean | null
+          has_mdf?: boolean | null
           has_nfe?: boolean
           has_pod?: boolean
           id?: string
