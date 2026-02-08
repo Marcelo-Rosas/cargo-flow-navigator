@@ -128,6 +128,31 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
               </div>
             </div>
 
+            {/* Shipper Info */}
+            {(quote.shipper_name || quote.freight_type) && (
+              <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                <h4 className="font-semibold text-foreground mb-3">Embarcador</h4>
+                <div className="flex items-center justify-between">
+                  <div>
+                    {quote.shipper_name && (
+                      <p className="font-medium text-foreground">{quote.shipper_name}</p>
+                    )}
+                    {quote.shipper_email && (
+                      <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                        <Mail className="w-3.5 h-3.5" />
+                        {quote.shipper_email}
+                      </p>
+                    )}
+                  </div>
+                  {quote.freight_type && (
+                    <Badge variant="outline" className="text-sm">
+                      {quote.freight_type}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Route */}
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 rounded-lg bg-muted/30 border border-border">
