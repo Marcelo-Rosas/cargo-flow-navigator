@@ -30,6 +30,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { useCreateQuote, useUpdateQuote } from '@/hooks/useQuotes';
 import { useClients } from '@/hooks/useClients';
+import { useShippers } from '@/hooks/useShippers';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
@@ -40,6 +41,10 @@ const quoteSchema = z.object({
   client_id: z.string().optional(),
   client_name: z.string().min(2, 'Nome do cliente obrigatório'),
   client_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+  shipper_id: z.string().optional(),
+  shipper_name: z.string().optional(),
+  shipper_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+  freight_type: z.enum(['CIF', 'FOB']).default('CIF'),
   origin: z.string().min(2, 'Origem obrigatória'),
   destination: z.string().min(2, 'Destino obrigatório'),
   cargo_type: z.string().optional(),
@@ -66,6 +71,7 @@ interface QuoteFormProps {
 export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { user } = useAuth();
   const { data: clients } = useClients();
+  const { data: shippers } = useShippers();
   const createQuoteMutation = useCreateQuote();
   const updateQuoteMutation = useUpdateQuote();
   const isEditing = !!quote;
@@ -76,6 +82,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       client_id: '',
       client_name: '',
       client_email: '',
+      shipper_id: '',
+      shipper_name: '',
+      shipper_email: '',
+      freight_type: 'CIF',
       origin: '',
       destination: '',
       cargo_type: '',
@@ -117,6 +127,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         client_id: quote.client_id || '',
         client_name: quote.client_name,
         client_email: quote.client_email || '',
+        shipper_id: quote.shipper_id || '',
+        shipper_name: quote.shipper_name || '',
+        shipper_email: quote.shipper_email || '',
+        freight_type: (quote.freight_type as 'CIF' | 'FOB') || 'CIF',
         origin: quote.origin,
         destination: quote.destination,
         cargo_type: quote.cargo_type || '',
@@ -127,7 +141,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         gris_percent: 0.3,
         ad_valorem_percent: 0.1,
         icms_percent: 12,
-        cargo_value: 0,
+        cargo_value: Number(quote.cargo_value) || 0,
         notes: quote.notes || '',
       });
     } else {
@@ -135,6 +149,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         client_id: '',
         client_name: '',
         client_email: '',
+        shipper_id: '',
+        shipper_name: '',
+        shipper_email: '',
+        freight_type: 'CIF',
         origin: '',
         destination: '',
         cargo_type: '',
@@ -160,6 +178,15 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     }
   };
 
+  const handleShipperSelect = (shipperId: string) => {
+    const selectedShipper = shippers?.find(s => s.id === shipperId);
+    if (selectedShipper) {
+      form.setValue('shipper_id', shipperId);
+      form.setValue('shipper_name', selectedShipper.name);
+      form.setValue('shipper_email', selectedShipper.email || '');
+    }
+  };
+
   const onSubmit = async (data: QuoteFormData) => {
     if (!user) {
       toast.error('Você precisa estar logado');
@@ -171,11 +198,16 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         client_id: data.client_id || null,
         client_name: data.client_name,
         client_email: data.client_email || null,
+        shipper_id: data.shipper_id || null,
+        shipper_name: data.shipper_name || null,
+        shipper_email: data.shipper_email || null,
+        freight_type: data.freight_type,
         origin: data.origin,
         destination: data.destination,
         cargo_type: data.cargo_type || null,
         weight: data.weight || null,
         volume: data.volume || null,
+        cargo_value: data.cargo_value || null,
         value: calculatedValue.total,
         notes: data.notes || null,
       };
@@ -278,6 +310,95 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   </FormItem>
                 )}
               />
+            </div>
+
+            <Separator />
+
+            {/* Embarcador Section */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-foreground">Embarcador</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="shipper_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Embarcador Existente</FormLabel>
+                      <Select 
+                        onValueChange={(value) => handleShipperSelect(value)}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecionar embarcador..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {shippers?.map((shipper) => (
+                            <SelectItem key={shipper.id} value={shipper.id}>
+                              {shipper.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="shipper_email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>E-mail Embarcador</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="embarcador@email.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="shipper_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome do Embarcador</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Nome ou razão social" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="freight_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Frete *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecionar..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="CIF">CIF (Frete por conta do remetente)</SelectItem>
+                          <SelectItem value="FOB">FOB (Frete por conta do destinatário)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <Separator />
