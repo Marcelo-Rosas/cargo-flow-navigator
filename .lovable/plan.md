@@ -1,321 +1,171 @@
 
+# Plano: Alterações no Board Operacional - UI Stage-Gated
 
-# Plano: Edge Function lookup-cep com Mascara de CEP
-
-## Objetivo
-
-Criar uma Edge Function centralizada para busca de enderecos via CEP, acompanhada de um componente reutilizavel `MaskedInput` para aplicar mascara visual (00000-000) e validacao Zod.
+## Resumo Executivo
+Implementar uma interface guiada por estágios no modal de detalhes da OS, onde componentes e documentos são exibidos condicionalmente conforme o estágio da ordem.
 
 ---
 
-## 1. Arquitetura da Solucao
+## 1. Mudanças no Banco de Dados
+
+### Novas colunas na tabela `orders`:
+A tabela precisa de novas flags para documentos específicos:
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `has_crlv` | boolean | CRLV do veículo |
+| `has_cnh` | boolean | CNH do motorista |
+| `has_comp_residencia` | boolean | Comprovante de residência |
+| `has_antt` | boolean | Registro ANTT |
+| `has_mdf` | boolean | MDF-e (Manifesto) |
+| `has_gr` | boolean | GR (Guia de Recolhimento) |
+
+---
+
+## 2. Lógica de Visibilidade por Estágio
+
+### Mapa de Visibilidade:
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ FRONTEND                                                    │
-│                                                             │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ MaskedInput (componente reutilizavel)                   │ │
-│ │ ├── mask="cep" -> formata como 00000-000               │ │
-│ │ ├── mask="cnpj" -> formata como 00.000.000/0000-00     │ │
-│ │ ├── mask="phone" -> formata como (00) 00000-0000       │ │
-│ │ └── onValueChange -> retorna valor sem mascara         │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                                                             │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ useCepLookup (hook)                                     │ │
-│ │ └── Chama Edge Function e retorna dados normalizados   │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                           │                                 │
-└───────────────────────────┼─────────────────────────────────┘
-                            │ supabase.functions.invoke
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│ EDGE FUNCTION: lookup-cep                                   │
-│                                                             │
-│ 1. Validar CEP (8 digitos)                                  │
-│ 2. Tentar ViaCEP (5s timeout)                               │
-│ 3. Fallback BrasilAPI (5s timeout)                          │
-│ 4. Retornar dados normalizados + campo "formatted"          │
-└─────────────────────────────────────────────────────────────┘
++-------------------+------------------+------------------+------------------+
+| Estágio           | Driver Section   | Driver Docs      | Fiscal Docs      |
++-------------------+------------------+------------------+------------------+
+| ordem_criada      |        -         |        -         |        -         |
+| busca_motorista   |   DROPDOWN       | CRLV,CNH,CR,ANTT |        -         |
+| documentacao      |   VISUALIZAR     | CRLV,CNH,CR,ANTT | NFe,CTe,MDF,GR   |
+| coleta_realizada  |   VISUALIZAR     | CRLV,CNH,CR,ANTT | NFe,CTe,MDF,GR   |
+| em_transito       |   VISUALIZAR     | CRLV,CNH,CR,ANTT | NFe,CTe,MDF,GR   |
+| entregue          |   VISUALIZAR     | CRLV,CNH,CR,ANTT | NFe,CTe,MDF,GR+POD|
++-------------------+------------------+------------------+------------------+
+```
+
+### Tab "Documentos":
+- Visivel apenas no estágio `documentacao`
+
+### Rota (Origem/Destino):
+- Visivel em **todos** os estágios
+
+---
+
+## 3. Novos Hooks
+
+### `useDrivers.ts`
+```typescript
+// Lista motoristas ativos para dropdown
+// Retorna: { id, name, phone }
+```
+
+### `useVehicles.ts`
+```typescript
+// Lista veículos ativos (opcionalmente filtrados por driver_id)
+// Retorna: { id, plate, driver_id }
 ```
 
 ---
 
-## 2. Arquivos a Criar/Modificar
+## 4. Alterações nos Componentes
 
-| Arquivo | Acao | Descricao |
-|---------|------|-----------|
-| `src/components/ui/masked-input.tsx` | Criar | Componente reutilizavel com mascaras |
-| `src/hooks/useCepLookup.ts` | Criar | Hook para consumir Edge Function |
-| `supabase/functions/lookup-cep/index.ts` | Criar | Edge Function principal |
-| `supabase/config.toml` | Modificar | Adicionar `verify_jwt = false` |
+### `OrderDetailModal.tsx`
+1. **Importar hooks** `useDrivers` e `useVehicles`
+2. **Tab Documentos**: Condicionar visibilidade ao estágio `documentacao`
+3. **Seção Driver**: 
+   - A partir de `busca_motorista`: Mostrar dropdowns para motorista/veículo
+   - Ao selecionar motorista, auto-preencher `driver_name`, `driver_phone`
+   - Ao selecionar veículo, auto-preencher `vehicle_plate`
+4. **Status dos Documentos**:
+   - `busca_motorista`: CRLV, CNH, Comp.Res., ANTT
+   - `documentacao+`: NFe, CTe, MDF-e, GR
+   - `entregue`: POD
+
+### `OrderForm.tsx`
+- Trocar inputs de texto por **dropdowns** para motorista e veículo
+- Usar hooks para popular opções
+- Ao salvar, gravar tanto IDs quanto campos legados (snapshot)
 
 ---
 
-## 3. Componente MaskedInput
+## 5. Arquivos a Modificar
 
-### Interface
+| Arquivo | Ação |
+|---------|------|
+| `src/hooks/useDrivers.ts` | CRIAR - hook para listar motoristas |
+| `src/hooks/useVehicles.ts` | CRIAR - hook para listar veículos |
+| `src/components/modals/OrderDetailModal.tsx` | MODIFICAR - lógica stage-gated |
+| `src/components/forms/OrderForm.tsx` | MODIFICAR - dropdowns motorista/veículo |
+
+---
+
+## 6. Migração SQL
+
+```sql
+-- Adicionar colunas de documentos do motorista
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_crlv boolean DEFAULT false;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_cnh boolean DEFAULT false;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_comp_residencia boolean DEFAULT false;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_antt boolean DEFAULT false;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_mdf boolean DEFAULT false;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_gr boolean DEFAULT false;
+```
+
+---
+
+## 7. Seção Técnica
+
+### Constantes de Estágios para Lógica Condicional
 
 ```typescript
-interface MaskedInputProps extends Omit<InputProps, 'onChange'> {
-  mask: 'cep' | 'cnpj' | 'cpf' | 'phone';
-  onValueChange?: (rawValue: string, maskedValue: string) => void;
-}
+const STAGES_WITH_DRIVER = ['busca_motorista', 'documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
+const STAGES_WITH_FISCAL_DOCS = ['documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
+const STAGE_WITH_POD = 'entregue';
+const STAGE_WITH_DOCS_TAB = 'documentacao';
 ```
 
-### Logica de Mascaras
-
-| Mask | Formato | Regex de limpeza | Max digits |
-|------|---------|------------------|------------|
-| cep | 00000-000 | /\D/g | 8 |
-| cnpj | 00.000.000/0000-00 | /\D/g | 14 |
-| cpf | 000.000.000-00 | /\D/g | 11 |
-| phone | (00) 00000-0000 | /\D/g | 11 |
-
-### Exemplo de Uso
-
-```tsx
-<MaskedInput
-  mask="cep"
-  placeholder="00000-000"
-  value={field.value}
-  onValueChange={(raw) => field.onChange(raw)}
-  onBlur={() => handleCepLookup(field.value)}
-/>
-```
-
----
-
-## 4. Validacao Zod com Mascara
-
-### Schema CEP
+### Mapeamento de Documentos por Categoria
 
 ```typescript
-// Aceita com ou sem mascara, valida 8 digitos
-const cepSchema = z
-  .string()
-  .transform((val) => val.replace(/\D/g, ''))
-  .refine((val) => val.length === 8, {
-    message: 'CEP deve ter 8 digitos',
-  });
+// Documentos do Motorista (visíveis a partir de busca_motorista)
+const DRIVER_DOCS = [
+  { key: 'has_crlv', label: 'CRLV' },
+  { key: 'has_cnh', label: 'CNH' },
+  { key: 'has_comp_residencia', label: 'Comp.Res.' },
+  { key: 'has_antt', label: 'ANTT' },
+];
+
+// Documentos Fiscais (visíveis a partir de documentacao)
+const FISCAL_DOCS = [
+  { key: 'has_nfe', label: 'NF-e' },
+  { key: 'has_cte', label: 'CT-e' },
+  { key: 'has_mdf', label: 'MDF-e' },
+  { key: 'has_gr', label: 'GR' },
+];
+
+// POD (visível apenas em entregue)
+const POD_DOC = { key: 'has_pod', label: 'POD' };
 ```
 
-### Uso no QuoteForm
-
-```typescript
-const quoteSchema = z.object({
-  // ... outros campos
-  origin_cep: z.string()
-    .transform((v) => v.replace(/\D/g, ''))
-    .refine((v) => v === '' || v.length === 8, 'CEP invalido'),
-  destination_cep: z.string()
-    .transform((v) => v.replace(/\D/g, ''))
-    .refine((v) => v === '' || v.length === 8, 'CEP invalido'),
-});
-```
+### Pattern de Snapshot para Dados Legados
+Ao selecionar motorista/veículo via dropdown, o sistema deve:
+1. Salvar `driver_id` (FK) para relacionamento
+2. Salvar `driver_name`, `driver_phone`, `vehicle_plate` como snapshot textual para histórico
 
 ---
 
-## 5. Edge Function lookup-cep
+## 8. Critérios de Aceite
 
-### Endpoint
-
-```text
-POST /functions/v1/lookup-cep
-Content-Type: application/json
-
-{ "cep": "01310100" }   // aceita com ou sem mascara
-```
-
-### Response (sucesso)
-
-```json
-{
-  "success": true,
-  "data": {
-    "cep": "01310-100",
-    "logradouro": "Avenida Paulista",
-    "complemento": "",
-    "bairro": "Bela Vista",
-    "localidade": "Sao Paulo",
-    "uf": "SP",
-    "ibge": "3550308",
-    "formatted": "Sao Paulo - SP"
-  }
-}
-```
-
-### Response (erro)
-
-```json
-{
-  "success": false,
-  "error": "CEP invalido. Informe 8 digitos."
-}
-```
-
-### Fluxo Interno
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ 1. Receber CEP do body                                      │
-│    └─ Limpar mascara: "01310-100" -> "01310100"             │
-├─────────────────────────────────────────────────────────────┤
-│ 2. Validar formato                                          │
-│    └─ Se != 8 digitos -> 400 "CEP invalido"                 │
-├─────────────────────────────────────────────────────────────┤
-│ 3. Tentar ViaCEP                                            │
-│    └─ GET https://viacep.com.br/ws/{cep}/json/              │
-│    └─ Timeout: 5 segundos                                   │
-│    └─ Se {erro: true} -> ir para fallback                   │
-├─────────────────────────────────────────────────────────────┤
-│ 4. Fallback BrasilAPI                                       │
-│    └─ GET https://brasilapi.com.br/api/cep/v1/{cep}         │
-│    └─ Timeout: 5 segundos                                   │
-├─────────────────────────────────────────────────────────────┤
-│ 5. Retornar dados normalizados                              │
-│    └─ Incluir campo "formatted": "Cidade - UF"              │
-│    └─ Se ambos falharem -> 404 "CEP nao encontrado"         │
-└─────────────────────────────────────────────────────────────┘
-```
+- [ ] Tab "Documentos" visível apenas em estágio `documentacao`
+- [ ] Seção Origem/Destino visível em todos os estágios
+- [ ] Seção Motorista aparece a partir de `busca_motorista` com dropdowns
+- [ ] Dropdown de motorista popula automaticamente nome e telefone
+- [ ] Dropdown de veículo popula automaticamente a placa
+- [ ] Docs do motorista (CRLV, CNH, etc.) visíveis a partir de `busca_motorista`
+- [ ] Docs fiscais (NFe, CTe, MDF, GR) visíveis a partir de `documentacao`
+- [ ] POD visível apenas em `entregue`
+- [ ] Dados persistem corretamente ao salvar
 
 ---
 
-## 6. Hook useCepLookup
-
-```typescript
-interface CepData {
-  cep: string;
-  logradouro: string;
-  complemento: string;
-  bairro: string;
-  localidade: string;
-  uf: string;
-  ibge: string;
-  formatted: string;
-}
-
-interface UseCepLookupReturn {
-  lookup: (cep: string) => Promise<CepData | null>;
-  isLoading: boolean;
-  error: string | null;
-}
-
-export function useCepLookup(): UseCepLookupReturn {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const lookup = async (cep: string): Promise<CepData | null> => {
-    const clean = cep.replace(/\D/g, '');
-    if (clean.length !== 8) {
-      setError('CEP deve ter 8 digitos');
-      return null;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke('lookup-cep', {
-        body: { cep: clean },
-      });
-
-      if (fnError) throw fnError;
-      if (!data.success) {
-        setError(data.error);
-        return null;
-      }
-
-      return data.data;
-    } catch {
-      setError('Erro ao buscar CEP');
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return { lookup, isLoading, error };
-}
-```
-
----
-
-## 7. Integracao no QuoteForm (opcional)
-
-Apos criar os componentes, a integracao no formulario de cotacoes seria:
-
-```tsx
-// Adicionar campos de CEP ao schema
-origin_cep: z.string().optional(),
-destination_cep: z.string().optional(),
-
-// No formulario
-const { lookup, isLoading: cepLoading } = useCepLookup();
-
-const handleOriginCepBlur = async () => {
-  const cep = form.getValues('origin_cep');
-  if (!cep || cep.replace(/\D/g, '').length !== 8) return;
-  
-  const data = await lookup(cep);
-  if (data) {
-    form.setValue('origin', data.formatted);
-  }
-};
-
-// Campo com mascara
-<FormField
-  control={form.control}
-  name="origin_cep"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>CEP Origem</FormLabel>
-      <FormControl>
-        <MaskedInput
-          mask="cep"
-          placeholder="00000-000"
-          value={field.value || ''}
-          onValueChange={(raw) => field.onChange(raw)}
-          onBlur={handleOriginCepBlur}
-        />
-      </FormControl>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
-```
-
----
-
-## 8. Configuracao config.toml
-
-```toml
-[functions.lookup-cep]
-verify_jwt = false
-```
-
----
-
-## 9. Beneficios
-
-| Aspecto | Antes | Depois |
-|---------|-------|--------|
-| Mascara visual | Nenhuma | 00000-000 |
-| Validacao | Manual | Zod automatico |
-| Fallback | Nenhum | BrasilAPI |
-| Reuso | Copiar codigo | Componente + Hook |
-| Logs | Frontend only | Servidor (debugging) |
-| CORS | Browser-dependent | Controlado |
-
----
-
-## 10. Ordem de Implementacao
-
-1. Criar `src/components/ui/masked-input.tsx`
-2. Criar `supabase/functions/lookup-cep/index.ts`
-3. Atualizar `supabase/config.toml`
-4. Criar `src/hooks/useCepLookup.ts`
-5. Testar Edge Function via curl
-6. (Opcional) Integrar no QuoteForm e outros formularios
-
+## Próximos Passos
+1. Aprovar o plano para iniciar implementação
+2. Executar migração SQL para adicionar novas colunas
+3. Criar hooks `useDrivers` e `useVehicles`
+4. Implementar lógica stage-gated no modal
