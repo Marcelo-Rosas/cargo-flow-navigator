@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { GripVertical, MoreHorizontal, Mail, Copy, Calendar, MapPin } from 'lucide-react';
+import { GripVertical, MoreHorizontal, Mail, Copy, Calendar, MapPin, Truck, Building2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -112,12 +112,29 @@ export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
       </div>
 
       {/* Route */}
-      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
-        <MapPin className="w-3.5 h-3.5" />
+      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
         <span className="truncate">{quote.origin}</span>
         <span>→</span>
         <span className="truncate">{quote.destination}</span>
       </div>
+
+      {/* Shipper & Freight Type */}
+      {(quote.shipper_name || quote.freight_type) && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+          {quote.shipper_name && (
+            <div className="flex items-center gap-1 truncate">
+              <Building2 className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate max-w-[100px]">{quote.shipper_name}</span>
+            </div>
+          )}
+          {quote.freight_type && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              {quote.freight_type}
+            </Badge>
+          )}
+        </div>
+      )}
 
       {/* Tags */}
       {tags.length > 0 && (
