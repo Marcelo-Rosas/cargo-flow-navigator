@@ -32,6 +32,8 @@ import { MaskedInput } from '@/components/ui/masked-input';
 import { useCreateQuote, useUpdateQuote } from '@/hooks/useQuotes';
 import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
+import { usePriceTables } from '@/hooks/usePriceTables';
+import { useVehicleTypes, usePaymentTerms } from '@/hooks/usePricingRules';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -47,6 +49,7 @@ const quoteSchema = z.object({
   shipper_name: z.string().optional(),
   shipper_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   freight_type: z.enum(['CIF', 'FOB']).default('CIF'),
+  freight_modality: z.enum(['lotacao', 'fracionado']).optional(),
   origin_cep: z.string().optional(),
   destination_cep: z.string().optional(),
   origin: z.string().min(2, 'Origem obrigatória'),
@@ -54,6 +57,11 @@ const quoteSchema = z.object({
   cargo_type: z.string().optional(),
   weight: z.number().min(0, 'Peso inválido').optional().default(0),
   volume: z.number().min(0, 'Volume inválido').optional().default(0),
+  // Pricing selectors
+  price_table_id: z.string().optional(),
+  vehicle_type_id: z.string().optional(),
+  payment_term_id: z.string().optional(),
+  km_distance: z.number().min(0, 'Distância inválida').optional(),
   // Pricing components - all optional with defaults
   base_freight: z.number().min(0, 'Valor inválido').optional().default(0),
   toll: z.number().min(0, 'Valor inválido').optional().default(0),
@@ -79,6 +87,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { user } = useAuth();
   const { data: clients } = useClients();
   const { data: shippers } = useShippers();
+  const { data: priceTables } = usePriceTables();
+  const { data: vehicleTypes } = useVehicleTypes();
+  const { data: paymentTerms } = usePaymentTerms();
   const createQuoteMutation = useCreateQuote();
   const updateQuoteMutation = useUpdateQuote();
   const isEditing = !!quote;
@@ -101,6 +112,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       shipper_name: '',
       shipper_email: '',
       freight_type: 'CIF',
+      freight_modality: undefined,
       origin_cep: '',
       destination_cep: '',
       origin: '',
@@ -108,6 +120,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       cargo_type: '',
       weight: 0,
       volume: 0,
+      price_table_id: '',
+      vehicle_type_id: '',
+      payment_term_id: '',
+      km_distance: undefined,
       base_freight: 0,
       toll: 0,
       gris_percent: 0.3,
@@ -152,6 +168,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         shipper_name: quote.shipper_name || '',
         shipper_email: quote.shipper_email || '',
         freight_type: (quote.freight_type as 'CIF' | 'FOB') || 'CIF',
+        freight_modality: (quote.freight_modality as 'lotacao' | 'fracionado') || undefined,
         origin_cep: quote.origin_cep || '',
         destination_cep: quote.destination_cep || '',
         origin: quote.origin,
@@ -159,8 +176,12 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         cargo_type: quote.cargo_type || '',
         weight: Number(quote.weight) || 0,
         volume: Number(quote.volume) || 0,
+        price_table_id: quote.price_table_id || '',
+        vehicle_type_id: quote.vehicle_type_id || '',
+        payment_term_id: quote.payment_term_id || '',
+        km_distance: quote.km_distance ? Number(quote.km_distance) : undefined,
         base_freight: Number(quote.value) || 0,
-        toll: 0,
+        toll: Number(quote.toll_value) || 0,
         gris_percent: 0.3,
         ad_valorem_percent: 0.1,
         icms_percent: 12,
@@ -176,6 +197,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         shipper_name: '',
         shipper_email: '',
         freight_type: 'CIF',
+        freight_modality: undefined,
         origin_cep: '',
         destination_cep: '',
         origin: '',
@@ -183,6 +205,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         cargo_type: '',
         weight: 0,
         volume: 0,
+        price_table_id: '',
+        vehicle_type_id: '',
+        payment_term_id: '',
+        km_distance: undefined,
         base_freight: 0,
         toll: 0,
         gris_percent: 0.3,
@@ -280,6 +306,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         shipper_name: data.shipper_name || null,
         shipper_email: data.shipper_email || null,
         freight_type: data.freight_type,
+        freight_modality: data.freight_modality || null,
         origin_cep: sanitizeCep(data.origin_cep || '') || null,
         destination_cep: sanitizeCep(data.destination_cep || '') || null,
         origin: data.origin,
@@ -287,6 +314,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         cargo_type: data.cargo_type || null,
         weight: data.weight || null,
         volume: data.volume || null,
+        price_table_id: data.price_table_id || null,
+        vehicle_type_id: data.vehicle_type_id || null,
+        payment_term_id: data.payment_term_id || null,
+        km_distance: data.km_distance || null,
+        toll_value: data.toll || null,
         cargo_value: data.cargo_value || null,
         value: calculatedValue.total,
         notes: data.notes || null,
@@ -657,6 +689,144 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 <Calculator className="w-5 h-5 text-primary" />
                 <h3 className="font-semibold text-foreground">Precificação</h3>
               </div>
+
+              {/* Pricing Selectors Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="freight_modality"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Modalidade de Frete</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value || ''}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecionar modalidade..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="lotacao">Lotação</SelectItem>
+                          <SelectItem value="fracionado">Fracionado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="price_table_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tabela de Preços</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value || ''}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecionar tabela..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {priceTables?.map((table) => (
+                            <SelectItem key={table.id} value={table.id}>
+                              {table.name} ({table.modality === 'lotacao' ? 'Lotação' : 'Fracionado'})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="vehicle_type_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Veículo</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value || ''}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecionar veículo..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {vehicleTypes?.map((vehicle) => (
+                            <SelectItem key={vehicle.id} value={vehicle.id}>
+                              {vehicle.name} ({vehicle.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="payment_term_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prazo de Pagamento</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value || ''}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecionar prazo..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {paymentTerms?.map((term) => (
+                            <SelectItem key={term.id} value={term.id}>
+                              {term.name} {term.adjustment_percent !== 0 && `(${term.adjustment_percent > 0 ? '+' : ''}${term.adjustment_percent}%)`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="km_distance"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Distância (km)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="0"
+                          value={field.value ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === '' ? undefined : parseFloat(val));
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Separator className="my-2" />
               
               <div className="grid grid-cols-2 gap-4">
                 <FormField

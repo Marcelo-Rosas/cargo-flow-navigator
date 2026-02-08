@@ -9,7 +9,10 @@ import {
   Package,
   Scale,
   Box,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Truck,
+  CreditCard,
+  Route
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +27,9 @@ import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
+import { usePriceTable } from '@/hooks/usePriceTables';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -49,6 +55,37 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
 
   if (!quote) return null;
+
+  // Fetch related data for display
+  const { data: priceTable } = usePriceTable(quote.price_table_id || '');
+  
+  const { data: vehicleType } = useQuery({
+    queryKey: ['vehicle-type', quote.vehicle_type_id],
+    queryFn: async () => {
+      if (!quote.vehicle_type_id) return null;
+      const { data } = await supabase
+        .from('vehicle_types')
+        .select('name, code')
+        .eq('id', quote.vehicle_type_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!quote.vehicle_type_id,
+  });
+
+  const { data: paymentTerm } = useQuery({
+    queryKey: ['payment-term', quote.payment_term_id],
+    queryFn: async () => {
+      if (!quote.payment_term_id) return null;
+      const { data } = await supabase
+        .from('payment_terms')
+        .select('name, code, adjustment_percent')
+        .eq('id', quote.payment_term_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!quote.payment_term_id,
+  });
 
   const stageInfo = STAGE_LABELS[quote.stage];
   const canConvert = quote.stage !== 'ganho' && quote.stage !== 'perdido';
@@ -207,6 +244,69 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                         <span className="text-xs">Volume</span>
                       </div>
                       <p className="font-medium text-foreground text-sm">{Number(quote.volume).toLocaleString('pt-BR')} m³</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Pricing Details */}
+            {(priceTable || vehicleType || paymentTerm || quote.km_distance || quote.freight_modality) && (
+              <div>
+                <h4 className="font-semibold text-foreground mb-3">Detalhes de Precificação</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {quote.freight_modality && (
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <Package className="w-4 h-4" />
+                        <span className="text-xs">Modalidade</span>
+                      </div>
+                      <p className="font-medium text-foreground text-sm">
+                        {quote.freight_modality === 'lotacao' ? 'Lotação' : 'Fracionado'}
+                      </p>
+                    </div>
+                  )}
+                  {priceTable && (
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <DollarSign className="w-4 h-4" />
+                        <span className="text-xs">Tabela de Preços</span>
+                      </div>
+                      <p className="font-medium text-foreground text-sm">{priceTable.name}</p>
+                    </div>
+                  )}
+                  {vehicleType && (
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <Truck className="w-4 h-4" />
+                        <span className="text-xs">Veículo</span>
+                      </div>
+                      <p className="font-medium text-foreground text-sm">{vehicleType.name} ({vehicleType.code})</p>
+                    </div>
+                  )}
+                  {paymentTerm && (
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <CreditCard className="w-4 h-4" />
+                        <span className="text-xs">Prazo Pagamento</span>
+                      </div>
+                      <p className="font-medium text-foreground text-sm">
+                        {paymentTerm.name}
+                        {paymentTerm.adjustment_percent !== 0 && (
+                          <span className="text-muted-foreground ml-1">
+                            ({paymentTerm.adjustment_percent > 0 ? '+' : ''}{paymentTerm.adjustment_percent}%)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                  {quote.km_distance && (
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <Route className="w-4 h-4" />
+                        <span className="text-xs">Distância</span>
+                      </div>
+                      <p className="font-medium text-foreground text-sm">{Number(quote.km_distance).toLocaleString('pt-BR')} km</p>
                     </div>
                   )}
                 </div>
