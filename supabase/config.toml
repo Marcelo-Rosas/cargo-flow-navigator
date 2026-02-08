@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.calculate-freight]
 verify_jwt = false
+
+[functions.lookup-cep]
+verify_jwt = false
