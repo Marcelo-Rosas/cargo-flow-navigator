@@ -442,26 +442,80 @@ function findIcmsColumnIndex(headers: string[], fieldName: string): number {
   return -1;
 }
 
-function validateIcmsRow(row: Partial<ParsedIcmsRow>, index: number): { isValid: boolean; errors: string[] } {
+/**
+ * Normaliza rate_percent para escala "humana" (3-25)
+ * - 0.12 → 12 (multiplicar por 100)
+ * - 0.7 → 7 (multiplicar por 10)
+ * - 70, 120 → 7, 12 (dividir por 10)
+ * - 7, 12 → 7, 12 (manter)
+ */
+function normalizeIcmsRate(value: number): { normalized: number; error?: string } {
+  const VALID_MIN = 3;
+  const VALID_MAX = 25;
+  
+  // Already in valid range (3-25)
+  if (value >= VALID_MIN && value <= VALID_MAX) {
+    return { normalized: value };
+  }
+  
+  // Decimal scale (0 < x < 1): try *100 first, then *10
+  if (value > 0 && value < 1) {
+    const times100 = value * 100;
+    if (times100 >= VALID_MIN && times100 <= VALID_MAX) {
+      return { normalized: times100 };
+    }
+    const times10 = value * 10;
+    if (times10 >= VALID_MIN && times10 <= VALID_MAX) {
+      return { normalized: times10 };
+    }
+    return { normalized: value, error: `Valor ${value} não pode ser normalizado para escala 3-25` };
+  }
+  
+  // Value between 1 and 3: might be 1.2 meaning 12
+  if (value >= 1 && value < VALID_MIN) {
+    const times10 = value * 10;
+    if (times10 >= VALID_MIN && times10 <= VALID_MAX) {
+      return { normalized: times10 };
+    }
+  }
+  
+  // High values (>25): try dividing by 10
+  if (value > VALID_MAX && value <= 250) {
+    const divided = value / 10;
+    if (divided >= VALID_MIN && divided <= VALID_MAX) {
+      return { normalized: divided };
+    }
+  }
+  
+  // Value is 0 - special case for same state (intra-state might be 0 or different)
+  if (value === 0) {
+    return { normalized: 0 };
+  }
+  
+  return { normalized: value, error: `Valor ${value} fora do intervalo esperado (3-25)` };
+}
+
+function validateIcmsRow(row: Partial<ParsedIcmsRow>, index: number, originalRate?: number): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
   const VALID_STATES = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
   
-  if (!row.origin_state || row.origin_state.length !== 2) {
-    errors.push(`Linha ${index + 1}: UF origem inválida`);
-  } else if (!VALID_STATES.includes(row.origin_state.toUpperCase())) {
+  if (!row.origin_state || !/^[A-Z]{2}$/.test(row.origin_state)) {
+    errors.push(`Linha ${index + 1}: UF origem inválida (esperado 2 letras maiúsculas)`);
+  } else if (!VALID_STATES.includes(row.origin_state)) {
     errors.push(`Linha ${index + 1}: UF origem "${row.origin_state}" não existe`);
   }
   
-  if (!row.destination_state || row.destination_state.length !== 2) {
-    errors.push(`Linha ${index + 1}: UF destino inválida`);
-  } else if (!VALID_STATES.includes(row.destination_state.toUpperCase())) {
+  if (!row.destination_state || !/^[A-Z]{2}$/.test(row.destination_state)) {
+    errors.push(`Linha ${index + 1}: UF destino inválida (esperado 2 letras maiúsculas)`);
+  } else if (!VALID_STATES.includes(row.destination_state)) {
     errors.push(`Linha ${index + 1}: UF destino "${row.destination_state}" não existe`);
   }
   
   if (row.rate_percent === undefined || row.rate_percent === null) {
     errors.push(`Linha ${index + 1}: Alíquota é obrigatória`);
-  } else if (row.rate_percent < 0 || row.rate_percent > 100) {
-    errors.push(`Linha ${index + 1}: Alíquota deve estar entre 0 e 100`);
+  } else if (row.rate_percent !== 0 && (row.rate_percent < 3 || row.rate_percent > 25)) {
+    const origDisplay = originalRate !== undefined ? ` (original: ${originalRate})` : '';
+    errors.push(`Linha ${index + 1}: Alíquota ${row.rate_percent}${origDisplay} fora do intervalo 3-25%`);
   }
   
   return { isValid: errors.length === 0, errors };
@@ -492,13 +546,27 @@ export function parseCSVIcms(content: string, delimiter: string = ';'): ParseRes
     
     if (values.every(v => !v || v === '')) continue;
     
+    const originState = values[originIdx]?.toUpperCase().trim() || '';
+    const destState = values[destIdx]?.toUpperCase().trim() || '';
+    const rawRate = normalizeBrazilianNumber(values[rateIdx]) ?? 0;
+    
+    // Normalize rate to human scale (3-25)
+    const { normalized: normalizedRate, error: rateError } = normalizeIcmsRate(rawRate);
+    
     const row: Partial<ParsedIcmsRow> = {
-      origin_state: values[originIdx]?.toUpperCase().trim() || '',
-      destination_state: values[destIdx]?.toUpperCase().trim() || '',
-      rate_percent: normalizeBrazilianNumber(values[rateIdx]) ?? 0,
+      origin_state: originState,
+      destination_state: destState,
+      rate_percent: normalizedRate,
     };
     
-    const validation = validateIcmsRow(row, rows.length);
+    const validation = validateIcmsRow(row, rows.length, rawRate !== normalizedRate ? rawRate : undefined);
+    
+    // Add rate normalization error if present
+    if (rateError) {
+      validation.errors.push(`Linha ${i}: ${rateError}`);
+      validation.isValid = false;
+    }
+    
     rows.push({
       ...row,
       isValid: validation.isValid,
