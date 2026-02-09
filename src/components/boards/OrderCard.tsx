@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
-import { STAGE_DOCUMENTS } from '@/lib/order-documents';
+import { STAGE_DOCUMENTS, DocumentConfig, groupDocumentsByCategory } from '@/lib/order-documents';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -74,15 +74,11 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
   const needsPod = order.stage === 'entregue' && !order.has_pod;
 
   // Documentos visíveis para o estágio atual
-  const visibleDocuments = STAGE_DOCUMENTS[order.stage] || [];
+  const visibleDocuments: DocumentConfig[] = [...(STAGE_DOCUMENTS[order.stage] || [])];
   const hasDocumentsToShow = visibleDocuments.length > 0;
 
   // Agrupa documentos por categoria
-  const documentsByGroup = visibleDocuments.reduce((acc, doc) => {
-    if (!acc[doc.group]) acc[doc.group] = [];
-    acc[doc.group].push(doc);
-    return acc;
-  }, {} as Record<string, typeof visibleDocuments>);
+  const documentsByGroup = groupDocumentsByCategory(visibleDocuments);
 
   // Calcula progresso
   const totalDocs = visibleDocuments.length;
