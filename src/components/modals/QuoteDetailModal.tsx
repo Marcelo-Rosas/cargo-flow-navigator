@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { formatRouteUf, PricingBreakdown } from '@/lib/freight-calculator';
+import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -100,9 +100,9 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
   // REGRA: Converter para OS só quando stage === 'ganho'
   const canConvert = quote.stage === 'ganho';
   
-  // Parse pricing breakdown
-  const breakdown = quote.pricing_breakdown as unknown as PricingBreakdown | null;
-  const routeUfLabel = formatRouteUf(quote.origin, quote.destination);
+  // Parse pricing breakdown - using new StoredPricingBreakdown type
+  const breakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+  const routeUfLabel = breakdown?.meta?.routeUfLabel || formatRouteUf(quote.origin, quote.destination);
   const kmBandLabel = breakdown?.meta?.kmBandLabel;
   const kmStatus = breakdown?.meta?.kmStatus || 'OK';
   const marginPercent = breakdown?.meta?.marginPercent ?? breakdown?.profitability?.margemPercent;
