@@ -1,171 +1,222 @@
+# Plano de Refatoração: Alinhamento freightCalculator ↔ Edge Function
 
-# Plano: Alterações no Board Operacional - UI Stage-Gated
+## 📊 Diagnóstico Atual
 
-## Resumo Executivo
-Implementar uma interface guiada por estágios no modal de detalhes da OS, onde componentes e documentos são exibidos condicionalmente conforme o estágio da ordem.
+### Frontend (`src/lib/freightCalculator.ts`)
+- **Política**: FOB Lotação, impostos "por fora" (sem gross-up)
+- **DAS**: 14% | **Markup**: 30% | **Overhead**: 15%
+- **Componentes**: baseCost → baseFreight (com markup), GRIS, TSO, RCTR-C, TDE, TEAR
+- **Saída**: `FreightCalculationOutput` com estrutura aninhada (meta, components, rates, totals, profitability)
 
----
+### Backend (`supabase/functions/calculate-freight`)
+- **Política**: ICMS com gross-up (inverso do frontend!)
+- **TAC**: Ajuste por diesel (não existe no frontend)
+- **Payment Term**: Ajuste por prazo de pagamento (não existe no frontend)
+- **Saída**: `FreightBreakdown` com estrutura plana diferente
 
-## 1. Mudanças no Banco de Dados
+### ⚠️ Divergências Críticas
 
-### Novas colunas na tabela `orders`:
-A tabela precisa de novas flags para documentos específicos:
-
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| `has_crlv` | boolean | CRLV do veículo |
-| `has_cnh` | boolean | CNH do motorista |
-| `has_comp_residencia` | boolean | Comprovante de residência |
-| `has_antt` | boolean | Registro ANTT |
-| `has_mdf` | boolean | MDF-e (Manifesto) |
-| `has_gr` | boolean | GR (Guia de Recolhimento) |
-
----
-
-## 2. Lógica de Visibilidade por Estágio
-
-### Mapa de Visibilidade:
-
-```text
-+-------------------+------------------+------------------+------------------+
-| Estágio           | Driver Section   | Driver Docs      | Fiscal Docs      |
-+-------------------+------------------+------------------+------------------+
-| ordem_criada      |        -         |        -         |        -         |
-| busca_motorista   |   DROPDOWN       | CRLV,CNH,CR,ANTT |        -         |
-| documentacao      |   VISUALIZAR     | CRLV,CNH,CR,ANTT | NFe,CTe,MDF,GR   |
-| coleta_realizada  |   VISUALIZAR     | CRLV,CNH,CR,ANTT | NFe,CTe,MDF,GR   |
-| em_transito       |   VISUALIZAR     | CRLV,CNH,CR,ANTT | NFe,CTe,MDF,GR   |
-| entregue          |   VISUALIZAR     | CRLV,CNH,CR,ANTT | NFe,CTe,MDF,GR+POD|
-+-------------------+------------------+------------------+------------------+
-```
-
-### Tab "Documentos":
-- Visivel apenas no estágio `documentacao`
-
-### Rota (Origem/Destino):
-- Visivel em **todos** os estágios
+| Aspecto | Frontend | Backend | Ação |
+|---------|----------|---------|------|
+| ICMS | Por fora (soma simples) | Gross-up (÷ 1-rate) | **Alinhar ao frontend** |
+| DAS | 14% fixo | Não implementado | **Adicionar ao backend** |
+| Markup | 30% sobre baseCost | Não implementado | **Adicionar ao backend** |
+| RCTR-C | cost_value_percent | Não implementado | **Adicionar ao backend** |
+| TAC | Não implementado | Implementado | **Manter opcional** |
+| Payment Term | Não implementado | Implementado | **Manter opcional** |
+| TDE/TEAR | 20% sobre baseFreight | Não implementado | **Adicionar ao backend** |
+| Overhead | 15% sobre margemBruta | Não implementado | **Adicionar ao backend** |
 
 ---
 
-## 3. Novos Hooks
+## 🎯 Decisão de Arquitetura
 
-### `useDrivers.ts`
+### Opção A: Frontend como "Source of Truth" ✅ (Recomendado)
+- Edge Function alinha-se 100% ao `freightCalculator.ts`
+- Frontend calcula localmente para preview rápido
+- Backend valida/persiste com mesmas regras
+- TAC e Payment Term são **extensões opcionais**
+
+### Opção B: Backend como "Source of Truth"
+- Frontend chama Edge Function para todo cálculo
+- Mais latência, mas garante consistência
+
+**Decisão**: Opção A - Frontend já implementa a política correta do "Referencial"
+
+---
+
+## 📋 Tarefas de Implementação
+
+### Fase 1: Tipos Compartilhados (10 min)
+- [ ] 1.1 Criar `supabase/functions/_shared/freight-types.ts`
+- [ ] 1.2 Definir `FreightCalculationInput` e `FreightCalculationOutput` alinhados ao frontend
+- [ ] 1.3 Exportar `normalizeIcmsRate()` para uso compartilhado
+
+### Fase 2: Refatorar Edge Function (40 min)
+- [ ] 2.1 **ICMS por fora**: Remover gross-up → `icms = receitaBruta * (rate/100)`
+- [ ] 2.2 **DAS**: Buscar `pricing_parameters.das_percent` (fallback 14%)
+- [ ] 2.3 **Markup**: Buscar `pricing_parameters.markup_percent` (fallback 30%)
+- [ ] 2.4 **RCTR-C**: Adicionar `rctrc = cargoValue * (cost_value_percent/100)`
+- [ ] 2.5 **TDE/TEAR**: Adicionar flags no input, calcular como 20% do baseFreight
+- [ ] 2.6 **Overhead**: Buscar `pricing_parameters.overhead_percent` (fallback 15%)
+- [ ] 2.7 **Rentabilidade**: Calcular margemBruta, overhead, resultadoLiquido, margemPercent
+- [ ] 2.8 **Estrutura output**: Alinhar ao formato `FreightCalculationOutput`
+
+### Fase 3: Decisão TAC/Payment Term (5 min)
+- [ ] 3.1 **TAC**: Manter como campo opcional no input, aplicar se fornecido
+- [ ] 3.2 **Payment Term**: Manter como campo opcional no input, aplicar se fornecido
+- [ ] 3.3 Não adicionar ao frontend por enquanto (escopo futuro)
+
+### Fase 4: Atualizar Hook `useCalculateFreight` (10 min)
+- [ ] 4.1 Atualizar tipos para novo formato de input
+- [ ] 4.2 Atualizar tipos para novo formato de output
+- [ ] 4.3 Manter compatibilidade com chamadas existentes
+
+### Fase 5: Testes e Validação (15 min)
+- [ ] 5.1 Criar caso de teste com valores conhecidos
+- [ ] 5.2 Comparar `totalCliente` frontend vs backend
+- [ ] 5.3 Validar divergência máxima < R$ 0.01
+- [ ] 5.4 Testar edge cases (km fora de faixa, tabela não encontrada)
+
+---
+
+## 🔄 Contratos de API (Proposta Final)
+
+### Input Unificado
 ```typescript
-// Lista motoristas ativos para dropdown
-// Retorna: { id, name, phone }
+interface FreightCalculationInput {
+  // Localização (obrigatório)
+  originCity: string;          // "Itajaí - SC"
+  destinationCity: string;     // "São Paulo - SP"
+  kmDistance: number;
+  
+  // Carga (obrigatório)
+  weightKg: number;
+  volumeM3: number;
+  cargoValue: number;
+  
+  // Pedágio (obrigatório - manual)
+  tollValue: number;
+  
+  // Referência (obrigatório)
+  priceTableId: string;
+  
+  // ICMS (opcional - se não informado, buscar por UF)
+  icmsRatePercent?: number;
+  
+  // Taxas NTC (opcional)
+  tdeEnabled?: boolean;
+  tearEnabled?: boolean;
+  
+  // Overrides globais (opcional - se não informado, buscar de pricing_parameters)
+  dasPercent?: number;         // fallback: 14
+  markupPercent?: number;      // fallback: 30
+  overheadPercent?: number;    // fallback: 15
+  
+  // Extensões opcionais (backend only)
+  tacEnabled?: boolean;        // aplicar TAC se true
+  paymentTermCode?: string;    // aplicar ajuste prazo se informado
+}
 ```
 
-### `useVehicles.ts`
+### Output Unificado
 ```typescript
-// Lista veículos ativos (opcionalmente filtrados por driver_id)
-// Retorna: { id, plate, driver_id }
+interface FreightCalculationOutput {
+  status: 'OK' | 'OUT_OF_RANGE' | 'MISSING_DATA';
+  error?: string;
+  
+  meta: {
+    routeUfLabel: string | null;        // "SC→SP"
+    kmBandLabel: string | null;         // "1-50"
+    kmStatus: 'OK' | 'OUT_OF_RANGE';
+    marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
+    marginPercent: number;
+    cubageFactor: number;
+    cubageWeightKg: number;
+    billableWeightKg: number;
+  };
+  
+  components: {
+    baseCost: number;          // ANTES do markup
+    baseFreight: number;       // APÓS markup (baseCost * 1.30)
+    toll: number;
+    gris: number;
+    tso: number;
+    rctrc: number;
+    adValorem: number;         // sempre 0
+    tde: number;
+    tear: number;
+    // Extensões opcionais
+    tacAdjustment?: number;
+    paymentAdjustment?: number;
+  };
+  
+  rates: {
+    dasPercent: number;
+    icmsPercent: number;
+    grisPercent: number;
+    tsoPercent: number;
+    costValuePercent: number;
+    markupPercent: number;
+    overheadPercent: number;
+  };
+  
+  totals: {
+    receitaBruta: number;      // soma components
+    das: number;               // receitaBruta * das%
+    icms: number;              // receitaBruta * icms% (POR FORA!)
+    totalImpostos: number;     // das + icms
+    totalCliente: number;      // receitaBruta + totalImpostos
+  };
+  
+  profitability: {
+    custosCarreteiro: number;
+    custosDescarga: number;
+    custosDiretos: number;
+    margemBruta: number;
+    overhead: number;
+    resultadoLiquido: number;
+    margemPercent: number;
+  };
+  
+  // Debug info (backend only)
+  fallbacksApplied?: string[];
+}
 ```
 
 ---
 
-## 4. Alterações nos Componentes
+## ⏱️ Estimativa Total
 
-### `OrderDetailModal.tsx`
-1. **Importar hooks** `useDrivers` e `useVehicles`
-2. **Tab Documentos**: Condicionar visibilidade ao estágio `documentacao`
-3. **Seção Driver**: 
-   - A partir de `busca_motorista`: Mostrar dropdowns para motorista/veículo
-   - Ao selecionar motorista, auto-preencher `driver_name`, `driver_phone`
-   - Ao selecionar veículo, auto-preencher `vehicle_plate`
-4. **Status dos Documentos**:
-   - `busca_motorista`: CRLV, CNH, Comp.Res., ANTT
-   - `documentacao+`: NFe, CTe, MDF-e, GR
-   - `entregue`: POD
-
-### `OrderForm.tsx`
-- Trocar inputs de texto por **dropdowns** para motorista e veículo
-- Usar hooks para popular opções
-- Ao salvar, gravar tanto IDs quanto campos legados (snapshot)
+| Fase | Complexidade | Tempo |
+|------|--------------|-------|
+| Fase 1 - Tipos | Baixa | 10 min |
+| Fase 2 - Edge Function | Alta | 40 min |
+| Fase 3 - TAC/Payment | Baixa | 5 min |
+| Fase 4 - Hook | Média | 10 min |
+| Fase 5 - Testes | Média | 15 min |
+| **Total** | | **~80 min** |
 
 ---
 
-## 5. Arquivos a Modificar
+## ✅ Critérios de Aceite
 
-| Arquivo | Ação |
-|---------|------|
-| `src/hooks/useDrivers.ts` | CRIAR - hook para listar motoristas |
-| `src/hooks/useVehicles.ts` | CRIAR - hook para listar veículos |
-| `src/components/modals/OrderDetailModal.tsx` | MODIFICAR - lógica stage-gated |
-| `src/components/forms/OrderForm.tsx` | MODIFICAR - dropdowns motorista/veículo |
-
----
-
-## 6. Migração SQL
-
-```sql
--- Adicionar colunas de documentos do motorista
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_crlv boolean DEFAULT false;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_cnh boolean DEFAULT false;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_comp_residencia boolean DEFAULT false;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_antt boolean DEFAULT false;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_mdf boolean DEFAULT false;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS has_gr boolean DEFAULT false;
-```
+1. ✅ Edge Function retorna exatamente o mesmo `totalCliente` que o frontend para inputs idênticos
+2. ✅ ICMS calculado "por fora" (soma simples) em ambos
+3. ✅ DAS de 14% aplicado sobre receita bruta em ambos
+4. ✅ Markup de 30% sobre baseCost em ambos
+5. ✅ RCTR-C calculado com `cost_value_percent` em ambos
+6. ✅ TDE/TEAR de 20% sobre baseFreight quando habilitados
+7. ✅ Margem de rentabilidade calculada corretamente
+8. ✅ Tipos TypeScript 100% compatíveis entre frontend e backend
+9. ✅ Fallbacks documentados e logados quando usados
 
 ---
 
-## 7. Seção Técnica
+## 🚀 Próximos Passos
 
-### Constantes de Estágios para Lógica Condicional
-
-```typescript
-const STAGES_WITH_DRIVER = ['busca_motorista', 'documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
-const STAGES_WITH_FISCAL_DOCS = ['documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
-const STAGE_WITH_POD = 'entregue';
-const STAGE_WITH_DOCS_TAB = 'documentacao';
-```
-
-### Mapeamento de Documentos por Categoria
-
-```typescript
-// Documentos do Motorista (visíveis a partir de busca_motorista)
-const DRIVER_DOCS = [
-  { key: 'has_crlv', label: 'CRLV' },
-  { key: 'has_cnh', label: 'CNH' },
-  { key: 'has_comp_residencia', label: 'Comp.Res.' },
-  { key: 'has_antt', label: 'ANTT' },
-];
-
-// Documentos Fiscais (visíveis a partir de documentacao)
-const FISCAL_DOCS = [
-  { key: 'has_nfe', label: 'NF-e' },
-  { key: 'has_cte', label: 'CT-e' },
-  { key: 'has_mdf', label: 'MDF-e' },
-  { key: 'has_gr', label: 'GR' },
-];
-
-// POD (visível apenas em entregue)
-const POD_DOC = { key: 'has_pod', label: 'POD' };
-```
-
-### Pattern de Snapshot para Dados Legados
-Ao selecionar motorista/veículo via dropdown, o sistema deve:
-1. Salvar `driver_id` (FK) para relacionamento
-2. Salvar `driver_name`, `driver_phone`, `vehicle_plate` como snapshot textual para histórico
-
----
-
-## 8. Critérios de Aceite
-
-- [ ] Tab "Documentos" visível apenas em estágio `documentacao`
-- [ ] Seção Origem/Destino visível em todos os estágios
-- [ ] Seção Motorista aparece a partir de `busca_motorista` com dropdowns
-- [ ] Dropdown de motorista popula automaticamente nome e telefone
-- [ ] Dropdown de veículo popula automaticamente a placa
-- [ ] Docs do motorista (CRLV, CNH, etc.) visíveis a partir de `busca_motorista`
-- [ ] Docs fiscais (NFe, CTe, MDF, GR) visíveis a partir de `documentacao`
-- [ ] POD visível apenas em `entregue`
-- [ ] Dados persistem corretamente ao salvar
-
----
-
-## Próximos Passos
-1. Aprovar o plano para iniciar implementação
-2. Executar migração SQL para adicionar novas colunas
-3. Criar hooks `useDrivers` e `useVehicles`
-4. Implementar lógica stage-gated no modal
+1. **Aprovar plano** para iniciar implementação
+2. **Fase 1**: Criar tipos compartilhados em `_shared/`
+3. **Fase 2**: Refatorar edge function alinhando à política do frontend
+4. **Fase 3-4**: Atualizar hook e decidir extensões
+5. **Fase 5**: Validar com testes comparativos
