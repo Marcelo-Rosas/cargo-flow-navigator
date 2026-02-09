@@ -12,11 +12,15 @@ import {
   ArrowRightLeft,
   Truck,
   CreditCard,
-  Route
+  Route,
+  AlertTriangle,
+  TrendingUp,
+  Receipt
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +34,7 @@ import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { formatRouteUf, PricingBreakdown } from '@/lib/freight-calculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -49,6 +54,8 @@ const STAGE_LABELS: Record<QuoteStage, { label: string; color: string }> = {
   ganho: { label: 'Ganho', color: 'bg-success/10 text-success' },
   perdido: { label: 'Perdido', color: 'bg-destructive/10 text-destructive' },
 };
+
+const TARGET_MARGIN_PERCENT = 15;
 
 export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps) {
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
@@ -89,7 +96,18 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
   if (!quote) return null;
 
   const stageInfo = STAGE_LABELS[quote.stage];
-  const canConvert = quote.stage !== 'ganho' && quote.stage !== 'perdido';
+  
+  // REGRA: Converter para OS só quando stage === 'ganho'
+  const canConvert = quote.stage === 'ganho';
+  
+  // Parse pricing breakdown
+  const breakdown = quote.pricing_breakdown as unknown as PricingBreakdown | null;
+  const routeUfLabel = formatRouteUf(quote.origin, quote.destination);
+  const kmBandLabel = breakdown?.meta?.kmBandLabel;
+  const kmStatus = breakdown?.meta?.kmStatus || 'OK';
+  const marginPercent = breakdown?.meta?.marginPercent ?? breakdown?.profitability?.margemPercent;
+  const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
+  const isBelowTarget = marginStatus === 'BELOW_TARGET' || (marginPercent !== undefined && marginPercent < TARGET_MARGIN_PERCENT);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -119,7 +137,7 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-3">
@@ -127,6 +145,17 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                 <Badge className={cn(stageInfo.color)}>
                   {stageInfo.label}
                 </Badge>
+                {routeUfLabel && (
+                  <Badge variant="outline" className="text-xs">
+                    <Route className="w-3 h-3 mr-1" />
+                    {routeUfLabel}
+                  </Badge>
+                )}
+                {kmBandLabel && (
+                  <Badge variant="outline" className="text-xs">
+                    {kmBandLabel} km
+                  </Badge>
+                )}
               </DialogTitle>
               <div className="flex items-center gap-2">
                 {canConvert && (
@@ -148,6 +177,26 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
           </DialogHeader>
 
           <div className="space-y-6 mt-4">
+            {/* Margin Alert */}
+            {isBelowTarget && marginPercent !== undefined && (
+              <Alert variant="destructive" className="bg-warning/10 border-warning text-warning-foreground">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Margem de {marginPercent.toFixed(1)}% está abaixo da meta de {TARGET_MARGIN_PERCENT}%
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* OUT_OF_RANGE Alert */}
+            {kmStatus === 'OUT_OF_RANGE' && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Distância fora da faixa de quilometragem da tabela de preços selecionada
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Client Info */}
             <div className="p-4 rounded-lg bg-muted/30 border border-border">
               <div className="flex items-center gap-3">
@@ -182,11 +231,18 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                       </p>
                     )}
                   </div>
-                  {quote.freight_type && (
-                    <Badge variant="outline" className="text-sm">
-                      {quote.freight_type}
-                    </Badge>
-                  )}
+                  <div className="flex gap-2">
+                    {quote.freight_type && (
+                      <Badge variant="outline" className="text-sm">
+                        {quote.freight_type}
+                      </Badge>
+                    )}
+                    {quote.freight_modality && (
+                      <Badge variant="outline" className="text-sm">
+                        {quote.freight_modality === 'lotacao' ? 'Lotação' : 'Fracionado'}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -256,17 +312,6 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
               <div>
                 <h4 className="font-semibold text-foreground mb-3">Detalhes de Precificação</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  {quote.freight_modality && (
-                    <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                        <Package className="w-4 h-4" />
-                        <span className="text-xs">Modalidade</span>
-                      </div>
-                      <p className="font-medium text-foreground text-sm">
-                        {quote.freight_modality === 'lotacao' ? 'Lotação' : 'Fracionado'}
-                      </p>
-                    </div>
-                  )}
                   {priceTable && (
                     <div className="p-3 rounded-lg bg-muted/30 border border-border">
                       <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -314,18 +359,140 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
               </div>
             )}
 
-            {/* Value */}
-            <div className="p-6 rounded-lg bg-primary/5 border border-primary/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-primary">
-                  <DollarSign className="w-5 h-5" />
-                  <span className="font-medium">Valor Total</span>
+            {/* Pricing Breakdown */}
+            {breakdown && breakdown.totals && (
+              <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Receipt className="w-4 h-4" />
+                  Breakdown do Cálculo
+                </h4>
+                
+                {/* Components */}
+                <div className="space-y-2 text-sm">
+                  {breakdown.components && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Frete Base</span>
+                        <span>{formatCurrency(breakdown.components.baseFreight || 0)}</span>
+                      </div>
+                      {breakdown.components.toll > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Pedágio</span>
+                          <span>{formatCurrency(breakdown.components.toll)}</span>
+                        </div>
+                      )}
+                      {breakdown.components.rctrc > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2)}%)</span>
+                          <span>{formatCurrency(breakdown.components.rctrc)}</span>
+                        </div>
+                      )}
+                      {breakdown.components.gris > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">GRIS ({breakdown.rates?.grisPercent?.toFixed(2)}%)</span>
+                          <span>{formatCurrency(breakdown.components.gris)}</span>
+                        </div>
+                      )}
+                      {breakdown.components.tso > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">TSO ({breakdown.rates?.tsoPercent?.toFixed(2)}%)</span>
+                          <span>{formatCurrency(breakdown.components.tso)}</span>
+                        </div>
+                      )}
+                      {breakdown.components.tde > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">TDE (NTC)</span>
+                          <span>{formatCurrency(breakdown.components.tde)}</span>
+                        </div>
+                      )}
+                      {breakdown.components.tear > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">TEAR (NTC)</span>
+                          <span>{formatCurrency(breakdown.components.tear)}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
+                  <Separator className="my-2" />
+                  
+                  {/* Totals */}
+                  <div className="flex justify-between font-medium">
+                    <span>Receita Bruta</span>
+                    <span>{formatCurrency(breakdown.totals.receitaBruta || 0)}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)</span>
+                    <span>{formatCurrency(breakdown.totals.das || 0)}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>ICMS ({breakdown.rates?.icmsPercent?.toFixed(2)}%)</span>
+                    <span>{formatCurrency(breakdown.totals.icms || 0)}</span>
+                  </div>
+                  
+                  <Separator className="my-2" />
+                  
+                  <div className="flex justify-between font-semibold text-lg">
+                    <span>Total Cliente</span>
+                    <span className="text-primary">{formatCurrency(breakdown.totals.totalCliente || 0)}</span>
+                  </div>
                 </div>
-                <p className="text-3xl font-bold text-primary">
-                  {formatCurrency(Number(quote.value))}
-                </p>
+                
+                {/* Profitability */}
+                {breakdown.profitability && (
+                  <>
+                    <Separator className="my-4" />
+                    <h5 className="font-medium text-foreground mb-2 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4" />
+                      Rentabilidade
+                    </h5>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Margem Bruta</span>
+                        <span>{formatCurrency(breakdown.profitability.margemBruta || 0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Overhead</span>
+                        <span>{formatCurrency(breakdown.profitability.overhead || 0)}</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>Resultado Líquido</span>
+                        <span className={cn(
+                          breakdown.profitability.resultadoLiquido >= 0 ? 'text-success' : 'text-destructive'
+                        )}>
+                          {formatCurrency(breakdown.profitability.resultadoLiquido || 0)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>Margem %</span>
+                        <span className={cn(
+                          isBelowTarget ? 'text-warning-foreground' : 'text-success'
+                        )}>
+                          {(breakdown.profitability.margemPercent || 0).toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
+            )}
+
+            {/* Value (fallback if no breakdown) */}
+            {!breakdown && (
+              <div className="p-6 rounded-lg bg-primary/5 border border-primary/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-primary">
+                    <DollarSign className="w-5 h-5" />
+                    <span className="font-medium">Valor Total</span>
+                  </div>
+                  <p className="text-3xl font-bold text-primary">
+                    {formatCurrency(Number(quote.value))}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Validity */}
             {quote.validity_date && (

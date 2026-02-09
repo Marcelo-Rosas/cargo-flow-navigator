@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { GripVertical, MoreHorizontal, Mail, Copy, Calendar, MapPin, Truck, Building2 } from 'lucide-react';
+import { GripVertical, MoreHorizontal, Mail, Copy, Calendar, MapPin, Building2, ArrowRightLeft, Route, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,8 +13,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
+import { extractUf, formatRouteUf } from '@/lib/freight-calculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
+type PricingBreakdown = {
+  meta?: {
+    routeUfLabel?: string | null;
+    kmBandLabel?: string | null;
+    kmStatus?: 'OK' | 'OUT_OF_RANGE';
+    marginStatus?: 'OK' | 'BELOW_TARGET' | 'UNKNOWN';
+    marginPercent?: number;
+  };
+};
 
 interface QuoteCardProps {
   quote: Quote;
@@ -52,6 +62,19 @@ export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
   };
 
   const tags = quote.tags || [];
+  
+  // Extract route UF label
+  const routeUfLabel = formatRouteUf(quote.origin, quote.destination);
+  
+  // Get km band from pricing_breakdown or from km_distance
+  const breakdown = quote.pricing_breakdown as PricingBreakdown | null;
+  const kmBandLabel = breakdown?.meta?.kmBandLabel || null;
+  const kmStatus = breakdown?.meta?.kmStatus || 'OK';
+  const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
+  const marginPercent = breakdown?.meta?.marginPercent;
+  
+  // Show convert button only when stage === 'ganho'
+  const canConvert = quote.stage === 'ganho';
 
   return (
     <motion.div
@@ -63,7 +86,8 @@ export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
       className={cn(
         "bg-card rounded-lg border border-border shadow-card p-4 cursor-pointer group",
         "hover:shadow-card-hover hover:border-primary/30 transition-all duration-200",
-        isDragging && "opacity-90 rotate-2 scale-[1.02] shadow-lg z-50"
+        isDragging && "opacity-90 rotate-2 scale-[1.02] shadow-lg z-50",
+        marginStatus === 'BELOW_TARGET' && "border-l-4 border-l-warning"
       )}
       onClick={onEdit}
     >
@@ -101,11 +125,20 @@ export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
             <DropdownMenuItem>
               <Copy className="w-4 h-4 mr-2" /> Clonar
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {quote.stage !== 'ganho' && quote.stage !== 'perdido' && (
-              <DropdownMenuItem onClick={onConvert} className="text-success">
-                Converter para OS
-              </DropdownMenuItem>
+            {canConvert && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onConvert?.();
+                  }} 
+                  className="text-success"
+                >
+                  <ArrowRightLeft className="w-4 h-4 mr-2" />
+                  Converter para OS
+                </DropdownMenuItem>
+              </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -117,6 +150,36 @@ export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
         <span className="truncate">{quote.origin}</span>
         <span>→</span>
         <span className="truncate">{quote.destination}</span>
+      </div>
+
+      {/* Route UF Badge + Km Band Badge */}
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {routeUfLabel && (
+          <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
+            <Route className="w-3 h-3 mr-1" />
+            {routeUfLabel}
+          </Badge>
+        )}
+        
+        {kmBandLabel && kmStatus === 'OK' && (
+          <Badge variant="secondary" className="text-xs bg-muted">
+            {kmBandLabel} km
+          </Badge>
+        )}
+        
+        {kmStatus === 'OUT_OF_RANGE' && (
+          <Badge variant="secondary" className="text-xs bg-destructive/10 text-destructive">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            Fora da faixa
+          </Badge>
+        )}
+        
+        {marginStatus === 'BELOW_TARGET' && marginPercent !== undefined && (
+          <Badge variant="secondary" className="text-xs bg-warning/10 text-warning-foreground">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            {marginPercent.toFixed(1)}%
+          </Badge>
+        )}
       </div>
 
       {/* Shipper & Freight Type */}
@@ -131,6 +194,11 @@ export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
           {quote.freight_type && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0">
               {quote.freight_type}
+            </Badge>
+          )}
+          {quote.freight_modality && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              {quote.freight_modality === 'lotacao' ? 'Lot' : 'Frac'}
             </Badge>
           )}
         </div>

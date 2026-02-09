@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Calculator } from 'lucide-react';
+import { Loader2, Calculator, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,17 +27,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { MaskedInput } from '@/components/ui/masked-input';
-import { useCreateQuote, useUpdateQuote } from '@/hooks/useQuotes';
+import { useCreateQuote, useUpdateQuote, useDeleteQuote } from '@/hooks/useQuotes';
 import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { usePriceTables } from '@/hooks/usePriceTables';
 import { useVehicleTypes, usePaymentTerms } from '@/hooks/usePricingRules';
+import { usePriceTableRowByKmRange } from '@/hooks/usePriceTableRows';
+import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
+import { cn } from '@/lib/utils';
+import { 
+  calculateFreightLocal, 
+  buildPricingBreakdown, 
+  formatRouteUf,
+  extractUf
+} from '@/lib/freight-calculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 
@@ -48,7 +71,7 @@ const quoteSchema = z.object({
   shipper_id: z.string().optional(),
   shipper_name: z.string().optional(),
   shipper_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
-  freight_type: z.enum(['CIF', 'FOB']).default('CIF'),
+  freight_type: z.enum(['CIF', 'FOB']).default('FOB'),
   freight_modality: z.enum(['lotacao', 'fracionado']).optional(),
   origin_cep: z.string().optional(),
   destination_cep: z.string().optional(),
@@ -62,13 +85,12 @@ const quoteSchema = z.object({
   vehicle_type_id: z.string().optional(),
   payment_term_id: z.string().optional(),
   km_distance: z.number().min(0, 'Distância inválida').optional(),
-  // Pricing components - all optional with defaults
-  base_freight: z.number().min(0, 'Valor inválido').optional().default(0),
-  toll: z.number().min(0, 'Valor inválido').optional().default(0),
-  gris_percent: z.number().min(0).max(100, 'Percentual inválido').optional().default(0.3),
-  ad_valorem_percent: z.number().min(0).max(100, 'Percentual inválido').optional().default(0.1),
-  icms_percent: z.number().min(0).max(100, 'Percentual inválido').optional().default(12),
+  // Pricing components
   cargo_value: z.number().min(0, 'Valor inválido').optional().default(0),
+  toll: z.number().min(0, 'Valor inválido').optional().default(0),
+  // NTC flags
+  tde_enabled: z.boolean().optional().default(false),
+  tear_enabled: z.boolean().optional().default(false),
   notes: z.string().max(500, 'Observações muito longas').optional(),
 });
 
@@ -92,6 +114,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: paymentTerms } = usePaymentTerms();
   const createQuoteMutation = useCreateQuote();
   const updateQuoteMutation = useUpdateQuote();
+  const deleteQuoteMutation = useDeleteQuote();
   const isEditing = !!quote;
 
   // Track if user manually edited origin/destination
@@ -111,7 +134,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       shipper_id: '',
       shipper_name: '',
       shipper_email: '',
-      freight_type: 'CIF',
+      freight_type: 'FOB',
       freight_modality: undefined,
       origin_cep: '',
       destination_cep: '',
@@ -124,35 +147,68 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       vehicle_type_id: '',
       payment_term_id: '',
       km_distance: undefined,
-      base_freight: 0,
-      toll: 0,
-      gris_percent: 0.3,
-      ad_valorem_percent: 0.1,
-      icms_percent: 12,
       cargo_value: 0,
+      toll: 0,
+      tde_enabled: false,
+      tear_enabled: false,
       notes: '',
     },
   });
 
-  const watchedValues = form.watch(['base_freight', 'toll', 'gris_percent', 'ad_valorem_percent', 'icms_percent', 'cargo_value']);
+  const watchedPriceTableId = form.watch('price_table_id');
+  const watchedKmDistance = form.watch('km_distance');
+  const watchedOrigin = form.watch('origin');
+  const watchedDestination = form.watch('destination');
+  const watchedWeight = form.watch('weight');
+  const watchedVolume = form.watch('volume');
+  const watchedCargoValue = form.watch('cargo_value');
+  const watchedToll = form.watch('toll');
+  const watchedTdeEnabled = form.watch('tde_enabled');
+  const watchedTearEnabled = form.watch('tear_enabled');
 
-  const calculatedValue = useMemo(() => {
-    const [baseFreight, toll, grisPercent, adValoremPercent, icmsPercent, cargoValue] = watchedValues;
-    
-    const gris = (cargoValue * (grisPercent / 100));
-    const adValorem = (cargoValue * (adValoremPercent / 100));
-    const subtotal = baseFreight + toll + gris + adValorem;
-    const icms = subtotal * (icmsPercent / 100);
-    const total = subtotal + icms;
-    
-    return {
-      gris,
-      adValorem,
-      subtotal,
-      icms,
-      total,
-    };
-  }, [watchedValues]);
+  // Get price table row for the km distance
+  const { data: priceTableRow, isLoading: isLoadingPriceRow } = usePriceTableRowByKmRange(
+    watchedPriceTableId || '',
+    watchedKmDistance || 0
+  );
+
+  // Get ICMS rate for origin/destination states
+  const originUf = extractUf(watchedOrigin || '');
+  const destUf = extractUf(watchedDestination || '');
+  const { data: icmsRateData } = useIcmsRateForPricing(originUf || '', destUf || '');
+  const icmsRate = icmsRateData?.rate_percent ?? 12;
+
+  // Calculate freight using the pure function
+  const calculationResult = useMemo(() => {
+    return calculateFreightLocal({
+      weightKg: watchedWeight || 0,
+      volumeM3: watchedVolume || 0,
+      cargoValue: watchedCargoValue || 0,
+      tollValue: watchedToll || 0,
+      kmDistance: watchedKmDistance || 0,
+      priceTableRow: priceTableRow || null,
+      icmsRate: icmsRate,
+      tdeEnabled: watchedTdeEnabled || false,
+      tearEnabled: watchedTearEnabled || false,
+    });
+  }, [
+    watchedWeight, 
+    watchedVolume, 
+    watchedCargoValue, 
+    watchedToll,
+    watchedKmDistance, 
+    priceTableRow, 
+    icmsRate,
+    watchedTdeEnabled,
+    watchedTearEnabled
+  ]);
+
+  // Add route UF to meta
+  useEffect(() => {
+    if (watchedOrigin && watchedDestination) {
+      calculationResult.meta.routeUfLabel = formatRouteUf(watchedOrigin, watchedDestination);
+    }
+  }, [watchedOrigin, watchedDestination, calculationResult]);
 
   useEffect(() => {
     // Reset user edit flags when form opens/closes
@@ -167,7 +223,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         shipper_id: quote.shipper_id || '',
         shipper_name: quote.shipper_name || '',
         shipper_email: quote.shipper_email || '',
-        freight_type: (quote.freight_type as 'CIF' | 'FOB') || 'CIF',
+        freight_type: (quote.freight_type as 'CIF' | 'FOB') || 'FOB',
         freight_modality: (quote.freight_modality as 'lotacao' | 'fracionado') || undefined,
         origin_cep: quote.origin_cep || '',
         destination_cep: quote.destination_cep || '',
@@ -180,12 +236,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         vehicle_type_id: quote.vehicle_type_id || '',
         payment_term_id: quote.payment_term_id || '',
         km_distance: quote.km_distance ? Number(quote.km_distance) : undefined,
-        base_freight: Number(quote.value) || 0,
-        toll: Number(quote.toll_value) || 0,
-        gris_percent: 0.3,
-        ad_valorem_percent: 0.1,
-        icms_percent: 12,
         cargo_value: Number(quote.cargo_value) || 0,
+        toll: Number(quote.toll_value) || 0,
+        tde_enabled: false,
+        tear_enabled: false,
         notes: quote.notes || '',
       });
     } else {
@@ -196,7 +250,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         shipper_id: '',
         shipper_name: '',
         shipper_email: '',
-        freight_type: 'CIF',
+        freight_type: 'FOB',
         freight_modality: undefined,
         origin_cep: '',
         destination_cep: '',
@@ -209,12 +263,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         vehicle_type_id: '',
         payment_term_id: '',
         km_distance: undefined,
-        base_freight: 0,
-        toll: 0,
-        gris_percent: 0.3,
-        ad_valorem_percent: 0.1,
-        icms_percent: 12,
         cargo_value: 0,
+        toll: 0,
+        tde_enabled: false,
+        tear_enabled: false,
         notes: '',
       });
     }
@@ -291,13 +343,47 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!quote) return;
+    
+    try {
+      await deleteQuoteMutation.mutateAsync(quote.id);
+      toast.success('Cotação excluída com sucesso');
+      onClose();
+    } catch (error) {
+      toast.error('Erro ao excluir cotação');
+    }
+  };
+
   const onSubmit = async (data: QuoteFormData) => {
     if (!user) {
       toast.error('Você precisa estar logado');
       return;
     }
 
+    // Block if OUT_OF_RANGE
+    if (calculationResult.status === 'OUT_OF_RANGE') {
+      toast.error(calculationResult.error || 'Distância fora da faixa de quilometragem');
+      return;
+    }
+
     try {
+      // Build pricing breakdown for storage
+      const pricingBreakdown = buildPricingBreakdown(calculationResult, {
+        weightKg: data.weight || 0,
+        volumeM3: data.volume || 0,
+        cargoValue: data.cargo_value || 0,
+        tollValue: data.toll || 0,
+        kmDistance: data.km_distance || 0,
+        priceTableRow: priceTableRow || null,
+        icmsRate: icmsRate,
+        tdeEnabled: data.tde_enabled || false,
+        tearEnabled: data.tear_enabled || false,
+      });
+      
+      // Add route UF to meta
+      pricingBreakdown.meta.routeUfLabel = formatRouteUf(data.origin, data.destination);
+
       const quoteData = {
         client_id: data.client_id || null,
         client_name: data.client_name,
@@ -314,13 +400,16 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         cargo_type: data.cargo_type || null,
         weight: data.weight || null,
         volume: data.volume || null,
+        cubage_weight: calculationResult.cubageWeight || null,
+        billable_weight: calculationResult.billableWeight || null,
         price_table_id: data.price_table_id || null,
         vehicle_type_id: data.vehicle_type_id || null,
         payment_term_id: data.payment_term_id || null,
         km_distance: data.km_distance || null,
         toll_value: data.toll || null,
         cargo_value: data.cargo_value || null,
-        value: calculatedValue.total,
+        value: calculationResult.totalCliente,
+        pricing_breakdown: pricingBreakdown as unknown as Database['public']['Tables']['quotes']['Row']['pricing_breakdown'],
         notes: data.notes || null,
       };
 
@@ -343,7 +432,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     }
   };
 
-  const isLoading = createQuoteMutation.isPending || updateQuoteMutation.isPending;
+  const isLoading = createQuoteMutation.isPending || updateQuoteMutation.isPending || deleteQuoteMutation.isPending;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -352,15 +441,44 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     }).format(value);
   };
 
+  const routeUfLabel = formatRouteUf(watchedOrigin || '', watchedDestination || '');
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar Cotação' : 'Nova Cotação'}</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>{isEditing ? 'Editar Cotação' : 'Nova Cotação'}</DialogTitle>
+            {routeUfLabel && (
+              <Badge variant="outline" className="text-xs">
+                {routeUfLabel}
+              </Badge>
+            )}
+          </div>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* OUT_OF_RANGE Alert */}
+            {calculationResult.status === 'OUT_OF_RANGE' && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {calculationResult.error || 'Distância fora da faixa de quilometragem da tabela selecionada'}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Margin Alert */}
+            {calculationResult.meta.marginStatus === 'BELOW_TARGET' && (
+              <Alert className="bg-warning/10 border-warning">
+                <AlertTriangle className="h-4 w-4 text-warning-foreground" />
+                <AlertDescription className="text-warning-foreground">
+                  Margem de {calculationResult.margemPercent.toFixed(1)}% abaixo da meta de 15%
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Cliente Section */}
             <div className="space-y-4">
               <h3 className="font-semibold text-foreground">Dados do Cliente</h3>
@@ -502,8 +620,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="CIF">CIF (Frete por conta do remetente)</SelectItem>
                           <SelectItem value="FOB">FOB (Frete por conta do destinatário)</SelectItem>
+                          <SelectItem value="CIF">CIF (Frete por conta do remetente)</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -679,6 +797,20 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   )}
                 />
               </div>
+
+              {/* Peso Faturável Info */}
+              {(watchedWeight > 0 || watchedVolume > 0) && (
+                <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Peso Cubado (x 300 kg/m³)</span>
+                    <span>{calculationResult.cubageWeight.toLocaleString('pt-BR')} kg</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>Peso Faturável</span>
+                    <span>{calculationResult.billableWeight.toLocaleString('pt-BR')} kg</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <Separator />
@@ -808,7 +940,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   name="km_distance"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Distância (km)</FormLabel>
+                      <FormLabel>Distância (km) *</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -825,6 +957,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   )}
                 />
               </div>
+
+              {/* Km Band Info */}
+              {calculationResult.meta.kmBandLabel && calculationResult.status === 'OK' && (
+                <Badge variant="outline" className="text-xs">
+                  Faixa: {calculationResult.meta.kmBandLabel} km
+                </Badge>
+              )}
 
               <Separator className="my-2" />
               
@@ -851,28 +990,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
                 <FormField
                   control={form.control}
-                  name="base_freight"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Frete Base (R$) *</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.01"
-                          placeholder="0,00"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-4 gap-4">
-                <FormField
-                  control={form.control}
                   name="toll"
                   render={({ field }) => (
                     <FormItem>
@@ -890,63 +1007,42 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     </FormItem>
                   )}
                 />
+              </div>
 
+              {/* NTC Taxes */}
+              <div className="flex gap-6">
                 <FormField
                   control={form.control}
-                  name="gris_percent"
+                  name="tde_enabled"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>GRIS (%)</FormLabel>
+                    <FormItem className="flex items-center gap-2">
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.01"
-                          placeholder="0,30"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
                         />
                       </FormControl>
-                      <FormMessage />
+                      <FormLabel className="!mt-0 text-sm font-normal">
+                        TDE (20%)
+                      </FormLabel>
                     </FormItem>
                   )}
                 />
 
                 <FormField
                   control={form.control}
-                  name="ad_valorem_percent"
+                  name="tear_enabled"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ad Valorem (%)</FormLabel>
+                    <FormItem className="flex items-center gap-2">
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.01"
-                          placeholder="0,10"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
                         />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="icms_percent"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>ICMS (%)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.01"
-                          placeholder="12"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        />
-                      </FormControl>
-                      <FormMessage />
+                      <FormLabel className="!mt-0 text-sm font-normal">
+                        TEAR (20%)
+                      </FormLabel>
                     </FormItem>
                   )}
                 />
@@ -955,25 +1051,79 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               {/* Calculated Values */}
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">GRIS ({form.watch('gris_percent')}%)</span>
-                  <span className="text-foreground">{formatCurrency(calculatedValue.gris)}</span>
+                  <span className="text-muted-foreground">Frete Base</span>
+                  <span className="text-foreground">{formatCurrency(calculationResult.baseFreight)}</span>
+                </div>
+                {calculationResult.toll > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Pedágio</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.toll)}</span>
+                  </div>
+                )}
+                {calculationResult.gris > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">GRIS ({calculationResult.rates.grisPercent.toFixed(2)}%)</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.gris)}</span>
+                  </div>
+                )}
+                {calculationResult.tso > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">TSO ({calculationResult.rates.tsoPercent.toFixed(2)}%)</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.tso)}</span>
+                  </div>
+                )}
+                {calculationResult.rctrc > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">RCTR-C ({calculationResult.rates.costValuePercent.toFixed(2)}%)</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.rctrc)}</span>
+                  </div>
+                )}
+                {calculationResult.tde > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">TDE (NTC)</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.tde)}</span>
+                  </div>
+                )}
+                {calculationResult.tear > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">TEAR (NTC)</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.tear)}</span>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex justify-between text-sm font-medium">
+                  <span className="text-foreground">Receita Bruta</span>
+                  <span className="text-foreground">{formatCurrency(calculationResult.receitaBruta)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Ad Valorem ({form.watch('ad_valorem_percent')}%)</span>
-                  <span className="text-foreground">{formatCurrency(calculatedValue.adValorem)}</span>
+                  <span className="text-muted-foreground">DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)</span>
+                  <span className="text-foreground">{formatCurrency(calculationResult.das)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="text-foreground">{formatCurrency(calculatedValue.subtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">ICMS ({form.watch('icms_percent')}%)</span>
-                  <span className="text-foreground">{formatCurrency(calculatedValue.icms)}</span>
+                  <span className="text-muted-foreground">ICMS ({calculationResult.rates.icmsPercent.toFixed(2)}%)</span>
+                  <span className="text-foreground">{formatCurrency(calculationResult.icms)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">
-                  <span className="text-foreground">Total</span>
-                  <span className="text-primary text-lg">{formatCurrency(calculatedValue.total)}</span>
+                  <span className="text-foreground">Total Cliente</span>
+                  <span className="text-primary text-lg">{formatCurrency(calculationResult.totalCliente)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Resultado Líquido</span>
+                  <span className={cn(
+                    calculationResult.resultadoLiquido >= 0 ? 'text-success' : 'text-destructive'
+                  )}>
+                    {formatCurrency(calculationResult.resultadoLiquido)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm font-medium">
+                  <span className="text-foreground">Margem</span>
+                  <span className={cn(
+                    calculationResult.meta.marginStatus === 'BELOW_TARGET' ? 'text-warning-foreground' : 'text-success'
+                  )}>
+                    {calculationResult.margemPercent.toFixed(1)}%
+                  </span>
                 </div>
               </div>
             </div>
@@ -1000,14 +1150,48 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               )}
             />
 
-            <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {isEditing ? 'Salvar' : 'Criar Cotação'}
-              </Button>
+            <div className="flex justify-between pt-4">
+              {/* Delete Button - only when editing */}
+              {isEditing && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" variant="destructive" size="sm">
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Excluir
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir cotação?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja excluir esta cotação? Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleDelete}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
+              <div className="flex gap-3 ml-auto">
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isLoading || calculationResult.status === 'OUT_OF_RANGE'}
+                >
+                  {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {isEditing ? 'Salvar' : 'Criar Cotação'}
+                </Button>
+              </div>
             </div>
           </form>
         </Form>
