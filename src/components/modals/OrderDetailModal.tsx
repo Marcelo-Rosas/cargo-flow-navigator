@@ -47,7 +47,7 @@ interface OrderDetailModalProps {
 
 // Stage visibility constants
 const STAGES_WITH_DRIVER: OrderStage[] = ['busca_motorista', 'documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
-const STAGE_WITH_DOCS_TAB: OrderStage = 'documentacao';
+const STAGES_WITH_DOCS_TAB: OrderStage[] = ['busca_motorista', 'documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
 
 const STAGE_LABELS: Record<OrderStage, { label: string; color: string }> = {
   ordem_criada: { label: 'Ordem Criada', color: 'bg-muted text-muted-foreground' },
@@ -71,7 +71,7 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
   
   // Stage-based visibility flags
   const showDriverSection = STAGES_WITH_DRIVER.includes(order.stage);
-  const showDocsTab = order.stage === STAGE_WITH_DOCS_TAB;
+  const showDocsTab = STAGES_WITH_DOCS_TAB.includes(order.stage);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
