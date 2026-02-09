@@ -1,3 +1,4 @@
+// src/lib/freight-calculator.ts
 /**
  * Calculadora de Frete FOB - Lotação
  * 
@@ -145,6 +146,17 @@ export function formatRouteUf(origin: string, destination: string): string | nul
   return null;
 }
 
+/**
+ * Normaliza taxa ICMS para escala percentual
+ * CSV pode ter 0.7 para 7%, 0.12 para 12%, etc.
+ */
+function normalizeIcmsRate(ratePercent: number): number {
+  if (ratePercent === 0) return 0;
+  if (ratePercent > 0 && ratePercent <= 0.25) return ratePercent * 100; // 0.12 => 12
+  if (ratePercent > 0.25 && ratePercent <= 1) return ratePercent * 10;  // 0.7  => 7
+  return ratePercent; // já percentual
+}
+
 // ============================================
 // MAIN CALCULATION FUNCTION
 // ============================================
@@ -200,7 +212,7 @@ export function calculateFreightLocal(input: FreightCalculationInput): FreightCa
     margemPercent: 0,
     rates: {
       dasPercent,
-      icmsPercent: icmsRate,
+      icmsPercent: normalizeIcmsRate(icmsRate),
       grisPercent: 0,
       tsoPercent: 0,
       costValuePercent: 0,
@@ -295,8 +307,8 @@ export function calculateFreightLocal(input: FreightCalculationInput): FreightCa
   // DAS = receitaBruta * (dasPercent / 100)
   result.das = result.receitaBruta * (dasPercent / 100);
   
-  // ICMS = receitaBruta * (icmsRate / 100)
-  result.icms = result.receitaBruta * (icmsRate / 100);
+  // ICMS = receitaBruta * (icmsRate / 100) - normalized
+  result.icms = result.receitaBruta * (result.rates.icmsPercent / 100);
   
   // Total Impostos = DAS + ICMS
   result.totalImpostos = result.das + result.icms;
