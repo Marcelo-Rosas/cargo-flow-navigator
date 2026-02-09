@@ -14,67 +14,88 @@ interface CepData {
   formatted: string;
 }
 
-async function fetchViaCep(cep: string): Promise<CepData | null> {
+async function fetchWithTimeout(url: string, timeoutMs = 5000): Promise<Response | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
-      signal: controller.signal,
-    });
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
-
-    if (!response.ok) return null;
-
-    const json = await response.json();
-    if (json.erro) return null;
-
-    return {
-      cep: json.cep,
-      logradouro: json.logradouro || '',
-      complemento: json.complemento || '',
-      bairro: json.bairro || '',
-      localidade: json.localidade,
-      uf: json.uf,
-      ibge: json.ibge || '',
-      formatted: `${json.localidade} - ${json.uf}`,
-    };
+    return response;
   } catch {
     return null;
   }
+}
+
+async function fetchViaCep(cep: string): Promise<CepData | null> {
+  const response = await fetchWithTimeout(`https://viacep.com.br/ws/${cep}/json/`);
+  if (!response?.ok) return null;
+
+  const json = await response.json();
+  if (json.erro) return null;
+
+  return {
+    cep: json.cep,
+    logradouro: json.logradouro || '',
+    complemento: json.complemento || '',
+    bairro: json.bairro || '',
+    localidade: json.localidade,
+    uf: json.uf,
+    ibge: json.ibge || '',
+    formatted: '',
+  };
 }
 
 async function fetchBrasilApi(cep: string): Promise<CepData | null> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+  const response = await fetchWithTimeout(`https://brasilapi.com.br/api/cep/v2/${cep}`);
+  if (!response?.ok) return null;
 
-    const response = await fetch(`https://brasilapi.com.br/api/cep/v1/${cep}`, {
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
+  const json = await response.json();
+  if (!json.cep) return null;
 
-    if (!response.ok) return null;
+  return {
+    cep: json.cep,
+    logradouro: json.street || '',
+    complemento: '',
+    bairro: json.neighborhood || '',
+    localidade: json.city || '',
+    uf: json.state || '',
+    ibge: '',
+    formatted: '',
+  };
+}
 
-    const json = await response.json();
+async function fetchOpenCep(cep: string): Promise<CepData | null> {
+  const response = await fetchWithTimeout(`https://opencep.com/v1/${cep}.json`);
+  if (!response?.ok) return null;
 
-    return {
-      cep: json.cep,
-      logradouro: json.street || '',
-      complemento: '',
-      bairro: json.neighborhood || '',
-      localidade: json.city,
-      uf: json.state,
-      ibge: json.ibge || '',
-      formatted: `${json.city} - ${json.state}`,
-    };
-  } catch {
-    return null;
-  }
+  const json = await response.json();
+  if (!json.cep) return null;
+
+  return {
+    cep: json.cep,
+    logradouro: json.logradouro || '',
+    complemento: json.complemento || '',
+    bairro: json.bairro || '',
+    localidade: json.localidade || '',
+    uf: json.uf || '',
+    ibge: json.ibge || '',
+    formatted: '',
+  };
+}
+
+function formatAddress(data: CepData): string {
+  return [
+    data.logradouro,
+    data.complemento,
+    data.bairro,
+    `${data.localidade} - ${data.uf}`,
+    data.cep,
+  ]
+    .filter(Boolean)
+    .join(', ');
 }
 
 Deno.serve(async (req) => {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -82,7 +103,6 @@ Deno.serve(async (req) => {
   try {
     const { cep } = await req.json();
 
-    // Validação: apenas dígitos, 8 caracteres
     const cleanCep = cep?.replace(/\D/g, '');
     if (!cleanCep || cleanCep.length !== 8) {
       return new Response(
@@ -93,13 +113,17 @@ Deno.serve(async (req) => {
 
     console.log('[lookup-cep] Buscando CEP:', cleanCep);
 
-    // Tentar ViaCEP primeiro
+    // Fallback triplo: ViaCEP → BrasilAPI v2 → OpenCEP
     let data = await fetchViaCep(cleanCep);
 
-    // Fallback para BrasilAPI se ViaCEP falhar
     if (!data) {
-      console.log('[lookup-cep] ViaCEP falhou, tentando BrasilAPI');
+      console.log('[lookup-cep] ViaCEP falhou, tentando BrasilAPI v2');
       data = await fetchBrasilApi(cleanCep);
+    }
+
+    if (!data) {
+      console.log('[lookup-cep] BrasilAPI falhou, tentando OpenCEP');
+      data = await fetchOpenCep(cleanCep);
     }
 
     if (!data) {
@@ -109,6 +133,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    data.formatted = formatAddress(data);
     console.log('[lookup-cep] Sucesso:', data.formatted);
 
     return new Response(
