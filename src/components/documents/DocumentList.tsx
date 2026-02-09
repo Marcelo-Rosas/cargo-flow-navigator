@@ -25,8 +25,13 @@ interface DocumentListProps {
 }
 
 const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
+  cnh: { label: 'CNH', color: 'bg-blue-500/10 text-blue-600' },
+  crlv: { label: 'CRLV', color: 'bg-blue-500/10 text-blue-600' },
+  comp_residencia: { label: 'Comp.Res.', color: 'bg-blue-500/10 text-blue-600' },
+  antt_motorista: { label: 'ANTT', color: 'bg-blue-500/10 text-blue-600' },
   nfe: { label: 'NF-e', color: 'bg-primary/10 text-primary' },
   cte: { label: 'CT-e', color: 'bg-success/10 text-success' },
+  mdfe: { label: 'MDF-e', color: 'bg-primary/10 text-primary' },
   pod: { label: 'POD', color: 'bg-warning/10 text-warning-foreground' },
   outros: { label: 'Outros', color: 'bg-muted text-muted-foreground' },
 };

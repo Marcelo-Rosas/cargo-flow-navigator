@@ -1361,7 +1361,16 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "comercial" | "operacao" | "fiscal" | "leitura"
-      document_type: "nfe" | "cte" | "pod" | "outros"
+      document_type:
+        | "nfe"
+        | "cte"
+        | "pod"
+        | "outros"
+        | "cnh"
+        | "crlv"
+        | "comp_residencia"
+        | "antt_motorista"
+        | "mdfe"
       occurrence_severity: "baixa" | "media" | "alta" | "critica"
       order_stage:
         | "ordem_criada"
@@ -1506,7 +1515,17 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "comercial", "operacao", "fiscal", "leitura"],
-      document_type: ["nfe", "cte", "pod", "outros"],
+      document_type: [
+        "nfe",
+        "cte",
+        "pod",
+        "outros",
+        "cnh",
+        "crlv",
+        "comp_residencia",
+        "antt_motorista",
+        "mdfe",
+      ],
       occurrence_severity: ["baixa", "media", "alta", "critica"],
       order_stage: [
         "ordem_criada",

@@ -42,15 +42,25 @@ import { Database } from '@/integrations/supabase/types';
 type DocumentType = Database['public']['Enums']['document_type'];
 
 const typeLabels: Record<DocumentType, string> = {
+  cnh: 'CNH',
+  crlv: 'CRLV',
+  comp_residencia: 'Comp. Residência',
+  antt_motorista: 'ANTT',
   nfe: 'NF-e',
   cte: 'CT-e',
+  mdfe: 'MDF-e',
   pod: 'Comprovante',
   outros: 'Outros',
 };
 
 const typeColors: Record<DocumentType, string> = {
+  cnh: 'bg-blue-500/10 text-blue-600',
+  crlv: 'bg-blue-500/10 text-blue-600',
+  comp_residencia: 'bg-blue-500/10 text-blue-600',
+  antt_motorista: 'bg-blue-500/10 text-blue-600',
   nfe: 'bg-primary/10 text-primary',
   cte: 'bg-accent text-accent-foreground',
+  mdfe: 'bg-primary/10 text-primary',
   pod: 'bg-success/10 text-success',
   outros: 'bg-muted text-muted-foreground',
 };

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, X, FileText, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,10 +19,13 @@ import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 
 type DocumentType = Database['public']['Enums']['document_type'];
+type Order = Database['public']['Tables']['orders']['Row'];
+type OrderStage = Order['stage'];
 
 interface DocumentUploadProps {
   orderId?: string;
   quoteId?: string;
+  orderStage?: OrderStage;
   onSuccess?: () => void;
 }
 
@@ -33,19 +36,93 @@ interface UploadingFile {
   type: DocumentType;
 }
 
-const DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
-  { value: 'nfe', label: 'NF-e' },
-  { value: 'cte', label: 'CT-e' },
-  { value: 'pod', label: 'POD (Comprovante de Entrega)' },
-  { value: 'outros', label: 'Outros' },
-];
+// Tipos de documento disponíveis por estágio (progressivo)
+const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: string }[]> = {
+  'ordem_criada': [
+    { value: 'outros', label: 'Outros' }
+  ],
+  'busca_motorista': [
+    { value: 'cnh', label: 'CNH (Motorista)' },
+    { value: 'crlv', label: 'CRLV (Veículo)' },
+    { value: 'comp_residencia', label: 'Comprovante de Residência' },
+    { value: 'antt_motorista', label: 'ANTT (Motorista)' },
+    { value: 'outros', label: 'Outros' }
+  ],
+  'documentacao': [
+    { value: 'cnh', label: 'CNH (Motorista)' },
+    { value: 'crlv', label: 'CRLV (Veículo)' },
+    { value: 'comp_residencia', label: 'Comprovante de Residência' },
+    { value: 'antt_motorista', label: 'ANTT (Motorista)' },
+    { value: 'nfe', label: 'NF-e' },
+    { value: 'cte', label: 'CT-e' },
+    { value: 'mdfe', label: 'MDF-e' },
+    { value: 'outros', label: 'Outros' }
+  ],
+  'coleta_realizada': [
+    { value: 'cnh', label: 'CNH (Motorista)' },
+    { value: 'crlv', label: 'CRLV (Veículo)' },
+    { value: 'comp_residencia', label: 'Comprovante de Residência' },
+    { value: 'antt_motorista', label: 'ANTT (Motorista)' },
+    { value: 'nfe', label: 'NF-e' },
+    { value: 'cte', label: 'CT-e' },
+    { value: 'mdfe', label: 'MDF-e' },
+    { value: 'outros', label: 'Outros' }
+  ],
+  'em_transito': [
+    { value: 'cnh', label: 'CNH (Motorista)' },
+    { value: 'crlv', label: 'CRLV (Veículo)' },
+    { value: 'comp_residencia', label: 'Comprovante de Residência' },
+    { value: 'antt_motorista', label: 'ANTT (Motorista)' },
+    { value: 'nfe', label: 'NF-e' },
+    { value: 'cte', label: 'CT-e' },
+    { value: 'mdfe', label: 'MDF-e' },
+    { value: 'outros', label: 'Outros' }
+  ],
+  'entregue': [
+    { value: 'cnh', label: 'CNH (Motorista)' },
+    { value: 'crlv', label: 'CRLV (Veículo)' },
+    { value: 'comp_residencia', label: 'Comprovante de Residência' },
+    { value: 'antt_motorista', label: 'ANTT (Motorista)' },
+    { value: 'nfe', label: 'NF-e' },
+    { value: 'cte', label: 'CT-e' },
+    { value: 'mdfe', label: 'MDF-e' },
+    { value: 'pod', label: 'POD (Comprovante de Entrega)' },
+    { value: 'outros', label: 'Outros' }
+  ]
+};
 
-export function DocumentUpload({ orderId, quoteId, onSuccess }: DocumentUploadProps) {
+// Mapeamento de tipo de documento para campo booleano da ordem
+const DOCUMENT_TYPE_TO_ORDER_FIELD: Record<string, keyof Order | null> = {
+  'cnh': 'has_cnh',
+  'crlv': 'has_crlv',
+  'comp_residencia': 'has_comp_residencia',
+  'antt_motorista': 'has_antt_motorista',
+  'nfe': 'has_nfe',
+  'cte': 'has_cte',
+  'mdfe': 'has_mdfe',
+  'pod': 'has_pod',
+  'outros': null
+};
+
+export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: DocumentUploadProps) {
   const { user } = useAuth();
   const createDocumentMutation = useCreateDocument();
   const updateOrderMutation = useUpdateOrder();
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
-  const [selectedType, setSelectedType] = useState<DocumentType>('outros');
+  
+  // Pega os tipos disponíveis para o estágio atual
+  const availableTypes = orderStage 
+    ? DOCUMENT_TYPES_BY_STAGE[orderStage] 
+    : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
+  
+  const [selectedType, setSelectedType] = useState<DocumentType>(availableTypes[0].value);
+  
+  // Atualiza o tipo selecionado quando o estágio muda
+  useEffect(() => {
+    if (availableTypes.length > 0 && !availableTypes.find(t => t.value === selectedType)) {
+      setSelectedType(availableTypes[0].value);
+    }
+  }, [orderStage, availableTypes, selectedType]);
 
   const uploadFile = async (file: File, type: DocumentType) => {
     if (!user) {
@@ -102,13 +179,15 @@ export function DocumentUpload({ orderId, quoteId, onSuccess }: DocumentUploadPr
       uploaded_by: user.id,
     });
 
-    // Update order document flags if applicable
-    if (orderId && (type === 'nfe' || type === 'cte' || type === 'pod')) {
-      const updateField = type === 'nfe' ? 'has_nfe' : type === 'cte' ? 'has_cte' : 'has_pod';
-      await updateOrderMutation.mutateAsync({
-        id: orderId,
-        updates: { [updateField]: true },
-      });
+    // Update order document flags baseado no tipo
+    if (orderId) {
+      const orderField = DOCUMENT_TYPE_TO_ORDER_FIELD[type];
+      if (orderField) {
+        await updateOrderMutation.mutateAsync({
+          id: orderId,
+          updates: { [orderField]: true },
+        });
+      }
     }
 
     setUploadingFiles(prev => 
@@ -173,7 +252,7 @@ export function DocumentUpload({ orderId, quoteId, onSuccess }: DocumentUploadPr
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {DOCUMENT_TYPES.map(type => (
+            {availableTypes.map(type => (
               <SelectItem key={type.value} value={type.value}>
                 {type.label}
               </SelectItem>
