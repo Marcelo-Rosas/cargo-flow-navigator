@@ -13,18 +13,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
-import { extractUf, formatRouteUf } from '@/lib/freight-calculator';
+import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
-type PricingBreakdown = {
-  meta?: {
-    routeUfLabel?: string | null;
-    kmBandLabel?: string | null;
-    kmStatus?: 'OK' | 'OUT_OF_RANGE';
-    marginStatus?: 'OK' | 'BELOW_TARGET' | 'UNKNOWN';
-    marginPercent?: number;
-  };
-};
 
 interface QuoteCardProps {
   quote: Quote;
@@ -63,11 +54,11 @@ export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
 
   const tags = quote.tags || [];
   
-  // Extract route UF label
-  const routeUfLabel = formatRouteUf(quote.origin, quote.destination);
+  // Extract route UF label from breakdown or generate from origin/destination
+  const breakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+  const routeUfLabel = breakdown?.meta?.routeUfLabel || formatRouteUf(quote.origin, quote.destination);
   
-  // Get km band from pricing_breakdown or from km_distance
-  const breakdown = quote.pricing_breakdown as PricingBreakdown | null;
+  // Get km band from pricing_breakdown
   const kmBandLabel = breakdown?.meta?.kmBandLabel || null;
   const kmStatus = breakdown?.meta?.kmStatus || 'OK';
   const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
