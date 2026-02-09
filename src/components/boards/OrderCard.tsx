@@ -186,12 +186,12 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
         </div>
       )}
 
-      {/* Alerts */}
+      {/* Alerts - Ocorrências */}
       {hasOccurrences && (
         <div className="flex flex-wrap gap-1 mb-3">
           <Badge variant="secondary" className="text-xs bg-warning/10 text-warning-foreground gap-1">
             <AlertTriangle className="w-3 h-3" />
-            {occurrences.length} ocorrência(s)
+            {occurrences.length} ocorrência{occurrences.length !== 1 ? 's' : ''}
           </Badge>
         </div>
       )}
