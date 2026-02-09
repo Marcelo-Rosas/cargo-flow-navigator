@@ -1,380 +1,142 @@
 // src/lib/freightCalculator.ts
 /**
- * Calculadora de Frete FOB - Lotação
- * Impostos "por fora" (sem gross-up)
+ * ============================================
+ * CALCULADORA DE FRETE - VERSÃO DEFINITIVA
+ * ============================================
+ * 
+ * Regras:
+ * - FOB Lotação (cost_per_ton)
+ * - Impostos "por fora" (sem gross-up)
+ * - DAS: 14% (Regras atualizadas)
+ * - Markup: 30% sobre baseCost
+ * - TSO substitui ad_valorem
+ * - Compatível com frontend e backend
  */
 
-export type Uf = string;
+import { Database } from '@/integrations/supabase/types';
+
+type PriceTableRow = Database['public']['Tables']['price_table_rows']['Row'];
 
 // ============================================
-// CONFIGURATION TYPES
+// CONSTANTS
 // ============================================
 
-export interface FreightConfig {
-  dasPercent: number;          // default 14 (vem de Regras)
-  markupPercent: number;       // default 30 (vem de Regras)
-  overheadPercent: number;     // default 15 (vem de Regras)
-  cubageFactorKgM3: number;    // default 300 (Regra NTC)
-  targetMarginPercent?: number; // para o "dentro da margem prevista"
-}
+export const FREIGHT_CONSTANTS = {
+  CUBAGE_FACTOR_KG_M3: 300,
+  DEFAULT_DAS_PERCENT: 14,
+  DEFAULT_MARKUP_PERCENT: 30,
+  DEFAULT_OVERHEAD_PERCENT: 15,
+  TARGET_MARGIN_PERCENT: 15,
+  NTC_TDE_PERCENT: 20,
+  NTC_TEAR_PERCENT: 20,
+} as const;
 
-export interface FreightInput {
-  // contexto
-  originUF: Uf;
-  destinationUF: Uf;
+// ============================================
+// TYPES - INPUT
+// ============================================
+
+export interface FreightCalculationInput {
+  // Localização
+  originCity: string;          // ex: "Itajaí, SC"
+  destinationCity: string;     // ex: "São Paulo, SP"
   kmDistance: number;
   
-  // carga
+  // Carga
   weightKg: number;
   volumeM3: number;
   cargoValue: number;
   
-  // pedágio sempre manual
-  toll: number;
+  // Pedágio manual
+  tollValue: number;
   
-  // NTC
-  hasTde: boolean;
-  hasTear: boolean;
+  // Linha da tabela de preços (já selecionada)
+  priceTableRow: PriceTableRow | null;
+  priceTableId?: string;       // Para referência
   
-  // custos diretos
-  carreteiroCost: number;
-  descargaCost: number;
+  // Alíquota ICMS (já normalizada em %)
+  icmsRatePercent: number;     // ex: 7, 12, 18
   
-  // overrides (se existirem)
-  baseFreightOverride?: number;
-  grisPercentOverride?: number;
-  tsoPercentOverride?: number;
-  rctrcPercentOverride?: number; // equivale ao cost_value_percent
-  adValoremOverride?: number;    // default 0 (se existir)
+  // Taxas NTC opcionais
+  tdeEnabled?: boolean;
+  tearEnabled?: boolean;
   
-  config: FreightConfig;
-}
-
-export interface PriceTableRow {
-  km_from: number;
-  km_to: number;
-  cost_per_ton: number;
-  gris_percent: number;
-  tso_percent: number;
-  cost_value_percent: number; // RCTR-C
+  // Overrides globais (opcional)
+  dasPercent?: number;         // Default: 14
+  markupPercent?: number;      // Default: 30
+  overheadPercent?: number;    // Default: 15
+  
+  // Custos diretos (para rentabilidade - opcional)
+  carreteiroPercent?: number;  // % sobre receita bruta
+  descargaValue?: number;      // Valor fixo descarga
 }
 
 // ============================================
-// OUTPUT TYPES
+// TYPES - OUTPUT (compatível com QuoteDetailModal)
 // ============================================
 
-export interface FreightOutput {
-  badges: {
-    routeUf: string;     // "SC→SP"
-    kmRange: string;     // "1–50"
+export interface FreightCalculationOutput {
+  status: 'OK' | 'OUT_OF_RANGE' | 'MISSING_DATA';
+  error?: string;
+  
+  // Meta (para badges e alertas)
+  meta: {
+    routeUfLabel: string | null;        // "SC→SP"
+    kmBandLabel: string | null;         // "1-50"
+    kmStatus: 'OK' | 'OUT_OF_RANGE';
+    marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
+    marginPercent: number;              // Duplicado para fácil acesso
+    cubageFactor: number;               // 300
+    cubageWeightKg: number;
+    billableWeightKg: number;
   };
   
-  revenue: {
-    baseFreight: number;
+  // Components (alinhado com QuoteDetailModal)
+  components: {
+    baseCost: number;          // ANTES do markup (para auditoria)
+    baseFreight: number;       // APÓS markup (= baseCost * 1.30)
     toll: number;
     gris: number;
     tso: number;
-    rctrc: number;
-    adValorem: number;
-    ntc: { tde: number; tear: number; total: number };
-    receitaBruta: number;
+    rctrc: number;             // RCTR-C (seguro)
+    adValorem: number;         // Sempre 0 (legado)
+    tde: number;
+    tear: number;
   };
   
-  taxes: {
+  // Rates usados (para exibir % na UI)
+  rates: {
     dasPercent: number;
     icmsPercent: number;
+    grisPercent: number;
+    tsoPercent: number;
+    costValuePercent: number;  // Para RCTR-C
+    markupPercent: number;
+    overheadPercent: number;
+  };
+  
+  // Totals
+  totals: {
+    receitaBruta: number;      // Soma de components (exceto baseCost)
     das: number;
     icms: number;
-    totalImpostos: number;
+    totalImpostos: number;     // das + icms
+    totalCliente: number;      // receitaBruta + totalImpostos
   };
   
-  totals: {
-    totalCliente: number;
-  };
-  
-  profit: {
-    custosDiretos: number;
-    margemBruta: number;
+  // Profitability
+  profitability: {
+    custosCarreteiro: number;
+    custosDescarga: number;
+    custosDiretos: number;     // carreteiro + descarga
+    margemBruta: number;       // receitaBruta - impostos - custos
     overhead: number;
     resultadoLiquido: number;
-    margemPercent: number;
-    withinTargetMargin?: boolean;
-    targetMarginPercent?: number;
-  };
-  
-  meta: {
-    weightCubedKg: number;
-    weightBillableKg: number;
-    tonBillable: number;
-    priceRowUsed: boolean;
+    margemPercent: number;     // % sobre receita bruta
   };
 }
 
 // ============================================
-// ERROR TYPE
-// ============================================
-
-export class FreightCalculationError extends Error {
-  constructor(
-    message: string,
-    public readonly code: 'OUT_OF_RANGE' | 'MISSING_DATA' | 'INVALID_INPUT'
-  ) {
-    super(message);
-    this.name = 'FreightCalculationError';
-  }
-}
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-/**
- * Normaliza taxa ICMS para escala percentual
- * CSV pode ter 0.7 para 7%, 0.12 para 12%, etc.
- */
-export function normalizeIcmsRate(ratePercent: number): number {
-  if (ratePercent === 0) return 0;
-  if (ratePercent > 0 && ratePercent <= 0.25) return ratePercent * 100; // 0.12 => 12
-  if (ratePercent > 0.25 && ratePercent <= 1) return ratePercent * 10;  // 0.7  => 7
-  return ratePercent; // já percentual
-}
-
-/**
- * Extrai UF de string "Cidade - UF"
- */
-export function extractUf(location: string): string | null {
-  if (!location) return null;
-  
-  // Padrão: "Cidade - UF"
-  const match = location.match(/[-–]\s*([A-Z]{2})\s*$/i);
-  if (match) {
-    return match[1].toUpperCase();
-  }
-  
-  // Fallback: últimos 2 caracteres se forem letras
-  const trimmed = location.trim();
-  const lastTwo = trimmed.slice(-2);
-  if (/^[A-Z]{2}$/i.test(lastTwo)) {
-    return lastTwo.toUpperCase();
-  }
-  
-  return null;
-}
-
-/**
- * Formata rota UF "SC→SP"
- */
-export function formatRouteUf(origin: string, destination: string): string | null {
-  const originUf = extractUf(origin);
-  const destUf = extractUf(destination);
-  
-  if (originUf && destUf) {
-    return `${originUf}→${destUf}`;
-  }
-  
-  return null;
-}
-
-/**
- * Seleciona linha da tabela de preços por faixa de KM
- * REGRA: km_from <= km_distance <= km_to
- * Retorna erro se não encontrar faixa correspondente
- */
-export function pickPriceRowByKm(rows: PriceTableRow[], km: number): PriceTableRow {
-  const row = rows.find(r => km >= r.km_from && km <= r.km_to);
-  
-  if (!row) {
-    throw new FreightCalculationError(
-      `KM fora das faixas da tabela (km=${km}). Verifique a tabela de preços.`,
-      'OUT_OF_RANGE'
-    );
-  }
-  
-  return row;
-}
-
-// ============================================
-// MAIN CALCULATION FUNCTION
-// ============================================
-
-export function calculateFreightLocal(params: {
-  input: FreightInput;
-  priceRows: PriceTableRow[];   // da tabela selecionada
-  icmsRatePercent: number;      // vindo do banco por UF origem/destino
-}): FreightOutput {
-  const { input, priceRows, icmsRatePercent } = params;
-  
-  // Seleciona linha da tabela por faixa de KM
-  const row = pickPriceRowByKm(priceRows, input.kmDistance);
-  
-  // ============================================
-  // STEP 1: Peso Faturável
-  // ============================================
-  
-  const cubageFactor = input.config.cubageFactorKgM3 || 300;
-  const weightCubedKg = (input.volumeM3 || 0) * cubageFactor;
-  const weightBillableKg = Math.max(input.weightKg || 0, weightCubedKg);
-  const tonBillable = weightBillableKg / 1000;
-  
-  // ============================================
-  // STEP 2: Componentes do Frete
-  // ============================================
-  
-  // Base Cost (custo base sem markup)
-  const baseCost = tonBillable * row.cost_per_ton;
-  
-  // Markup (aplicado sobre o custo base)
-  const markupPercent = input.config.markupPercent ?? 30;
-  
-  // Base Freight (com markup aplicado, ou override)
-  const baseFreight = input.baseFreightOverride ?? (baseCost * (1 + markupPercent / 100));
-  
-  // Percentuais (override ou da tabela)
-  const grisPct = input.grisPercentOverride ?? row.gris_percent ?? 0;
-  const tsoPct = input.tsoPercentOverride ?? row.tso_percent ?? 0;
-  const rctrcPct = input.rctrcPercentOverride ?? row.cost_value_percent ?? 0;
-  
-  // Valores calculados
-  const gris = (input.cargoValue || 0) * (grisPct / 100);
-  const tso = (input.cargoValue || 0) * (tsoPct / 100);
-  const rctrc = (input.cargoValue || 0) * (rctrcPct / 100);
-  
-  // Ad Valorem: default 0 (regra atual)
-  const adValorem = input.adValoremOverride ?? 0;
-  
-  // NTC: TDE e TEAR = 20% cada sobre baseFreight quando ativados
-  const tde = input.hasTde ? baseFreight * 0.20 : 0;
-  const tear = input.hasTear ? baseFreight * 0.20 : 0;
-  const ntcTotal = tde + tear;
-  
-  // ============================================
-  // STEP 3: Receita Bruta (FOB)
-  // ============================================
-  
-  const receitaBruta = 
-    baseFreight + 
-    (input.toll || 0) + 
-    gris + 
-    tso + 
-    rctrc + 
-    adValorem + 
-    ntcTotal;
-  
-  // ============================================
-  // STEP 4: Impostos "por fora" (SEM GROSS-UP)
-  // ============================================
-  
-  const dasPercent = input.config.dasPercent ?? 14;
-  const icmsPercent = normalizeIcmsRate(icmsRatePercent);
-  
-  const das = receitaBruta * (dasPercent / 100);
-  const icms = receitaBruta * (icmsPercent / 100);
-  const totalImpostos = das + icms;
-  
-  // Total Cliente = Receita Bruta + Impostos (por fora)
-  const totalCliente = receitaBruta + totalImpostos;
-  
-  // ============================================
-  // STEP 5: Rentabilidade
-  // ============================================
-  
-  const custosDiretos = (input.carreteiroCost || 0) + (input.descargaCost || 0);
-  const margemBruta = receitaBruta - totalImpostos - custosDiretos;
-  
-  const overheadPercent = input.config.overheadPercent ?? 0;
-  const overhead = margemBruta * (overheadPercent / 100);
-  
-  const resultadoLiquido = margemBruta - overhead;
-  const margemPercent = receitaBruta > 0 ? (resultadoLiquido / receitaBruta) * 100 : 0;
-  
-  // Comparação com margem alvo
-  const targetMarginPercent = input.config.targetMarginPercent;
-  const withinTargetMargin = typeof targetMarginPercent === 'number' 
-    ? margemPercent >= targetMarginPercent 
-    : undefined;
-  
-  // ============================================
-  // RETURN
-  // ============================================
-  
-  return {
-    badges: {
-      routeUf: `${input.originUF}→${input.destinationUF}`,
-      kmRange: `${row.km_from}–${row.km_to}`,
-    },
-    
-    revenue: {
-      baseFreight,
-      toll: input.toll || 0,
-      gris,
-      tso,
-      rctrc,
-      adValorem,
-      ntc: { tde, tear, total: ntcTotal },
-      receitaBruta,
-    },
-    
-    taxes: {
-      dasPercent,
-      icmsPercent,
-      das,
-      icms,
-      totalImpostos,
-    },
-    
-    totals: {
-      totalCliente,
-    },
-    
-    profit: {
-      custosDiretos,
-      margemBruta,
-      overhead,
-      resultadoLiquido,
-      margemPercent,
-      withinTargetMargin,
-      targetMarginPercent,
-    },
-    
-    meta: {
-      weightCubedKg,
-      weightBillableKg,
-      tonBillable,
-      priceRowUsed: true,
-    },
-  };
-}
-
-// ============================================
-// SAFE CALCULATION (returns result or error state)
-// ============================================
-
-export type SafeFreightResult = 
-  | { success: true; output: FreightOutput }
-  | { success: false; error: string; code: 'OUT_OF_RANGE' | 'MISSING_DATA' | 'INVALID_INPUT' };
-
-export function calculateFreightSafe(params: {
-  input: FreightInput;
-  priceRows: PriceTableRow[];
-  icmsRatePercent: number;
-}): SafeFreightResult {
-  try {
-    const output = calculateFreightLocal(params);
-    return { success: true, output };
-  } catch (error) {
-    if (error instanceof FreightCalculationError) {
-      return { success: false, error: error.message, code: error.code };
-    }
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Erro desconhecido', 
-      code: 'INVALID_INPUT' 
-    };
-  }
-}
-
-// ============================================
-// PRICING BREAKDOWN FOR STORAGE (JSONB)
+// STORED BREAKDOWN (para salvar em JSONB)
 // ============================================
 
 export interface StoredPricingBreakdown {
@@ -384,12 +146,12 @@ export interface StoredPricingBreakdown {
   error?: string;
   
   meta: {
-    routeUfLabel: string;
-    kmBandLabel: string;
+    routeUfLabel: string | null;
+    kmBandLabel: string | null;
     kmStatus: 'OK' | 'OUT_OF_RANGE';
-    marginStatus: 'OK' | 'BELOW_TARGET' | 'UNKNOWN';
+    marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
     marginPercent: number;
-    // Additional fees selection stored in meta
+    // Optional fields for additional fees
     selectedConditionalFeeIds?: string[];
     waitingTimeEnabled?: boolean;
     waitingTimeHours?: number;
@@ -411,8 +173,9 @@ export interface StoredPricingBreakdown {
     adValorem: number;
     tde: number;
     tear: number;
-    conditionalFeesTotal: number;
-    waitingTimeCost: number;
+    // Optional fields for additional costs
+    conditionalFeesTotal?: number;
+    waitingTimeCost?: number;
   };
   
   totals: {
@@ -424,6 +187,8 @@ export interface StoredPricingBreakdown {
   };
   
   profitability: {
+    custosCarreteiro: number;
+    custosDescarga: number;
     custosDiretos: number;
     margemBruta: number;
     overhead: number;
@@ -433,92 +198,368 @@ export interface StoredPricingBreakdown {
   
   rates: {
     dasPercent: number;
-    markupPercent: number;
     icmsPercent: number;
     grisPercent: number;
     tsoPercent: number;
     costValuePercent: number;
+    markupPercent: number;
     overheadPercent: number;
   };
 }
 
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Extrai UF de string "Cidade, SC" ou "Cidade - SC"
+ */
+export function extractUf(location: string): string | null {
+  if (!location) return null;
+  
+  // Padrão 1: "Cidade, UF" ou "Cidade - UF"
+  const match = location.match(/[,-]\s*([A-Z]{2})\s*$/i);
+  if (match) {
+    return match[1].toUpperCase();
+  }
+  
+  // Fallback: últimos 2 caracteres se forem letras
+  const trimmed = location.trim();
+  const lastTwo = trimmed.slice(-2);
+  if (/^[A-Z]{2}$/i.test(lastTwo)) {
+    return lastTwo.toUpperCase();
+  }
+  
+  return null;
+}
+
+/**
+ * Formata rota "SC→SP"
+ */
+export function formatRouteUf(origin: string, destination: string): string | null {
+  const originUf = extractUf(origin);
+  const destUf = extractUf(destination);
+  
+  if (originUf && destUf) {
+    return `${originUf}→${destUf}`;
+  }
+  
+  return null;
+}
+
+/**
+ * Normaliza taxa ICMS para escala percentual (3-25)
+ * - 0.12 → 12 (×100)
+ * - 0.7 → 7 (×10)
+ * - 70 → 7 (÷10)
+ */
+export function normalizeIcmsRate(rate: number): number {
+  if (rate === 0) return 0;
+  
+  // Já está na escala correta (3-25)
+  if (rate >= 3 && rate <= 25) return rate;
+  
+  // Decimal pequeno: 0 < x < 1
+  if (rate > 0 && rate < 1) {
+    const times100 = rate * 100;
+    if (times100 >= 3 && times100 <= 25) return times100;
+    
+    const times10 = rate * 10;
+    if (times10 >= 3 && times10 <= 25) return times10;
+  }
+  
+  // Entre 1 e 3: pode ser 1.2 = 12%
+  if (rate >= 1 && rate < 3) {
+    const times10 = rate * 10;
+    if (times10 >= 3 && times10 <= 25) return times10;
+  }
+  
+  // Muito alto: > 25
+  if (rate > 25 && rate <= 250) {
+    const divided = rate / 10;
+    if (divided >= 3 && divided <= 25) return divided;
+  }
+  
+  // Fallback: retorna o valor original (mesmo se fora da faixa)
+  return rate;
+}
+
+// ============================================
+// MAIN CALCULATION FUNCTION
+// ============================================
+
+export function calculateFreight(input: FreightCalculationInput): FreightCalculationOutput {
+  // Defaults
+  const dasPercent = input.dasPercent ?? FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT;
+  const markupPercent = input.markupPercent ?? FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT;
+  const overheadPercent = input.overheadPercent ?? FREIGHT_CONSTANTS.DEFAULT_OVERHEAD_PERCENT;
+  const carreteiroPercent = input.carreteiroPercent ?? 0;
+  const descargaValue = input.descargaValue ?? 0;
+  
+  // Normalize ICMS rate
+  const icmsPercent = normalizeIcmsRate(input.icmsRatePercent);
+  
+  // Initialize result
+  const result: FreightCalculationOutput = {
+    status: 'OK',
+    meta: {
+      routeUfLabel: formatRouteUf(input.originCity, input.destinationCity),
+      kmBandLabel: null,
+      kmStatus: 'OK',
+      marginStatus: 'AT_TARGET',
+      marginPercent: 0,
+      cubageFactor: FREIGHT_CONSTANTS.CUBAGE_FACTOR_KG_M3,
+      cubageWeightKg: 0,
+      billableWeightKg: 0,
+    },
+    components: {
+      baseCost: 0,
+      baseFreight: 0,
+      toll: input.tollValue,
+      gris: 0,
+      tso: 0,
+      rctrc: 0,
+      adValorem: 0,
+      tde: 0,
+      tear: 0,
+    },
+    rates: {
+      dasPercent,
+      icmsPercent,
+      grisPercent: 0,
+      tsoPercent: 0,
+      costValuePercent: 0,
+      markupPercent,
+      overheadPercent,
+    },
+    totals: {
+      receitaBruta: 0,
+      das: 0,
+      icms: 0,
+      totalImpostos: 0,
+      totalCliente: 0,
+    },
+    profitability: {
+      custosCarreteiro: 0,
+      custosDescarga: descargaValue,
+      custosDiretos: descargaValue,
+      margemBruta: 0,
+      overhead: 0,
+      resultadoLiquido: 0,
+      margemPercent: 0,
+    },
+  };
+  
+  // ============================================
+  // VALIDATION: Price Table Row
+  // ============================================
+  
+  if (!input.priceTableRow) {
+    result.status = 'MISSING_DATA';
+    result.error = 'Tabela de preços não selecionada';
+    return result;
+  }
+  
+  const row = input.priceTableRow;
+  const kmFrom = Number(row.km_from);
+  const kmTo = Number(row.km_to);
+  
+  // Verify km within range
+  if (input.kmDistance < kmFrom || input.kmDistance > kmTo) {
+    result.status = 'OUT_OF_RANGE';
+    result.meta.kmStatus = 'OUT_OF_RANGE';
+    result.meta.kmBandLabel = `${kmFrom}-${kmTo}`;
+    result.error = `Distância ${input.kmDistance} km fora da faixa ${kmFrom}-${kmTo} km`;
+    return result;
+  }
+  
+  result.meta.kmBandLabel = `${kmFrom}-${kmTo}`;
+  
+  // ============================================
+  // STEP 1: PESO FATURÁVEL
+  // ============================================
+  
+  const cubageWeightKg = input.volumeM3 * FREIGHT_CONSTANTS.CUBAGE_FACTOR_KG_M3;
+  const billableWeightKg = Math.max(input.weightKg, cubageWeightKg);
+  
+  result.meta.cubageWeightKg = cubageWeightKg;
+  result.meta.billableWeightKg = billableWeightKg;
+  
+  // ============================================
+  // STEP 2: FRETE BASE (com MARKUP)
+  // ============================================
+  
+  const costPerTon = Number(row.cost_per_ton) || 0;
+  
+  // baseCost = (peso kg / 1000) * cost_per_ton
+  const baseCost = (billableWeightKg / 1000) * costPerTon;
+  
+  // baseFreight = baseCost * (1 + markup/100)
+  const baseFreight = baseCost * (1 + markupPercent / 100);
+  
+  result.components.baseCost = baseCost;
+  result.components.baseFreight = baseFreight;
+  
+  // ============================================
+  // STEP 3: COMPONENTES PERCENTUAIS SOBRE VALOR DA CARGA
+  // ============================================
+  
+  const grisPercent = Number(row.gris_percent) || 0;
+  const tsoPercent = Number(row.tso_percent) || 0;
+  const costValuePercent = Number(row.cost_value_percent) || 0;
+  
+  result.rates.grisPercent = grisPercent;
+  result.rates.tsoPercent = tsoPercent;
+  result.rates.costValuePercent = costValuePercent;
+  
+  result.components.gris = input.cargoValue * (grisPercent / 100);
+  result.components.tso = input.cargoValue * (tsoPercent / 100);
+  result.components.rctrc = input.cargoValue * (costValuePercent / 100);
+  result.components.adValorem = 0; // Sempre 0 (TSO substitui)
+  
+  // ============================================
+  // STEP 4: TAXAS NTC (20% sobre baseFreight)
+  // ============================================
+  
+  if (input.tdeEnabled) {
+    result.components.tde = baseFreight * (FREIGHT_CONSTANTS.NTC_TDE_PERCENT / 100);
+  }
+  
+  if (input.tearEnabled) {
+    result.components.tear = baseFreight * (FREIGHT_CONSTANTS.NTC_TEAR_PERCENT / 100);
+  }
+  
+  // ============================================
+  // STEP 5: RECEITA BRUTA (soma de components exceto baseCost)
+  // ============================================
+  
+  result.totals.receitaBruta =
+    result.components.baseFreight +
+    result.components.toll +
+    result.components.gris +
+    result.components.tso +
+    result.components.rctrc +
+    result.components.adValorem +
+    result.components.tde +
+    result.components.tear;
+  
+  // ============================================
+  // STEP 6: IMPOSTOS "POR FORA" (sem gross-up)
+  // ============================================
+  
+  result.totals.das = result.totals.receitaBruta * (dasPercent / 100);
+  result.totals.icms = result.totals.receitaBruta * (icmsPercent / 100);
+  result.totals.totalImpostos = result.totals.das + result.totals.icms;
+  
+  // ============================================
+  // STEP 7: TOTAL CLIENTE
+  // ============================================
+  
+  result.totals.totalCliente = result.totals.receitaBruta + result.totals.totalImpostos;
+  
+  // ============================================
+  // STEP 8: RENTABILIDADE
+  // ============================================
+  
+  result.profitability.custosCarreteiro = result.totals.receitaBruta * (carreteiroPercent / 100);
+  result.profitability.custosDescarga = descargaValue;
+  result.profitability.custosDiretos = result.profitability.custosCarreteiro + result.profitability.custosDescarga;
+  
+  result.profitability.margemBruta = 
+    result.totals.receitaBruta - 
+    result.totals.totalImpostos - 
+    result.profitability.custosDiretos;
+  
+  result.profitability.overhead = result.profitability.margemBruta * (overheadPercent / 100);
+  result.profitability.resultadoLiquido = result.profitability.margemBruta - result.profitability.overhead;
+  
+  result.profitability.margemPercent = result.totals.receitaBruta > 0
+    ? (result.profitability.resultadoLiquido / result.totals.receitaBruta) * 100
+    : 0;
+  
+  // ============================================
+  // STEP 9: META STATUS
+  // ============================================
+  
+  result.meta.marginPercent = result.profitability.margemPercent;
+  
+  if (result.profitability.margemPercent > FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT) {
+    result.meta.marginStatus = 'ABOVE_TARGET';
+  } else if (result.profitability.margemPercent < FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT) {
+    result.meta.marginStatus = 'BELOW_TARGET';
+  } else {
+    result.meta.marginStatus = 'AT_TARGET';
+  }
+  
+  return result;
+}
+
+// ============================================
+// BUILDER: Stored Breakdown (para salvar em DB)
+// ============================================
+
 export function buildStoredBreakdown(
-  output: FreightOutput,
-  input: FreightInput,
-  priceRow: PriceTableRow,
-  targetMarginPercent?: number,
-  additionalFees?: { conditionalFeesTotal: number; selectedFeeIds: string[]; waitingTimeEnabled: boolean; waitingTimeHours: number; waitingTimeCost: number }
+  output: FreightCalculationOutput,
+  input: FreightCalculationInput
 ): StoredPricingBreakdown {
-  const marginStatus = targetMarginPercent !== undefined
-    ? (output.profit.margemPercent >= targetMarginPercent ? 'OK' : 'BELOW_TARGET')
-    : 'UNKNOWN';
-  
-  const markupPercent = input.config.markupPercent ?? 30;
-  const overheadPercent = input.config.overheadPercent ?? 15;
-  
-  // Calculate baseCost (before markup)
-  const baseCost = output.meta.tonBillable * priceRow.cost_per_ton;
-  
   return {
     calculatedAt: new Date().toISOString(),
-    version: '2.1-fob-lotacao',
-    status: 'OK',
+    version: '3.0-fob-lotacao-markup',
+    status: output.status,
+    error: output.error,
     
     meta: {
-      routeUfLabel: output.badges.routeUf,
-      kmBandLabel: output.badges.kmRange,
-      kmStatus: 'OK',
-      marginStatus,
-      marginPercent: output.profit.margemPercent,
-      selectedConditionalFeeIds: additionalFees?.selectedFeeIds,
-      waitingTimeEnabled: additionalFees?.waitingTimeEnabled,
-      waitingTimeHours: additionalFees?.waitingTimeHours,
+      routeUfLabel: output.meta.routeUfLabel,
+      kmBandLabel: output.meta.kmBandLabel,
+      kmStatus: output.meta.kmStatus,
+      marginStatus: output.meta.marginStatus,
+      marginPercent: output.meta.marginPercent,
     },
     
     weights: {
-      cubageWeight: output.meta.weightCubedKg,
-      billableWeight: output.meta.weightBillableKg,
-      tonBillable: output.meta.tonBillable,
+      cubageWeight: output.meta.cubageWeightKg,
+      billableWeight: output.meta.billableWeightKg,
+      tonBillable: output.meta.billableWeightKg / 1000,
     },
     
     components: {
-      baseCost,
-      baseFreight: output.revenue.baseFreight,
-      toll: output.revenue.toll,
-      gris: output.revenue.gris,
-      tso: output.revenue.tso,
-      rctrc: output.revenue.rctrc,
-      adValorem: output.revenue.adValorem,
-      tde: output.revenue.ntc.tde,
-      tear: output.revenue.ntc.tear,
-      conditionalFeesTotal: additionalFees?.conditionalFeesTotal ?? 0,
-      waitingTimeCost: additionalFees?.waitingTimeCost ?? 0,
+      baseCost: output.components.baseCost,
+      baseFreight: output.components.baseFreight,
+      toll: output.components.toll,
+      gris: output.components.gris,
+      tso: output.components.tso,
+      rctrc: output.components.rctrc,
+      adValorem: output.components.adValorem,
+      tde: output.components.tde,
+      tear: output.components.tear,
     },
     
     totals: {
-      receitaBruta: output.revenue.receitaBruta,
-      das: output.taxes.das,
-      icms: output.taxes.icms,
-      totalImpostos: output.taxes.totalImpostos,
+      receitaBruta: output.totals.receitaBruta,
+      das: output.totals.das,
+      icms: output.totals.icms,
+      totalImpostos: output.totals.totalImpostos,
       totalCliente: output.totals.totalCliente,
     },
     
     profitability: {
-      custosDiretos: output.profit.custosDiretos,
-      margemBruta: output.profit.margemBruta,
-      overhead: output.profit.overhead,
-      resultadoLiquido: output.profit.resultadoLiquido,
-      margemPercent: output.profit.margemPercent,
+      custosCarreteiro: output.profitability.custosCarreteiro,
+      custosDescarga: output.profitability.custosDescarga,
+      custosDiretos: output.profitability.custosDiretos,
+      margemBruta: output.profitability.margemBruta,
+      overhead: output.profitability.overhead,
+      resultadoLiquido: output.profitability.resultadoLiquido,
+      margemPercent: output.profitability.margemPercent,
     },
     
     rates: {
-      dasPercent: output.taxes.dasPercent,
-      markupPercent,
-      icmsPercent: output.taxes.icmsPercent,
-      grisPercent: priceRow.gris_percent,
-      tsoPercent: priceRow.tso_percent,
-      costValuePercent: priceRow.cost_value_percent,
-      overheadPercent,
+      dasPercent: output.rates.dasPercent,
+      icmsPercent: output.rates.icmsPercent,
+      grisPercent: output.rates.grisPercent,
+      tsoPercent: output.rates.tsoPercent,
+      costValuePercent: output.rates.costValuePercent,
+      markupPercent: output.rates.markupPercent,
+      overheadPercent: output.rates.overheadPercent,
     },
   };
 }

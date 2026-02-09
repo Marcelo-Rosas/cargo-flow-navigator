@@ -156,7 +156,7 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
       
       const defaultWeights = { cubageWeight: 0, billableWeight: 0, tonBillable: 0 };
       const defaultTotals = { receitaBruta: 0, das: 0, icms: 0, totalImpostos: 0, totalCliente: 0 };
-      const defaultProfitability = { custosDiretos: 0, margemBruta: 0, overhead: 0, resultadoLiquido: 0, margemPercent: 0 };
+      const defaultProfitability = { custosCarreteiro: 0, custosDescarga: 0, custosDiretos: 0, margemBruta: 0, overhead: 0, resultadoLiquido: 0, margemPercent: 0 };
       const defaultRates = { dasPercent: 14, markupPercent: 30, icmsPercent: 0, grisPercent: 0, tsoPercent: 0, costValuePercent: 0, overheadPercent: 15 };
       
       // Update breakdown with new selections

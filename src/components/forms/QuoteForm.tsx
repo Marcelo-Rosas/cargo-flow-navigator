@@ -56,11 +56,11 @@ import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { 
-  calculateFreightLocal, 
-  buildPricingBreakdown, 
+  calculateFreight, 
+  buildStoredBreakdown, 
   formatRouteUf,
   extractUf
-} from '@/lib/freight-calculator';
+} from '@/lib/freightCalculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 
@@ -180,18 +180,22 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   // Calculate freight using the pure function
   const calculationResult = useMemo(() => {
-    return calculateFreightLocal({
+    return calculateFreight({
+      originCity: watchedOrigin || '',
+      destinationCity: watchedDestination || '',
       weightKg: watchedWeight || 0,
       volumeM3: watchedVolume || 0,
       cargoValue: watchedCargoValue || 0,
       tollValue: watchedToll || 0,
       kmDistance: watchedKmDistance || 0,
       priceTableRow: priceTableRow || null,
-      icmsRate: icmsRate,
+      icmsRatePercent: icmsRate,
       tdeEnabled: watchedTdeEnabled || false,
       tearEnabled: watchedTearEnabled || false,
     });
   }, [
+    watchedOrigin,
+    watchedDestination,
     watchedWeight, 
     watchedVolume, 
     watchedCargoValue, 
@@ -203,12 +207,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     watchedTearEnabled
   ]);
 
-  // Add route UF to meta
-  useEffect(() => {
-    if (watchedOrigin && watchedDestination) {
-      calculationResult.meta.routeUfLabel = formatRouteUf(watchedOrigin, watchedDestination);
-    }
-  }, [watchedOrigin, watchedDestination, calculationResult]);
 
   useEffect(() => {
     // Reset user edit flags when form opens/closes
@@ -369,20 +367,19 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
     try {
       // Build pricing breakdown for storage
-      const pricingBreakdown = buildPricingBreakdown(calculationResult, {
+      const pricingBreakdown = buildStoredBreakdown(calculationResult, {
+        originCity: data.origin,
+        destinationCity: data.destination,
         weightKg: data.weight || 0,
         volumeM3: data.volume || 0,
         cargoValue: data.cargo_value || 0,
         tollValue: data.toll || 0,
         kmDistance: data.km_distance || 0,
         priceTableRow: priceTableRow || null,
-        icmsRate: icmsRate,
+        icmsRatePercent: icmsRate,
         tdeEnabled: data.tde_enabled || false,
         tearEnabled: data.tear_enabled || false,
       });
-      
-      // Add route UF to meta
-      pricingBreakdown.meta.routeUfLabel = formatRouteUf(data.origin, data.destination);
 
       const quoteData = {
         client_id: data.client_id || null,
@@ -400,15 +397,15 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         cargo_type: data.cargo_type || null,
         weight: data.weight || null,
         volume: data.volume || null,
-        cubage_weight: calculationResult.cubageWeight || null,
-        billable_weight: calculationResult.billableWeight || null,
+        cubage_weight: calculationResult.meta.cubageWeightKg || null,
+        billable_weight: calculationResult.meta.billableWeightKg || null,
         price_table_id: data.price_table_id || null,
         vehicle_type_id: data.vehicle_type_id || null,
         payment_term_id: data.payment_term_id || null,
         km_distance: data.km_distance || null,
         toll_value: data.toll || null,
         cargo_value: data.cargo_value || null,
-        value: calculationResult.totalCliente,
+        value: calculationResult.totals.totalCliente,
         pricing_breakdown: pricingBreakdown as unknown as Database['public']['Tables']['quotes']['Row']['pricing_breakdown'],
         notes: data.notes || null,
       };
@@ -474,7 +471,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               <Alert className="bg-warning/10 border-warning">
                 <AlertTriangle className="h-4 w-4 text-warning-foreground" />
                 <AlertDescription className="text-warning-foreground">
-                  Margem de {calculationResult.margemPercent.toFixed(1)}% abaixo da meta de 15%
+                  Margem de {calculationResult.profitability.margemPercent.toFixed(1)}% abaixo da meta de 15%
                 </AlertDescription>
               </Alert>
             )}
@@ -803,11 +800,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 <div className="p-3 rounded-lg bg-muted/50 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Peso Cubado (x 300 kg/m³)</span>
-                    <span>{calculationResult.cubageWeight.toLocaleString('pt-BR')} kg</span>
+                    <span>{calculationResult.meta.cubageWeightKg.toLocaleString('pt-BR')} kg</span>
                   </div>
                   <div className="flex justify-between font-medium">
                     <span>Peso Faturável</span>
-                    <span>{calculationResult.billableWeight.toLocaleString('pt-BR')} kg</span>
+                    <span>{calculationResult.meta.billableWeightKg.toLocaleString('pt-BR')} kg</span>
                   </div>
                 </div>
               )}
@@ -1052,69 +1049,69 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Frete Base</span>
-                  <span className="text-foreground">{formatCurrency(calculationResult.baseFreight)}</span>
+                  <span className="text-foreground">{formatCurrency(calculationResult.components.baseFreight)}</span>
                 </div>
-                {calculationResult.toll > 0 && (
+                {calculationResult.components.toll > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Pedágio</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.toll)}</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.components.toll)}</span>
                   </div>
                 )}
-                {calculationResult.gris > 0 && (
+                {calculationResult.components.gris > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">GRIS ({calculationResult.rates.grisPercent.toFixed(2)}%)</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.gris)}</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.components.gris)}</span>
                   </div>
                 )}
-                {calculationResult.tso > 0 && (
+                {calculationResult.components.tso > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">TSO ({calculationResult.rates.tsoPercent.toFixed(2)}%)</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.tso)}</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.components.tso)}</span>
                   </div>
                 )}
-                {calculationResult.rctrc > 0 && (
+                {calculationResult.components.rctrc > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">RCTR-C ({calculationResult.rates.costValuePercent.toFixed(2)}%)</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.rctrc)}</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.components.rctrc)}</span>
                   </div>
                 )}
-                {calculationResult.tde > 0 && (
+                {calculationResult.components.tde > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">TDE (NTC)</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.tde)}</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.components.tde)}</span>
                   </div>
                 )}
-                {calculationResult.tear > 0 && (
+                {calculationResult.components.tear > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">TEAR (NTC)</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.tear)}</span>
+                    <span className="text-foreground">{formatCurrency(calculationResult.components.tear)}</span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between text-sm font-medium">
                   <span className="text-foreground">Receita Bruta</span>
-                  <span className="text-foreground">{formatCurrency(calculationResult.receitaBruta)}</span>
+                  <span className="text-foreground">{formatCurrency(calculationResult.totals.receitaBruta)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)</span>
-                  <span className="text-foreground">{formatCurrency(calculationResult.das)}</span>
+                  <span className="text-foreground">{formatCurrency(calculationResult.totals.das)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">ICMS ({calculationResult.rates.icmsPercent.toFixed(2)}%)</span>
-                  <span className="text-foreground">{formatCurrency(calculationResult.icms)}</span>
+                  <span className="text-foreground">{formatCurrency(calculationResult.totals.icms)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span className="text-foreground">Total Cliente</span>
-                  <span className="text-primary text-lg">{formatCurrency(calculationResult.totalCliente)}</span>
+                  <span className="text-primary text-lg">{formatCurrency(calculationResult.totals.totalCliente)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Resultado Líquido</span>
                   <span className={cn(
-                    calculationResult.resultadoLiquido >= 0 ? 'text-success' : 'text-destructive'
+                    calculationResult.profitability.resultadoLiquido >= 0 ? 'text-success' : 'text-destructive'
                   )}>
-                    {formatCurrency(calculationResult.resultadoLiquido)}
+                    {formatCurrency(calculationResult.profitability.resultadoLiquido)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm font-medium">
@@ -1122,7 +1119,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   <span className={cn(
                     calculationResult.meta.marginStatus === 'BELOW_TARGET' ? 'text-warning-foreground' : 'text-success'
                   )}>
-                    {calculationResult.margemPercent.toFixed(1)}%
+                    {calculationResult.profitability.margemPercent.toFixed(1)}%
                   </span>
                 </div>
               </div>
