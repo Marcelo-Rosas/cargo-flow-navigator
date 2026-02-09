@@ -1,84 +1,23 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from '../_shared/cors.ts';
-
-// =====================================================
-// TYPES
-// =====================================================
-
-interface CalculateFreightInput {
-  origin: string;
-  destination: string;
-  weight_kg: number;
-  volume_m3: number;
-  cargo_value: number;
-  km_distance?: number;
-  price_table_id?: string;
-  vehicle_type_code?: string;
-  payment_term_code?: string;
-  conditional_fees?: string[];
-  waiting_hours?: number;
-}
-
-interface FreightBreakdown {
-  weight_real: number;
-  weight_cubed: number;
-  weight_billable: number;
-  base_freight: number;
-  gris: number;
-  tso: number;
-  toll: number;
-  tac_adjustment: number;
-  icms: number;
-  waiting_time: number;
-  conditional_fees: Record<string, number>;
-  payment_adjustment: number;
-  subtotal: number;
-  total: number;
-}
-
-interface ParametersUsed {
-  cubage_factor: number;
-  icms_rate: number;
-  tac_percent: number;
-  payment_term: string;
-  vehicle_type: string | null;
-}
-
-interface CalculateFreightResponse {
-  success: boolean;
-  breakdown: FreightBreakdown;
-  parameters_used: ParametersUsed;
-  fallbacks_applied: string[];
-  errors: string[];
-}
-
-// =====================================================
-// FALLBACK CONSTANTS
-// =====================================================
-
-const FALLBACK = {
-  CUBAGE_FACTOR: 300,
-  ICMS_RATE: 12,
-  TAC_PERCENT: 0,
-  WAITING_FREE_HOURS: 6,
-  WAITING_RATE_PER_HOUR: 50,
-  PAYMENT_TERM_CODE: 'D30',
-  PAYMENT_TERM_ADJUSTMENT: 1.5,
-};
-
-// =====================================================
-// HELPER FUNCTIONS
-// =====================================================
-
-function extractStateFromLocation(location: string): string | null {
-  const match = location.match(/\s*-\s*([A-Z]{2})\s*$/i);
-  return match ? match[1].toUpperCase() : null;
-}
-
-function extractCityFromLocation(location: string): string | null {
-  const match = location.match(/^(.+?)\s*-\s*[A-Z]{2}\s*$/i);
-  return match ? match[1].trim() : null;
-}
+import {
+  FREIGHT_CONSTANTS,
+  type CalculateFreightInput,
+  type CalculateFreightResponse,
+  type FreightMeta,
+  type FreightComponents,
+  type FreightRates,
+  type FreightTotals,
+  type FreightProfitability,
+  extractUf,
+  extractCity,
+  formatRouteUf,
+  normalizeIcmsRate,
+  calculateCubageWeight,
+  calculateBillableWeight,
+  roundCurrency,
+  getMarginStatus,
+} from '../_shared/freight-types.ts';
 
 // =====================================================
 // MAIN HANDLER
@@ -96,52 +35,66 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const input: CalculateFreightInput = await req.json();
-    console.log('[calculate-freight] Request received for route:', input.origin, '→', input.destination);
+    console.log('[calculate-freight] Request:', input.origin, '→', input.destination, `${input.km_distance}km`);
 
-    // Validate required fields
+    const fallbacksApplied: string[] = [];
     const errors: string[] = [];
+
+    // =====================================================
+    // VALIDATION
+    // =====================================================
+    
     if (!input.origin) errors.push('Campo "origin" é obrigatório');
     if (!input.destination) errors.push('Campo "destination" é obrigatório');
-    if (input.weight_kg === undefined || input.weight_kg < 0) errors.push('Campo "weight_kg" é obrigatório e deve ser >= 0');
-    if (input.volume_m3 === undefined || input.volume_m3 < 0) errors.push('Campo "volume_m3" é obrigatório e deve ser >= 0');
-    if (input.cargo_value === undefined || input.cargo_value < 0) errors.push('Campo "cargo_value" é obrigatório e deve ser >= 0');
+    if (input.weight_kg === undefined || input.weight_kg < 0) errors.push('Campo "weight_kg" inválido');
+    if (input.volume_m3 === undefined || input.volume_m3 < 0) errors.push('Campo "volume_m3" inválido');
+    if (input.cargo_value === undefined || input.cargo_value < 0) errors.push('Campo "cargo_value" inválido');
 
     if (errors.length > 0) {
       return new Response(
-        JSON.stringify({ success: false, errors }),
+        JSON.stringify({ success: false, status: 'MISSING_DATA', errors }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const fallbacksApplied: string[] = [];
-
     // =====================================================
-    // 1. GET CUBAGE FACTOR
+    // GET GLOBAL PARAMETERS
     // =====================================================
-    let cubageFactor = FALLBACK.CUBAGE_FACTOR;
-    const { data: cubageParam } = await supabase
+    
+    const { data: allParams } = await supabase
       .from('pricing_parameters')
-      .select('value')
-      .eq('key', 'cubage_factor')
-      .maybeSingle();
+      .select('key, value');
 
-    if (cubageParam?.value) {
-      cubageFactor = Number(cubageParam.value);
-    } else {
-      fallbacksApplied.push(`cubage_factor: usando fallback ${FALLBACK.CUBAGE_FACTOR} kg/m³`);
-    }
+    const paramsMap = new Map<string, number>();
+    allParams?.forEach(p => paramsMap.set(p.key, Number(p.value)));
 
-    // Calculate weights
-    const weightReal = input.weight_kg;
-    const weightCubed = input.volume_m3 * cubageFactor;
-    const weightBillable = Math.max(weightReal, weightCubed);
+    const cubageFactor = paramsMap.get('cubage_factor') ?? FREIGHT_CONSTANTS.CUBAGE_FACTOR_KG_M3;
+    const dasPercent = input.das_percent ?? paramsMap.get('das_percent') ?? FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT;
+    const markupPercent = input.markup_percent ?? paramsMap.get('markup_percent') ?? FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT;
+    const overheadPercent = input.overhead_percent ?? paramsMap.get('overhead_percent') ?? FREIGHT_CONSTANTS.DEFAULT_OVERHEAD_PERCENT;
+    const carreteiroPercent = input.carreteiro_percent ?? paramsMap.get('carreteiro_percent') ?? 0;
+    const descargaValue = input.descarga_value ?? 0;
+
+    if (!paramsMap.has('das_percent')) fallbacksApplied.push(`das_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT}%`);
+    if (!paramsMap.has('markup_percent')) fallbacksApplied.push(`markup_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT}%`);
 
     // =====================================================
-    // 2. GET PRICE TABLE ROW (base freight calculation)
+    // CALCULATE WEIGHTS
     // =====================================================
-    let baseFreight = 0;
+    
+    const cubageWeightKg = input.volume_m3 * cubageFactor;
+    const billableWeightKg = Math.max(input.weight_kg, cubageWeightKg);
+
+    // =====================================================
+    // GET PRICE TABLE ROW
+    // =====================================================
+    
+    let baseCost = 0;
     let grisPercent = 0;
     let tsoPercent = 0;
+    let costValuePercent = 0;
+    let kmBandLabel: string | null = null;
+    let kmStatus: 'OK' | 'OUT_OF_RANGE' = 'OK';
 
     if (input.price_table_id && input.km_distance !== undefined) {
       const { data: priceRow } = await supabase
@@ -153,162 +106,57 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (priceRow) {
-        // Calculate base freight based on weight
-        if (priceRow.cost_per_kg) {
-          baseFreight = weightBillable * Number(priceRow.cost_per_kg);
-        } else if (priceRow.cost_per_ton) {
-          baseFreight = (weightBillable / 1000) * Number(priceRow.cost_per_ton);
-        }
-
-        grisPercent = priceRow.gris_percent ? Number(priceRow.gris_percent) : 0;
-        // TSO (Seguro Obrigatório) - percentual variável por faixa de distância
-        tsoPercent = priceRow.tso_percent ? Number(priceRow.tso_percent) : 0;
+        kmBandLabel = `${priceRow.km_from}-${priceRow.km_to}`;
         
-        console.log(`[calculate-freight] Faixa encontrada: ${priceRow.km_from}-${priceRow.km_to} km, TSO: ${tsoPercent}%`);
+        // FOB Lotação: usar cost_per_ton
+        const costPerTon = Number(priceRow.cost_per_ton) || 0;
+        baseCost = (billableWeightKg / 1000) * costPerTon;
+
+        grisPercent = Number(priceRow.gris_percent) || 0;
+        tsoPercent = Number(priceRow.tso_percent) || 0;
+        costValuePercent = Number(priceRow.cost_value_percent) || 0;
+
+        console.log(`[calculate-freight] Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, baseCost: ${baseCost}`);
       } else {
-        fallbacksApplied.push(`price_table_row: nenhuma faixa encontrada para ${input.km_distance} km`);
+        kmStatus = 'OUT_OF_RANGE';
+        fallbacksApplied.push(`price_table_row: nenhuma faixa para ${input.km_distance} km`);
       }
     } else {
-      fallbacksApplied.push('price_table: não informada ou km_distance ausente');
-    }
-
-    // Calculate GRIS and TSO (Seguro Obrigatório)
-    const grisValue = (input.cargo_value * grisPercent) / 100;
-    const tsoValue = (input.cargo_value * tsoPercent) / 100;
-
-    // =====================================================
-    // 3. GET TOLL VALUE
-    // =====================================================
-    let tollValue = 0;
-    const originState = extractStateFromLocation(input.origin);
-    const originCity = extractCityFromLocation(input.origin);
-    const destState = extractStateFromLocation(input.destination);
-    const destCity = extractCityFromLocation(input.destination);
-
-    if (originState && destState) {
-      // Try exact match first (with cities)
-      let { data: tollRoute } = await supabase
-        .from('toll_routes')
-        .select('toll_value')
-        .eq('origin_state', originState)
-        .eq('destination_state', destState)
-        .or(`origin_city.eq.${originCity},origin_city.is.null`)
-        .or(`destination_city.eq.${destCity},destination_city.is.null`)
-        .order('origin_city', { ascending: false, nullsFirst: false })
-        .order('destination_city', { ascending: false, nullsFirst: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (tollRoute?.toll_value) {
-        tollValue = Number(tollRoute.toll_value);
-      } else {
-        fallbacksApplied.push(`toll_routes: rota ${originState} → ${destState} não encontrada, usando 0`);
-      }
+      fallbacksApplied.push('price_table: não informada');
     }
 
     // =====================================================
-    // 4. GET TAC (diesel adjustment)
+    // CALCULATE BASE FREIGHT (with MARKUP)
     // =====================================================
-    let tacPercent = FALLBACK.TAC_PERCENT;
-    const today = new Date().toISOString().split('T')[0];
-
-    const { data: tacRate } = await supabase
-      .from('tac_rates')
-      .select('adjustment_percent')
-      .lte('reference_date', today)
-      .order('reference_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (tacRate?.adjustment_percent !== undefined) {
-      tacPercent = Number(tacRate.adjustment_percent);
-    } else {
-      fallbacksApplied.push(`tac_rates: sem registro válido, usando ${FALLBACK.TAC_PERCENT}%`);
-    }
+    
+    const baseFreight = baseCost * (1 + markupPercent / 100);
 
     // =====================================================
-    // 5. GET ICMS RATE
+    // CALCULATE COMPONENTS ON CARGO VALUE
     // =====================================================
-    let icmsRate = FALLBACK.ICMS_RATE;
-
-    if (originState && destState) {
-      const { data: icmsRow } = await supabase
-        .from('icms_rates')
-        .select('rate_percent')
-        .eq('origin_state', originState)
-        .eq('destination_state', destState)
-        .maybeSingle();
-
-      if (icmsRow?.rate_percent !== undefined) {
-        icmsRate = Number(icmsRow.rate_percent);
-      } else {
-        fallbacksApplied.push(`icms_rates: ${originState} → ${destState} não encontrada, usando ${FALLBACK.ICMS_RATE}%`);
-      }
-    }
+    
+    const gris = input.cargo_value * (grisPercent / 100);
+    const tso = input.cargo_value * (tsoPercent / 100);
+    const rctrc = input.cargo_value * (costValuePercent / 100);
+    const adValorem = 0; // Sempre 0 (TSO substitui)
 
     // =====================================================
-    // 6. GET WAITING TIME COST
+    // TOLL VALUE (manual)
     // =====================================================
-    let waitingTimeCost = 0;
-    let vehicleTypeId: string | null = null;
-
-    if (input.vehicle_type_code) {
-      const { data: vehicleType } = await supabase
-        .from('vehicle_types')
-        .select('id')
-        .eq('code', input.vehicle_type_code)
-        .eq('active', true)
-        .maybeSingle();
-      vehicleTypeId = vehicleType?.id || null;
-    }
-
-    if (input.waiting_hours !== undefined && input.waiting_hours > 0) {
-      // Try to find specific rule for vehicle type
-      let waitingRule = null;
-      
-      if (vehicleTypeId) {
-        const { data } = await supabase
-          .from('waiting_time_rules')
-          .select('*')
-          .eq('vehicle_type_id', vehicleTypeId)
-          .maybeSingle();
-        waitingRule = data;
-      }
-
-      // Fallback to default rule (vehicle_type_id IS NULL)
-      if (!waitingRule) {
-        const { data } = await supabase
-          .from('waiting_time_rules')
-          .select('*')
-          .is('vehicle_type_id', null)
-          .maybeSingle();
-        waitingRule = data;
-      }
-
-      if (waitingRule) {
-        const freeHours = Number(waitingRule.free_hours) || FALLBACK.WAITING_FREE_HOURS;
-        const excessHours = Math.max(0, input.waiting_hours - freeHours);
-        
-        if (excessHours > 0) {
-          const ratePerHour = Number(waitingRule.rate_per_hour) || FALLBACK.WAITING_RATE_PER_HOUR;
-          waitingTimeCost = excessHours * ratePerHour;
-          
-          // Apply minimum charge if configured
-          if (waitingRule.min_charge && waitingTimeCost < Number(waitingRule.min_charge)) {
-            waitingTimeCost = Number(waitingRule.min_charge);
-          }
-        }
-      } else {
-        // Use fallback values
-        const excessHours = Math.max(0, input.waiting_hours - FALLBACK.WAITING_FREE_HOURS);
-        waitingTimeCost = excessHours * FALLBACK.WAITING_RATE_PER_HOUR;
-        fallbacksApplied.push(`waiting_time_rules: usando fallback ${FALLBACK.WAITING_FREE_HOURS}h franquia + R$${FALLBACK.WAITING_RATE_PER_HOUR}/h`);
-      }
-    }
+    
+    const toll = input.toll_value ?? 0;
 
     // =====================================================
-    // 7. GET CONDITIONAL FEES
+    // NTC FEES (TDE/TEAR - 20% sobre baseFreight)
     // =====================================================
+    
+    const tde = input.tde_enabled ? baseFreight * (FREIGHT_CONSTANTS.NTC_TDE_PERCENT / 100) : 0;
+    const tear = input.tear_enabled ? baseFreight * (FREIGHT_CONSTANTS.NTC_TEAR_PERCENT / 100) : 0;
+
+    // =====================================================
+    // CONDITIONAL FEES
+    // =====================================================
+    
     const conditionalFeesBreakdown: Record<string, number> = {};
     let conditionalFeesTotal = 0;
 
@@ -324,41 +172,137 @@ Deno.serve(async (req) => {
         
         if (fee) {
           let feeValue = 0;
-          const baseValue = fee.applies_to === 'cargo_value' ? input.cargo_value : baseFreight;
+          const feeBase = fee.applies_to === 'cargo_value' ? input.cargo_value : baseFreight;
 
           switch (fee.fee_type) {
             case 'percentage':
-              feeValue = (baseValue * Number(fee.fee_value)) / 100;
+              feeValue = (feeBase * Number(fee.fee_value)) / 100;
               break;
             case 'fixed':
               feeValue = Number(fee.fee_value);
               break;
             case 'per_kg':
-              feeValue = weightBillable * Number(fee.fee_value);
+              feeValue = billableWeightKg * Number(fee.fee_value);
               break;
           }
 
-          // Apply min/max limits
-          if (fee.min_value && feeValue < Number(fee.min_value)) {
-            feeValue = Number(fee.min_value);
-          }
-          if (fee.max_value && feeValue > Number(fee.max_value)) {
-            feeValue = Number(fee.max_value);
-          }
+          // Apply min/max
+          if (fee.min_value && feeValue < Number(fee.min_value)) feeValue = Number(fee.min_value);
+          if (fee.max_value && feeValue > Number(fee.max_value)) feeValue = Number(fee.max_value);
 
-          conditionalFeesBreakdown[feeCode] = Math.round(feeValue * 100) / 100;
+          conditionalFeesBreakdown[feeCode] = roundCurrency(feeValue);
           conditionalFeesTotal += feeValue;
         } else {
-          fallbacksApplied.push(`conditional_fee: "${feeCode}" não encontrada ou inativa, ignorada`);
+          fallbacksApplied.push(`conditional_fee: "${feeCode}" não encontrada`);
         }
       }
     }
 
     // =====================================================
-    // 8. GET PAYMENT TERM ADJUSTMENT
+    // WAITING TIME
     // =====================================================
-    let paymentTermCode = input.payment_term_code || FALLBACK.PAYMENT_TERM_CODE;
-    let paymentAdjustmentPercent = FALLBACK.PAYMENT_TERM_ADJUSTMENT;
+    
+    let waitingTimeCost = 0;
+    let vehicleTypeId: string | null = null;
+
+    if (input.vehicle_type_code) {
+      const { data: vt } = await supabase
+        .from('vehicle_types')
+        .select('id')
+        .eq('code', input.vehicle_type_code)
+        .eq('active', true)
+        .maybeSingle();
+      vehicleTypeId = vt?.id ?? null;
+    }
+
+    if (input.waiting_hours !== undefined && input.waiting_hours > 0) {
+      let waitingRule = null;
+
+      if (vehicleTypeId) {
+        const { data } = await supabase
+          .from('waiting_time_rules')
+          .select('*')
+          .eq('vehicle_type_id', vehicleTypeId)
+          .maybeSingle();
+        waitingRule = data;
+      }
+
+      if (!waitingRule) {
+        const { data } = await supabase
+          .from('waiting_time_rules')
+          .select('*')
+          .is('vehicle_type_id', null)
+          .maybeSingle();
+        waitingRule = data;
+      }
+
+      if (waitingRule) {
+        const freeHours = Number(waitingRule.free_hours) || 6;
+        const excessHours = Math.max(0, input.waiting_hours - freeHours);
+        
+        if (excessHours > 0) {
+          const ratePerHour = Number(waitingRule.rate_per_hour) || 50;
+          waitingTimeCost = excessHours * ratePerHour;
+          
+          if (waitingRule.min_charge && waitingTimeCost < Number(waitingRule.min_charge)) {
+            waitingTimeCost = Number(waitingRule.min_charge);
+          }
+        }
+      } else {
+        const excessHours = Math.max(0, input.waiting_hours - 6);
+        waitingTimeCost = excessHours * 50;
+        fallbacksApplied.push('waiting_time_rules: usando fallback 6h + R$50/h');
+      }
+    }
+
+    // =====================================================
+    // GET ICMS RATE
+    // =====================================================
+    
+    const originUf = extractUf(input.origin);
+    const destUf = extractUf(input.destination);
+    let icmsPercent = FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT;
+
+    if (originUf && destUf) {
+      const { data: icmsRow } = await supabase
+        .from('icms_rates')
+        .select('rate_percent')
+        .eq('origin_state', originUf)
+        .eq('destination_state', destUf)
+        .maybeSingle();
+
+      if (icmsRow?.rate_percent !== undefined) {
+        icmsPercent = normalizeIcmsRate(Number(icmsRow.rate_percent));
+      } else {
+        fallbacksApplied.push(`icms_rates: ${originUf}→${destUf} não encontrada, usando ${FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT}%`);
+      }
+    }
+
+    // =====================================================
+    // GET TAC RATE (optional backend extension)
+    // =====================================================
+    
+    let tacPercent = 0;
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data: tacRate } = await supabase
+      .from('tac_rates')
+      .select('adjustment_percent')
+      .lte('reference_date', today)
+      .order('reference_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (tacRate?.adjustment_percent !== undefined) {
+      tacPercent = Number(tacRate.adjustment_percent);
+    }
+
+    // =====================================================
+    // GET PAYMENT TERM ADJUSTMENT (optional)
+    // =====================================================
+    
+    let paymentAdjustmentPercent = 0;
+    let paymentTermCode = input.payment_term_code ?? 'D30';
 
     const { data: paymentTerm } = await supabase
       .from('payment_terms')
@@ -369,69 +313,151 @@ Deno.serve(async (req) => {
 
     if (paymentTerm) {
       paymentAdjustmentPercent = Number(paymentTerm.adjustment_percent);
-      paymentTermCode = paymentTerm.code;
-    } else {
-      if (input.payment_term_code) {
-        fallbacksApplied.push(`payment_term: "${input.payment_term_code}" não encontrada, usando ${FALLBACK.PAYMENT_TERM_CODE}`);
-      }
-      paymentTermCode = FALLBACK.PAYMENT_TERM_CODE;
     }
 
     // =====================================================
-    // 9. CALCULATE TOTALS
+    // CALCULATE RECEITA BRUTA
     // =====================================================
     
-    // Subtotal before ICMS and payment adjustment
-    const subtotalBeforeICMS = baseFreight + grisValue + tsoValue + tollValue + waitingTimeCost + conditionalFeesTotal;
-    
-    // Apply TAC adjustment
-    const tacAdjustment = (subtotalBeforeICMS * tacPercent) / 100;
-    const subtotalWithTAC = subtotalBeforeICMS + tacAdjustment;
-    
-    // Apply payment term adjustment
-    const paymentAdjustment = (subtotalWithTAC * paymentAdjustmentPercent) / 100;
-    const subtotalWithPayment = subtotalWithTAC + paymentAdjustment;
-    
-    // Calculate ICMS (grossing up: value / (1 - icms_rate/100))
-    const icmsMultiplier = 1 / (1 - icmsRate / 100);
-    const totalWithICMS = subtotalWithPayment * icmsMultiplier;
-    const icmsValue = totalWithICMS - subtotalWithPayment;
+    const receitaBruta = 
+      baseFreight + 
+      toll + 
+      gris + 
+      tso + 
+      rctrc + 
+      adValorem + 
+      tde + 
+      tear + 
+      conditionalFeesTotal + 
+      waitingTimeCost;
 
-    // Round all values to 2 decimal places
-    const breakdown: FreightBreakdown = {
-      weight_real: Math.round(weightReal * 100) / 100,
-      weight_cubed: Math.round(weightCubed * 100) / 100,
-      weight_billable: Math.round(weightBillable * 100) / 100,
-      base_freight: Math.round(baseFreight * 100) / 100,
-      gris: Math.round(grisValue * 100) / 100,
-      tso: Math.round(tsoValue * 100) / 100,
-      toll: Math.round(tollValue * 100) / 100,
-      tac_adjustment: Math.round(tacAdjustment * 100) / 100,
-      icms: Math.round(icmsValue * 100) / 100,
-      waiting_time: Math.round(waitingTimeCost * 100) / 100,
-      conditional_fees: conditionalFeesBreakdown,
-      payment_adjustment: Math.round(paymentAdjustment * 100) / 100,
-      subtotal: Math.round(subtotalWithPayment * 100) / 100,
-      total: Math.round(totalWithICMS * 100) / 100,
+    // =====================================================
+    // APPLY TAC ADJUSTMENT
+    // =====================================================
+    
+    const tacAdjustment = receitaBruta * (tacPercent / 100);
+    const receitaComTac = receitaBruta + tacAdjustment;
+
+    // =====================================================
+    // APPLY PAYMENT TERM ADJUSTMENT
+    // =====================================================
+    
+    const paymentAdjustment = receitaComTac * (paymentAdjustmentPercent / 100);
+    const receitaFinal = receitaComTac + paymentAdjustment;
+
+    // =====================================================
+    // CALCULATE TAXES "POR FORA" (no gross-up)
+    // =====================================================
+    
+    const das = receitaFinal * (dasPercent / 100);
+    const icms = receitaFinal * (icmsPercent / 100);
+    const totalImpostos = das + icms;
+
+    // =====================================================
+    // CALCULATE TOTAL CLIENTE
+    // =====================================================
+    
+    const totalCliente = receitaFinal + totalImpostos;
+
+    // =====================================================
+    // CALCULATE PROFITABILITY
+    // =====================================================
+    
+    const custosCarreteiro = receitaFinal * (carreteiroPercent / 100);
+    const custosDescarga = descargaValue;
+    const custosDiretos = custosCarreteiro + custosDescarga;
+
+    const margemBruta = receitaFinal - totalImpostos - custosDiretos;
+    const overhead = margemBruta * (overheadPercent / 100);
+    const resultadoLiquido = margemBruta - overhead;
+
+    const margemPercent = receitaFinal > 0 
+      ? (resultadoLiquido / receitaFinal) * 100 
+      : 0;
+
+    // =====================================================
+    // BUILD RESPONSE
+    // =====================================================
+    
+    const routeUfLabel = formatRouteUf(input.origin, input.destination);
+    const marginStatus = getMarginStatus(margemPercent);
+
+    const meta: FreightMeta = {
+      route_uf_label: routeUfLabel,
+      km_band_label: kmBandLabel,
+      km_status: kmStatus,
+      margin_status: marginStatus,
+      margin_percent: roundCurrency(margemPercent),
+      cubage_factor: cubageFactor,
+      cubage_weight_kg: roundCurrency(cubageWeightKg),
+      billable_weight_kg: roundCurrency(billableWeightKg),
     };
 
-    const parametersUsed: ParametersUsed = {
-      cubage_factor: cubageFactor,
-      icms_rate: icmsRate,
+    const components: FreightComponents = {
+      base_cost: roundCurrency(baseCost),
+      base_freight: roundCurrency(baseFreight),
+      toll: roundCurrency(toll),
+      gris: roundCurrency(gris),
+      tso: roundCurrency(tso),
+      rctrc: roundCurrency(rctrc),
+      ad_valorem: 0,
+      tde: roundCurrency(tde),
+      tear: roundCurrency(tear),
+      conditional_fees_total: roundCurrency(conditionalFeesTotal),
+      waiting_time_cost: roundCurrency(waitingTimeCost),
+    };
+
+    const rates: FreightRates = {
+      das_percent: dasPercent,
+      icms_percent: icmsPercent,
+      gris_percent: grisPercent,
+      tso_percent: tsoPercent,
+      cost_value_percent: costValuePercent,
+      markup_percent: markupPercent,
+      overhead_percent: overheadPercent,
       tac_percent: tacPercent,
-      payment_term: paymentTermCode,
-      vehicle_type: input.vehicle_type_code || null,
+      payment_adjustment_percent: paymentAdjustmentPercent,
+    };
+
+    const totals: FreightTotals = {
+      receita_bruta: roundCurrency(receitaFinal),
+      das: roundCurrency(das),
+      icms: roundCurrency(icms),
+      tac_adjustment: roundCurrency(tacAdjustment),
+      payment_adjustment: roundCurrency(paymentAdjustment),
+      total_impostos: roundCurrency(totalImpostos),
+      total_cliente: roundCurrency(totalCliente),
+    };
+
+    const profitability: FreightProfitability = {
+      custos_carreteiro: roundCurrency(custosCarreteiro),
+      custos_descarga: roundCurrency(custosDescarga),
+      custos_diretos: roundCurrency(custosDiretos),
+      margem_bruta: roundCurrency(margemBruta),
+      overhead: roundCurrency(overhead),
+      resultado_liquido: roundCurrency(resultadoLiquido),
+      margem_percent: roundCurrency(margemPercent),
     };
 
     const response: CalculateFreightResponse = {
       success: true,
-      breakdown,
-      parameters_used: parametersUsed,
+      status: kmStatus === 'OUT_OF_RANGE' ? 'OUT_OF_RANGE' : 'OK',
+      error: kmStatus === 'OUT_OF_RANGE' ? `Distância ${input.km_distance} km fora da faixa` : undefined,
+      meta,
+      components,
+      rates,
+      totals,
+      profitability,
+      conditional_fees_breakdown: conditionalFeesBreakdown,
       fallbacks_applied: fallbacksApplied,
       errors: [],
     };
 
-    console.log('[calculate-freight] Calculation complete, total:', response.breakdown.total);
+    console.log('[calculate-freight] Complete:', {
+      total: totalCliente,
+      margin: margemPercent.toFixed(2) + '%',
+      status: response.status,
+    });
 
     return new Response(
       JSON.stringify(response),
@@ -441,13 +467,19 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('[calculate-freight] Error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
+    
     return new Response(
-      JSON.stringify({ 
-        success: false, 
+      JSON.stringify({
+        success: false,
+        status: 'MISSING_DATA',
         errors: [`Erro interno: ${errorMessage}`],
-        breakdown: null,
-        parameters_used: null,
-        fallbacks_applied: []
+        meta: null,
+        components: null,
+        rates: null,
+        totals: null,
+        profitability: null,
+        conditional_fees_breakdown: {},
+        fallbacks_applied: [],
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

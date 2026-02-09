@@ -15,14 +15,14 @@ import {
   Package, 
   Scale, 
   Truck,
-  MapPin
+  MapPin,
+  TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useCalculateFreight } from '@/hooks/useCalculateFreight';
+import { useCalculateFreight, type CalculateFreightResponse } from '@/hooks/useCalculateFreight';
 import { usePriceTables } from '@/hooks/usePriceTables';
 import { useVehicleTypes, usePaymentTerms, useConditionalFees } from '@/hooks/usePricingRules';
-import type { CalculateFreightResponse, FreightBreakdown } from '@/types/pricing';
 
 export function FreightSimulator() {
   const calculateFreight = useCalculateFreight();
@@ -38,11 +38,14 @@ export function FreightSimulator() {
   const [volumeM3, setVolumeM3] = useState('8');
   const [cargoValue, setCargoValue] = useState('50000');
   const [kmDistance, setKmDistance] = useState('450');
+  const [tollValue, setTollValue] = useState('0');
   const [priceTableId, setPriceTableId] = useState('');
   const [vehicleTypeCode, setVehicleTypeCode] = useState('');
   const [paymentTermCode, setPaymentTermCode] = useState('');
   const [selectedFees, setSelectedFees] = useState<string[]>([]);
   const [waitingHours, setWaitingHours] = useState('0');
+  const [tdeEnabled, setTdeEnabled] = useState(false);
+  const [tearEnabled, setTearEnabled] = useState(false);
 
   // Result
   const [result, setResult] = useState<CalculateFreightResponse | null>(null);
@@ -57,10 +60,13 @@ export function FreightSimulator() {
         weight_kg: parseFloat(weightKg) || 0,
         volume_m3: parseFloat(volumeM3) || 0,
         cargo_value: parseFloat(cargoValue) || 0,
-        km_distance: kmDistance ? parseFloat(kmDistance) : undefined,
+        km_distance: kmDistance ? parseFloat(kmDistance) : 0,
+        toll_value: parseFloat(tollValue) || 0,
         price_table_id: priceTableId || undefined,
         vehicle_type_code: vehicleTypeCode || undefined,
         payment_term_code: paymentTermCode || undefined,
+        tde_enabled: tdeEnabled,
+        tear_enabled: tearEnabled,
         conditional_fees: selectedFees.length > 0 ? selectedFees : undefined,
         waiting_hours: waitingHours ? parseFloat(waitingHours) : undefined,
       });
@@ -83,6 +89,14 @@ export function FreightSimulator() {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
+  };
+
+  const getMarginBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'ABOVE_TARGET': return 'default';
+      case 'BELOW_TARGET': return 'destructive';
+      default: return 'secondary';
+    }
   };
 
   return (
@@ -179,6 +193,16 @@ export function FreightSimulator() {
                 />
               </div>
               <div className="space-y-2">
+                <Label>Pedágio (R$)</Label>
+                <Input
+                  type="number"
+                  value={tollValue}
+                  onChange={(e) => setTollValue(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label>Tabela de Preço</Label>
                 <Select value={priceTableId} onValueChange={setPriceTableId}>
                   <SelectTrigger>
@@ -194,8 +218,6 @@ export function FreightSimulator() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Tipo de Veículo</Label>
                 <Select value={vehicleTypeCode} onValueChange={setVehicleTypeCode}>
@@ -212,51 +234,81 @@ export function FreightSimulator() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Prazo de Pagamento</Label>
-                <Select value={paymentTermCode} onValueChange={setPaymentTermCode}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Padrão" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Padrão (D30)</SelectItem>
-                    {paymentTerms?.map((t) => (
-                      <SelectItem key={t.id} value={t.code}>
-                        {t.name} ({t.adjustment_percent > 0 ? '+' : ''}{t.adjustment_percent}%)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Prazo de Pagamento</Label>
+              <Select value={paymentTermCode} onValueChange={setPaymentTermCode}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Padrão" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Padrão (D30)</SelectItem>
+                  {paymentTerms?.map((t) => (
+                    <SelectItem key={t.id} value={t.code}>
+                      {t.name} ({t.adjustment_percent > 0 ? '+' : ''}{t.adjustment_percent}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           <Separator />
 
-          {/* Conditional Fees */}
+          {/* NTC Fees */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <Scale className="h-4 w-4" />
-              Taxas Condicionais
+              Taxas NTC (20% sobre frete base)
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {conditionalFees?.map((fee) => (
-                <div key={fee.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={fee.code}
-                    checked={selectedFees.includes(fee.code)}
-                    onCheckedChange={() => toggleFee(fee.code)}
-                  />
-                  <label
-                    htmlFor={fee.code}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    {fee.code} - {fee.name}
-                  </label>
-                </div>
-              ))}
+            <div className="flex gap-6">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="tde"
+                  checked={tdeEnabled}
+                  onCheckedChange={(c) => setTdeEnabled(!!c)}
+                />
+                <label htmlFor="tde" className="text-sm font-medium">TDE</label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="tear"
+                  checked={tearEnabled}
+                  onCheckedChange={(c) => setTearEnabled(!!c)}
+                />
+                <label htmlFor="tear" className="text-sm font-medium">TEAR</label>
+              </div>
             </div>
           </div>
+
+          {/* Conditional Fees */}
+          {conditionalFees && conditionalFees.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-4">
+                <div className="text-sm font-medium text-muted-foreground">
+                  Taxas Condicionais
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {conditionalFees.map((fee) => (
+                    <div key={fee.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={fee.code}
+                        checked={selectedFees.includes(fee.code)}
+                        onCheckedChange={() => toggleFee(fee.code)}
+                      />
+                      <label
+                        htmlFor={fee.code}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {fee.code} - {fee.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
 
@@ -301,26 +353,42 @@ export function FreightSimulator() {
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                {result.errors?.join(', ') || 'Erro no cálculo'}
+                {result.errors?.join(', ') || result.error || 'Erro no cálculo'}
               </AlertDescription>
             </Alert>
           ) : (
             <div className="space-y-6">
+              {/* Meta Badges */}
+              {result.meta && (
+                <div className="flex flex-wrap gap-2">
+                  {result.meta.route_uf_label && (
+                    <Badge variant="outline">{result.meta.route_uf_label}</Badge>
+                  )}
+                  {result.meta.km_band_label && (
+                    <Badge variant="outline">{result.meta.km_band_label} km</Badge>
+                  )}
+                  <Badge variant={getMarginBadgeVariant(result.meta.margin_status)}>
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    Margem: {result.meta.margin_percent.toFixed(1)}%
+                  </Badge>
+                </div>
+              )}
+
               {/* Weight */}
               <div className="space-y-3">
                 <h4 className="font-medium text-sm text-muted-foreground">PESO</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground">Real</p>
-                    <p className="font-medium">{result.breakdown.weight_real.toLocaleString('pt-BR')} kg</p>
+                    <p className="font-medium">{parseFloat(weightKg).toLocaleString('pt-BR')} kg</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Cubado</p>
-                    <p className="font-medium">{result.breakdown.weight_cubed.toLocaleString('pt-BR')} kg</p>
+                    <p className="font-medium">{result.meta.cubage_weight_kg.toLocaleString('pt-BR')} kg</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Taxável</p>
-                    <p className="font-semibold text-primary">{result.breakdown.weight_billable.toLocaleString('pt-BR')} kg</p>
+                    <p className="font-semibold text-primary">{result.meta.billable_weight_kg.toLocaleString('pt-BR')} kg</p>
                   </div>
                 </div>
               </div>
@@ -331,42 +399,58 @@ export function FreightSimulator() {
               <div className="space-y-3">
                 <h4 className="font-medium text-sm text-muted-foreground">COMPONENTES</h4>
                 <div className="space-y-2">
-                  <BreakdownRow label="Frete Base" value={result.breakdown.base_freight} />
-                  <BreakdownRow label="GRIS" value={result.breakdown.gris} />
-                  <BreakdownRow label="TSO (Seguro Obrigatório)" value={result.breakdown.tso} />
-                  <BreakdownRow label="Pedágio" value={result.breakdown.toll} />
-                  <BreakdownRow 
-                    label={`TAC (${result.parameters_used.tac_percent}%)`} 
-                    value={result.breakdown.tac_adjustment} 
-                  />
-                  <BreakdownRow label="Estadia" value={result.breakdown.waiting_time} />
-                  
-                  {/* Conditional Fees */}
-                  {Object.entries(result.breakdown.conditional_fees).map(([code, value]) => (
-                    <BreakdownRow key={code} label={code} value={value as number} />
-                  ))}
-                  
-                  <BreakdownRow 
-                    label={`Prazo ${result.parameters_used.payment_term}`} 
-                    value={result.breakdown.payment_adjustment} 
-                  />
+                  <BreakdownRow label="Custo Base" value={result.components.base_cost} />
+                  <BreakdownRow label={`Frete Base (+${result.rates.markup_percent}%)`} value={result.components.base_freight} />
+                  <BreakdownRow label="Pedágio" value={result.components.toll} />
+                  <BreakdownRow label={`GRIS (${result.rates.gris_percent}%)`} value={result.components.gris} />
+                  <BreakdownRow label={`TSO (${result.rates.tso_percent}%)`} value={result.components.tso} />
+                  <BreakdownRow label={`RCTR-C (${result.rates.cost_value_percent}%)`} value={result.components.rctrc} />
+                  <BreakdownRow label="TDE (20%)" value={result.components.tde} />
+                  <BreakdownRow label="TEAR (20%)" value={result.components.tear} />
+                  <BreakdownRow label="Taxas Condicionais" value={result.components.conditional_fees_total} />
+                  <BreakdownRow label="Estadia" value={result.components.waiting_time_cost} />
                 </div>
               </div>
 
               <Separator />
 
-              {/* ICMS & Total */}
+              {/* Totals */}
               <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">ICMS ({result.parameters_used.icms_rate}%)</span>
-                  <span className="font-medium">{formatCurrency(result.breakdown.icms)}</span>
+                <h4 className="font-medium text-sm text-muted-foreground">TOTAIS</h4>
+                <div className="space-y-2">
+                  <BreakdownRow label="Receita Bruta" value={result.totals.receita_bruta} />
+                  {result.totals.tac_adjustment > 0 && (
+                    <BreakdownRow label={`TAC (${result.rates.tac_percent}%)`} value={result.totals.tac_adjustment} />
+                  )}
+                  {result.totals.payment_adjustment > 0 && (
+                    <BreakdownRow label={`Prazo (${result.rates.payment_adjustment_percent}%)`} value={result.totals.payment_adjustment} />
+                  )}
+                  <BreakdownRow label={`DAS (${result.rates.das_percent}%)`} value={result.totals.das} />
+                  <BreakdownRow label={`ICMS (${result.rates.icms_percent}%)`} value={result.totals.icms} />
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-lg font-semibold">TOTAL</span>
+                  <span className="text-lg font-semibold">TOTAL CLIENTE</span>
                   <span className="text-2xl font-bold text-primary">
-                    {formatCurrency(result.breakdown.total)}
+                    {formatCurrency(result.totals.total_cliente)}
                   </span>
+                </div>
+              </div>
+
+              {/* Profitability */}
+              <Separator />
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm text-muted-foreground">RENTABILIDADE</h4>
+                <div className="space-y-2">
+                  <BreakdownRow label="Custos Diretos" value={result.profitability.custos_diretos} negative />
+                  <BreakdownRow label="Margem Bruta" value={result.profitability.margem_bruta} />
+                  <BreakdownRow label={`Overhead (${result.rates.overhead_percent}%)`} value={result.profitability.overhead} negative />
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <span className="font-medium">Resultado Líquido</span>
+                    <span className={`font-bold ${result.profitability.resultado_liquido >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                      {formatCurrency(result.profitability.resultado_liquido)}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -392,13 +476,10 @@ export function FreightSimulator() {
               <div className="pt-4 border-t">
                 <p className="text-xs text-muted-foreground mb-2">Parâmetros utilizados:</p>
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">Cubagem: {result.parameters_used.cubage_factor} kg/m³</Badge>
-                  <Badge variant="outline">ICMS: {result.parameters_used.icms_rate}%</Badge>
-                  <Badge variant="outline">TAC: {result.parameters_used.tac_percent}%</Badge>
-                  <Badge variant="outline">Prazo: {result.parameters_used.payment_term}</Badge>
-                  {result.parameters_used.vehicle_type && (
-                    <Badge variant="outline">Veículo: {result.parameters_used.vehicle_type}</Badge>
-                  )}
+                  <Badge variant="outline">Cubagem: {result.meta.cubage_factor} kg/m³</Badge>
+                  <Badge variant="outline">DAS: {result.rates.das_percent}%</Badge>
+                  <Badge variant="outline">Markup: {result.rates.markup_percent}%</Badge>
+                  <Badge variant="outline">ICMS: {result.rates.icms_percent}%</Badge>
                 </div>
               </div>
             </div>
@@ -409,7 +490,7 @@ export function FreightSimulator() {
   );
 }
 
-function BreakdownRow({ label, value }: { label: string; value: number }) {
+function BreakdownRow({ label, value, negative }: { label: string; value: number; negative?: boolean }) {
   if (value === 0) return null;
   
   const formatCurrency = (val: number) => {
@@ -422,7 +503,9 @@ function BreakdownRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex justify-between items-center text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span>{formatCurrency(value)}</span>
+      <span className={negative ? 'text-destructive' : ''}>
+        {negative ? '-' : ''}{formatCurrency(value)}
+      </span>
     </div>
   );
 }
