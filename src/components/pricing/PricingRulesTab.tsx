@@ -13,7 +13,8 @@ import {
   Receipt, 
   Fuel, 
   Route, 
-  CreditCard 
+  CreditCard,
+  Percent
 } from 'lucide-react';
 
 import { PricingParametersSection } from './PricingParametersSection';
@@ -53,6 +54,24 @@ export function PricingRulesTab() {
       </CardHeader>
       <CardContent>
         <Accordion type="single" collapsible className="w-full">
+          {/* Impostos e Margens */}
+          <AccordionItem value="taxes-margins">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3">
+                <Percent className="h-5 w-5 text-muted-foreground" />
+                <span>Impostos e Margens</span>
+                <Badge variant="secondary" className="ml-2">
+                  3 parâmetros
+                </Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <PricingParametersSection 
+                includeKeys={['das_percent', 'markup_percent', 'overhead_percent']} 
+              />
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Parâmetros Gerais */}
           <AccordionItem value="parameters">
             <AccordionTrigger className="hover:no-underline">

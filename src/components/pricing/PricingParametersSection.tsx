@@ -10,8 +10,18 @@ import { Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PricingParameter } from '@/types/pricing';
 
-export function PricingParametersSection() {
-  const { data: parameters, isLoading } = usePricingParameters();
+interface PricingParametersSectionProps {
+  includeKeys?: string[];
+  title?: string;
+}
+
+export function PricingParametersSection({ includeKeys, title }: PricingParametersSectionProps = {}) {
+  const { data: allParameters, isLoading } = usePricingParameters();
+  
+  // Filter parameters by includeKeys if provided
+  const parameters = includeKeys && includeKeys.length > 0
+    ? allParameters?.filter(p => includeKeys.includes(p.key))
+    : allParameters;
   const updateMutation = useUpdatePricingParameter();
   const createMutation = useCreatePricingParameter();
   const deleteMutation = useDeletePricingParameter();

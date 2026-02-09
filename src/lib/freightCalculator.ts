@@ -12,6 +12,7 @@ export type Uf = string;
 
 export interface FreightConfig {
   dasPercent: number;          // default 14 (vem de Regras)
+  markupPercent: number;       // default 30 (vem de Regras)
   overheadPercent: number;     // default 15 (vem de Regras)
   cubageFactorKgM3: number;    // default 300 (Regra NTC)
   targetMarginPercent?: number; // para o "dentro da margem prevista"
@@ -219,8 +220,14 @@ export function calculateFreightLocal(params: {
   // STEP 2: Componentes do Frete
   // ============================================
   
-  // Base Freight (override ou calculado)
-  const baseFreight = input.baseFreightOverride ?? (tonBillable * row.cost_per_ton);
+  // Base Cost (custo base sem markup)
+  const baseCost = tonBillable * row.cost_per_ton;
+  
+  // Markup (aplicado sobre o custo base)
+  const markupPercent = input.config.markupPercent ?? 30;
+  
+  // Base Freight (com markup aplicado, ou override)
+  const baseFreight = input.baseFreightOverride ?? (baseCost * (1 + markupPercent / 100));
   
   // Percentuais (override ou da tabela)
   const grisPct = input.grisPercentOverride ?? row.gris_percent ?? 0;
@@ -382,6 +389,10 @@ export interface StoredPricingBreakdown {
     kmStatus: 'OK' | 'OUT_OF_RANGE';
     marginStatus: 'OK' | 'BELOW_TARGET' | 'UNKNOWN';
     marginPercent: number;
+    // Additional fees selection stored in meta
+    selectedConditionalFeeIds?: string[];
+    waitingTimeEnabled?: boolean;
+    waitingTimeHours?: number;
   };
   
   weights: {
@@ -391,6 +402,7 @@ export interface StoredPricingBreakdown {
   };
   
   components: {
+    baseCost: number;
     baseFreight: number;
     toll: number;
     gris: number;
@@ -399,6 +411,8 @@ export interface StoredPricingBreakdown {
     adValorem: number;
     tde: number;
     tear: number;
+    conditionalFeesTotal: number;
+    waitingTimeCost: number;
   };
   
   totals: {
@@ -419,10 +433,12 @@ export interface StoredPricingBreakdown {
   
   rates: {
     dasPercent: number;
+    markupPercent: number;
     icmsPercent: number;
     grisPercent: number;
     tsoPercent: number;
     costValuePercent: number;
+    overheadPercent: number;
   };
 }
 
@@ -430,15 +446,22 @@ export function buildStoredBreakdown(
   output: FreightOutput,
   input: FreightInput,
   priceRow: PriceTableRow,
-  targetMarginPercent?: number
+  targetMarginPercent?: number,
+  additionalFees?: { conditionalFeesTotal: number; selectedFeeIds: string[]; waitingTimeEnabled: boolean; waitingTimeHours: number; waitingTimeCost: number }
 ): StoredPricingBreakdown {
   const marginStatus = targetMarginPercent !== undefined
     ? (output.profit.margemPercent >= targetMarginPercent ? 'OK' : 'BELOW_TARGET')
     : 'UNKNOWN';
   
+  const markupPercent = input.config.markupPercent ?? 30;
+  const overheadPercent = input.config.overheadPercent ?? 15;
+  
+  // Calculate baseCost (before markup)
+  const baseCost = output.meta.tonBillable * priceRow.cost_per_ton;
+  
   return {
     calculatedAt: new Date().toISOString(),
-    version: '2.0-fob-lotacao',
+    version: '2.1-fob-lotacao',
     status: 'OK',
     
     meta: {
@@ -447,6 +470,9 @@ export function buildStoredBreakdown(
       kmStatus: 'OK',
       marginStatus,
       marginPercent: output.profit.margemPercent,
+      selectedConditionalFeeIds: additionalFees?.selectedFeeIds,
+      waitingTimeEnabled: additionalFees?.waitingTimeEnabled,
+      waitingTimeHours: additionalFees?.waitingTimeHours,
     },
     
     weights: {
@@ -456,6 +482,7 @@ export function buildStoredBreakdown(
     },
     
     components: {
+      baseCost,
       baseFreight: output.revenue.baseFreight,
       toll: output.revenue.toll,
       gris: output.revenue.gris,
@@ -464,6 +491,8 @@ export function buildStoredBreakdown(
       adValorem: output.revenue.adValorem,
       tde: output.revenue.ntc.tde,
       tear: output.revenue.ntc.tear,
+      conditionalFeesTotal: additionalFees?.conditionalFeesTotal ?? 0,
+      waitingTimeCost: additionalFees?.waitingTimeCost ?? 0,
     },
     
     totals: {
@@ -484,10 +513,12 @@ export function buildStoredBreakdown(
     
     rates: {
       dasPercent: output.taxes.dasPercent,
+      markupPercent,
       icmsPercent: output.taxes.icmsPercent,
       grisPercent: priceRow.gris_percent,
       tsoPercent: priceRow.tso_percent,
       costValuePercent: priceRow.cost_value_percent,
+      overheadPercent,
     },
   };
 }

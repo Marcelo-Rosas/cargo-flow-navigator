@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   MapPin, 
   Calendar, 
@@ -15,7 +15,8 @@ import {
   Route,
   AlertTriangle,
   TrendingUp,
-  Receipt
+  Receipt,
+  Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,14 +28,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
+import { AdditionalFeesSection, AdditionalFeesSelection, defaultAdditionalFeesSelection } from '@/components/quotes/AdditionalFeesSection';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
+import { toast } from 'sonner';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -60,6 +68,30 @@ const TARGET_MARGIN_PERCENT = 15;
 export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps) {
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
+  const [isAdditionalFeesOpen, setIsAdditionalFeesOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Initialize additional fees selection from breakdown
+  const getInitialFeesSelection = (): AdditionalFeesSelection => {
+    if (!quote) return defaultAdditionalFeesSelection;
+    
+    const breakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+    if (!breakdown?.meta) return defaultAdditionalFeesSelection;
+    
+    return {
+      conditionalFees: breakdown.meta.selectedConditionalFeeIds || [],
+      waitingTimeEnabled: breakdown.meta.waitingTimeEnabled || false,
+      waitingTimeHours: breakdown.meta.waitingTimeHours || 0,
+      waitingTimeCost: breakdown.components?.waitingTimeCost || 0,
+    };
+  };
+  
+  const [additionalFeesSelection, setAdditionalFeesSelection] = useState<AdditionalFeesSelection>(getInitialFeesSelection);
+
+  // Update selection when quote changes
+  useEffect(() => {
+    setAdditionalFeesSelection(getInitialFeesSelection());
+  }, [quote?.id, quote?.pricing_breakdown]);
 
   // All hooks MUST be called before any conditional returns
   const { data: priceTable } = usePriceTable(quote?.price_table_id || '');
@@ -91,6 +123,89 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
     },
     enabled: !!quote?.payment_term_id,
   });
+
+  // Mutation to save additional fees selection
+  const saveAdditionalFeesMutation = useMutation({
+    mutationFn: async (selection: AdditionalFeesSelection) => {
+      if (!quote) throw new Error('No quote');
+      
+      const currentBreakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+      
+      // Build defaults for missing fields
+      const defaultMeta = {
+        routeUfLabel: '',
+        kmBandLabel: '',
+        kmStatus: 'OK' as const,
+        marginStatus: 'UNKNOWN' as const,
+        marginPercent: 0,
+      };
+      
+      const defaultComponents = {
+        baseCost: 0,
+        baseFreight: 0,
+        toll: 0,
+        gris: 0,
+        tso: 0,
+        rctrc: 0,
+        adValorem: 0,
+        tde: 0,
+        tear: 0,
+        conditionalFeesTotal: 0,
+        waitingTimeCost: 0,
+      };
+      
+      const defaultWeights = { cubageWeight: 0, billableWeight: 0, tonBillable: 0 };
+      const defaultTotals = { receitaBruta: 0, das: 0, icms: 0, totalImpostos: 0, totalCliente: 0 };
+      const defaultProfitability = { custosDiretos: 0, margemBruta: 0, overhead: 0, resultadoLiquido: 0, margemPercent: 0 };
+      const defaultRates = { dasPercent: 14, markupPercent: 30, icmsPercent: 0, grisPercent: 0, tsoPercent: 0, costValuePercent: 0, overheadPercent: 15 };
+      
+      // Update breakdown with new selections
+      const updatedBreakdown: StoredPricingBreakdown = {
+        calculatedAt: currentBreakdown?.calculatedAt || new Date().toISOString(),
+        version: currentBreakdown?.version || '2.1-fob-lotacao',
+        status: currentBreakdown?.status || 'OK',
+        meta: {
+          ...defaultMeta,
+          ...currentBreakdown?.meta,
+          selectedConditionalFeeIds: selection.conditionalFees,
+          waitingTimeEnabled: selection.waitingTimeEnabled,
+          waitingTimeHours: selection.waitingTimeHours,
+        },
+        components: {
+          ...defaultComponents,
+          ...currentBreakdown?.components,
+          waitingTimeCost: selection.waitingTimeCost,
+        },
+        weights: currentBreakdown?.weights || defaultWeights,
+        totals: currentBreakdown?.totals || defaultTotals,
+        profitability: currentBreakdown?.profitability || defaultProfitability,
+        rates: currentBreakdown?.rates || defaultRates,
+      };
+      
+      const { error } = await supabase
+        .from('quotes')
+        .update({
+          pricing_breakdown: updatedBreakdown as unknown as typeof quote.pricing_breakdown,
+          waiting_time_cost: selection.waitingTimeCost,
+        })
+        .eq('id', quote.id);
+      
+      if (error) throw error;
+      return updatedBreakdown;
+    },
+    onSuccess: () => {
+      toast.success('Taxas adicionais salvas');
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+    },
+    onError: (error) => {
+      console.error('Error saving additional fees:', error);
+      toast.error('Erro ao salvar taxas adicionais');
+    },
+  });
+
+  const handleSaveAdditionalFees = () => {
+    saveAdditionalFeesMutation.mutate(additionalFeesSelection);
+  };
 
   // Early return AFTER all hooks
   if (!quote) return null;
@@ -478,6 +593,48 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                 )}
               </div>
             )}
+
+            {/* Additional Fees Section */}
+            <Collapsible open={isAdditionalFeesOpen} onOpenChange={setIsAdditionalFeesOpen}>
+              <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                <CollapsibleTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-between p-0 h-auto hover:bg-transparent"
+                  >
+                    <h4 className="font-semibold text-foreground flex items-center gap-2">
+                      <Plus className={cn("w-4 h-4 transition-transform", isAdditionalFeesOpen && "rotate-45")} />
+                      Taxas Adicionais
+                      {(additionalFeesSelection.conditionalFees.length > 0 || additionalFeesSelection.waitingTimeEnabled) && (
+                        <Badge variant="secondary" className="ml-2">
+                          {additionalFeesSelection.conditionalFees.length + (additionalFeesSelection.waitingTimeEnabled ? 1 : 0)}
+                        </Badge>
+                      )}
+                    </h4>
+                  </Button>
+                </CollapsibleTrigger>
+                
+                <CollapsibleContent className="pt-4">
+                  <AdditionalFeesSection
+                    selection={additionalFeesSelection}
+                    onChange={setAdditionalFeesSelection}
+                    baseFreight={breakdown?.components?.baseFreight || 0}
+                    cargoValue={quote.cargo_value || 0}
+                    vehicleTypeId={quote.vehicle_type_id || undefined}
+                  />
+                  
+                  <div className="flex justify-end mt-4">
+                    <Button 
+                      size="sm"
+                      onClick={handleSaveAdditionalFees}
+                      disabled={saveAdditionalFeesMutation.isPending}
+                    >
+                      {saveAdditionalFeesMutation.isPending ? 'Salvando...' : 'Salvar Taxas'}
+                    </Button>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
 
             {/* Value (fallback if no breakdown) */}
             {!breakdown && (
