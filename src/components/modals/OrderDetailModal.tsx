@@ -235,7 +235,7 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
 
               {showDocsTab && (
                 <TabsContent value="documents" className="m-0 space-y-6">
-                  <DocumentUpload orderId={order.id} />
+                  <DocumentUpload orderId={order.id} orderStage={order.stage} />
                   <Separator />
                   <DocumentList orderId={order.id} />
                 </TabsContent>
