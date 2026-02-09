@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  Package
+  Package,
+  Ship
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ const navItems = [
   { path: '/documentos', icon: FileText, label: 'Documentos' },
   { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
   { path: '/clientes', icon: Users, label: 'Clientes' },
+  { path: '/embarcadores', icon: Ship, label: 'Embarcadores' },
   { path: '/tabelas-preco', icon: Package, label: 'Tabelas de Preço' },
 ];
 

@@ -10,6 +10,7 @@ import Commercial from "./pages/Commercial";
 import Operations from "./pages/Operations";
 import Documents from "./pages/Documents";
 import Clients from "./pages/Clients";
+import Shippers from "./pages/Shippers";
 import PriceTables from "./pages/PriceTables";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/operacional" element={<ProtectedRoute><Operations /></ProtectedRoute>} />
             <Route path="/documentos" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
             <Route path="/clientes" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
+            <Route path="/embarcadores" element={<ProtectedRoute><Shippers /></ProtectedRoute>} />
             <Route path="/tabelas-preco" element={<ProtectedRoute><PriceTables /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
