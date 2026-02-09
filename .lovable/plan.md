@@ -1,139 +1,149 @@
-# Plano de Refatoração: Alinhamento freightCalculator ↔ Edge Function
 
-## ✅ Status: CONCLUÍDO
+# Plano: Suporte a Entrada de Peso em Toneladas
 
-**Última atualização:** 2026-02-09
+## Problema Identificado
 
----
+O sistema de cálculo de frete está funcionando corretamente com a fórmula:
 
-## 📊 Resumo da Implementação
+```
+baseCost = (billableWeightKg / 1000) × cost_per_ton
+```
 
-### Arquivos Criados/Modificados
+Porém, o campo de entrada de peso aceita apenas **kg**, enquanto operadores de lotação frequentemente informam cargas em **toneladas**. Se um usuário digita "10" pensando em 10 toneladas, o sistema interpreta como 10 kg, resultando em:
 
-| Arquivo | Ação | Descrição |
-|---------|------|-----------|
-| `supabase/functions/_shared/freight-types.ts` | ✅ Criado | Tipos e helpers compartilhados |
-| `supabase/functions/calculate-freight/index.ts` | ✅ Refatorado | Alinhado à política FOB Lotação |
-| `src/hooks/useCalculateFreight.ts` | ✅ Atualizado | Nova estrutura de tipos |
-| `src/types/pricing.ts` | ✅ Atualizado | Tipos alinhados |
-| `src/components/pricing/FreightSimulator.tsx` | ✅ Atualizado | UI para nova estrutura |
+- **Esperado**: 10t = 10.000 kg → baseCost = 10 × R$ 117,94 = R$ 1.179,40
+- **Calculado**: 10 kg → baseCost = 0,01 × R$ 117,94 = R$ 1,18
+
+Isso explica porque o "Frete Base não está pegando o valor de R$/TON da tabela".
 
 ---
 
-## ✅ Critérios de Aceite Validados
+## Solução Proposta
 
-1. ✅ **ICMS "por fora"**: `icms = receitaBruta * (rate/100)` - sem gross-up
-2. ✅ **DAS 14%**: Busca de `pricing_parameters` com fallback
-3. ✅ **Markup 30%**: `baseFreight = baseCost * 1.30`
-4. ✅ **RCTR-C**: Calculado com `cost_value_percent`
-5. ✅ **TDE/TEAR**: 20% sobre baseFreight quando habilitados
-6. ✅ **Rentabilidade**: margemBruta, overhead, resultadoLiquido, margemPercent
-7. ✅ **TAC/Payment Term**: Mantidos como extensões opcionais no backend
-8. ✅ **Tipos unificados**: Frontend e backend com mesma estrutura
+Adicionar um **Toggle de Unidade** (kg/ton) ao lado do campo de peso, que:
+
+1. Permite ao usuário escolher a unidade de entrada
+2. Converte automaticamente para kg ao enviar para o cálculo
+3. Exibe feedback visual claro sobre qual unidade está ativa
+4. Persiste a preferência no breakdown para auditoria
 
 ---
 
-## 🔄 Nova Estrutura de Response
+## Tarefas de Implementação
+
+### Tarefa 1: Atualizar QuoteForm.tsx
+
+**Modificações:**
+- Adicionar estado `weightUnit: 'kg' | 'ton'` com default `'kg'`
+- Criar ToggleGroup ao lado do campo de peso
+- Converter o valor para kg antes de passar para `calculateFreight()`:
+  ```typescript
+  const weightInKg = weightUnit === 'ton' 
+    ? watchedWeight * 1000 
+    : watchedWeight;
+  ```
+- Atualizar label do campo para mostrar unidade selecionada
+
+**Regra no código:**
+```typescript
+// Antes de calcular
+const effectiveWeightKg = weightUnit === 'ton' 
+  ? (form.watch('weight') || 0) * 1000 
+  : (form.watch('weight') || 0);
+```
+
+### Tarefa 2: Atualizar FreightSimulator.tsx
+
+**Modificações:**
+- Adicionar toggle de unidade similar ao QuoteForm
+- Converter peso antes de enviar para Edge Function
+- Atualizar labels e exibição de resultados
+
+### Tarefa 3: Atualizar QuoteDetailModal.tsx
+
+**Modificações:**
+- Detectar se o peso salvo é > 1000 kg e sugerir exibição em toneladas
+- Formatar exibição: `{weight >= 1000 ? (weight/1000).toFixed(2) + ' t' : weight + ' kg'}`
+- Ou usar lógica inteligente baseada no valor
+
+### Tarefa 4: Atualizar Tipos e Breakdown
+
+**Modificações em `StoredPricingBreakdown.meta`:**
+```typescript
+meta: {
+  // ... campos existentes
+  inputWeightUnit?: 'kg' | 'ton';  // Para auditoria
+}
+```
+
+---
+
+## Regra de Conversão (Documentação no Código)
 
 ```typescript
-interface CalculateFreightResponse {
-  success: boolean;
-  status: 'OK' | 'OUT_OF_RANGE' | 'MISSING_DATA';
-  error?: string;
-  
-  meta: {
-    route_uf_label: string | null;
-    km_band_label: string | null;
-    km_status: 'OK' | 'OUT_OF_RANGE';
-    margin_status: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
-    margin_percent: number;
-    cubage_factor: number;
-    cubage_weight_kg: number;
-    billable_weight_kg: number;
-  };
-  
-  components: {
-    base_cost: number;
-    base_freight: number;
-    toll: number;
-    gris: number;
-    tso: number;
-    rctrc: number;
-    ad_valorem: number;
-    tde: number;
-    tear: number;
-    conditional_fees_total: number;
-    waiting_time_cost: number;
-  };
-  
-  rates: {
-    das_percent: number;
-    icms_percent: number;
-    gris_percent: number;
-    tso_percent: number;
-    cost_value_percent: number;
-    markup_percent: number;
-    overhead_percent: number;
-    tac_percent: number;
-    payment_adjustment_percent: number;
-  };
-  
-  totals: {
-    receita_bruta: number;
-    das: number;
-    icms: number;
-    tac_adjustment: number;
-    payment_adjustment: number;
-    total_impostos: number;
-    total_cliente: number;
-  };
-  
-  profitability: {
-    custos_carreteiro: number;
-    custos_descarga: number;
-    custos_diretos: number;
-    margem_bruta: number;
-    overhead: number;
-    resultado_liquido: number;
-    margem_percent: number;
-  };
-  
-  conditional_fees_breakdown: Record<string, number>;
-  fallbacks_applied: string[];
-  errors: string[];
-}
+/**
+ * REGRA DE PESO - Entrada Flexível
+ * 
+ * O campo de peso suporta entrada em kg ou toneladas (ton).
+ * A conversão para kg é feita no ponto de entrada:
+ * 
+ * - Se unidade = 'kg':  weightKg = valor digitado
+ * - Se unidade = 'ton': weightKg = valor digitado × 1000
+ * 
+ * O cálculo interno SEMPRE usa kg:
+ * - cubageWeight = volume × 300 (fator kg/m³)
+ * - billableWeight = max(weightKg, cubageWeight)
+ * - baseCost = (billableWeight / 1000) × cost_per_ton
+ * 
+ * Exemplo com cost_per_ton = R$ 117,94:
+ * - Input: 5 ton → 5000 kg → 5 × R$ 117,94 = R$ 589,70
+ * - Input: 5 kg  → 5 kg    → 0,005 × R$ 117,94 = R$ 0,59
+ */
 ```
 
 ---
 
-## 🧪 Teste Realizado
+## UI Proposta
 
-**Input:**
-```json
-{
-  "origin": "São Paulo - SP",
-  "destination": "Curitiba - PR",
-  "km_distance": 450,
-  "weight_kg": 1500,
-  "volume_m3": 8,
-  "cargo_value": 50000,
-  "toll_value": 150,
-  "tde_enabled": true
-}
+```
+┌─────────────────────────────────────────┐
+│ Peso                                    │
+│ ┌──────────────────┐  ┌─────┬─────┐    │
+│ │ 10               │  │ kg  │ ton │    │
+│ └──────────────────┘  └─────┴─────┘    │
+│                         ▲ Toggle ativo  │
+└─────────────────────────────────────────┘
 ```
 
-**Output (resumo):**
-- Route: SP→PR
-- Billable Weight: 2400 kg (peso cubado prevalece)
-- DAS: 14%, Markup: 30%, ICMS: 12%
-- Margem: 62.9% (ABOVE_TARGET)
-- Total Cliente: R$ 191,84
+Usando `ToggleGroup` do Radix já disponível no projeto.
 
 ---
 
-## 🚀 Próximos Passos Sugeridos
+## Arquivos a Modificar
 
-1. **Integrar no QuoteForm**: Usar Edge Function para cálculo oficial
-2. **Criar tabela ICMS SP→PR**: Atualmente usando fallback 12%
-3. **Importar tabela de preços**: Para ter base_cost correto
-4. **Adicionar carreteiro_percent**: Para cálculo de custos diretos
+| Arquivo | Ação |
+|---------|------|
+| `src/components/forms/QuoteForm.tsx` | Adicionar toggle kg/ton |
+| `src/components/pricing/FreightSimulator.tsx` | Adicionar toggle kg/ton |
+| `src/components/modals/QuoteDetailModal.tsx` | Formatação inteligente de peso |
+| `src/lib/freightCalculator.ts` | Documentar regra no JSDoc |
+
+---
+
+## Validações Adicionais
+
+1. **Valor máximo sensível**: Alertar se peso em ton > 30 (provavelmente erro)
+2. **Consistência com volume**: Alertar se peso real < peso cubado em > 50%
+3. **Heurística de auto-detecção** (opcional futuro):
+   - Se valor < 100 e modalidade = lotação → sugerir "ton"
+   - Se valor > 10.000 → assumir kg
+
+---
+
+## Critérios de Aceite
+
+1. Usuário pode alternar entre kg e ton no QuoteForm
+2. Digitando "10" com unidade "ton" resulta em peso faturável de 10.000 kg
+3. O breakdown mostra o peso em kg independente da unidade de entrada
+4. O QuoteDetailModal exibe o peso com formatação legível
+5. A Edge Function continua recebendo `weight_kg` (sempre em kg)
