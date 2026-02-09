@@ -70,8 +70,6 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
 
   const occurrences = order.occurrences || [];
   const hasOccurrences = occurrences.length > 0;
-  const hasCriticalDocs = !order.has_nfe || !order.has_cte;
-  const needsPod = order.stage === 'entregue' && !order.has_pod;
 
   // Documentos visíveis para o estágio atual
   const visibleDocuments: DocumentConfig[] = [...(STAGE_DOCUMENTS[order.stage] || [])];
@@ -86,16 +84,6 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
   const progressPercentage = totalDocs > 0 ? (completedDocs / totalDocs) * 100 : 0;
   const hasPendingDocs = visibleDocuments.some(doc => !order[doc.key as keyof Order]);
 
-  // Debug checkpoint
-  console.log('OrderCard Debug:', {
-    osNumber: order.os_number,
-    stage: order.stage,
-    totalDocs,
-    completedDocs,
-    progressPercentage,
-    hasPendingDocs,
-    documentsByGroup
-  });
 
   return (
     <motion.div
@@ -199,19 +187,12 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
       )}
 
       {/* Alerts */}
-      {(hasOccurrences || hasCriticalDocs || needsPod) && (
+      {hasOccurrences && (
         <div className="flex flex-wrap gap-1 mb-3">
-          {hasOccurrences && (
-            <Badge variant="secondary" className="text-xs bg-warning/10 text-warning-foreground gap-1">
-              <AlertTriangle className="w-3 h-3" />
-              {occurrences.length} ocorrência(s)
-            </Badge>
-          )}
-          {needsPod && (
-            <Badge variant="secondary" className="text-xs bg-destructive/10 text-destructive gap-1">
-              POD Pendente
-            </Badge>
-          )}
+          <Badge variant="secondary" className="text-xs bg-warning/10 text-warning-foreground gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            {occurrences.length} ocorrência(s)
+          </Badge>
         </div>
       )}
 
