@@ -16,7 +16,7 @@ import { KanbanColumn } from '@/components/boards/KanbanColumn';
 import { QuoteCard } from '@/components/boards/QuoteCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useQuotes, useUpdateQuoteStage } from '@/hooks/useQuotes';
+import { useQuotes, useUpdateQuoteStage, useCreateQuote, useDeleteQuote } from '@/hooks/useQuotes';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
@@ -24,6 +24,16 @@ import { toast } from 'sonner';
 import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
 import { QuoteDetailModal } from '@/components/modals/QuoteDetailModal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -42,11 +52,14 @@ export default function Commercial() {
   const { user } = useAuth();
   const { data: quotes, isLoading } = useQuotes();
   const updateStageMutation = useUpdateQuoteStage();
+  const createQuoteMutation = useCreateQuote();
+  const deleteQuoteMutation = useDeleteQuote();
   const [activeQuote, setActiveQuote] = useState<Quote | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null);
 
   // Enable realtime updates
   useRealtimeSubscription(['quotes']);
@@ -58,6 +71,74 @@ export default function Commercial() {
       },
     })
   );
+
+  const handleClone = async (quote: Quote) => {
+    if (!user) return;
+
+    try {
+      const cloned = {
+        client_id: quote.client_id,
+        client_name: quote.client_name,
+        client_email: quote.client_email,
+        freight_modality: quote.freight_modality,
+        origin: quote.origin,
+        destination: quote.destination,
+        cargo_type: quote.cargo_type,
+        weight: quote.weight,
+        volume: quote.volume,
+        cubage_weight: quote.cubage_weight,
+        billable_weight: quote.billable_weight,
+        price_table_id: quote.price_table_id,
+        vehicle_type_id: quote.vehicle_type_id,
+        payment_term_id: quote.payment_term_id,
+        km_distance: quote.km_distance,
+        toll_value: quote.toll_value,
+        cargo_value: quote.cargo_value,
+        value: quote.value,
+        pricing_breakdown: quote.pricing_breakdown,
+        notes: quote.notes,
+        tags: quote.tags,
+        validity_date: quote.validity_date,
+        waiting_time_cost: quote.waiting_time_cost,
+        assigned_to: quote.assigned_to,
+        tac_percent: quote.tac_percent,
+        conditional_fees_breakdown: quote.conditional_fees_breakdown,
+        stage: 'novo_pedido' as QuoteStage,
+        created_by: user.id,
+      };
+
+      await createQuoteMutation.mutateAsync(cloned as any);
+      toast.success('Cotação clonada com sucesso');
+    } catch {
+      toast.error('Erro ao clonar cotação');
+    }
+  };
+
+  const handleSendEmail = (quote: Quote) => {
+    const to = quote.client_email || (quote as { shipper_email?: string | null }).shipper_email;
+    if (!to) {
+      toast.error('Sem e-mail cadastrado para envio');
+      return;
+    }
+
+    const subject = `Proposta - ${quote.client_name}`;
+    const body = `Olá ${quote.client_name},\n\nSegue a proposta da cotação.\n\nOrigem: ${quote.origin}\nDestino: ${quote.destination}\nValor: ${Number(quote.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n\nObrigado!`;
+
+    window.location.href =
+      `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const confirmDelete = async () => {
+    if (!quoteToDelete) return;
+
+    try {
+      await deleteQuoteMutation.mutateAsync(quoteToDelete.id);
+      toast.success('Cotação excluída');
+      setQuoteToDelete(null);
+    } catch {
+      toast.error('Erro ao excluir cotação');
+    }
+  };
 
   const filteredQuotes = useMemo(() => {
     if (!quotes) return [];
@@ -232,10 +313,14 @@ export default function Commercial() {
                 items={quotesByStage[stage.id].map((q) => q.id)}
               >
                 {quotesByStage[stage.id].map((quote) => (
-                  <QuoteCard 
-                    key={quote.id} 
-                    quote={quote} 
+                  <QuoteCard
+                    key={quote.id}
+                    quote={quote}
                     onEdit={() => setSelectedQuote(quote)}
+                    onClone={() => handleClone(quote)}
+                    onDelete={() => setQuoteToDelete(quote)}
+                    onSendEmail={() => handleSendEmail(quote)}
+                    onConvert={() => setConvertingQuote(quote)}
                   />
                 ))}
               </KanbanColumn>
@@ -264,6 +349,26 @@ export default function Commercial() {
         onClose={() => setConvertingQuote(null)} 
         quote={convertingQuote}
       />
+
+      <AlertDialog open={!!quoteToDelete} onOpenChange={(open) => !open && setQuoteToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir cotação?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a cotação de <strong>{quoteToDelete?.client_name}</strong>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setQuoteToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
