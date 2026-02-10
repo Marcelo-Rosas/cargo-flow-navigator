@@ -205,7 +205,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   }, [
     watchedOrigin,
     watchedDestination,
-    watchedWeight, 
+    effectiveWeightKg, 
     watchedVolume, 
     watchedCargoValue, 
     watchedToll,
