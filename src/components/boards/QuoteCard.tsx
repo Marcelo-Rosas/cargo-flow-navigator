@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { GripVertical, MoreHorizontal, Mail, Copy, Calendar, MapPin, Building2, ArrowRightLeft, Route, AlertTriangle } from 'lucide-react';
+import { GripVertical, MoreHorizontal, Mail, Copy, Calendar, MapPin, Building2, ArrowRightLeft, Route, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,10 +20,13 @@ type Quote = Database['public']['Tables']['quotes']['Row'];
 interface QuoteCardProps {
   quote: Quote;
   onEdit?: () => void;
+  onClone?: () => void;
+  onDelete?: () => void;
+  onSendEmail?: () => void;
   onConvert?: () => void;
 }
 
-export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
+export function QuoteCard({ quote, onEdit, onClone, onDelete, onSendEmail, onConvert }: QuoteCardProps) {
   const {
     attributes,
     listeners,
@@ -64,7 +67,7 @@ export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
   const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
   const marginPercent = breakdown?.meta?.marginPercent;
   
-  // Show convert button only when stage === 'ganho'
+  const canEmail = quote.stage === 'enviado' || quote.stage === 'negociacao';
   const canConvert = quote.stage === 'ganho';
 
   return (
@@ -110,20 +113,47 @@ export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>
-              <Mail className="w-4 h-4 mr-2" /> Enviar Proposta
+            {/* Sempre: Editar */}
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit?.();
+              }}
+            >
+              <Pencil className="w-4 h-4 mr-2" /> Editar
             </DropdownMenuItem>
-            <DropdownMenuItem>
+
+            {/* Sempre: Clonar */}
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onClone?.();
+              }}
+            >
               <Copy className="w-4 h-4 mr-2" /> Clonar
             </DropdownMenuItem>
+
+            {/* Só: Enviado e Negociação */}
+            {canEmail && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSendEmail?.();
+                }}
+              >
+                <Mail className="w-4 h-4 mr-2" /> Enviar E-mail
+              </DropdownMenuItem>
+            )}
+
+            {/* Só: Ganho */}
             {canConvert && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
                     onConvert?.();
-                  }} 
+                  }}
                   className="text-success"
                 >
                   <ArrowRightLeft className="w-4 h-4 mr-2" />
@@ -131,6 +161,18 @@ export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
                 </DropdownMenuItem>
               </>
             )}
+
+            {/* Sempre: Delete */}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete?.();
+              }}
+              className="text-destructive"
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
