@@ -125,6 +125,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   // Loading states for CEP lookups
   const [isLoadingOriginCep, setIsLoadingOriginCep] = useState(false);
   const [isLoadingDestinationCep, setIsLoadingDestinationCep] = useState(false);
+  
+  // Weight unit toggle: kg or ton
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'ton'>('ton');
 
   const form = useForm<QuoteFormData>({
     resolver: zodResolver(quoteSchema),
