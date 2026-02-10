@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useCalculateFreight, type CalculateFreightResponse } from '@/hooks/useCalculateFreight';
 import { usePriceTables } from '@/hooks/usePriceTables';
 import { useVehicleTypes, usePaymentTerms, useConditionalFees } from '@/hooks/usePricingRules';
