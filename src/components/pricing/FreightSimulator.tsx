@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useCalculateFreight, type CalculateFreightResponse } from '@/hooks/useCalculateFreight';
 import { usePriceTables } from '@/hooks/usePriceTables';
 import { useVehicleTypes, usePaymentTerms, useConditionalFees } from '@/hooks/usePricingRules';
@@ -34,7 +35,8 @@ export function FreightSimulator() {
   // Form state
   const [origin, setOrigin] = useState('São Paulo - SP');
   const [destination, setDestination] = useState('Curitiba - PR');
-  const [weightKg, setWeightKg] = useState('1500');
+  const [weightValue, setWeightValue] = useState('10');
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'ton'>('ton');
   const [volumeM3, setVolumeM3] = useState('8');
   const [cargoValue, setCargoValue] = useState('50000');
   const [kmDistance, setKmDistance] = useState('450');
@@ -54,10 +56,12 @@ export function FreightSimulator() {
 
   const handleCalculate = async () => {
     try {
+      const rawWeight = parseFloat(weightValue) || 0;
+      const weightKgValue = weightUnit === 'ton' ? rawWeight * 1000 : rawWeight;
       const response = await calculateFreight.mutateAsync({
         origin,
         destination,
-        weight_kg: parseFloat(weightKg) || 0,
+        weight_kg: weightKgValue,
         volume_m3: parseFloat(volumeM3) || 0,
         cargo_value: parseFloat(cargoValue) || 0,
         km_distance: kmDistance ? parseFloat(kmDistance) : 0,
@@ -149,12 +153,24 @@ export function FreightSimulator() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Peso (kg)</Label>
-                <Input
-                  type="number"
-                  value={weightKg}
-                  onChange={(e) => setWeightKg(e.target.value)}
-                />
+                <Label>Peso ({weightUnit})</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={weightValue}
+                    onChange={(e) => setWeightValue(e.target.value)}
+                  />
+                  <ToggleGroup 
+                    type="single" 
+                    value={weightUnit} 
+                    onValueChange={(v) => v && setWeightUnit(v as 'kg' | 'ton')}
+                    size="sm"
+                    className="shrink-0"
+                  >
+                    <ToggleGroupItem value="kg" className="text-xs px-2">kg</ToggleGroupItem>
+                    <ToggleGroupItem value="ton" className="text-xs px-2">ton</ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Volume (m³)</Label>
@@ -380,7 +396,7 @@ export function FreightSimulator() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground">Real</p>
-                    <p className="font-medium">{parseFloat(weightKg).toLocaleString('pt-BR')} kg</p>
+                    <p className="font-medium">{((weightUnit === 'ton' ? parseFloat(weightValue) * 1000 : parseFloat(weightValue)) || 0).toLocaleString('pt-BR')} kg</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Cubado</p>

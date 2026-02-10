@@ -151,6 +151,7 @@ export interface StoredPricingBreakdown {
     kmStatus: 'OK' | 'OUT_OF_RANGE';
     marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
     marginPercent: number;
+    inputWeightUnit?: 'kg' | 'ton';
     // Optional fields for additional fees
     selectedConditionalFeeIds?: string[];
     waitingTimeEnabled?: boolean;

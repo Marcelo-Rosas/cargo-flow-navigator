@@ -43,6 +43,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MaskedInput } from '@/components/ui/masked-input';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useCreateQuote, useUpdateQuote, useDeleteQuote } from '@/hooks/useQuotes';
 import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
@@ -124,6 +125,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   // Loading states for CEP lookups
   const [isLoadingOriginCep, setIsLoadingOriginCep] = useState(false);
   const [isLoadingDestinationCep, setIsLoadingDestinationCep] = useState(false);
+  
+  // Weight unit toggle: kg or ton
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'ton'>('ton');
 
   const form = useForm<QuoteFormData>({
     resolver: zodResolver(quoteSchema),
@@ -178,12 +182,17 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: icmsRateData } = useIcmsRateForPricing(originUf || '', destUf || '');
   const icmsRate = icmsRateData?.rate_percent ?? 12;
 
+  // Normalize weight to kg based on selected unit
+  const effectiveWeightKg = weightUnit === 'ton' 
+    ? (watchedWeight || 0) * 1000 
+    : (watchedWeight || 0);
+
   // Calculate freight using the pure function
   const calculationResult = useMemo(() => {
     return calculateFreight({
       originCity: watchedOrigin || '',
       destinationCity: watchedDestination || '',
-      weightKg: watchedWeight || 0,
+      weightKg: effectiveWeightKg,
       volumeM3: watchedVolume || 0,
       cargoValue: watchedCargoValue || 0,
       tollValue: watchedToll || 0,
@@ -196,7 +205,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   }, [
     watchedOrigin,
     watchedDestination,
-    watchedWeight, 
+    effectiveWeightKg, 
     watchedVolume, 
     watchedCargoValue, 
     watchedToll,
@@ -370,7 +379,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       const pricingBreakdown = buildStoredBreakdown(calculationResult, {
         originCity: data.origin,
         destinationCity: data.destination,
-        weightKg: data.weight || 0,
+        weightKg: effectiveWeightKg,
         volumeM3: data.volume || 0,
         cargoValue: data.cargo_value || 0,
         tollValue: data.toll || 0,
@@ -395,7 +404,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         origin: data.origin,
         destination: data.destination,
         cargo_type: data.cargo_type || null,
-        weight: data.weight || null,
+        weight: effectiveWeightKg || null,
         volume: data.volume || null,
         cubage_weight: calculationResult.meta.cubageWeightKg || null,
         billable_weight: calculationResult.meta.billableWeightKg || null,
@@ -760,15 +769,27 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   name="weight"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Peso (kg)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="0"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        />
-                      </FormControl>
+                      <FormLabel>Peso ({weightUnit})</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            placeholder="0"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <ToggleGroup 
+                          type="single" 
+                          value={weightUnit} 
+                          onValueChange={(v) => v && setWeightUnit(v as 'kg' | 'ton')}
+                          size="sm"
+                          className="shrink-0"
+                        >
+                          <ToggleGroupItem value="kg" className="text-xs px-2">kg</ToggleGroupItem>
+                          <ToggleGroupItem value="ton" className="text-xs px-2">ton</ToggleGroupItem>
+                        </ToggleGroup>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}

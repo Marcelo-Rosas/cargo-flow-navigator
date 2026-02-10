@@ -406,7 +406,11 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                         <Scale className="w-4 h-4" />
                         <span className="text-xs">Peso</span>
                       </div>
-                      <p className="font-medium text-foreground text-sm">{Number(quote.weight).toLocaleString('pt-BR')} kg</p>
+                      <p className="font-medium text-foreground text-sm">
+                        {Number(quote.weight) >= 1000 
+                          ? `${(Number(quote.weight) / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} t` 
+                          : `${Number(quote.weight).toLocaleString('pt-BR')} kg`}
+                      </p>
                     </div>
                   )}
                   {quote.volume && (
