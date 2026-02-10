@@ -62,7 +62,18 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+You can deploy in two ways:
+
+1. **Lovable publish**: open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click **Share -> Publish**.
+2. **GitHub Pages (automatic)**: this repository now includes a workflow at `.github/workflows/deploy.yml` that builds and deploys the Vite app to GitHub Pages every time there is a push to the `main` or `work` branch.
+
+### Enable GitHub Pages deployment
+
+1. In GitHub, go to **Settings -> Pages**.
+2. In **Build and deployment**, set **Source** to **GitHub Actions**.
+3. Push changes to `main` or `work` (or run the workflow manually in **Actions -> Deploy to GitHub Pages**).
+
+The workflow builds with a repository-aware base path so assets load correctly from `https://<owner>.github.io/<repo>/`.
 
 ## Can I connect a custom domain to my Lovable project?
 
