@@ -379,7 +379,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       const pricingBreakdown = buildStoredBreakdown(calculationResult, {
         originCity: data.origin,
         destinationCity: data.destination,
-        weightKg: data.weight || 0,
+        weightKg: effectiveWeightKg,
         volumeM3: data.volume || 0,
         cargoValue: data.cargo_value || 0,
         tollValue: data.toll || 0,
