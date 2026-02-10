@@ -153,12 +153,24 @@ export function FreightSimulator() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Peso (kg)</Label>
-                <Input
-                  type="number"
-                  value={weightKg}
-                  onChange={(e) => setWeightKg(e.target.value)}
-                />
+                <Label>Peso ({weightUnit})</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={weightValue}
+                    onChange={(e) => setWeightValue(e.target.value)}
+                  />
+                  <ToggleGroup 
+                    type="single" 
+                    value={weightUnit} 
+                    onValueChange={(v) => v && setWeightUnit(v as 'kg' | 'ton')}
+                    size="sm"
+                    className="shrink-0"
+                  >
+                    <ToggleGroupItem value="kg" className="text-xs px-2">kg</ToggleGroupItem>
+                    <ToggleGroupItem value="ton" className="text-xs px-2">ton</ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Volume (m³)</Label>
