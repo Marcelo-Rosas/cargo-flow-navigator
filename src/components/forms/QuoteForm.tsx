@@ -182,12 +182,17 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: icmsRateData } = useIcmsRateForPricing(originUf || '', destUf || '');
   const icmsRate = icmsRateData?.rate_percent ?? 12;
 
+  // Normalize weight to kg based on selected unit
+  const effectiveWeightKg = weightUnit === 'ton' 
+    ? (watchedWeight || 0) * 1000 
+    : (watchedWeight || 0);
+
   // Calculate freight using the pure function
   const calculationResult = useMemo(() => {
     return calculateFreight({
       originCity: watchedOrigin || '',
       destinationCity: watchedDestination || '',
-      weightKg: watchedWeight || 0,
+      weightKg: effectiveWeightKg,
       volumeM3: watchedVolume || 0,
       cargoValue: watchedCargoValue || 0,
       tollValue: watchedToll || 0,
