@@ -404,7 +404,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         origin: data.origin,
         destination: data.destination,
         cargo_type: data.cargo_type || null,
-        weight: data.weight || null,
+        weight: effectiveWeightKg || null,
         volume: data.volume || null,
         cubage_weight: calculationResult.meta.cubageWeightKg || null,
         billable_weight: calculationResult.meta.billableWeightKg || null,
