@@ -35,7 +35,8 @@ export function FreightSimulator() {
   // Form state
   const [origin, setOrigin] = useState('São Paulo - SP');
   const [destination, setDestination] = useState('Curitiba - PR');
-  const [weightKg, setWeightKg] = useState('1500');
+  const [weightValue, setWeightValue] = useState('10');
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'ton'>('ton');
   const [volumeM3, setVolumeM3] = useState('8');
   const [cargoValue, setCargoValue] = useState('50000');
   const [kmDistance, setKmDistance] = useState('450');
