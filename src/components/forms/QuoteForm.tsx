@@ -769,15 +769,27 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   name="weight"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Peso (kg)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="0"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        />
-                      </FormControl>
+                      <FormLabel>Peso ({weightUnit})</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            placeholder="0"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <ToggleGroup 
+                          type="single" 
+                          value={weightUnit} 
+                          onValueChange={(v) => v && setWeightUnit(v as 'kg' | 'ton')}
+                          size="sm"
+                          className="shrink-0"
+                        >
+                          <ToggleGroupItem value="kg" className="text-xs px-2">kg</ToggleGroupItem>
+                          <ToggleGroupItem value="ton" className="text-xs px-2">ton</ToggleGroupItem>
+                        </ToggleGroup>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}

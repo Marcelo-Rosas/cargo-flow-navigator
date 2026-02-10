@@ -396,7 +396,7 @@ export function FreightSimulator() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground">Real</p>
-                    <p className="font-medium">{parseFloat(weightKg).toLocaleString('pt-BR')} kg</p>
+                    <p className="font-medium">{((weightUnit === 'ton' ? parseFloat(weightValue) * 1000 : parseFloat(weightValue)) || 0).toLocaleString('pt-BR')} kg</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Cubado</p>
