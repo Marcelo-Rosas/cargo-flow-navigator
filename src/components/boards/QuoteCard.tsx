@@ -67,7 +67,7 @@ export function QuoteCard({ quote, onEdit, onClone, onDelete, onSendEmail, onCon
   const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
   const marginPercent = breakdown?.meta?.marginPercent;
   
-  // Show convert button only when stage === 'ganho'
+  const canEmail = quote.stage === 'enviado' || quote.stage === 'negociacao';
   const canConvert = quote.stage === 'ganho';
 
   return (
