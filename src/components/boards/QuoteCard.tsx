@@ -113,20 +113,47 @@ export function QuoteCard({ quote, onEdit, onClone, onDelete, onSendEmail, onCon
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>
-              <Mail className="w-4 h-4 mr-2" /> Enviar Proposta
+            {/* Sempre: Editar */}
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit?.();
+              }}
+            >
+              <Pencil className="w-4 h-4 mr-2" /> Editar
             </DropdownMenuItem>
-            <DropdownMenuItem>
+
+            {/* Sempre: Clonar */}
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onClone?.();
+              }}
+            >
               <Copy className="w-4 h-4 mr-2" /> Clonar
             </DropdownMenuItem>
+
+            {/* Só: Enviado e Negociação */}
+            {canEmail && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSendEmail?.();
+                }}
+              >
+                <Mail className="w-4 h-4 mr-2" /> Enviar E-mail
+              </DropdownMenuItem>
+            )}
+
+            {/* Só: Ganho */}
             {canConvert && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
                     onConvert?.();
-                  }} 
+                  }}
                   className="text-success"
                 >
                   <ArrowRightLeft className="w-4 h-4 mr-2" />
@@ -134,6 +161,18 @@ export function QuoteCard({ quote, onEdit, onClone, onDelete, onSendEmail, onCon
                 </DropdownMenuItem>
               </>
             )}
+
+            {/* Sempre: Delete */}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete?.();
+              }}
+              className="text-destructive"
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
