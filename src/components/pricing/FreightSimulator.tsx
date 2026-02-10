@@ -56,10 +56,12 @@ export function FreightSimulator() {
 
   const handleCalculate = async () => {
     try {
+      const rawWeight = parseFloat(weightValue) || 0;
+      const weightKgValue = weightUnit === 'ton' ? rawWeight * 1000 : rawWeight;
       const response = await calculateFreight.mutateAsync({
         origin,
         destination,
-        weight_kg: parseFloat(weightKg) || 0,
+        weight_kg: weightKgValue,
         volume_m3: parseFloat(volumeM3) || 0,
         cargo_value: parseFloat(cargoValue) || 0,
         km_distance: kmDistance ? parseFloat(kmDistance) : 0,
