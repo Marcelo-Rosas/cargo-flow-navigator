@@ -20,10 +20,13 @@ type Quote = Database['public']['Tables']['quotes']['Row'];
 interface QuoteCardProps {
   quote: Quote;
   onEdit?: () => void;
+  onClone?: () => void;
+  onDelete?: () => void;
+  onSendEmail?: () => void;
   onConvert?: () => void;
 }
 
-export function QuoteCard({ quote, onEdit, onConvert }: QuoteCardProps) {
+export function QuoteCard({ quote, onEdit, onClone, onDelete, onSendEmail, onConvert }: QuoteCardProps) {
   const {
     attributes,
     listeners,
