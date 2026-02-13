@@ -332,33 +332,46 @@ export function FreightSimulator() {
                 <h4 className="font-medium text-sm text-muted-foreground">COMPONENTES</h4>
                 <div className="space-y-2">
                   <BreakdownRow label="Frete Base" value={result.breakdown.base_freight} />
+                  {result.breakdown.correction_factor !== 1 && (
+                    <BreakdownRow
+                      label={`Fator INCTF (×${result.breakdown.correction_factor})`}
+                      value={result.breakdown.base_freight_adjusted}
+                    />
+                  )}
+                  <BreakdownRow
+                    label={`TAC (${result.parameters_used.tac_percent}% — ${result.parameters_used.tac_steps} degrau${result.parameters_used.tac_steps !== 1 ? 's' : ''}, diesel ${result.parameters_used.diesel_variation_percent.toFixed(1)}%)`}
+                    value={result.breakdown.tac_adjustment}
+                  />
                   <BreakdownRow label="GRIS" value={result.breakdown.gris} />
                   <BreakdownRow label="Ad Valorem" value={result.breakdown.ad_valorem} />
                   <BreakdownRow label="Pedágio" value={result.breakdown.toll} />
-                  <BreakdownRow 
-                    label={`TAC (${result.parameters_used.tac_percent}%)`} 
-                    value={result.breakdown.tac_adjustment} 
-                  />
                   <BreakdownRow label="Estadia" value={result.breakdown.waiting_time} />
-                  
+
                   {/* Conditional Fees */}
                   {Object.entries(result.breakdown.conditional_fees).map(([code, value]) => (
                     <BreakdownRow key={code} label={code} value={value as number} />
                   ))}
-                  
-                  <BreakdownRow 
-                    label={`Prazo ${result.parameters_used.payment_term}`} 
-                    value={result.breakdown.payment_adjustment} 
-                  />
                 </div>
               </div>
 
               <Separator />
 
-              {/* ICMS & Total */}
+              {/* Subtotal, Payment, ICMS & Total */}
               <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">ICMS ({result.parameters_used.icms_rate}%)</span>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>{formatCurrency(result.breakdown.subtotal)}</span>
+                </div>
+                <BreakdownRow
+                  label={`Prazo ${result.parameters_used.payment_term}`}
+                  value={result.breakdown.payment_adjustment}
+                />
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Base ICMS (excl. pedágio)</span>
+                  <span>{formatCurrency(result.breakdown.icms_base)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">ICMS ({result.parameters_used.icms_rate}%)</span>
                   <span className="font-medium">{formatCurrency(result.breakdown.icms)}</span>
                 </div>
                 <Separator />
@@ -393,9 +406,12 @@ export function FreightSimulator() {
                 <p className="text-xs text-muted-foreground mb-2">Parâmetros utilizados:</p>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline">Cubagem: {result.parameters_used.cubage_factor} kg/m³</Badge>
+                  <Badge variant="outline">INCTF: {result.parameters_used.correction_factor_inctf}</Badge>
                   <Badge variant="outline">ICMS: {result.parameters_used.icms_rate}%</Badge>
-                  <Badge variant="outline">TAC: {result.parameters_used.tac_percent}%</Badge>
+                  <Badge variant="outline">TAC: {result.parameters_used.tac_percent}% ({result.parameters_used.tac_steps}×1,75%)</Badge>
+                  <Badge variant="outline">Diesel: {result.parameters_used.diesel_variation_percent.toFixed(1)}%</Badge>
                   <Badge variant="outline">Prazo: {result.parameters_used.payment_term}</Badge>
+                  <Badge variant="outline">Franquia: {result.parameters_used.waiting_free_hours}h</Badge>
                   {result.parameters_used.vehicle_type && (
                     <Badge variant="outline">Veículo: {result.parameters_used.vehicle_type}</Badge>
                   )}

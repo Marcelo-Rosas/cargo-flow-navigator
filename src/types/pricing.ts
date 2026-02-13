@@ -131,6 +131,7 @@ export interface CalculateFreightInput {
   payment_term_code?: string;
   conditional_fees?: string[];
   waiting_hours?: number;
+  is_return?: boolean;
 }
 
 export interface FreightBreakdown {
@@ -138,24 +139,31 @@ export interface FreightBreakdown {
   weight_cubed: number;
   weight_billable: number;
   base_freight: number;
+  correction_factor: number;
+  base_freight_adjusted: number;
+  tac_adjustment: number;
   gris: number;
   ad_valorem: number;
   toll: number;
-  tac_adjustment: number;
-  icms: number;
   waiting_time: number;
   conditional_fees: Record<string, number>;
-  payment_adjustment: number;
   subtotal: number;
+  payment_adjustment: number;
+  icms_base: number;
+  icms: number;
   total: number;
 }
 
 export interface ParametersUsed {
   cubage_factor: number;
+  correction_factor_inctf: number;
   icms_rate: number;
   tac_percent: number;
+  diesel_variation_percent: number;
+  tac_steps: number;
   payment_term: string;
   vehicle_type: string | null;
+  waiting_free_hours: number;
 }
 
 export interface CalculateFreightResponse {
@@ -200,6 +208,7 @@ export const CONDITIONAL_FEE_CODES = [
   'OFF_HOURS',
   'RETURN',
   'REDELIVERY',
+  'TPD',
 ] as const;
 
 export type ConditionalFeeCode = typeof CONDITIONAL_FEE_CODES[number];
