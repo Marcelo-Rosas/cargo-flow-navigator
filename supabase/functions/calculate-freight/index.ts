@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
     if (input.weight_kg === undefined || input.weight_kg < 0) errors.push('Campo "weight_kg" inválido');
     if (input.volume_m3 === undefined || input.volume_m3 < 0) errors.push('Campo "volume_m3" inválido');
     if (input.cargo_value === undefined || input.cargo_value < 0) errors.push('Campo "cargo_value" inválido');
+    if (input.weight_kg === 0 && input.volume_m3 === 0) errors.push('weight_kg e volume_m3 não podem ser ambos zero');
 
     if (errors.length > 0) {
       return new Response(
@@ -75,8 +76,11 @@ Deno.serve(async (req) => {
     const carreteiroPercent = input.carreteiro_percent ?? paramsMap.get('carreteiro_percent') ?? 0;
     const descargaValue = input.descarga_value ?? 0;
 
+    const correctionFactor = paramsMap.get('correction_factor_inctf') ?? 1.0;
+
     if (!paramsMap.has('das_percent')) fallbacksApplied.push(`das_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT}%`);
     if (!paramsMap.has('markup_percent')) fallbacksApplied.push(`markup_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT}%`);
+    if (!paramsMap.has('correction_factor_inctf')) fallbacksApplied.push('correction_factor_inctf: não encontrado, usando 1.0');
 
     // =====================================================
     // CALCULATE WEIGHTS
@@ -126,10 +130,11 @@ Deno.serve(async (req) => {
     }
 
     // =====================================================
-    // CALCULATE BASE FREIGHT (with MARKUP)
+    // CALCULATE BASE FREIGHT (with INCTF correction + MARKUP)
     // =====================================================
-    
-    const baseFreight = baseCost * (1 + markupPercent / 100);
+
+    const baseCostAdjusted = baseCost * correctionFactor;
+    const baseFreight = baseCostAdjusted * (1 + markupPercent / 100);
 
     // =====================================================
     // CALCULATE COMPONENTS ON CARGO VALUE
@@ -186,9 +191,9 @@ Deno.serve(async (req) => {
               break;
           }
 
-          // Apply min/max
-          if (fee.min_value && feeValue < Number(fee.min_value)) feeValue = Number(fee.min_value);
-          if (fee.max_value && feeValue > Number(fee.max_value)) feeValue = Number(fee.max_value);
+          // Apply min/max (use != null to avoid falsy-zero bug)
+          if (fee.min_value != null && feeValue < Number(fee.min_value)) feeValue = Number(fee.min_value);
+          if (fee.max_value != null && feeValue > Number(fee.max_value)) feeValue = Number(fee.max_value);
 
           conditionalFeesBreakdown[feeCode] = roundCurrency(feeValue);
           conditionalFeesTotal += feeValue;
@@ -237,21 +242,30 @@ Deno.serve(async (req) => {
       }
 
       if (waitingRule) {
-        const freeHours = Number(waitingRule.free_hours) || 6;
+        const freeHours = Number(waitingRule.free_hours) || 5; // NTC 2.3: 5h franquia
         const excessHours = Math.max(0, input.waiting_hours - freeHours);
-        
+
         if (excessHours > 0) {
-          const ratePerHour = Number(waitingRule.rate_per_hour) || 50;
-          waitingTimeCost = excessHours * ratePerHour;
-          
-          if (waitingRule.min_charge && waitingTimeCost < Number(waitingRule.min_charge)) {
+          const ratePerHour = Number(waitingRule.rate_per_hour) || 146.44; // NTC: Truck
+          const ratePerDay = waitingRule.rate_per_day != null ? Number(waitingRule.rate_per_day) : null;
+
+          // NTC: se excede 24h da franquia, cobrar diária inteira
+          if (ratePerDay && excessHours >= 24) {
+            const fullDays = Math.ceil(excessHours / 24);
+            waitingTimeCost = fullDays * ratePerDay;
+          } else {
+            waitingTimeCost = excessHours * ratePerHour;
+          }
+
+          if (waitingRule.min_charge != null && waitingTimeCost < Number(waitingRule.min_charge)) {
             waitingTimeCost = Number(waitingRule.min_charge);
           }
         }
       } else {
-        const excessHours = Math.max(0, input.waiting_hours - 6);
-        waitingTimeCost = excessHours * 50;
-        fallbacksApplied.push('waiting_time_rules: usando fallback 6h + R$50/h');
+        // NTC fallback: 5h franquia, R$146.44/h (Caminhão Truck)
+        const excessHours = Math.max(0, input.waiting_hours - 5);
+        waitingTimeCost = excessHours * 146.44;
+        fallbacksApplied.push('waiting_time_rules: usando fallback NTC 5h + R$146,44/h');
       }
     }
 
@@ -278,23 +292,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Validate ICMS rate to prevent invalid calculations
+    if (icmsPercent >= 100) {
+      fallbacksApplied.push(`icms_percent ${icmsPercent}% inválida (>= 100%), usando ${FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT}%`);
+      icmsPercent = FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT;
+    }
+
     // =====================================================
-    // GET TAC RATE (optional backend extension)
+    // GET TAC RATE — NTC 2.6: Temporal formula
+    // Para cada 5% de variação do diesel → 1,75% sobre frete peso
+    // Base: frete base (EXCLUI pedágio, GRIS, etc.)
     // =====================================================
-    
+
     let tacPercent = 0;
+    let dieselVariationPercent = 0;
+    let tacSteps = 0;
     const today = new Date().toISOString().split('T')[0];
 
     const { data: tacRate } = await supabase
       .from('tac_rates')
-      .select('adjustment_percent')
+      .select('variation_percent')
       .lte('reference_date', today)
       .order('reference_date', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (tacRate?.adjustment_percent !== undefined) {
-      tacPercent = Number(tacRate.adjustment_percent);
+    if (tacRate?.variation_percent != null) {
+      dieselVariationPercent = Number(tacRate.variation_percent);
+      if (dieselVariationPercent >= 5) {
+        tacSteps = Math.floor(dieselVariationPercent / 5);
+        tacPercent = tacSteps * 1.75;
+      }
     }
 
     // =====================================================
@@ -332,10 +360,10 @@ Deno.serve(async (req) => {
       waitingTimeCost;
 
     // =====================================================
-    // APPLY TAC ADJUSTMENT
+    // APPLY TAC ADJUSTMENT (NTC: only on base freight, not full receita)
     // =====================================================
-    
-    const tacAdjustment = receitaBruta * (tacPercent / 100);
+
+    const tacAdjustment = baseFreight * (tacPercent / 100);
     const receitaComTac = receitaBruta + tacAdjustment;
 
     // =====================================================
@@ -394,7 +422,7 @@ Deno.serve(async (req) => {
     };
 
     const components: FreightComponents = {
-      base_cost: roundCurrency(baseCost),
+      base_cost: roundCurrency(baseCostAdjusted),
       base_freight: roundCurrency(baseFreight),
       toll: roundCurrency(toll),
       gris: roundCurrency(gris),
