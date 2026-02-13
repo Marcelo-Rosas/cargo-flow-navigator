@@ -1,5 +1,6 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+/// <reference path="./deno.d.ts" />
+import { serve } from "std/server";
+import { createClient } from "supabase";
 
 const allowedOrigin = Deno.env.get('ALLOWED_ORIGIN') || '*';
 
@@ -273,7 +274,7 @@ serve(async (req) => {
     if (input.waiting_hours !== undefined && input.waiting_hours > 0) {
       // Try to find specific rule for vehicle type
       let waitingRule = null;
-      
+
       if (vehicleTypeId) {
         const { data } = await supabase
           .from('waiting_time_rules')
@@ -296,11 +297,11 @@ serve(async (req) => {
       if (waitingRule) {
         const freeHours = Number(waitingRule.free_hours) || FALLBACK.WAITING_FREE_HOURS;
         const excessHours = Math.max(0, input.waiting_hours - freeHours);
-        
+
         if (excessHours > 0) {
           const ratePerHour = Number(waitingRule.rate_per_hour) || FALLBACK.WAITING_RATE_PER_HOUR;
           waitingTimeCost = excessHours * ratePerHour;
-          
+
           // Apply minimum charge if configured
           if (waitingRule.min_charge && waitingTimeCost < Number(waitingRule.min_charge)) {
             waitingTimeCost = Number(waitingRule.min_charge);
@@ -329,7 +330,7 @@ serve(async (req) => {
 
       for (const feeCode of input.conditional_fees) {
         const fee = fees?.find(f => f.code === feeCode);
-        
+
         if (fee) {
           let feeValue = 0;
           const baseValue = fee.applies_to === 'cargo_value' ? input.cargo_value : baseFreight;
@@ -388,18 +389,18 @@ serve(async (req) => {
     // =====================================================
     // 9. CALCULATE TOTALS
     // =====================================================
-    
+
     // Subtotal before ICMS and payment adjustment
     const subtotalBeforeICMS = baseFreight + grisValue + adValoremValue + tollValue + waitingTimeCost + conditionalFeesTotal;
-    
+
     // Apply TAC adjustment
     const tacAdjustment = (subtotalBeforeICMS * tacPercent) / 100;
     const subtotalWithTAC = subtotalBeforeICMS + tacAdjustment;
-    
+
     // Apply payment term adjustment
     const paymentAdjustment = (subtotalWithTAC * paymentAdjustmentPercent) / 100;
     const subtotalWithPayment = subtotalWithTAC + paymentAdjustment;
-    
+
     // Calculate ICMS (grossing up: value / (1 - icms_rate/100))
     const icmsMultiplier = 1 / (1 - icmsRate / 100);
     const totalWithICMS = subtotalWithPayment * icmsMultiplier;
@@ -449,8 +450,8 @@ serve(async (req) => {
   } catch (error) {
     console.error('[calculate-freight] Error:', error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
+      JSON.stringify({
+        success: false,
         errors: [`Erro interno: ${error.message}`],
         breakdown: null,
         parameters_used: null,

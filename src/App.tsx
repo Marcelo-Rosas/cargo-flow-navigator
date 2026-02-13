@@ -14,6 +14,7 @@ const Operations = lazy(() => import("./pages/Operations"));
 const Documents = lazy(() => import("./pages/Documents"));
 const Clients = lazy(() => import("./pages/Clients"));
 const PriceTables = lazy(() => import("./pages/PriceTables"));
+const Shippers = lazy(() => import("./pages/Shippers"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/documentos" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
               <Route path="/clientes" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
               <Route path="/tabelas-preco" element={<ProtectedRoute><PriceTables /></ProtectedRoute>} />
+              <Route path="/embarcadores" element={<ProtectedRoute><Shippers /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

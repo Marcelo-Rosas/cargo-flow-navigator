@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       audit_logs: {
@@ -48,6 +73,51 @@ export type Database = {
         Relationships: []
       }
       clients: {
+        Row: {
+          address: string | null
+          city: string | null
+          cnpj: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          cnpj?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          cnpj?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shippers: {
         Row: {
           address: string | null
           city: string | null
@@ -209,107 +279,6 @@ export type Database = {
           },
         ]
       }
-      drivers: {
-        Row: {
-          active: boolean
-          address: string | null
-          birth_date: string | null
-          city: string | null
-          cnh: string | null
-          cnh_category: string | null
-          cnh_validity: string | null
-          cpf: string | null
-          created_at: string
-          created_by: string | null
-          email: string | null
-          father_name: string | null
-          has_accident_history: boolean
-          has_robbery_history: boolean
-          id: string
-          mother_name: string | null
-          name: string
-          notes: string | null
-          owner_id: string | null
-          phone: string | null
-          phone_secondary: string | null
-          rg: string | null
-          rg_emitter: string | null
-          state: string | null
-          transported_before: boolean
-          transported_details: string | null
-          updated_at: string
-          zip_code: string | null
-        }
-        Insert: {
-          active?: boolean
-          address?: string | null
-          birth_date?: string | null
-          city?: string | null
-          cnh?: string | null
-          cnh_category?: string | null
-          cnh_validity?: string | null
-          cpf?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          father_name?: string | null
-          has_accident_history?: boolean
-          has_robbery_history?: boolean
-          id?: string
-          mother_name?: string | null
-          name: string
-          notes?: string | null
-          owner_id?: string | null
-          phone?: string | null
-          phone_secondary?: string | null
-          rg?: string | null
-          rg_emitter?: string | null
-          state?: string | null
-          transported_before?: boolean
-          transported_details?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
-        Update: {
-          active?: boolean
-          address?: string | null
-          birth_date?: string | null
-          city?: string | null
-          cnh?: string | null
-          cnh_category?: string | null
-          cnh_validity?: string | null
-          cpf?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          father_name?: string | null
-          has_accident_history?: boolean
-          has_robbery_history?: boolean
-          id?: string
-          mother_name?: string | null
-          name?: string
-          notes?: string | null
-          owner_id?: string | null
-          phone?: string | null
-          phone_secondary?: string | null
-          rg?: string | null
-          rg_emitter?: string | null
-          state?: string | null
-          transported_before?: boolean
-          transported_details?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "drivers_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "owners"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       icms_rates: {
         Row: {
           created_at: string
@@ -398,11 +367,18 @@ export type Database = {
           created_at: string
           created_by: string
           destination: string
-          driver_id: string | null
           driver_name: string | null
           driver_phone: string | null
           eta: string | null
+          has_antt: boolean | null
+          has_antt_motorista: boolean | null
+          has_cnh: boolean | null
+          has_comp_residencia: boolean | null
+          has_crlv: boolean | null
           has_cte: boolean
+          has_gr: boolean | null
+          has_mdf: boolean | null
+          has_mdfe: boolean | null
           has_nfe: boolean
           has_pod: boolean
           id: string
@@ -411,7 +387,6 @@ export type Database = {
           os_number: string
           quote_id: string | null
           stage: Database["public"]["Enums"]["order_stage"]
-          ui_last_tab: string | null
           updated_at: string
           value: number
           vehicle_plate: string | null
@@ -425,11 +400,18 @@ export type Database = {
           created_at?: string
           created_by: string
           destination: string
-          driver_id?: string | null
           driver_name?: string | null
           driver_phone?: string | null
           eta?: string | null
+          has_antt?: boolean | null
+          has_antt_motorista?: boolean | null
+          has_cnh?: boolean | null
+          has_comp_residencia?: boolean | null
+          has_crlv?: boolean | null
           has_cte?: boolean
+          has_gr?: boolean | null
+          has_mdf?: boolean | null
+          has_mdfe?: boolean | null
           has_nfe?: boolean
           has_pod?: boolean
           id?: string
@@ -438,7 +420,6 @@ export type Database = {
           os_number: string
           quote_id?: string | null
           stage?: Database["public"]["Enums"]["order_stage"]
-          ui_last_tab?: string | null
           updated_at?: string
           value?: number
           vehicle_plate?: string | null
@@ -452,11 +433,18 @@ export type Database = {
           created_at?: string
           created_by?: string
           destination?: string
-          driver_id?: string | null
           driver_name?: string | null
           driver_phone?: string | null
           eta?: string | null
+          has_antt?: boolean | null
+          has_antt_motorista?: boolean | null
+          has_cnh?: boolean | null
+          has_comp_residencia?: boolean | null
+          has_crlv?: boolean | null
           has_cte?: boolean
+          has_gr?: boolean | null
+          has_mdf?: boolean | null
+          has_mdfe?: boolean | null
           has_nfe?: boolean
           has_pod?: boolean
           id?: string
@@ -465,7 +453,6 @@ export type Database = {
           os_number?: string
           quote_id?: string | null
           stage?: Database["public"]["Enums"]["order_stage"]
-          ui_last_tab?: string | null
           updated_at?: string
           value?: number
           vehicle_plate?: string | null
@@ -481,13 +468,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "orders_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "orders_quote_id_fkey"
             columns: ["quote_id"]
             isOneToOne: false
@@ -495,63 +475,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      owners: {
-        Row: {
-          active: boolean
-          address: string | null
-          city: string | null
-          cpf_cnpj: string | null
-          created_at: string
-          created_by: string | null
-          email: string | null
-          id: string
-          name: string
-          notes: string | null
-          phone: string | null
-          rg: string | null
-          rg_emitter: string | null
-          state: string | null
-          updated_at: string
-          zip_code: string | null
-        }
-        Insert: {
-          active?: boolean
-          address?: string | null
-          city?: string | null
-          cpf_cnpj?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          id?: string
-          name: string
-          notes?: string | null
-          phone?: string | null
-          rg?: string | null
-          rg_emitter?: string | null
-          state?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
-        Update: {
-          active?: boolean
-          address?: string | null
-          city?: string | null
-          cpf_cnpj?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          id?: string
-          name?: string
-          notes?: string | null
-          phone?: string | null
-          rg?: string | null
-          rg_emitter?: string | null
-          state?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
-        Relationships: []
       }
       payment_terms: {
         Row: {
@@ -727,6 +650,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          perfil: Database["public"]["Enums"]["user_profile"]
           phone: string | null
           updated_at: string
           user_id: string
@@ -737,6 +661,7 @@ export type Database = {
           email: string
           full_name: string
           id?: string
+          perfil?: Database["public"]["Enums"]["user_profile"]
           phone?: string | null
           updated_at?: string
           user_id: string
@@ -747,6 +672,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          perfil?: Database["public"]["Enums"]["user_profile"]
           phone?: string | null
           updated_at?: string
           user_id?: string
@@ -767,20 +693,14 @@ export type Database = {
           created_by: string
           cubage_weight: number | null
           destination: string
-          destination_cep: string | null
           freight_modality: string | null
-          freight_type: string
           id: string
           km_distance: number | null
           notes: string | null
           origin: string
-          origin_cep: string | null
           payment_term_id: string | null
           price_table_id: string | null
           pricing_breakdown: Json | null
-          shipper_email: string | null
-          shipper_id: string | null
-          shipper_name: string | null
           stage: Database["public"]["Enums"]["quote_stage"]
           tac_percent: number | null
           tags: string[] | null
@@ -806,20 +726,14 @@ export type Database = {
           created_by: string
           cubage_weight?: number | null
           destination: string
-          destination_cep?: string | null
           freight_modality?: string | null
-          freight_type?: string
           id?: string
           km_distance?: number | null
           notes?: string | null
           origin: string
-          origin_cep?: string | null
           payment_term_id?: string | null
           price_table_id?: string | null
           pricing_breakdown?: Json | null
-          shipper_email?: string | null
-          shipper_id?: string | null
-          shipper_name?: string | null
           stage?: Database["public"]["Enums"]["quote_stage"]
           tac_percent?: number | null
           tags?: string[] | null
@@ -845,20 +759,14 @@ export type Database = {
           created_by?: string
           cubage_weight?: number | null
           destination?: string
-          destination_cep?: string | null
           freight_modality?: string | null
-          freight_type?: string
           id?: string
           km_distance?: number | null
           notes?: string | null
           origin?: string
-          origin_cep?: string | null
           payment_term_id?: string | null
           price_table_id?: string | null
           pricing_breakdown?: Json | null
-          shipper_email?: string | null
-          shipper_id?: string | null
-          shipper_name?: string | null
           stage?: Database["public"]["Enums"]["quote_stage"]
           tac_percent?: number | null
           tags?: string[] | null
@@ -894,13 +802,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "quotes_shipper_id_fkey"
-            columns: ["shipper_id"]
-            isOneToOne: false
-            referencedRelation: "shippers"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "quotes_vehicle_type_id_fkey"
             columns: ["vehicle_type_id"]
             isOneToOne: false
@@ -908,51 +809,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      shippers: {
-        Row: {
-          address: string | null
-          city: string | null
-          cnpj: string | null
-          created_at: string
-          created_by: string | null
-          email: string | null
-          id: string
-          name: string
-          notes: string | null
-          phone: string | null
-          state: string | null
-          updated_at: string
-        }
-        Insert: {
-          address?: string | null
-          city?: string | null
-          cnpj?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          id?: string
-          name: string
-          notes?: string | null
-          phone?: string | null
-          state?: string | null
-          updated_at?: string
-        }
-        Update: {
-          address?: string | null
-          city?: string | null
-          cnpj?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          id?: string
-          name?: string
-          notes?: string | null
-          phone?: string | null
-          state?: string | null
-          updated_at?: string
-        }
-        Relationships: []
       }
       tac_rates: {
         Row: {
@@ -1052,80 +908,6 @@ export type Database = {
           },
         ]
       }
-      trailers: {
-        Row: {
-          active: boolean
-          brand: string | null
-          capacity_kg: number | null
-          chassis: string | null
-          city: string | null
-          color: string | null
-          created_at: string
-          created_by: string | null
-          driver_id: string | null
-          id: string
-          model: string | null
-          notes: string | null
-          plate: string
-          renavam: string | null
-          state: string | null
-          trailer_type: string | null
-          updated_at: string
-          year_manufacture: number | null
-          year_model: number | null
-        }
-        Insert: {
-          active?: boolean
-          brand?: string | null
-          capacity_kg?: number | null
-          chassis?: string | null
-          city?: string | null
-          color?: string | null
-          created_at?: string
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          model?: string | null
-          notes?: string | null
-          plate: string
-          renavam?: string | null
-          state?: string | null
-          trailer_type?: string | null
-          updated_at?: string
-          year_manufacture?: number | null
-          year_model?: number | null
-        }
-        Update: {
-          active?: boolean
-          brand?: string | null
-          capacity_kg?: number | null
-          chassis?: string | null
-          city?: string | null
-          color?: string | null
-          created_at?: string
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          model?: string | null
-          notes?: string | null
-          plate?: string
-          renavam?: string | null
-          state?: string | null
-          trailer_type?: string | null
-          updated_at?: string
-          year_manufacture?: number | null
-          year_model?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "trailers_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_roles: {
         Row: {
           created_at: string
@@ -1182,80 +964,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      vehicles: {
-        Row: {
-          active: boolean
-          brand: string | null
-          capacity_kg: number | null
-          chassis: string | null
-          city: string | null
-          color: string | null
-          created_at: string
-          created_by: string | null
-          driver_id: string | null
-          id: string
-          model: string | null
-          notes: string | null
-          plate: string
-          renavam: string | null
-          state: string | null
-          updated_at: string
-          vehicle_type: string | null
-          year_manufacture: number | null
-          year_model: number | null
-        }
-        Insert: {
-          active?: boolean
-          brand?: string | null
-          capacity_kg?: number | null
-          chassis?: string | null
-          city?: string | null
-          color?: string | null
-          created_at?: string
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          model?: string | null
-          notes?: string | null
-          plate: string
-          renavam?: string | null
-          state?: string | null
-          updated_at?: string
-          vehicle_type?: string | null
-          year_manufacture?: number | null
-          year_model?: number | null
-        }
-        Update: {
-          active?: boolean
-          brand?: string | null
-          capacity_kg?: number | null
-          chassis?: string | null
-          city?: string | null
-          color?: string | null
-          created_at?: string
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          model?: string | null
-          notes?: string | null
-          plate?: string
-          renavam?: string | null
-          state?: string | null
-          updated_at?: string
-          vehicle_type?: string | null
-          year_manufacture?: number | null
-          year_model?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vehicles_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       waiting_time_rules: {
         Row: {
@@ -1315,6 +1023,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_profile: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_profile"]
+      }
       generate_os_number: { Args: never; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
@@ -1334,10 +1046,27 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: never; Returns: boolean }
+      set_user_profile: {
+        Args: {
+          new_profile: Database["public"]["Enums"]["user_profile"]
+          target_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "comercial" | "operacao" | "fiscal" | "leitura"
-      document_type: "nfe" | "cte" | "pod" | "outros"
+      document_type:
+        | "nfe"
+        | "cte"
+        | "pod"
+        | "outros"
+        | "cnh"
+        | "crlv"
+        | "comp_residencia"
+        | "antt_motorista"
+        | "mdfe"
       occurrence_severity: "baixa" | "media" | "alta" | "critica"
       order_stage:
         | "ordem_criada"
@@ -1354,6 +1083,7 @@ export type Database = {
         | "negociacao"
         | "ganho"
         | "perdido"
+      user_profile: "admin" | "operacional" | "financeiro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1479,10 +1209,23 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "comercial", "operacao", "fiscal", "leitura"],
-      document_type: ["nfe", "cte", "pod", "outros"],
+      document_type: [
+        "nfe",
+        "cte",
+        "pod",
+        "outros",
+        "cnh",
+        "crlv",
+        "comp_residencia",
+        "antt_motorista",
+        "mdfe",
+      ],
       occurrence_severity: ["baixa", "media", "alta", "critica"],
       order_stage: [
         "ordem_criada",
@@ -1501,6 +1244,7 @@ export const Constants = {
         "ganho",
         "perdido",
       ],
+      user_profile: ["admin", "operacional", "financeiro"],
     },
   },
 } as const

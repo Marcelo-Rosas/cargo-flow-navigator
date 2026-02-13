@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const allowedOrigin = Deno.env.get('ALLOWED_ORIGIN') || '*';
 
@@ -55,7 +55,7 @@ function validatePercentage(value: number | null | undefined, fieldName: string)
 
 function validateRow(row: PriceTableRowInput, index: number): string[] {
   const errors: string[] = [];
-  
+
   if (row.km_from === undefined || row.km_from === null) {
     errors.push(`Linha ${index + 1}: km_from é obrigatório`);
   }
@@ -68,7 +68,7 @@ function validateRow(row: PriceTableRowInput, index: number): string[] {
   if (row.km_from !== undefined && row.km_from < 0) {
     errors.push(`Linha ${index + 1}: km_from deve ser >= 0`);
   }
-  
+
   // Validate percentages
   const percentFields = [
     { value: row.cost_value_percent, name: 'cost_value_percent' },
@@ -77,14 +77,14 @@ function validateRow(row: PriceTableRowInput, index: number): string[] {
     { value: row.toll_percent, name: 'toll_percent' },
     { value: row.ad_valorem_percent, name: 'ad_valorem_percent' },
   ];
-  
+
   for (const field of percentFields) {
     const error = validatePercentage(field.value, field.name);
     if (error) {
       errors.push(`Linha ${index + 1}: ${error}`);
     }
   }
-  
+
   return errors;
 }
 
@@ -95,9 +95,9 @@ interface RangeWithIndex {
 }
 
 // Deduplicates rows by km_from-km_to key using "last-wins" strategy
-function deduplicateRows(rows: PriceTableRowInput[]): { 
-  uniqueRows: PriceTableRowInput[]; 
-  duplicatesRemoved: number 
+function deduplicateRows(rows: PriceTableRowInput[]): {
+  uniqueRows: PriceTableRowInput[];
+  duplicatesRemoved: number
 } {
   const map = new Map<string, PriceTableRowInput>();
   for (const row of rows) {
@@ -113,7 +113,7 @@ function deduplicateRows(rows: PriceTableRowInput[]): {
 
 function detectOverlappingRanges(rows: PriceTableRowInput[]): string[] {
   const errors: string[] = [];
-  
+
   // Filter valid rows and add original index
   const validRanges: RangeWithIndex[] = rows
     .map((row, index) => ({
@@ -122,20 +122,20 @@ function detectOverlappingRanges(rows: PriceTableRowInput[]): string[] {
       index: index + 1 // 1-indexed for user display
     }))
     .filter(r => r.km_from !== undefined && r.km_to !== undefined && r.km_to >= r.km_from);
-  
+
   if (validRanges.length < 2) return errors;
-  
+
   // Sort by km_from, then by km_to
   validRanges.sort((a, b) => {
     if (a.km_from !== b.km_from) return a.km_from - b.km_from;
     return a.km_to - b.km_to;
   });
-  
+
   // Check for overlaps (after deduplication check, so we only look at distinct ranges)
   // Two ranges overlap if: prev.km_to >= next.km_from (for inclusive ranges)
   // But we want gaps, so valid means: next.km_from > prev.km_to (no overlap)
   // Overlap exists when: next.km_from <= prev.km_to
-  
+
   // First deduplicate for overlap check (same range is a duplicate, not overlap)
   const uniqueRanges: RangeWithIndex[] = [];
   const seenKeys = new Set<string>();
@@ -146,17 +146,17 @@ function detectOverlappingRanges(rows: PriceTableRowInput[]): string[] {
       uniqueRanges.push(range);
     }
   }
-  
+
   for (let i = 1; i < uniqueRanges.length; i++) {
     const prev = uniqueRanges[i - 1];
     const curr = uniqueRanges[i];
-    
+
     // Overlap if current starts before or at previous end
     if (curr.km_from <= prev.km_to) {
       errors.push(`Faixas sobrepostas: ${prev.km_from}-${prev.km_to} (linha ${prev.index}) e ${curr.km_from}-${curr.km_to} (linha ${curr.index})`);
     }
   }
-  
+
   return errors;
 }
 
@@ -174,12 +174,12 @@ serve(async (req) => {
     if (!authHeader) {
       console.error('[import-price-table] Missing Authorization header');
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          rowsTotal: 0, 
-          rowsInserted: 0, 
-          rowsUpdated: 0, 
-          errors: ['Não autorizado: token ausente'] 
+        JSON.stringify({
+          success: false,
+          rowsTotal: 0,
+          rowsInserted: 0,
+          rowsUpdated: 0,
+          errors: ['Não autorizado: token ausente']
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -188,7 +188,7 @@ serve(async (req) => {
     // Create Supabase client with user's JWT (respects RLS)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    
+
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: { Authorization: authHeader }
@@ -200,12 +200,12 @@ serve(async (req) => {
     if (authError || !user) {
       console.error('[import-price-table] Auth error:', authError?.message);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          rowsTotal: 0, 
-          rowsInserted: 0, 
-          rowsUpdated: 0, 
-          errors: ['Não autorizado: usuário inválido'] 
+        JSON.stringify({
+          success: false,
+          rowsTotal: 0,
+          rowsInserted: 0,
+          rowsUpdated: 0,
+          errors: ['Não autorizado: usuário inválido']
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -257,12 +257,12 @@ serve(async (req) => {
     if (errors.length > 0) {
       console.error('[import-price-table] Basic validation errors:', errors);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          rowsTotal: rows?.length || 0, 
-          rowsInserted: 0, 
-          rowsUpdated: 0, 
-          errors 
+        JSON.stringify({
+          success: false,
+          rowsTotal: rows?.length || 0,
+          rowsInserted: 0,
+          rowsUpdated: 0,
+          errors
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -270,25 +270,25 @@ serve(async (req) => {
 
     // DEDUPLICATION: Remove duplicates using "last-wins" strategy
     const { uniqueRows, duplicatesRemoved } = deduplicateRows(rows);
-    
+
     if (duplicatesRemoved > 0) {
       console.log(`[import-price-table] Deduplicação: ${duplicatesRemoved} linhas duplicadas removidas (last-wins)`);
     }
 
     // OVERLAP VALIDATION: Check for overlapping ranges AFTER deduplication
     const overlapErrors = detectOverlappingRanges(uniqueRows);
-    
+
     console.log(`[import-price-table] Validação global: ${rows.length} linhas originais, ${uniqueRows.length} após deduplicação, ${overlapErrors.length} sobreposições`);
-    
+
     if (overlapErrors.length > 0) {
       console.error('[import-price-table] Faixas sobrepostas detectadas:', overlapErrors);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           rowsTotal: rows.length,
           duplicatesRemoved,
-          rowsInserted: 0, 
-          rowsUpdated: 0, 
+          rowsInserted: 0,
+          rowsUpdated: 0,
           errors: overlapErrors
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -302,10 +302,10 @@ serve(async (req) => {
 
     // Step 1: Create or update price_table
     const isNewTable = !priceTable.id || priceTable.id === 'new';
-    
+
     if (isNewTable) {
       console.log('[import-price-table] Creating new price table');
-      
+
       const { data: newTable, error: insertError } = await supabase
         .from('price_tables')
         .insert({
@@ -322,13 +322,13 @@ serve(async (req) => {
       if (insertError) {
         console.error('[import-price-table] Error creating price table:', insertError);
         return new Response(
-          JSON.stringify({ 
-            success: false, 
+          JSON.stringify({
+            success: false,
             rowsTotal,
             duplicatesRemoved,
-            rowsInserted: 0, 
-            rowsUpdated: 0, 
-            errors: [`Erro ao criar tabela de preço: ${insertError.message}`] 
+            rowsInserted: 0,
+            rowsUpdated: 0,
+            errors: [`Erro ao criar tabela de preço: ${insertError.message}`]
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -354,13 +354,13 @@ serve(async (req) => {
       if (updateError) {
         console.error('[import-price-table] Error updating price table:', updateError);
         return new Response(
-          JSON.stringify({ 
-            success: false, 
+          JSON.stringify({
+            success: false,
             rowsTotal,
             duplicatesRemoved,
-            rowsInserted: 0, 
-            rowsUpdated: 0, 
-            errors: [`Erro ao atualizar tabela de preço: ${updateError.message}`] 
+            rowsInserted: 0,
+            rowsUpdated: 0,
+            errors: [`Erro ao atualizar tabela de preço: ${updateError.message}`]
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -370,7 +370,7 @@ serve(async (req) => {
     // Step 2: Handle active flag (deactivate others first)
     if (priceTable.active === true) {
       console.log('[import-price-table] Setting table as active, deactivating others');
-      
+
       // Deactivate other tables with same modality
       const { error: deactivateError } = await supabase
         .from('price_tables')
@@ -392,14 +392,14 @@ serve(async (req) => {
       if (activateError) {
         console.error('[import-price-table] Error activating table:', activateError);
         return new Response(
-          JSON.stringify({ 
-            success: false, 
+          JSON.stringify({
+            success: false,
             priceTableId,
             rowsTotal,
             duplicatesRemoved,
-            rowsInserted: 0, 
-            rowsUpdated: 0, 
-            errors: [`Erro ao ativar tabela: ${activateError.message}`] 
+            rowsInserted: 0,
+            rowsUpdated: 0,
+            errors: [`Erro ao ativar tabela: ${activateError.message}`]
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -409,7 +409,7 @@ serve(async (req) => {
     // Step 3: Handle rows based on importMode
     if (importMode === 'replace') {
       console.log('[import-price-table] Replace mode: deleting existing rows');
-      
+
       // Delete all existing rows for this table
       const { error: deleteError } = await supabase
         .from('price_table_rows')
@@ -419,14 +419,14 @@ serve(async (req) => {
       if (deleteError) {
         console.error('[import-price-table] Error deleting existing rows:', deleteError);
         return new Response(
-          JSON.stringify({ 
-            success: false, 
+          JSON.stringify({
+            success: false,
             priceTableId,
             rowsTotal,
             duplicatesRemoved,
-            rowsInserted: 0, 
-            rowsUpdated: 0, 
-            errors: [`Erro ao remover linhas existentes: ${deleteError.message}`] 
+            rowsInserted: 0,
+            rowsUpdated: 0,
+            errors: [`Erro ao remover linhas existentes: ${deleteError.message}`]
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -453,14 +453,14 @@ serve(async (req) => {
       if (insertRowsError) {
         console.error('[import-price-table] Error inserting rows:', insertRowsError);
         return new Response(
-          JSON.stringify({ 
-            success: false, 
+          JSON.stringify({
+            success: false,
             priceTableId,
             rowsTotal,
             duplicatesRemoved,
-            rowsInserted: 0, 
-            rowsUpdated: 0, 
-            errors: [`Erro ao inserir linhas: ${insertRowsError.message}`] 
+            rowsInserted: 0,
+            rowsUpdated: 0,
+            errors: [`Erro ao inserir linhas: ${insertRowsError.message}`]
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -491,16 +491,16 @@ serve(async (req) => {
       );
 
       // Count how many incoming rows match existing keys (using deduplicated rows)
-      const matchingKeys = uniqueRows.filter(r => 
+      const matchingKeys = uniqueRows.filter(r =>
         existingKeys.has(`${r.km_from}-${r.km_to}`)
       ).length;
 
       rowsUpdated = matchingKeys;
       rowsInserted = uniqueRows.length - matchingKeys;
 
-      console.log('[import-price-table] Upsert counts:', { 
-        rowsUpdated, 
-        rowsInserted, 
+      console.log('[import-price-table] Upsert counts:', {
+        rowsUpdated,
+        rowsInserted,
         existingCount: existingKeys.size,
         originalRows: rows.length,
         uniqueRows: uniqueRows.length,
@@ -531,14 +531,14 @@ serve(async (req) => {
       if (upsertError) {
         console.error('[import-price-table] Error upserting rows:', upsertError);
         return new Response(
-          JSON.stringify({ 
-            success: false, 
+          JSON.stringify({
+            success: false,
             priceTableId,
             rowsTotal,
             duplicatesRemoved,
-            rowsInserted: 0, 
-            rowsUpdated: 0, 
-            errors: [`Erro ao inserir/atualizar linhas: ${upsertError.message}`] 
+            rowsInserted: 0,
+            rowsUpdated: 0,
+            errors: [`Erro ao inserir/atualizar linhas: ${upsertError.message}`]
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -567,12 +567,12 @@ serve(async (req) => {
   } catch (error) {
     console.error('[import-price-table] Unexpected error:', error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        rowsTotal: 0, 
-        rowsInserted: 0, 
-        rowsUpdated: 0, 
-        errors: [`Erro inesperado: ${error.message}`] 
+      JSON.stringify({
+        success: false,
+        rowsTotal: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        errors: [`Erro inesperado: ${error.message}`]
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

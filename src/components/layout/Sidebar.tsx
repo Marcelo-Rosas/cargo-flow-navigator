@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  TrendingUp, 
-  Truck, 
-  FileText, 
-  BarChart3, 
-  Users, 
-  Settings, 
-  Plug, 
+import {
+  LayoutDashboard,
+  TrendingUp,
+  Truck,
+  FileText,
+  BarChart3,
+  Users,
+  Ship,
+  Settings,
+  Plug,
   HelpCircle,
   ChevronLeft,
   ChevronRight,
@@ -27,6 +28,7 @@ const navItems = [
   { path: '/documentos', icon: FileText, label: 'Documentos' },
   { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
   { path: '/clientes', icon: Users, label: 'Clientes' },
+  { path: '/embarcadores', icon: Ship, label: 'Embarcadores' },
   { path: '/tabelas-preco', icon: Package, label: 'Tabelas de Preço' },
 ];
 
