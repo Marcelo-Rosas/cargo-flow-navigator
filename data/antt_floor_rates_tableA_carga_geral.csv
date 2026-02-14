@@ -1,0 +1,8 @@
+operation_table,cargo_type,axes_count,ccd,cc,valid_from,valid_until
+A,carga_geral,2,3.6815,436.39,,
+A,carga_geral,3,4.7062,523.33,,
+A,carga_geral,4,5.3386,568.72,,
+A,carga_geral,5,6.1604,635.08,,
+A,carga_geral,6,6.7774,648.95,,
+A,carga_geral,7,7.4902,803.22,,
+A,carga_geral,9,8.5104,872.44,,

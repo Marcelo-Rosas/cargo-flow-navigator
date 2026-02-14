@@ -1,0 +1,65 @@
+[
+  {
+    "operation_table": "A",
+    "cargo_type": "carga_geral",
+    "axes_count": 2,
+    "ccd": 3.6815,
+    "cc": 436.39,
+    "valid_from": null,
+    "valid_until": null
+  },
+  {
+    "operation_table": "A",
+    "cargo_type": "carga_geral",
+    "axes_count": 3,
+    "ccd": 4.7062,
+    "cc": 523.33,
+    "valid_from": null,
+    "valid_until": null
+  },
+  {
+    "operation_table": "A",
+    "cargo_type": "carga_geral",
+    "axes_count": 4,
+    "ccd": 5.3386,
+    "cc": 568.72,
+    "valid_from": null,
+    "valid_until": null
+  },
+  {
+    "operation_table": "A",
+    "cargo_type": "carga_geral",
+    "axes_count": 5,
+    "ccd": 6.1604,
+    "cc": 635.08,
+    "valid_from": null,
+    "valid_until": null
+  },
+  {
+    "operation_table": "A",
+    "cargo_type": "carga_geral",
+    "axes_count": 6,
+    "ccd": 6.7774,
+    "cc": 648.95,
+    "valid_from": null,
+    "valid_until": null
+  },
+  {
+    "operation_table": "A",
+    "cargo_type": "carga_geral",
+    "axes_count": 7,
+    "ccd": 7.4902,
+    "cc": 803.22,
+    "valid_from": null,
+    "valid_until": null
+  },
+  {
+    "operation_table": "A",
+    "cargo_type": "carga_geral",
+    "axes_count": 9,
+    "ccd": 8.5104,
+    "cc": 872.44,
+    "valid_from": null,
+    "valid_until": null
+  }
+]
