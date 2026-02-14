@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
     
     const originUf = extractUf(input.origin);
     const destUf = extractUf(input.destination);
-    let icmsPercent = FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT;
+    let icmsPercent: number = FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT;
 
     if (originUf && destUf) {
       const { data: icmsRow } = await supabase
