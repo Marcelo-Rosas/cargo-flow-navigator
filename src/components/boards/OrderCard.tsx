@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
-import { STAGE_DOCUMENTS, DocumentConfig, groupDocumentsByCategory } from '@/lib/order-documents';
+import { DocumentConfig, getNextStage, getNextStageRequirements, groupDocumentsByCategory } from '@/lib/order-documents';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -71,18 +71,19 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
   const occurrences = order.occurrences || [];
   const hasOccurrences = occurrences.length > 0;
 
-  // Documentos visíveis para o estágio atual
-  const visibleDocuments: DocumentConfig[] = [...(STAGE_DOCUMENTS[order.stage] || [])];
-  const hasDocumentsToShow = visibleDocuments.length > 0;
+  // Requisitos para avançar para a próxima fase (gates por estágio)
+  const nextStage = getNextStage(order.stage);
+  const requirements: DocumentConfig[] = [...getNextStageRequirements(order.stage)];
+  const hasDocumentsToShow = requirements.length > 0;
 
-  // Agrupa documentos por categoria
-  const documentsByGroup = groupDocumentsByCategory(visibleDocuments);
+  // Agrupa requisitos por categoria
+  const documentsByGroup = groupDocumentsByCategory(requirements);
 
-  // Calcula progresso
-  const totalDocs = visibleDocuments.length;
-  const completedDocs = visibleDocuments.filter(doc => order[doc.key as keyof Order]).length;
+  // Calcula progresso (somente requisitos do próximo estágio)
+  const totalDocs = requirements.length;
+  const completedDocs = requirements.filter(doc => order[doc.key as keyof Order]).length;
   const progressPercentage = totalDocs > 0 ? (completedDocs / totalDocs) * 100 : 0;
-  const hasPendingDocs = visibleDocuments.some(doc => !order[doc.key as keyof Order]);
+  const hasPendingDocs = requirements.some(doc => !order[doc.key as keyof Order]);
 
 
   return (
@@ -114,8 +115,30 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
             <GripVertical className="w-4 h-4 text-muted-foreground" />
           </button>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-semibold text-foreground">{order.os_number}</h4>
+
+              {/* Badge de gate: obrigatoriedades para avançar para a próxima fase (por estágio) */}
+              {hasDocumentsToShow && hasPendingDocs && nextStage && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[10px] px-2 py-0.5",
+                    order.stage === 'em_transito'
+                      ? "border-amber-500/40 text-amber-700 bg-amber-500/10"
+                      : "border-amber-500/40 text-amber-700 bg-amber-500/10"
+                  )}
+                >
+                  {order.stage === 'em_transito'
+                    ? 'POD obrigatório para finalizar'
+                    : order.stage === 'busca_motorista'
+                      ? `Docs do motorista pendentes (${completedDocs}/${totalDocs})`
+                      : order.stage === 'documentacao'
+                        ? `Docs fiscais pendentes (${completedDocs}/${totalDocs})`
+                        : `Pendências para avançar (${completedDocs}/${totalDocs})`}
+                </Badge>
+              )}
+
               {hasDocumentsToShow && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <FileText className="w-3 h-3" />
@@ -136,6 +159,7 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
               size="icon" 
               className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => e.stopPropagation()}
+              aria-label="Ações da ordem de serviço"
             >
               <MoreHorizontal className="w-4 h-4" />
             </Button>

@@ -87,7 +87,7 @@ const formatFileSize = (bytes: number | null) => {
 
 export default function Documents() {
   const { user } = useAuth();
-  const { data: documents, isLoading } = useDocuments();
+  const { data: documents, isLoading, isError, error, refetch } = useDocuments();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [isDragging, setIsDragging] = useState(false);
@@ -156,6 +156,16 @@ export default function Documents() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+      ) : isError ? (
+        <div className="bg-card rounded-xl border border-border shadow-card p-8">
+          <p className="text-foreground font-medium">Não foi possível carregar os documentos</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {(error instanceof Error && error.message) || 'Erro inesperado ao buscar documentos.'}
+          </p>
+          <div className="mt-4">
+            <Button onClick={() => refetch()}>Tentar novamente</Button>
+          </div>
+        </div>
       ) : filteredDocuments.length === 0 ? (
         <div className="bg-card rounded-xl border border-border shadow-card p-8 text-center">
           <FileText className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
@@ -195,10 +205,10 @@ export default function Documents() {
                       <td className="px-4 py-3 text-muted-foreground">{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(doc.created_at))}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-8 w-8"><Eye className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8"><Download className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Visualizar documento"><Eye className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Baixar documento"><Download className="w-4 h-4" /></Button>
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="w-4 h-4" /></Button></DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Mais ações"><MoreHorizontal className="w-4 h-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem>Anexar a OS</DropdownMenuItem>
                               <DropdownMenuItem>Validar Chave</DropdownMenuItem>

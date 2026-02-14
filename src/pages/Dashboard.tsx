@@ -61,10 +61,10 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: recentOrders, isLoading: ordersLoading } = useRecentOrders(5);
-  const { data: conversionData } = useConversionChartData();
-  const { data: revenueData } = useRevenueByClientData();
+  const { data: stats, isLoading: statsLoading, isError: statsIsError, error: statsError, refetch: refetchStats } = useDashboardStats();
+  const { data: recentOrders, isLoading: ordersLoading, isError: ordersIsError, error: ordersError, refetch: refetchOrders } = useRecentOrders(5);
+  const { data: conversionData, isError: conversionIsError, error: conversionError, refetch: refetchConversion } = useConversionChartData();
+  const { data: revenueData, isError: revenueIsError, error: revenueError, refetch: refetchRevenue } = useRevenueByClientData();
 
   // Enable realtime updates
   useRealtimeSubscription(['quotes', 'orders', 'occurrences']);
@@ -83,6 +83,37 @@ export default function Dashboard() {
     queryClient.invalidateQueries({ queryKey: ['quote-stage-distribution'] });
     queryClient.invalidateQueries({ queryKey: ['order-stage-distribution'] });
   };
+
+  const hasError = statsIsError || ordersIsError || conversionIsError || revenueIsError;
+  const firstError = (statsError || ordersError || conversionError || revenueError) as unknown;
+
+  if (hasError) {
+    return (
+      <MainLayout>
+        <div className="bg-card rounded-xl border border-border shadow-card p-6">
+          <h2 className="text-lg font-semibold text-foreground">Não foi possível carregar o dashboard</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {(firstError instanceof Error && firstError.message) || 'Erro inesperado ao buscar dados.'}
+          </p>
+          <div className="flex items-center gap-2 mt-4">
+            <Button
+              onClick={() => {
+                refetchStats();
+                refetchOrders();
+                refetchConversion();
+                refetchRevenue();
+              }}
+            >
+              Tentar novamente
+            </Button>
+            <Button variant="outline" onClick={handleRefresh}>
+              Recarregar
+            </Button>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   if (!user) {
     return (
@@ -124,7 +155,7 @@ export default function Dashboard() {
           transition={{ delay: 0.2 }}
           className="flex items-center gap-3"
         >
-          <Button variant="outline" size="icon" onClick={handleRefresh}>
+          <Button variant="outline" size="icon" onClick={handleRefresh} aria-label="Atualizar dashboard">
             <RefreshCw className="w-4 h-4" />
           </Button>
           <ExportReports />

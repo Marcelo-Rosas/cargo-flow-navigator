@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { ArrowRight, Truck, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';

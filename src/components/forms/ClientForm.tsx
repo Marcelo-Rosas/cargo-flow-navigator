@@ -35,6 +35,7 @@ const clientSchema = z.object({
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().max(2, 'Use a sigla do estado (ex: SP)').optional(),
+  zip_code: z.string().optional(),
   notes: z.string().max(500, 'Observações muito longas').optional(),
 });
 
@@ -63,6 +64,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
       address: '',
       city: '',
       state: '',
+      zip_code: '',
       notes: '',
     },
   });
@@ -77,6 +79,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
         address: client.address || '',
         city: client.city || '',
         state: client.state || '',
+        zip_code: client.zip_code || '',
         notes: client.notes || '',
       });
     } else {
@@ -88,6 +91,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
         address: '',
         city: '',
         state: '',
+        zip_code: '',
         notes: '',
       });
     }
@@ -133,6 +137,9 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
       const uf = (data.uf || data.estado || data.state || '').toString().toUpperCase();
       safeSet('state', uf?.slice(0, 2));
 
+      const cep = (data.cep || data.codigo_postal || data.zip_code || '').toString();
+      safeSet('zip_code', cep);
+
       toast.success('Dados preenchidos automaticamente pelo CNPJ');
     } catch {
       // Silently fail - API might be unavailable
@@ -159,6 +166,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
             address: data.address || null,
             city: data.city || null,
             state: data.state || null,
+            zip_code: data.zip_code || null,
             notes: data.notes || null,
           },
         });
@@ -172,6 +180,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
           address: data.address || null,
           city: data.city || null,
           state: data.state || null,
+          zip_code: data.zip_code || null,
           notes: data.notes || null,
           created_by: user.id,
         });
@@ -286,7 +295,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="city"
@@ -309,6 +318,20 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                     <FormLabel>Estado</FormLabel>
                     <FormControl>
                       <Input placeholder="SP" maxLength={2} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="zip_code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CEP</FormLabel>
+                    <FormControl>
+                      <Input placeholder="00000-000" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -28,7 +28,7 @@ export default function Shippers() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
-  const { data: shippers, isLoading } = useShippers(debouncedSearchTerm, { enabled: !!user });
+  const { data: shippers, isLoading, isError, error, refetch } = useShippers(debouncedSearchTerm, { enabled: !!user });
   const deleteShipperMutation = useDeleteShipper();
   
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -118,6 +118,16 @@ export default function Shippers() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
+      ) : isError ? (
+        <div className="bg-card rounded-xl border border-border shadow-card p-8">
+          <p className="text-foreground font-medium">Não foi possível carregar os embarcadores</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {(error instanceof Error && error.message) || 'Erro inesperado ao buscar embarcadores.'}
+          </p>
+          <div className="mt-4">
+            <Button onClick={() => refetch()}>Tentar novamente</Button>
+          </div>
+        </div>
       ) : shippers?.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
@@ -202,6 +212,7 @@ export default function Shippers() {
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => handleEdit(shipper)}
+                          aria-label="Editar embarcador"
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -210,6 +221,7 @@ export default function Shippers() {
                           size="icon"
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={() => setDeletingShipper(shipper)}
+                          aria-label="Excluir embarcador"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>

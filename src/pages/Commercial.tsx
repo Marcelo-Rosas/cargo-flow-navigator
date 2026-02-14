@@ -40,7 +40,7 @@ const QUOTE_STAGES: { id: QuoteStage; label: string; color: string }[] = [
 
 export default function Commercial() {
   const { user } = useAuth();
-  const { data: quotes, isLoading } = useQuotes();
+  const { data: quotes, isLoading, isError, error, refetch } = useQuotes();
   const updateStageMutation = useUpdateQuoteStage();
   const [activeQuote, setActiveQuote] = useState<Quote | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -166,6 +166,22 @@ export default function Commercial() {
     );
   }
 
+  if (isError) {
+    return (
+      <MainLayout>
+        <div className="bg-card rounded-xl border border-border shadow-card p-6">
+          <h2 className="text-lg font-semibold text-foreground">Não foi possível carregar as cotações</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {(error instanceof Error && error.message) || 'Erro inesperado ao buscar cotações.'}
+          </p>
+          <div className="mt-4">
+            <Button onClick={() => refetch()}>Tentar novamente</Button>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       {/* Page Header */}
@@ -198,7 +214,7 @@ export default function Commercial() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" aria-label="Filtrar cotações">
             <Filter className="w-4 h-4" />
           </Button>
           <Button className="gap-2" onClick={() => setIsFormOpen(true)}>

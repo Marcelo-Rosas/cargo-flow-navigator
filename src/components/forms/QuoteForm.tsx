@@ -285,6 +285,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       form.setValue('client_id', clientId);
       form.setValue('client_name', selectedClient.name);
       form.setValue('client_email', selectedClient.email || '');
+
+      // CEP destino vem do cadastro do Cliente
+      if (selectedClient.zip_code) {
+        form.setValue('destination_cep', sanitizeCep(selectedClient.zip_code), { shouldDirty: true });
+        // Atualiza destino (Cidade - UF) via lookup de CEP, respeitando edição manual
+        void handleDestinationCepBlur();
+      }
     }
   };
 
@@ -294,6 +301,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       form.setValue('shipper_id', shipperId);
       form.setValue('shipper_name', selectedShipper.name);
       form.setValue('shipper_email', selectedShipper.email || '');
+
+      // CEP origem vem do cadastro do Embarcador
+      if (selectedShipper.zip_code) {
+        form.setValue('origin_cep', sanitizeCep(selectedShipper.zip_code), { shouldDirty: true });
+        // Atualiza origem (Cidade - UF) via lookup de CEP, respeitando edição manual
+        void handleOriginCepBlur();
+      }
     }
   };
 

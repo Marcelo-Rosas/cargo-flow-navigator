@@ -6,11 +6,7 @@ import {
   TrendingUp, 
   Truck, 
   FileText, 
-  BarChart3, 
-  Users, 
-  Settings, 
-  Plug, 
-  HelpCircle,
+  Users,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -27,16 +23,16 @@ const navItems = [
   { path: '/comercial', icon: TrendingUp, label: 'Comercial' },
   { path: '/operacional', icon: Truck, label: 'Operação' },
   { path: '/documentos', icon: FileText, label: 'Documentos' },
-  { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
+  // { path: '/relatorios', icon: BarChart3, label: 'Relatórios' }, // (a implementar)
   { path: '/clientes', icon: Users, label: 'Clientes' },
   { path: '/embarcadores', icon: Ship, label: 'Embarcadores' },
   { path: '/tabelas-preco', icon: Package, label: 'Tabelas de Preço' },
 ];
 
 const bottomNavItems = [
-  { path: '/configuracoes', icon: Settings, label: 'Configurações' },
-  { path: '/integracoes', icon: Plug, label: 'Integrações' },
-  { path: '/ajuda', icon: HelpCircle, label: 'Ajuda' },
+  // { path: '/configuracoes', icon: Settings, label: 'Configurações' }, // (a implementar)
+  // { path: '/integracoes', icon: Plug, label: 'Integrações' }, // (a implementar)
+  // { path: '/ajuda', icon: HelpCircle, label: 'Ajuda' }, // (a implementar)
 ];
 
 export function Sidebar() {
