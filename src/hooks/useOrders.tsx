@@ -7,9 +7,25 @@ type OrderInsert = Database['public']['Tables']['orders']['Insert'];
 type OrderUpdate = Database['public']['Tables']['orders']['Update'];
 type OrderStage = Database['public']['Enums']['order_stage'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
+type Quote = Database['public']['Tables']['quotes']['Row'];
 
 export interface OrderWithOccurrences extends Order {
   occurrences: Occurrence[];
+  quote?: Pick<
+    Quote,
+    | 'id'
+    | 'shipper_name'
+    | 'shipper_id'
+    | 'client_name'
+    | 'client_id'
+    | 'origin'
+    | 'origin_cep'
+    | 'destination'
+    | 'destination_cep'
+    | 'freight_type'
+    | 'km_distance'
+    | 'vehicle_type_id'
+  > | null;
 }
 
 export function useOrders() {
@@ -20,7 +36,21 @@ export function useOrders() {
         .from('orders')
         .select(`
           *,
-          occurrences (*)
+          occurrences (*),
+          quote:quotes (
+            id,
+            shipper_name,
+            shipper_id,
+            client_name,
+            client_id,
+            origin,
+            origin_cep,
+            destination,
+            destination_cep,
+            freight_type,
+            km_distance,
+            vehicle_type_id
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -38,7 +68,21 @@ export function useOrder(id: string) {
         .from('orders')
         .select(`
           *,
-          occurrences (*)
+          occurrences (*),
+          quote:quotes (
+            id,
+            shipper_name,
+            shipper_id,
+            client_name,
+            client_id,
+            origin,
+            origin_cep,
+            destination,
+            destination_cep,
+            freight_type,
+            km_distance,
+            vehicle_type_id
+          )
         `)
         .eq('id', id)
         .maybeSingle();

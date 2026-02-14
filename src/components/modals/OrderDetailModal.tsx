@@ -33,10 +33,26 @@ import { cn } from '@/lib/utils';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
+type Quote = Database['public']['Tables']['quotes']['Row'];
 type OrderStage = Database['public']['Enums']['order_stage'];
 
 interface OrderWithOccurrences extends Order {
   occurrences: Occurrence[];
+  quote?: Pick<
+    Quote,
+    | 'id'
+    | 'shipper_name'
+    | 'shipper_id'
+    | 'client_name'
+    | 'client_id'
+    | 'origin'
+    | 'origin_cep'
+    | 'destination'
+    | 'destination_cep'
+    | 'freight_type'
+    | 'km_distance'
+    | 'vehicle_type_id'
+  > | null;
 }
 
 interface OrderDetailModalProps {
@@ -115,7 +131,7 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                   {stageInfo.label}
                 </Badge>
               </DialogTitle>
-              <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)}>
+              <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)} aria-label="Editar ordem de serviço">
                 <Pencil className="w-4 h-4" />
               </Button>
             </div>
@@ -143,13 +159,22 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
 
             <div className="flex-1 overflow-y-auto mt-4">
               <TabsContent value="details" className="m-0 space-y-6">
-                {/* Client Info */}
-                <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                  <h4 className="font-semibold text-foreground mb-2">Cliente</h4>
-                  <p className="text-lg text-foreground">{order.client_name}</p>
+                {/* Contexto da OS (para continuidade do fluxo) */}
+                <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+                  {order.quote?.shipper_name && (
+                    <div>
+                      <h4 className="font-semibold text-foreground">Embarcador</h4>
+                      <p className="text-foreground">{order.quote.shipper_name}</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <h4 className="font-semibold text-foreground">Cliente</h4>
+                    <p className="text-foreground">{order.client_name}</p>
+                  </div>
                 </div>
 
-                {/* Route - Always visible */}
+                {/* Rota + CEP */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-lg bg-muted/30 border border-border">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -157,6 +182,9 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                       <span className="text-sm">Origem</span>
                     </div>
                     <p className="font-medium text-foreground">{order.origin}</p>
+                    {order.quote?.origin_cep && (
+                      <p className="text-xs text-muted-foreground mt-1">CEP: {order.quote.origin_cep}</p>
+                    )}
                   </div>
                   <div className="p-4 rounded-lg bg-muted/30 border border-border">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -164,6 +192,9 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                       <span className="text-sm">Destino</span>
                     </div>
                     <p className="font-medium text-foreground">{order.destination}</p>
+                    {order.quote?.destination_cep && (
+                      <p className="text-xs text-muted-foreground mt-1">CEP: {order.quote.destination_cep}</p>
+                    )}
                   </div>
                 </div>
 
@@ -192,19 +223,31 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                   </div>
                 )}
 
-                {/* Value and ETA */}
+                {/* Valores */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-lg bg-muted/30 border border-border">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <DollarSign className="w-4 h-4" />
-                      <span className="text-sm">Valor do Frete</span>
+                      <span className="text-sm">Valor do Frete (cliente)</span>
                     </div>
                     <p className="text-xl font-bold text-foreground">
                       {formatCurrency(Number(order.value))}
                     </p>
                   </div>
+
+                  <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <DollarSign className="w-4 h-4" />
+                      <span className="text-sm">Piso mínimo p/ carreteiro (ANTT)</span>
+                    </div>
+                    <p className="text-xl font-bold text-foreground">—</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Depende do tipo de caminhão/operação e KM (a implementar)
+                    </p>
+                  </div>
+
                   {order.eta && (
-                    <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                    <div className="p-4 rounded-lg bg-muted/30 border border-border col-span-2">
                       <div className="flex items-center gap-2 text-muted-foreground mb-1">
                         <Calendar className="w-4 h-4" />
                         <span className="text-sm">Previsão de Entrega</span>
