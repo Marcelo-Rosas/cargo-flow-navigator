@@ -20,10 +20,7 @@ CREATE TABLE IF NOT EXISTS public.antt_floor_rates (
 
   created_by uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-
-  -- NOTE: expression-based uniqueness (COALESCE(valid_from,...)) cannot be used in a table UNIQUE constraint.
-  -- We'll create an expression index below.
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- Unicidade por (tabela, tipo de carga, eixos, vigência)
