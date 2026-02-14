@@ -29,36 +29,26 @@ export function ExportReports() {
     }).format(value);
   };
 
-  const exportToCSV = (data: unknown[], filename: string, headers: string[], keys: string[]) => {
+  const exportToCSV = (data: any[], filename: string, headers: string[], keys: string[]) => {
     const csvRows = [headers.join(';')];
 
     data.forEach((item) => {
-      const row = item as Record<string, unknown>;
       const values = keys.map((key) => {
-        const value = row[key];
+        let value = item[key];
         if (value === null || value === undefined) return '';
         if (typeof value === 'number') return value.toString().replace('.', ',');
         if (typeof value === 'string' && value.includes(';')) return `"${value}"`;
-        return String(value);
+        return value;
       });
       csvRows.push(values.join(';'));
     });
 
     const csvString = csvRows.join('\n');
     const blob = new Blob(['\ufeff' + csvString], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-
     const link = document.createElement('a');
-    link.href = url;
+    link.href = URL.createObjectURL(blob);
     link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
-    link.style.display = 'none';
-
-    document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-
-    // cleanup
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
   const handleExport = async (type: ExportType) => {
@@ -66,12 +56,10 @@ export function ExportReports() {
 
     try {
       if (type === 'quotes' || type === 'full') {
-        const { data: quotes, error: quotesError } = await supabase
+        const { data: quotes } = await supabase
           .from('quotes')
           .select('*')
           .order('created_at', { ascending: false });
-
-        if (quotesError) throw quotesError;
 
         if (quotes) {
           exportToCSV(
@@ -89,12 +77,10 @@ export function ExportReports() {
       }
 
       if (type === 'orders' || type === 'full') {
-        const { data: orders, error: ordersError } = await supabase
+        const { data: orders } = await supabase
           .from('orders')
           .select('*')
           .order('created_at', { ascending: false });
-
-        if (ordersError) throw ordersError;
 
         if (orders) {
           exportToCSV(
@@ -115,12 +101,10 @@ export function ExportReports() {
       }
 
       if (type === 'clients' || type === 'full') {
-        const { data: clients, error: clientsError } = await supabase
+        const { data: clients } = await supabase
           .from('clients')
           .select('*')
           .order('created_at', { ascending: false });
-
-        if (clientsError) throw clientsError;
 
         if (clients) {
           exportToCSV(

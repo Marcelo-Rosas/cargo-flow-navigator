@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Search, Pencil, Trash2, Loader2, Building2, Phone, Mail, MapPin } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -10,7 +10,6 @@ import { toast } from 'sonner';
 import { ClientForm } from '@/components/forms/ClientForm';
 import { Database } from '@/integrations/supabase/types';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useSearchParams } from 'react-router-dom';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +25,6 @@ type Client = Database['public']['Tables']['clients']['Row'];
 
 export default function Clients() {
   const { user } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
@@ -36,16 +34,6 @@ export default function Clients() {
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-
-  // Deep-link actions (Topbar)
-  useEffect(() => {
-    const action = searchParams.get('new');
-    if (action === 'client') {
-      setIsFormOpen(true);
-      searchParams.delete('new');
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
