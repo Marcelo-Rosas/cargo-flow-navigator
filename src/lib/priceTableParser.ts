@@ -1,5 +1,3 @@
-import * as XLSX from 'xlsx';
-
 export interface ParsedPriceRow {
   km_from: number;
   km_to: number;
@@ -249,151 +247,160 @@ export function parseCSVPriceTable(content: string, delimiter: string = ';'): Pa
   };
 }
 
+function worksheetToRows(worksheet: {
+  rowCount: number;
+  getRow: (rowIdx: number) => {
+    cellCount: number;
+    actualCellCount: number;
+    getCell: (colIdx: number) => { text?: string };
+  };
+}): string[][] {
+  const rows: string[][] = [];
+
+  for (let rowIdx = 1; rowIdx <= worksheet.rowCount; rowIdx++) {
+    const row = worksheet.getRow(rowIdx);
+    const maxCol = Math.max(row.cellCount, row.actualCellCount);
+    const values: string[] = [];
+
+    for (let colIdx = 1; colIdx <= maxCol; colIdx++) {
+      const text = row.getCell(colIdx).text;
+      values.push(String(text ?? '').trim());
+    }
+
+    rows.push(values);
+  }
+
+  return rows;
+}
+
 export async function parseXLSXPriceTable(file: File): Promise<ParseResult<ParsedPriceRow>> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        // Get first sheet
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        
-        // Convert to array of arrays, using formatted text for proper number handling
-        const rawRows: string[][] = XLSX.utils.sheet_to_json(worksheet, { 
-          header: 1, 
-          raw: false, // Use formatted text
-          defval: '' 
-        });
-        
-        if (rawRows.length < 2) {
-          resolve({ rows: [], totalRows: 0, validRows: 0, invalidRows: 0, errors: ['Planilha vazia ou sem dados'] });
-          return;
+  try {
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const buffer = await file.arrayBuffer();
+    await workbook.xlsx.load(buffer);
+
+    // Get first worksheet
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+      return { rows: [], totalRows: 0, validRows: 0, invalidRows: 0, errors: ['Planilha vazia ou sem abas'] };
+    }
+
+    const rawRows = worksheetToRows(worksheet);
+    if (rawRows.length < 2) {
+      return { rows: [], totalRows: 0, validRows: 0, invalidRows: 0, errors: ['Planilha vazia ou sem dados'] };
+    }
+
+    // Detect header row (skip any blank rows at top)
+    let headerRowIdx = 0;
+    while (headerRowIdx < rawRows.length && rawRows[headerRowIdx].every(cell => !cell || cell === '')) {
+      headerRowIdx++;
+    }
+
+    // Check for legacy format (2 header rows)
+    const possibleHeaders = rawRows[headerRowIdx];
+    const nextRow = rawRows[headerRowIdx + 1];
+
+    // If the row after headers also looks like headers (contains text like "DE" or "ATE"), skip it
+    let dataStartIdx = headerRowIdx + 1;
+    if (nextRow && nextRow.some(cell => {
+      const lower = String(cell).toLowerCase().trim();
+      return lower === 'de' || lower === 'ate' || lower === 'até' || lower === 'from' || lower === 'to';
+    })) {
+      dataStartIdx = headerRowIdx + 2;
+    }
+
+    const headers = possibleHeaders.map(h => String(h || '').trim());
+
+    // Find column indices
+    const kmFromIdx = findColumnIndex(headers, 'km_from');
+    const kmToIdx = findColumnIndex(headers, 'km_to');
+    const kmRangeIdx = findColumnIndex(headers, 'km_range');
+    const costPerTonIdx = findColumnIndex(headers, 'cost_per_ton');
+    const costPerKgIdx = findColumnIndex(headers, 'cost_per_kg');
+    const costValuePercentIdx = findColumnIndex(headers, 'cost_value_percent');
+    const grisIdx = findColumnIndex(headers, 'gris_percent');
+    const tsoIdx = findColumnIndex(headers, 'tso_percent'); // Também encontra ad_valorem_percent por alias
+    const tollIdx = findColumnIndex(headers, 'toll_percent');
+
+    const hasKmRange = kmRangeIdx !== -1;
+    const hasKmSeparate = kmFromIdx !== -1 && kmToIdx !== -1;
+
+    if (!hasKmRange && !hasKmSeparate) {
+      return {
+        rows: [],
+        totalRows: 0,
+        validRows: 0,
+        invalidRows: 0,
+        errors: ['Colunas de KM não encontradas. Esperado: km_from/km_to ou faixa'],
+      };
+    }
+
+    const rows: ParsedPriceRow[] = [];
+    const errors: string[] = [];
+
+    for (let i = dataStartIdx; i < rawRows.length; i++) {
+      const values = rawRows[i];
+
+      // Skip empty rows
+      if (!values || values.every(v => !v || v === '')) continue;
+
+      let km_from: number | null = null;
+      let km_to: number | null = null;
+
+      if (hasKmRange) {
+        const range = parseKmRange(values[kmRangeIdx]);
+        if (range) {
+          km_from = range.from;
+          km_to = range.to;
         }
-        
-        // Detect header row (skip any blank rows at top)
-        let headerRowIdx = 0;
-        while (headerRowIdx < rawRows.length && rawRows[headerRowIdx].every(cell => !cell || cell === '')) {
-          headerRowIdx++;
-        }
-        
-        // Check for legacy format (2 header rows)
-        const possibleHeaders = rawRows[headerRowIdx];
-        const nextRow = rawRows[headerRowIdx + 1];
-        
-        // If the row after headers also looks like headers (contains text like "DE" or "ATE"), skip it
-        let dataStartIdx = headerRowIdx + 1;
-        if (nextRow && nextRow.some(cell => {
-          const lower = String(cell).toLowerCase().trim();
-          return lower === 'de' || lower === 'ate' || lower === 'até' || lower === 'from' || lower === 'to';
-        })) {
-          dataStartIdx = headerRowIdx + 2;
-        }
-        
-        const headers = possibleHeaders.map(h => String(h || '').trim());
-        
-        // Find column indices
-        const kmFromIdx = findColumnIndex(headers, 'km_from');
-        const kmToIdx = findColumnIndex(headers, 'km_to');
-        const kmRangeIdx = findColumnIndex(headers, 'km_range');
-        const costPerTonIdx = findColumnIndex(headers, 'cost_per_ton');
-        const costPerKgIdx = findColumnIndex(headers, 'cost_per_kg');
-        const costValuePercentIdx = findColumnIndex(headers, 'cost_value_percent');
-        const grisIdx = findColumnIndex(headers, 'gris_percent');
-        const tsoIdx = findColumnIndex(headers, 'tso_percent');  // Também encontra ad_valorem_percent por alias
-        const tollIdx = findColumnIndex(headers, 'toll_percent');
-        
-        const hasKmRange = kmRangeIdx !== -1;
-        const hasKmSeparate = kmFromIdx !== -1 && kmToIdx !== -1;
-        
-        if (!hasKmRange && !hasKmSeparate) {
-          resolve({ 
-            rows: [], 
-            totalRows: 0, 
-            validRows: 0, 
-            invalidRows: 0, 
-            errors: ['Colunas de KM não encontradas. Esperado: km_from/km_to ou faixa'] 
-          });
-          return;
-        }
-        
-        const rows: ParsedPriceRow[] = [];
-        const errors: string[] = [];
-        
-        for (let i = dataStartIdx; i < rawRows.length; i++) {
-          const values = rawRows[i];
-          
-          // Skip empty rows
-          if (!values || values.every(v => !v || v === '')) continue;
-          
-          let km_from: number | null = null;
-          let km_to: number | null = null;
-          
-          if (hasKmRange) {
-            const range = parseKmRange(values[kmRangeIdx]);
-            if (range) {
-              km_from = range.from;
-              km_to = range.to;
-            }
-          }
-          
-          if (km_from === null && hasKmSeparate) {
-            km_from = parseKmStrict(values[kmFromIdx]);
-            km_to = parseKmStrict(values[kmToIdx]);
-          }
-          
-          // Skip rows without valid KM data
-          if (km_from === null || km_to === null) continue;
-          
-          const row: Partial<ParsedPriceRow> = {
-            km_from,
-            km_to,
-            cost_per_ton: costPerTonIdx !== -1 ? normalizeBrazilianNumber(values[costPerTonIdx]) : null,
-            cost_per_kg: costPerKgIdx !== -1 ? normalizeBrazilianNumber(values[costPerKgIdx]) : null,
-            cost_value_percent: costValuePercentIdx !== -1 ? normalizeBrazilianNumber(values[costValuePercentIdx]) : null,
-            gris_percent: grisIdx !== -1 ? normalizeBrazilianNumber(values[grisIdx]) : null,
-            tso_percent: tsoIdx !== -1 ? normalizeBrazilianNumber(values[tsoIdx]) : null,
-            toll_percent: tollIdx !== -1 ? normalizeBrazilianNumber(values[tollIdx]) : null,
-          };
-          
-          const validation = validatePriceRow(row, rows.length);
-          rows.push({
-            ...row,
-            isValid: validation.isValid,
-            errors: validation.errors,
-          } as ParsedPriceRow);
-          
-          errors.push(...validation.errors);
-        }
-        
-        resolve({
-          rows,
-          totalRows: rows.length,
-          validRows: rows.filter(r => r.isValid).length,
-          invalidRows: rows.filter(r => !r.isValid).length,
-          errors,
-        });
-        
-      } catch (err) {
-        resolve({ 
-          rows: [], 
-          totalRows: 0, 
-          validRows: 0, 
-          invalidRows: 0, 
-          errors: [`Erro ao processar arquivo: ${err instanceof Error ? err.message : 'Erro desconhecido'}`] 
-        });
       }
+
+      if (km_from === null && hasKmSeparate) {
+        km_from = parseKmStrict(values[kmFromIdx]);
+        km_to = parseKmStrict(values[kmToIdx]);
+      }
+
+      // Skip rows without valid KM data
+      if (km_from === null || km_to === null) continue;
+
+      const row: Partial<ParsedPriceRow> = {
+        km_from,
+        km_to,
+        cost_per_ton: costPerTonIdx !== -1 ? normalizeBrazilianNumber(values[costPerTonIdx]) : null,
+        cost_per_kg: costPerKgIdx !== -1 ? normalizeBrazilianNumber(values[costPerKgIdx]) : null,
+        cost_value_percent: costValuePercentIdx !== -1 ? normalizeBrazilianNumber(values[costValuePercentIdx]) : null,
+        gris_percent: grisIdx !== -1 ? normalizeBrazilianNumber(values[grisIdx]) : null,
+        tso_percent: tsoIdx !== -1 ? normalizeBrazilianNumber(values[tsoIdx]) : null,
+        toll_percent: tollIdx !== -1 ? normalizeBrazilianNumber(values[tollIdx]) : null,
+      };
+
+      const validation = validatePriceRow(row, rows.length);
+      rows.push({
+        ...row,
+        isValid: validation.isValid,
+        errors: validation.errors,
+      } as ParsedPriceRow);
+
+      errors.push(...validation.errors);
+    }
+
+    return {
+      rows,
+      totalRows: rows.length,
+      validRows: rows.filter(r => r.isValid).length,
+      invalidRows: rows.filter(r => !r.isValid).length,
+      errors,
     };
-    
-    reader.onerror = () => {
-      resolve({ rows: [], totalRows: 0, validRows: 0, invalidRows: 0, errors: ['Erro ao ler arquivo'] });
+  } catch (err) {
+    return {
+      rows: [],
+      totalRows: 0,
+      validRows: 0,
+      invalidRows: 0,
+      errors: [`Erro ao processar arquivo: ${err instanceof Error ? err.message : 'Erro desconhecido'}`],
     };
-    
-    reader.readAsArrayBuffer(file);
-  });
+  }
 }
 
 export async function parsePriceTableFile(file: File): Promise<ParseResult<ParsedPriceRow>> {
@@ -404,7 +411,7 @@ export async function parsePriceTableFile(file: File): Promise<ParseResult<Parse
     return parseCSVPriceTable(content);
   }
   
-  if (extension === 'xlsx' || extension === 'xls' || extension === 'xlsm') {
+  if (extension === 'xlsx' || extension === 'xlsm') {
     return parseXLSXPriceTable(file);
   }
   
@@ -413,7 +420,7 @@ export async function parsePriceTableFile(file: File): Promise<ParseResult<Parse
     totalRows: 0, 
     validRows: 0, 
     invalidRows: 0, 
-    errors: [`Formato não suportado: ${extension}. Use CSV, XLSX ou XLS.`] 
+    errors: [`Formato não suportado: ${extension}. Use CSV, XLSX ou XLSM.`] 
   };
 }
 

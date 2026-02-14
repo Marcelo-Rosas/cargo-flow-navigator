@@ -112,7 +112,6 @@ export function PriceTableImportModal({
     accept: {
       'text/csv': ['.csv'],
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'application/vnd.ms-excel': ['.xls'],
       'application/vnd.ms-excel.sheet.macroEnabled.12': ['.xlsm'],
     },
     maxFiles: 1,
@@ -180,7 +179,7 @@ export function PriceTableImportModal({
             Importar Faixas de Preço
           </DialogTitle>
           <DialogDescription>
-            Importe faixas de KM de um arquivo CSV ou Excel (XLSX)
+            Importe faixas de KM de um arquivo CSV ou Excel (XLSX/XLSM)
           </DialogDescription>
         </DialogHeader>
 
@@ -268,7 +267,7 @@ export function PriceTableImportModal({
                 {isDragActive ? 'Solte o arquivo aqui' : 'Arraste um arquivo ou clique para selecionar'}
               </p>
               <p className="text-sm text-muted-foreground">
-                CSV (separador ;) ou Excel (XLSX, XLS) • Máximo 10MB
+                CSV (separador ;) ou Excel (XLSX, XLSM) • Máximo 10MB
               </p>
             </div>
 

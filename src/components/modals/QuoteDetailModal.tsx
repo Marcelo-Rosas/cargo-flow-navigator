@@ -36,7 +36,7 @@ import {
 import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
 import { AdditionalFeesSection, AdditionalFeesSelection, defaultAdditionalFeesSelection } from '@/components/quotes/AdditionalFeesSection';
-import { Database } from '@/integrations/supabase/types';
+import type { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
