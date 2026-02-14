@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 import { ArrowRight, Truck, AlertTriangle, CheckCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -90,10 +89,7 @@ export function RecentOrdersList({ orders, onViewOrder, onViewAll }: RecentOrder
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: 0.1 * index }}
               className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-muted/50 transition-colors cursor-pointer group"
-              onClick={() => {
-                if (onViewOrder) return onViewOrder(order);
-                navigate(`/operacional?orderId=${order.id}`);
-              }}
+              onClick={() => onViewOrder?.(order)}
             >
               <div className="flex items-center gap-3">
                 <div

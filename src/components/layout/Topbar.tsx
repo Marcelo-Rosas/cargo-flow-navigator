@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { Search, Bell, Plus, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,23 +20,8 @@ interface TopbarProps {
 }
 
 export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
-  const navigate = useNavigate();
   const { setIsOpen } = useGlobalSearch();
   const { user, signOut } = useAuth();
-
-  const handleNewQuote = () => {
-    if (onNewQuote) return onNewQuote();
-    navigate('/comercial?new=quote');
-  };
-
-  const handleNewOrder = () => {
-    if (onNewOrder) return onNewOrder();
-    navigate('/operacional?new=order');
-  };
-
-  const handleNewClient = () => {
-    navigate('/clientes?new=client');
-  };
 
   return (
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
@@ -73,13 +57,13 @@ export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel>Criar Novo</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleNewQuote}>
+            <DropdownMenuItem onClick={onNewQuote}>
               Nova Cotação
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleNewOrder}>
+            <DropdownMenuItem onClick={onNewOrder}>
               Nova Ordem de Serviço
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleNewClient}>
+            <DropdownMenuItem>
               Novo Cliente
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -101,30 +85,21 @@ export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
           <DropdownMenuContent align="end" className="w-80">
             <DropdownMenuLabel>Notificações</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="flex flex-col items-start gap-1 py-3"
-              onClick={() => navigate('/operacional?q=OS-2024-0003')}
-            >
+            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
               <span className="font-medium">Ocorrência Crítica</span>
               <span className="text-sm text-muted-foreground">
                 OS-2024-0003: Atraso na coleta registrado
               </span>
               <span className="text-xs text-muted-foreground">Há 2 horas</span>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="flex flex-col items-start gap-1 py-3"
-              onClick={() => navigate('/operacional?q=OS-2024-0002')}
-            >
+            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
               <span className="font-medium">Documento Pendente</span>
               <span className="text-sm text-muted-foreground">
                 CT-e não anexado na OS-2024-0002
               </span>
               <span className="text-xs text-muted-foreground">Há 5 horas</span>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="flex flex-col items-start gap-1 py-3"
-              onClick={() => navigate('/comercial')}
-            >
+            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
               <span className="font-medium">Cotação Ganha</span>
               <span className="text-sm text-muted-foreground">
                 Loja Virtual Express confirmou proposta

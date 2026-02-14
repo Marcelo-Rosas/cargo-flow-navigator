@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   DndContext, 
   DragEndEvent, 
@@ -12,7 +12,6 @@ import {
 import { motion } from 'framer-motion';
 import { Plus, Filter, Search, Loader2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { useSearchParams } from 'react-router-dom';
 import { KanbanColumn } from '@/components/boards/KanbanColumn';
 import { QuoteCard } from '@/components/boards/QuoteCard';
 import { Button } from '@/components/ui/button';
@@ -41,7 +40,6 @@ const QUOTE_STAGES: { id: QuoteStage; label: string; color: string }[] = [
 
 export default function Commercial() {
   const { user } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { data: quotes, isLoading } = useQuotes();
   const updateStageMutation = useUpdateQuoteStage();
   const [activeQuote, setActiveQuote] = useState<Quote | null>(null);
@@ -52,17 +50,6 @@ export default function Commercial() {
 
   // Enable realtime updates
   useRealtimeSubscription(['quotes']);
-
-  // Deep-link actions (Topbar)
-  useEffect(() => {
-    const action = searchParams.get('new');
-    if (action === 'quote') {
-      setIsFormOpen(true);
-      // clear param to avoid reopening on refresh loops
-      searchParams.delete('new');
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

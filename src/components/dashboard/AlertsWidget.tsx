@@ -107,11 +107,11 @@ export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-foreground">Alertas Críticos</h3>
-        <span className="text-sm text-muted-foreground">{visibleAlerts.length} pendentes</span>
+        <span className="text-sm text-muted-foreground">{alerts.length} pendentes</span>
       </div>
 
       <div className="space-y-3">
-        {visibleAlerts.map((alert, index) => {
+        {alerts.map((alert, index) => {
           const style = alertStyles[alert.type];
           const Icon = style.icon;
 
@@ -133,18 +133,7 @@ export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
                     <p className="font-medium text-foreground">{alert.title}</p>
                     <p className="text-sm text-muted-foreground">{alert.description}</p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 shrink-0"
-                    onClick={() =>
-                      setDismissed((prev) => {
-                        const next = new Set(prev);
-                        next.add(alert.id);
-                        return next;
-                      })
-                    }
-                  >
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
@@ -152,9 +141,9 @@ export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-muted-foreground">{alert.time}</span>
                   {alert.action && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
                       className="h-7 text-xs"
                       onClick={() => {
                         if (alert.action?.onClick) return alert.action.onClick();
