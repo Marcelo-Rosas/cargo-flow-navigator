@@ -103,6 +103,7 @@ export type Database = {
           phone: string | null
           state: string | null
           updated_at: string
+          zip_code: string | null
         }
         Insert: {
           address?: string | null
@@ -117,6 +118,7 @@ export type Database = {
           phone?: string | null
           state?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Update: {
           address?: string | null
@@ -131,6 +133,7 @@ export type Database = {
           phone?: string | null
           state?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Relationships: []
       }
@@ -1064,6 +1067,7 @@ export type Database = {
           phone: string | null
           state: string | null
           updated_at: string
+          zip_code: string | null
         }
         Insert: {
           address?: string | null
@@ -1078,6 +1082,7 @@ export type Database = {
           phone?: string | null
           state?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Update: {
           address?: string | null
@@ -1092,6 +1097,7 @@ export type Database = {
           phone?: string | null
           state?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Relationships: []
       }
