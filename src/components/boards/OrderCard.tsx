@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
-import { STAGE_DOCUMENTS, DocumentConfig, groupDocumentsByCategory } from '@/lib/order-documents';
+import { DocumentConfig, getNextStage, getNextStageRequirements, groupDocumentsByCategory } from '@/lib/order-documents';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -71,18 +71,19 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
   const occurrences = order.occurrences || [];
   const hasOccurrences = occurrences.length > 0;
 
-  // Documentos visíveis para o estágio atual
-  const visibleDocuments: DocumentConfig[] = [...(STAGE_DOCUMENTS[order.stage] || [])];
-  const hasDocumentsToShow = visibleDocuments.length > 0;
+  // Requisitos para avançar para a próxima fase (gates por estágio)
+  const nextStage = getNextStage(order.stage);
+  const requirements: DocumentConfig[] = [...getNextStageRequirements(order.stage)];
+  const hasDocumentsToShow = requirements.length > 0;
 
-  // Agrupa documentos por categoria
-  const documentsByGroup = groupDocumentsByCategory(visibleDocuments);
+  // Agrupa requisitos por categoria
+  const documentsByGroup = groupDocumentsByCategory(requirements);
 
-  // Calcula progresso
-  const totalDocs = visibleDocuments.length;
-  const completedDocs = visibleDocuments.filter(doc => order[doc.key as keyof Order]).length;
+  // Calcula progresso (somente requisitos do próximo estágio)
+  const totalDocs = requirements.length;
+  const completedDocs = requirements.filter(doc => order[doc.key as keyof Order]).length;
   const progressPercentage = totalDocs > 0 ? (completedDocs / totalDocs) * 100 : 0;
-  const hasPendingDocs = visibleDocuments.some(doc => !order[doc.key as keyof Order]);
+  const hasPendingDocs = requirements.some(doc => !order[doc.key as keyof Order]);
 
 
   return (
@@ -117,13 +118,13 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
             <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-semibold text-foreground">{order.os_number}</h4>
 
-              {/* Badge de pendência crítica (POD) */}
-              {!order.has_pod && order.stage !== 'entregue' && (
+              {/* Requisitos para avançar para a próxima fase */}
+              {hasDocumentsToShow && hasPendingDocs && nextStage && (
                 <Badge
                   variant="outline"
                   className="text-[10px] px-2 py-0.5 border-amber-500/40 text-amber-700 bg-amber-500/10"
                 >
-                  POD pendente
+                  Pendências p/ {nextStage.replaceAll('_', ' ')}
                 </Badge>
               )}
 
