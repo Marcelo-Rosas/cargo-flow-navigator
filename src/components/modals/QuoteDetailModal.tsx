@@ -40,6 +40,7 @@ import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { supabase } from '@/integrations/supabase/client';
 import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
 import { toast } from 'sonner';
@@ -102,13 +103,24 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
       if (!quote?.vehicle_type_id) return null;
       const { data } = await supabase
         .from('vehicle_types')
-        .select('name, code')
+        .select('name, code, axes_count')
         .eq('id', quote.vehicle_type_id)
         .maybeSingle();
       return data;
     },
     enabled: !!quote?.vehicle_type_id,
   });
+
+  const axesCount = (vehicleType as any)?.axes_count ?? null;
+  const kmDistance = quote?.km_distance ?? null;
+  const { data: anttRate } = useAnttFloorRate({
+    operationTable: 'A',
+    cargoType: 'carga_geral',
+    axesCount,
+  });
+  const anttCalc = (anttRate && kmDistance)
+    ? calculateAnttMinimum({ kmDistance: Number(kmDistance), ccd: Number(anttRate.ccd), cc: Number(anttRate.cc) })
+    : null;
 
   const { data: paymentTerm } = useQuery({
     queryKey: ['payment-term', quote?.payment_term_id],
@@ -427,7 +439,7 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
             )}
 
             {/* Pricing Details */}
-            {(priceTable || vehicleType || paymentTerm || quote.km_distance || quote.freight_modality) && (
+            {(priceTable || vehicleType || paymentTerm || quote.km_distance || quote.freight_modality || anttCalc) && (
               <div>
                 <h4 className="font-semibold text-foreground mb-3">Detalhes de Precificação</h4>
                 <div className="grid grid-cols-2 gap-3">
@@ -474,6 +486,92 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                       <p className="font-medium text-foreground text-sm">{Number(quote.km_distance).toLocaleString('pt-BR')} km</p>
                     </div>
                   )}
+
+                  {/* Piso mínimo ANTT (carreteiro) - Tabela A / Carga Geral */}
+                  <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <DollarSign className="w-4 h-4" />
+                        <span className="text-xs">Piso ANTT (carreteiro)</span>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">Tabela A • Carga Geral</Badge>
+                    </div>
+
+                    {anttCalc ? (
+                      <>
+                        <p className="font-semibold text-foreground mt-1">{formatCurrency(anttCalc.total)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {axesCount || '-'} eixos • {Number(kmDistance || 0).toLocaleString('pt-BR')} km
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          Memória: ({Number(kmDistance || 0).toLocaleString('pt-BR')} × {Number(anttRate?.ccd || 0).toFixed(4)}) + {Number(anttRate?.cc || 0).toFixed(2)}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={async () => {
+                            const current = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+                            const updated: StoredPricingBreakdown = {
+                              calculatedAt: current?.calculatedAt || new Date().toISOString(),
+                              version: current?.version || '4.0-fob-lotacao-markup-scope',
+                              status: current?.status || 'OK',
+                              error: current?.error,
+                              meta: {
+                                ...(current?.meta || {
+                                  routeUfLabel: formatRouteUf(quote.origin, quote.destination),
+                                  kmBandLabel: null,
+                                  kmStatus: 'OK',
+                                  marginStatus: 'AT_TARGET',
+                                  marginPercent: 0,
+                                }),
+                                antt: {
+                                  operationTable: 'A',
+                                  cargoType: 'carga_geral',
+                                  axesCount: Number(axesCount),
+                                  kmDistance: Number(kmDistance),
+                                  ccd: Number(anttRate?.ccd || 0),
+                                  cc: Number(anttRate?.cc || 0),
+                                  ida: Number(anttCalc.ida),
+                                  retornoVazio: 0,
+                                  total: Number(anttCalc.total),
+                                  calculatedAt: new Date().toISOString(),
+                                },
+                              },
+                              // mantém o resto se existir; senão cria estrutura mínima
+                              weights: current?.weights || { cubageWeight: 0, billableWeight: 0, tonBillable: 0 },
+                              components: current?.components || { baseCost: 0, baseFreight: 0, toll: 0, gris: 0, tso: 0, rctrc: 0, adValorem: 0, tde: 0, tear: 0, conditionalFeesTotal: 0, waitingTimeCost: 0 },
+                              totals: current?.totals || { receitaBruta: 0, das: 0, icms: 0, totalImpostos: 0, totalCliente: 0 },
+                              profitability: current?.profitability || { custosCarreteiro: 0, custosDescarga: 0, custosDiretos: 0, margemBruta: 0, overhead: 0, resultadoLiquido: 0, margemPercent: 0 },
+                              rates: current?.rates || { dasPercent: 14, icmsPercent: 0, grisPercent: 0, tsoPercent: 0, costValuePercent: 0, markupPercent: 30, overheadPercent: 15, targetMarginPercent: 15 },
+                              conditionalFeesBreakdown: current?.conditionalFeesBreakdown,
+                            };
+
+                            const { error } = await supabase
+                              .from('quotes')
+                              .update({ pricing_breakdown: updated as unknown as typeof quote.pricing_breakdown })
+                              .eq('id', quote.id);
+
+                            if (error) {
+                              toast.error('Erro ao salvar piso ANTT');
+                              return;
+                            }
+                            toast.success('Piso ANTT salvo na memória de cálculo');
+                            queryClient.invalidateQueries({ queryKey: ['quotes'] });
+                          }}
+                        >
+                          Salvar no breakdown
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-medium text-muted-foreground mt-1">—</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Cadastre CCD/CC em ANTT Floor Rates e selecione veículo + KM.
+                        </p>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

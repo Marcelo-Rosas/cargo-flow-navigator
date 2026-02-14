@@ -25,7 +25,13 @@ export interface OrderWithOccurrences extends Order {
     | 'freight_type'
     | 'km_distance'
     | 'vehicle_type_id'
-  > | null;
+  > & {
+    vehicle_type?: {
+      axes_count: number | null;
+      code: string;
+      name: string;
+    } | null;
+  } | null;
 }
 
 export function useOrders() {
@@ -81,7 +87,12 @@ export function useOrder(id: string) {
             destination_cep,
             freight_type,
             km_distance,
-            vehicle_type_id
+            vehicle_type_id,
+            vehicle_type:vehicle_types (
+              axes_count,
+              code,
+              name
+            )
           )
         `)
         .eq('id', id)

@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      antt_floor_rates: {
+        Row: {
+          axes_count: number
+          cargo_type: string
+          cc: number
+          ccd: number
+          created_at: string
+          created_by: string | null
+          id: string
+          operation_table: string
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          axes_count: number
+          cargo_type: string
+          cc: number
+          ccd: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          operation_table: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          axes_count?: number
+          cargo_type?: string
+          cc?: number
+          ccd?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          operation_table?: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string

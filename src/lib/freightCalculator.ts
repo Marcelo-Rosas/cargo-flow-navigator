@@ -201,6 +201,20 @@ export interface StoredPricingBreakdown {
     waitingTimeEnabled?: boolean;
     waitingTimeHours?: number;
     markupScope?: MarkupScope;
+
+    // ANTT piso mínimo (memória de cálculo) - opcional
+    antt?: {
+      operationTable: 'A' | 'B' | 'C' | 'D';
+      cargoType: string;
+      axesCount: number;
+      kmDistance: number;
+      ccd: number;
+      cc: number;
+      ida: number;
+      retornoVazio: number;
+      total: number;
+      calculatedAt: string;
+    };
   };
 
   weights: {

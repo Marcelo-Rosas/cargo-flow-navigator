@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { 
   MapPin, 
   Truck, 
@@ -52,7 +53,13 @@ interface OrderWithOccurrences extends Order {
     | 'freight_type'
     | 'km_distance'
     | 'vehicle_type_id'
-  > | null;
+  > & {
+    vehicle_type?: {
+      axes_count: number | null;
+      code: string;
+      name: string;
+    } | null;
+  } | null;
 }
 
 interface OrderDetailModalProps {
@@ -80,6 +87,19 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
   const resolveOccurrenceMutation = useResolveOccurrence();
   const [isOccurrenceFormOpen, setIsOccurrenceFormOpen] = useState(false);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+
+  // ANTT piso mínimo (Tabela A / Carga Geral / sem retorno vazio)
+  const axesCount = order?.quote?.vehicle_type?.axes_count ?? null;
+  const kmDistance = order?.quote?.km_distance ?? null;
+  const { data: anttRate } = useAnttFloorRate({
+    operationTable: 'A',
+    cargoType: 'carga_geral',
+    axesCount,
+  });
+
+  const anttCalc = (anttRate && kmDistance)
+    ? calculateAnttMinimum({ kmDistance: Number(kmDistance), ccd: Number(anttRate.ccd), cc: Number(anttRate.cc) })
+    : null;
 
   if (!order) return null;
 
@@ -240,10 +260,26 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                       <DollarSign className="w-4 h-4" />
                       <span className="text-sm">Piso mínimo p/ carreteiro (ANTT)</span>
                     </div>
-                    <p className="text-xl font-bold text-foreground">—</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Depende do tipo de caminhão/operação e KM (a implementar)
-                    </p>
+                    {anttCalc ? (
+                      <>
+                        <p className="text-xl font-bold text-foreground">
+                          {formatCurrency(anttCalc.total)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Tabela A • Carga Geral • {axesCount || '-'} eixos • {Number(kmDistance || 0).toLocaleString('pt-BR')} km
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Memória: ({Number(kmDistance || 0).toLocaleString('pt-BR')} × {Number(anttRate?.ccd || 0).toFixed(4)}) + {Number(anttRate?.cc || 0).toFixed(2)}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xl font-bold text-foreground">—</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Cadastre CCD/CC em ANTT Floor Rates (Tabela A / Carga Geral) e preencha KM + veículo.
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   {order.eta && (
