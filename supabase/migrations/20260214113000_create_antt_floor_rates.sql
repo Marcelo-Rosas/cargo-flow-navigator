@@ -22,8 +22,14 @@ CREATE TABLE IF NOT EXISTS public.antt_floor_rates (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
 
-  CONSTRAINT antt_floor_rates_unique UNIQUE (operation_table, cargo_type, axes_count, COALESCE(valid_from, '1900-01-01'::date))
+  -- NOTE: expression-based uniqueness (COALESCE(valid_from,...)) cannot be used in a table UNIQUE constraint.
+  -- We'll create an expression index below.
 );
+
+-- Unicidade por (tabela, tipo de carga, eixos, vigência)
+-- Treat NULL valid_from as '1900-01-01' so "no-validity" rows remain unique.
+CREATE UNIQUE INDEX IF NOT EXISTS antt_floor_rates_unique
+  ON public.antt_floor_rates (operation_table, cargo_type, axes_count, COALESCE(valid_from, '1900-01-01'::date));
 
 ALTER TABLE public.antt_floor_rates ENABLE ROW LEVEL SECURITY;
 
