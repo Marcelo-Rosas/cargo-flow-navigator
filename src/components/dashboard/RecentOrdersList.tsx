@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { ArrowRight, Truck, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -37,6 +38,7 @@ const stageColors: Record<OrderStage, string> = {
 };
 
 export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps) {
+  const navigate = useNavigate();
   if (!orders || orders.length === 0) {
     return (
       <motion.div
@@ -64,7 +66,12 @@ export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps)
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-foreground">Ordens Recentes</h3>
-        <Button variant="ghost" size="sm" className="gap-1 text-primary">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1 text-primary"
+          onClick={() => navigate('/operacional')}
+        >
           Ver todas <ArrowRight className="w-4 h-4" />
         </Button>
       </div>
@@ -81,7 +88,10 @@ export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps)
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: 0.1 * index }}
               className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-muted/50 transition-colors cursor-pointer group"
-              onClick={() => onViewOrder?.(order)}
+              onClick={() => {
+                if (onViewOrder) return onViewOrder(order);
+                navigate(`/operacional?orderId=${order.id}`);
+              }}
             >
               <div className="flex items-center gap-3">
                 <div className={cn(

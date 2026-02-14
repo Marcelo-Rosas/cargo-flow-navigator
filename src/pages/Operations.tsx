@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { 
   DndContext, 
   DragEndEvent, 
@@ -12,6 +12,7 @@ import {
 import { motion } from 'framer-motion';
 import { Plus, Filter, Search, List, LayoutGrid, Loader2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
+import { useSearchParams } from 'react-router-dom';
 import { KanbanColumn } from '@/components/boards/KanbanColumn';
 import { OrderCard } from '@/components/boards/OrderCard';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ const stageColors: Record<OrderStage, string> = {
 
 export default function Operations() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: orders, isLoading } = useOrders();
   const updateStageMutation = useUpdateOrderStage();
   const [activeOrder, setActiveOrder] = useState<OrderWithOccurrences | null>(null);
@@ -59,6 +61,33 @@ export default function Operations() {
 
   // Enable realtime updates
   useRealtimeSubscription(['orders', 'occurrences']);
+
+  // Deep-link actions (Topbar + Dashboard widgets)
+  useEffect(() => {
+    const newAction = searchParams.get('new');
+    const q = searchParams.get('q');
+    const orderId = searchParams.get('orderId');
+
+    if (newAction === 'order') {
+      setIsFormOpen(true);
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+
+    if (q && q !== searchTerm) {
+      setSearchTerm(q);
+    }
+
+    if (orderId && orders) {
+      const found = orders.find((o) => o.id === orderId);
+      if (found) {
+        setSelectedOrder(found);
+        // keep orderId in URL (useful for share). If you prefer, uncomment to clear.
+        // searchParams.delete('orderId');
+        // setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [orders, searchParams, searchTerm, setSearchParams]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
