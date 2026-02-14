@@ -26,6 +26,7 @@ const ORDER_STAGES: { id: OrderStage; label: string }[] = [
 interface RecentOrdersListProps {
   orders: OrderWithOccurrences[];
   onViewOrder?: (order: OrderWithOccurrences) => void;
+  onViewAll?: () => void;
 }
 
 const stageColors: Record<OrderStage, string> = {
@@ -37,8 +38,14 @@ const stageColors: Record<OrderStage, string> = {
   entregue: 'bg-success/20 text-success',
 };
 
-export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps) {
+export function RecentOrdersList({ orders, onViewOrder, onViewAll }: RecentOrdersListProps) {
   const navigate = useNavigate();
+
+  const handleViewAll = () => {
+    if (onViewAll) return onViewAll();
+    navigate('/operacional');
+  };
+
   if (!orders || orders.length === 0) {
     return (
       <motion.div
@@ -66,21 +73,16 @@ export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps)
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-foreground">Ordens Recentes</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1 text-primary"
-          onClick={() => navigate('/operacional')}
-        >
+        <Button variant="ghost" size="sm" className="gap-1 text-primary" onClick={handleViewAll}>
           Ver todas <ArrowRight className="w-4 h-4" />
         </Button>
       </div>
 
       <div className="space-y-3">
         {orders.slice(0, 5).map((order, index) => {
-          const stage = ORDER_STAGES.find(s => s.id === order.stage);
+          const stage = ORDER_STAGES.find((s) => s.id === order.stage);
           const occurrences = order.occurrences || [];
-          
+
           return (
             <motion.div
               key={order.id}
@@ -94,10 +96,12 @@ export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps)
               }}
             >
               <div className="flex items-center gap-3">
-                <div className={cn(
-                  "w-10 h-10 rounded-lg flex items-center justify-center",
-                  order.stage === 'entregue' ? 'bg-success/10' : 'bg-primary/10'
-                )}>
+                <div
+                  className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center',
+                    order.stage === 'entregue' ? 'bg-success/10' : 'bg-primary/10'
+                  )}
+                >
                   {order.stage === 'entregue' ? (
                     <CheckCircle className="w-5 h-5 text-success" />
                   ) : occurrences.length > 0 ? (
@@ -109,10 +113,7 @@ export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps)
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-foreground">{order.os_number}</span>
-                    <Badge 
-                      variant="secondary" 
-                      className={cn("text-xs", stageColors[order.stage])}
-                    >
+                    <Badge variant="secondary" className={cn('text-xs', stageColors[order.stage])}>
                       {stage?.label}
                     </Badge>
                   </div>
@@ -124,30 +125,26 @@ export function RecentOrdersList({ orders, onViewOrder }: RecentOrdersListProps)
 
               <div className="flex items-center gap-4">
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-medium text-foreground">
-                    {order.client_name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {order.driver_name || 'Motorista não atribuído'}
-                  </p>
+                  <p className="text-sm font-medium text-foreground">{order.client_name}</p>
+                  <p className="text-xs text-muted-foreground">{order.driver_name || 'Motorista não atribuído'}</p>
                 </div>
-                
+
                 <div className="flex gap-1">
-                  <Badge 
-                    variant={order.has_nfe ? "default" : "outline"} 
-                    className={cn("text-xs", order.has_nfe && "bg-success text-success-foreground")}
+                  <Badge
+                    variant={order.has_nfe ? 'default' : 'outline'}
+                    className={cn('text-xs', order.has_nfe && 'bg-success text-success-foreground')}
                   >
                     NF-e
                   </Badge>
-                  <Badge 
-                    variant={order.has_cte ? "default" : "outline"} 
-                    className={cn("text-xs", order.has_cte && "bg-success text-success-foreground")}
+                  <Badge
+                    variant={order.has_cte ? 'default' : 'outline'}
+                    className={cn('text-xs', order.has_cte && 'bg-success text-success-foreground')}
                   >
                     CT-e
                   </Badge>
-                  <Badge 
-                    variant={order.has_pod ? "default" : "outline"} 
-                    className={cn("text-xs", order.has_pod && "bg-success text-success-foreground")}
+                  <Badge
+                    variant={order.has_pod ? 'default' : 'outline'}
+                    className={cn('text-xs', order.has_pod && 'bg-success text-success-foreground')}
                   >
                     POD
                   </Badge>

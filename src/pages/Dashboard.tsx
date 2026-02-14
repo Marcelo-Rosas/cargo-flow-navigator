@@ -10,6 +10,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
+import { useNavigate } from 'react-router-dom';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { RecentOrdersList } from '@/components/dashboard/RecentOrdersList';
 import { AlertsWidget } from '@/components/dashboard/AlertsWidget';
@@ -57,6 +58,7 @@ const emptyRevenueData = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
@@ -307,7 +309,11 @@ export default function Dashboard() {
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 </div>
               ) : (
-                <RecentOrdersList orders={recentOrders || []} />
+                <RecentOrdersList
+                  orders={recentOrders || []}
+                  onViewAll={() => navigate('/operacional')}
+                  onViewOrder={(order) => navigate(`/operacional?orderId=${order.id}`)}
+                />
               )}
             </div>
             <div>
@@ -425,7 +431,11 @@ export default function Dashboard() {
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 </div>
               ) : (
-                <RecentOrdersList orders={recentOrders || []} />
+                <RecentOrdersList
+                  orders={recentOrders || []}
+                  onViewAll={() => navigate('/operacional')}
+                  onViewOrder={(order) => navigate(`/operacional?orderId=${order.id}`)}
+                />
               )}
             </div>
           </div>
