@@ -114,8 +114,19 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
             <GripVertical className="w-4 h-4 text-muted-foreground" />
           </button>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-semibold text-foreground">{order.os_number}</h4>
+
+              {/* Badge de pendência crítica (POD) */}
+              {!order.has_pod && order.stage !== 'entregue' && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] px-2 py-0.5 border-amber-500/40 text-amber-700 bg-amber-500/10"
+                >
+                  POD pendente
+                </Badge>
+              )}
+
               {hasDocumentsToShow && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <FileText className="w-3 h-3" />
@@ -136,6 +147,7 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
               size="icon" 
               className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => e.stopPropagation()}
+              aria-label="Ações da ordem de serviço"
             >
               <MoreHorizontal className="w-4 h-4" />
             </Button>

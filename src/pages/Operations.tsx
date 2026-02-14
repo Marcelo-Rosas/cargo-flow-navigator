@@ -141,8 +141,13 @@ export default function Operations() {
           stage: targetStage.id 
         });
         toast.success(`OS movida para ${targetStage.label}`);
-      } catch (error) {
-        toast.error('Erro ao mover OS');
+      } catch (error: any) {
+        const msg = (error?.message || error?.toString?.() || '').toString();
+        if (msg.toLowerCase().includes('pod obrigatório') || msg.toLowerCase().includes('pod obrigatorio')) {
+          toast.error('Anexe o comprovante de entrega (POD) antes de finalizar');
+        } else {
+          toast.error('Erro ao mover OS');
+        }
       }
       return;
     }
@@ -161,8 +166,13 @@ export default function Operations() {
           stage: overOrder.stage 
         });
         toast.success(`OS movida para ${ORDER_STAGES.find(s => s.id === overOrder.stage)?.label}`);
-      } catch (error) {
-        toast.error('Erro ao mover OS');
+      } catch (error: any) {
+        const msg = (error?.message || error?.toString?.() || '').toString();
+        if (msg.toLowerCase().includes('pod obrigatório') || msg.toLowerCase().includes('pod obrigatorio')) {
+          toast.error('Anexe o comprovante de entrega (POD) antes de finalizar');
+        } else {
+          toast.error('Erro ao mover OS');
+        }
       }
     }
   };
