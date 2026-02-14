@@ -157,7 +157,7 @@ export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
                       size="sm"
                       className="h-7 text-xs"
                       onClick={() => {
-                        alert.action?.onClick?.();
+                        if (alert.action?.onClick) return alert.action.onClick();
                         defaultAction(alert);
                       }}
                     >

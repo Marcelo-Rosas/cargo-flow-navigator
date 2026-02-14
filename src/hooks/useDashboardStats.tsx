@@ -194,24 +194,32 @@ export function useConversionChartData() {
         .select('stage, created_at')
         .gte('created_at', sixMonthsAgo.toISOString());
 
-      // Group by month and calculate conversion rate
+      // Group by month (keep stable ordering for the last 6 months)
+      const monthKeys: string[] = [];
       const monthlyData: Record<string, { total: number; won: number }> = {};
 
-      quotes?.forEach(quote => {
-        const month = new Date(quote.created_at).toLocaleDateString('pt-BR', { month: 'short' });
-        if (!monthlyData[month]) {
-          monthlyData[month] = { total: 0, won: 0 };
-        }
-        monthlyData[month].total++;
-        if (quote.stage === 'ganho') {
-          monthlyData[month].won++;
-        }
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const key = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+        monthKeys.push(key);
+        monthlyData[key] = { total: 0, won: 0 };
+      }
+
+      quotes?.forEach((quote) => {
+        const key = new Date(quote.created_at).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+        if (!monthlyData[key]) return;
+        monthlyData[key].total++;
+        if (quote.stage === 'ganho') monthlyData[key].won++;
       });
 
-      return Object.entries(monthlyData).map(([name, data]) => ({
-        name,
-        value: data.total > 0 ? Math.round((data.won / data.total) * 100) : 0,
-      }));
+      return monthKeys.map((name) => {
+        const data = monthlyData[name];
+        return {
+          name,
+          value: data.total > 0 ? Math.round((data.won / data.total) * 100) : 0,
+        };
+      });
     },
   });
 }

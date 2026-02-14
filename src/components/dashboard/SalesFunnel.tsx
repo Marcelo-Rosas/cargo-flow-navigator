@@ -34,7 +34,9 @@ export function SalesFunnel() {
     >
       <h3 className="text-lg font-semibold text-foreground mb-6">Funil de Vendas</h3>
       <div className="space-y-4">
-        {funnelData?.map((stage, index) => (
+        {funnelData?.map((stage, index) => {
+          const pct = Math.max(0, Math.min(100, stage.percentage ?? 0));
+          return (
           <motion.div
             key={stage.stage}
             initial={{ opacity: 0, x: -20 }}
@@ -53,18 +55,19 @@ export function SalesFunnel() {
               <motion.div
                 className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-lg flex items-center justify-end pr-3"
                 initial={{ width: 0 }}
-                animate={{ width: `${stage.percentage}%` }}
+                animate={{ width: `${pct}%` }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
               >
-                {stage.percentage > 20 && (
+                {pct > 20 && (
                   <span className="text-xs font-medium text-primary-foreground">
-                    {stage.percentage}%
+                    {pct}%
                   </span>
                 )}
               </motion.div>
             </div>
           </motion.div>
-        ))}
+        );
+        })}
       </div>
     </motion.div>
   );

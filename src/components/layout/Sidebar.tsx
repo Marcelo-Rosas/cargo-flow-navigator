@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { BrandLogo } from '@/components/BrandLogo';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -51,23 +52,22 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-sidebar-border">
-        <motion.div 
-          className="flex items-center gap-3"
-          animate={{ justifyContent: isCollapsed ? 'center' : 'flex-start' }}
+        <motion.div
+          className="w-full"
+          animate={{ display: 'flex', justifyContent: isCollapsed ? 'center' : 'flex-start' }}
         >
-          <div className="w-10 h-10 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <Package className="w-6 h-6 text-sidebar-primary-foreground" />
-          </div>
-          <AnimatePresence>
-            {!isCollapsed && (
+          <AnimatePresence initial={false}>
+            {isCollapsed ? (
+              <BrandLogo key="logo-collapsed" withText={false} />
+            ) : (
               <motion.div
+                key="logo-expanded"
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.15 }}
               >
-                <span className="font-bold text-lg text-sidebar-foreground">Vectra</span>
-                <span className="font-bold text-lg text-sidebar-muted"> Cargo</span>
+                <BrandLogo withText />
               </motion.div>
             )}
           </AnimatePresence>

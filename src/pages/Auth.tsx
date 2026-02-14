@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, Mail, Lock, Eye, EyeOff, ArrowRight, User } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, User } from 'lucide-react';
+import { BrandLogo } from '@/components/BrandLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -170,13 +171,7 @@ export default function Auth() {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-sidebar-primary flex items-center justify-center">
-              <Package className="w-7 h-7 text-sidebar-primary-foreground" />
-            </div>
-            <div>
-              <span className="font-bold text-2xl text-sidebar-foreground">Vectra</span>
-              <span className="font-bold text-2xl text-sidebar-muted"> Cargo</span>
-            </div>
+            <BrandLogo size="lg" iconWrapClassName="bg-sidebar-primary" />
           </div>
 
           {/* Hero Text */}
@@ -236,13 +231,12 @@ export default function Auth() {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <Package className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <span className="font-bold text-xl text-foreground">Vectra</span>
-              <span className="font-bold text-xl text-muted-foreground"> Cargo</span>
-            </div>
+            <BrandLogo
+              size="md"
+              iconWrapClassName="bg-primary"
+              textPrimaryClassName="text-foreground"
+              textSecondaryClassName="text-muted-foreground"
+            />
           </div>
 
           <Tabs defaultValue="login" className="w-full">
