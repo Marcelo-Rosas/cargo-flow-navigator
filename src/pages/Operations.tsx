@@ -51,7 +51,7 @@ export default function Operations() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { data: orders, isLoading } = useOrders();
+  const { data: orders, isLoading, isError, error, refetch } = useOrders();
   const updateStageMutation = useUpdateOrderStage();
   const [activeOrder, setActiveOrder] = useState<OrderWithOccurrences | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -183,6 +183,22 @@ export default function Operations() {
     );
   }
 
+  if (isError) {
+    return (
+      <MainLayout>
+        <div className="bg-card rounded-xl border border-border shadow-card p-6">
+          <h2 className="text-lg font-semibold text-foreground">Não foi possível carregar as OS</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {(error instanceof Error && error.message) || 'Erro inesperado ao buscar ordens de serviço.'}
+          </p>
+          <div className="mt-4">
+            <Button onClick={() => refetch()}>Tentar novamente</Button>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       {/* Page Header */}
@@ -228,7 +244,7 @@ export default function Operations() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" aria-label="Filtrar ordens de serviço">
             <Filter className="w-4 h-4" />
           </Button>
           <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
