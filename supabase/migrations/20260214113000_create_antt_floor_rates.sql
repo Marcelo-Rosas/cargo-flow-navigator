@@ -27,9 +27,10 @@ CREATE TABLE IF NOT EXISTS public.antt_floor_rates (
 );
 
 -- Unicidade por (tabela, tipo de carga, eixos, vigência)
--- Treat NULL valid_from as '1900-01-01' so "no-validity" rows remain unique.
+-- Observação: UNIQUE permite múltiplos NULLs em valid_from. Se você quiser bloquear isso,
+-- podemos trocar por um índice único por expressão (COALESCE) depois.
 CREATE UNIQUE INDEX IF NOT EXISTS antt_floor_rates_unique
-  ON public.antt_floor_rates (operation_table, cargo_type, axes_count, COALESCE(valid_from, '1900-01-01'::date));
+  ON public.antt_floor_rates (operation_table, cargo_type, axes_count, valid_from);
 
 ALTER TABLE public.antt_floor_rates ENABLE ROW LEVEL SECURITY;
 
