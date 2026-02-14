@@ -149,6 +149,72 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_conditions: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      discharge_checklist_items: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           created_at: string
@@ -790,8 +856,11 @@ export type Database = {
           created_at: string
           created_by: string
           cubage_weight: number | null
+          delivery_conditions_selected: Json | null
+          delivery_notes: string | null
           destination: string
           destination_cep: string | null
+          discharge_checklist_selected: Json | null
           freight_modality: string | null
           freight_type: string
           id: string
@@ -829,8 +898,11 @@ export type Database = {
           created_at?: string
           created_by: string
           cubage_weight?: number | null
+          delivery_conditions_selected?: Json | null
+          delivery_notes?: string | null
           destination: string
           destination_cep?: string | null
+          discharge_checklist_selected?: Json | null
           freight_modality?: string | null
           freight_type?: string
           id?: string
@@ -868,8 +940,11 @@ export type Database = {
           created_at?: string
           created_by?: string
           cubage_weight?: number | null
+          delivery_conditions_selected?: Json | null
+          delivery_notes?: string | null
           destination?: string
           destination_cep?: string | null
+          discharge_checklist_selected?: Json | null
           freight_modality?: string | null
           freight_type?: string
           id?: string
