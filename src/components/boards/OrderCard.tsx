@@ -118,13 +118,24 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
             <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-semibold text-foreground">{order.os_number}</h4>
 
-              {/* Requisitos para avançar para a próxima fase */}
+              {/* Badge de gate: obrigatoriedades para avançar para a próxima fase (por estágio) */}
               {hasDocumentsToShow && hasPendingDocs && nextStage && (
                 <Badge
                   variant="outline"
-                  className="text-[10px] px-2 py-0.5 border-amber-500/40 text-amber-700 bg-amber-500/10"
+                  className={cn(
+                    "text-[10px] px-2 py-0.5",
+                    order.stage === 'em_transito'
+                      ? "border-amber-500/40 text-amber-700 bg-amber-500/10"
+                      : "border-amber-500/40 text-amber-700 bg-amber-500/10"
+                  )}
                 >
-                  Pendências p/ {nextStage.replaceAll('_', ' ')}
+                  {order.stage === 'em_transito'
+                    ? 'POD obrigatório para finalizar'
+                    : order.stage === 'busca_motorista'
+                      ? `Docs do motorista pendentes (${completedDocs}/${totalDocs})`
+                      : order.stage === 'documentacao'
+                        ? `Docs fiscais pendentes (${completedDocs}/${totalDocs})`
+                        : `Pendências para avançar (${completedDocs}/${totalDocs})`}
                 </Badge>
               )}
 
