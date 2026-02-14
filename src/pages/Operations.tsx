@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   DndContext, 
   DragEndEvent, 
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOrders, useUpdateOrderStage, OrderWithOccurrences } from '@/hooks/useOrders';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
@@ -47,6 +48,8 @@ const stageColors: Record<OrderStage, string> = {
 };
 
 export default function Operations() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { data: orders, isLoading } = useOrders();
   const updateStageMutation = useUpdateOrderStage();
@@ -59,6 +62,16 @@ export default function Operations() {
 
   // Enable realtime updates
   useRealtimeSubscription(['orders', 'occurrences']);
+
+  // Deep-link support: /operacional?orderId=<uuid>
+  useEffect(() => {
+    const orderId = searchParams.get('orderId');
+    if (!orderId) return;
+    if (!orders || orders.length === 0) return;
+
+    const order = orders.find((o) => o.id === orderId);
+    if (order) setSelectedOrder(order);
+  }, [searchParams, orders]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -297,7 +310,11 @@ export default function Operations() {
                       {filteredOrders.map((order) => {
                         const stage = ORDER_STAGES.find((s) => s.id === order.stage);
                         return (
-                          <tr key={order.id} className="hover:bg-muted/30 cursor-pointer transition-colors">
+                          <tr
+                            key={order.id}
+                            className="hover:bg-muted/30 cursor-pointer transition-colors"
+                            onClick={() => setSelectedOrder(order)}
+                          >
                             <td className="px-4 py-3 font-medium text-foreground">{order.os_number}</td>
                             <td className="px-4 py-3 text-foreground">{order.client_name}</td>
                             <td className="px-4 py-3 text-muted-foreground">
@@ -339,7 +356,13 @@ export default function Operations() {
       {/* Order Detail Modal */}
       <OrderDetailModal 
         open={!!selectedOrder} 
-        onClose={() => setSelectedOrder(null)} 
+        onClose={() => {
+          setSelectedOrder(null);
+          // If opened via deep-link, clean the URL
+          if (searchParams.get('orderId')) {
+            navigate('/operacional', { replace: true });
+          }
+        }} 
         order={selectedOrder}
       />
       
