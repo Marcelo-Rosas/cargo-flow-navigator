@@ -15,30 +15,22 @@ interface KPICardProps {
   delay?: number;
 }
 
-const variantStyles = {
-  default: 'bg-card',
-  primary: 'bg-primary/10',
-  success: 'bg-success/10',
-  warning: 'bg-warning/10',
-  destructive: 'bg-destructive/10',
-};
-
 const iconVariantStyles = {
   default: 'bg-muted text-muted-foreground',
-  primary: 'bg-primary text-primary-foreground',
-  success: 'bg-success text-success-foreground',
-  warning: 'bg-warning text-warning-foreground',
-  destructive: 'bg-destructive text-destructive-foreground',
+  primary: 'bg-primary/10 text-primary',
+  success: 'bg-success/10 text-success',
+  warning: 'bg-warning/10 text-warning',
+  destructive: 'bg-destructive/10 text-destructive',
 };
 
-export function KPICard({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon, 
-  trend, 
+export function KPICard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  trend,
   variant = 'default',
-  delay = 0 
+  delay = 0
 }: KPICardProps) {
   return (
     <motion.div
@@ -46,26 +38,27 @@ export function KPICard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: [0.22, 0.9, 0.32, 1] }}
       className={cn(
-        "p-6 rounded-xl border border-border shadow-card card-hover",
-        variantStyles[variant]
+        "h-full p-6 rounded-xl border border-border bg-card shadow-card card-hover"
       )}
     >
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <div className="flex items-start justify-between gap-4 h-full">
+        <div className="flex flex-col gap-2 min-w-0 flex-1">
+          <p className="text-sm font-medium text-muted-foreground truncate">{title}</p>
+
           <div className="flex items-baseline gap-2">
-            <motion.span 
-              className="text-3xl font-bold text-foreground"
+            <motion.span
+              className="text-3xl font-bold text-foreground tabular-nums"
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3, delay: delay + 0.2 }}
             >
               {value}
             </motion.span>
+
             {trend && (
-              <span 
+              <span
                 className={cn(
-                  "text-sm font-medium",
+                  "text-sm font-medium tabular-nums",
                   trend.isPositive ? "text-success" : "text-destructive"
                 )}
               >
@@ -73,14 +66,14 @@ export function KPICard({
               </span>
             )}
           </div>
-          {subtitle && (
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
-          )}
+
+          {/* reserva sempre a linha para manter equidade de altura */}
+          <p className="text-sm text-muted-foreground min-h-[20px]">
+            {subtitle ?? " "}
+          </p>
         </div>
-        <div className={cn(
-          "p-3 rounded-lg",
-          iconVariantStyles[variant]
-        )}>
+
+        <div className={cn("shrink-0 p-3 rounded-lg", iconVariantStyles[variant])}>
           <Icon className="w-5 h-5" />
         </div>
       </div>

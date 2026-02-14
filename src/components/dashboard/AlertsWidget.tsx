@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
 import { AlertTriangle, FileWarning, Clock, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -11,7 +13,7 @@ interface Alert {
   time: string;
   action?: {
     label: string;
-    onClick: () => void;
+    onClick?: () => void;
   };
 }
 
@@ -26,10 +28,7 @@ const mockAlerts: Alert[] = [
     title: 'Documento Vencido',
     description: 'CT-e da OS-2024-0002 pendente há 48h',
     time: 'Agora',
-    action: {
-      label: 'Resolver',
-      onClick: () => {},
-    },
+    action: { label: 'Resolver' },
   },
   {
     id: '2',
@@ -37,10 +36,7 @@ const mockAlerts: Alert[] = [
     title: 'Atraso na Entrega',
     description: 'OS-2024-0003 ultrapassou ETA previsto',
     time: 'Há 2h',
-    action: {
-      label: 'Ver OS',
-      onClick: () => {},
-    },
+    action: { label: 'Ver OS' },
   },
   {
     id: '3',
@@ -48,10 +44,7 @@ const mockAlerts: Alert[] = [
     title: 'Comprovante Pendente',
     description: '3 entregas aguardando upload de canhoto',
     time: 'Hoje',
-    action: {
-      label: 'Verificar',
-      onClick: () => {},
-    },
+    action: { label: 'Verificar' },
   },
 ];
 
@@ -74,6 +67,37 @@ const alertStyles = {
 };
 
 export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
+  const navigate = useNavigate();
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
+
+  const visibleAlerts = useMemo(
+    () => alerts.filter((a) => !dismissed.has(a.id)),
+    [alerts, dismissed]
+  );
+
+  const extractOs = (text: string) => {
+    const m = text.match(/OS-\d{4}-\d{4}/i);
+    return m ? m[0].toUpperCase() : null;
+  };
+
+  const defaultAction = (alert: Alert) => {
+    const os = extractOs(`${alert.title} ${alert.description}`);
+
+    if (alert.action?.label === 'Resolver') {
+      if (os) return navigate(`/documentos?q=${encodeURIComponent(os)}`);
+      return navigate('/documentos');
+    }
+
+    if (alert.action?.label === 'Ver OS') {
+      if (os) return navigate(`/operacional?q=${encodeURIComponent(os)}`);
+      return navigate('/operacional');
+    }
+
+    if (alert.action?.label === 'Verificar') {
+      return navigate('/documentos');
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -97,15 +121,12 @@ export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: 0.1 * index }}
-              className={cn(
-                "p-4 rounded-lg border flex items-start gap-3",
-                style.bg
-              )}
+              className={cn('p-4 rounded-lg border flex items-start gap-3', style.bg)}
             >
-              <div className={cn("mt-0.5", style.iconColor)}>
+              <div className={cn('mt-0.5', style.iconColor)}>
                 <Icon className="w-5 h-5" />
               </div>
-              
+
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -116,7 +137,7 @@ export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
-                
+
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-muted-foreground">{alert.time}</span>
                   {alert.action && (
@@ -124,7 +145,10 @@ export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
                       variant="ghost" 
                       size="sm" 
                       className="h-7 text-xs"
-                      onClick={alert.action.onClick}
+                      onClick={() => {
+                        if (alert.action?.onClick) return alert.action.onClick();
+                        defaultAction(alert);
+                      }}
                     >
                       {alert.action.label}
                     </Button>
