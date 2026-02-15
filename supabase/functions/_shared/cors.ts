@@ -4,8 +4,25 @@
  * For multiple origins, use comma-separated ALLOWED_ORIGINS.
  */
 export function getCorsHeaders(req: Request): Record<string, string> {
-  const allowed =
-    Deno.env.get('ALLOWED_ORIGINS') || Deno.env.get('ALLOWED_ORIGIN') || 'http://localhost:5173';
+  const getEnv = (key: string) => {
+    try {
+      if (
+        typeof (globalThis as { Deno?: { env?: { get?: (k: string) => string | undefined } } }).Deno
+          ?.env?.get === 'function'
+      ) {
+        return (
+          globalThis as { Deno: { env: { get: (k: string) => string | undefined } } }
+        ).Deno.env.get(key);
+      }
+      if (typeof process !== 'undefined' && process.env) {
+        return process.env[key];
+      }
+    } catch {
+      // ignore
+    }
+    return undefined;
+  };
+  const allowed = getEnv('ALLOWED_ORIGINS') || getEnv('ALLOWED_ORIGIN') || 'http://localhost:5173';
   const origins = allowed.split(',').map((o) => o.trim());
   const requestOrigin = req.headers.get('Origin');
 

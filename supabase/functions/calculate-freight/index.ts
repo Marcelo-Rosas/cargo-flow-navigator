@@ -1,4 +1,5 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+/// <reference path="deno.d.ts" />
+import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { calculateFreightInputSchema } from '../_shared/freight-schema.ts';
 import {
@@ -20,6 +21,13 @@ import {
   getMarginStatus,
 } from '../_shared/freight-types.ts';
 
+type WaitingRuleRow = {
+  free_hours?: number | null;
+  rate_per_hour?: number | null;
+  rate_per_day?: number | null;
+  min_charge?: number | null;
+};
+
 // =====================================================
 // MAIN HANDLER
 // =====================================================
@@ -34,8 +42,32 @@ Deno.serve(async (req) => {
 
   try {
     // Use ANON_KEY + user JWT (respects RLS); requires verify_jwt = true
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    // Use Deno.env only if running in Deno, fallback for other runtimes (e.g., Node test or local dev)
+    const getEnvSafe = (key: string) => {
+      // @ts-expect-error Deno global may be undefined in Node
+      if (typeof Deno !== 'undefined' && Deno.env && typeof Deno.env.get === 'function') {
+        return Deno.env.get(key);
+      } else if (typeof process !== 'undefined' && process.env) {
+        return process.env[key];
+      }
+      return undefined;
+    };
+
+    const supabaseUrl = getEnvSafe('SUPABASE_URL');
+    const supabaseAnonKey = getEnvSafe('SUPABASE_ANON_KEY');
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          status: 'SERVER_ERROR',
+          errors: ['Environment variables SUPABASE_URL or SUPABASE_ANON_KEY not set'],
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -302,13 +334,13 @@ Deno.serve(async (req) => {
       }
 
       if (waitingRule) {
-        const freeHours = Number(waitingRule.free_hours) || 5; // NTC 2.3: 5h franquia
+        const rule = waitingRule as WaitingRuleRow;
+        const freeHours = Number(rule.free_hours) || 5; // NTC 2.3: 5h franquia
         const excessHours = Math.max(0, input.waiting_hours - freeHours);
 
         if (excessHours > 0) {
-          const ratePerHour = Number(waitingRule.rate_per_hour) || 146.44; // NTC: Truck
-          const ratePerDay =
-            waitingRule.rate_per_day != null ? Number(waitingRule.rate_per_day) : null;
+          const ratePerHour = Number(rule.rate_per_hour) || 146.44; // NTC: Truck
+          const ratePerDay = rule.rate_per_day != null ? Number(rule.rate_per_day) : null;
 
           // NTC: se excede 24h da franquia, cobrar diária inteira
           if (ratePerDay && excessHours >= 24) {
@@ -318,8 +350,8 @@ Deno.serve(async (req) => {
             waitingTimeCost = excessHours * ratePerHour;
           }
 
-          if (waitingRule.min_charge != null && waitingTimeCost < Number(waitingRule.min_charge)) {
-            waitingTimeCost = Number(waitingRule.min_charge);
+          if (rule.min_charge != null && waitingTimeCost < Number(rule.min_charge)) {
+            waitingTimeCost = Number(rule.min_charge);
           }
         }
       } else {

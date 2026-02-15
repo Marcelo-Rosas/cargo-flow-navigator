@@ -60,11 +60,17 @@ import {
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 
+// Select/Combobox podem passar number; coerce para string
+const idString = z
+  .union([z.string(), z.number()])
+  .transform((v) => (v == null || v === '' ? undefined : String(v)))
+  .optional();
+
 const quoteSchema = z.object({
-  client_id: z.string().optional(),
+  client_id: idString,
   client_name: z.string().min(2, 'Nome do cliente obrigatório'),
   client_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
-  shipper_id: z.string().optional(),
+  shipper_id: idString,
   shipper_name: z.string().optional(),
   shipper_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   freight_type: z.enum(['CIF', 'FOB']).default('FOB'),
@@ -84,9 +90,9 @@ const quoteSchema = z.object({
   weight: z.number().min(0, 'Peso inválido').optional().default(0),
   volume: z.number().min(0, 'Volume inválido').optional().default(0),
   // Pricing selectors
-  price_table_id: z.string().optional(),
-  vehicle_type_id: z.string().optional(),
-  payment_term_id: z.string().optional(),
+  price_table_id: idString,
+  vehicle_type_id: idString,
+  payment_term_id: idString,
   km_distance: z.number().min(0, 'Distância inválida').optional(),
   // Pricing components
   cargo_value: z.number().min(0, 'Valor inválido').optional().default(0),
