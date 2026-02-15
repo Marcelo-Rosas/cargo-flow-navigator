@@ -383,21 +383,39 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
     setIsCalculatingKm(true);
     try {
-      // Geocode no browser (BrasilAPI permite CORS); Edge pode falhar acessando APIs BR
-      const fetchCoords = async (cep: string) => {
-        const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
-        if (!res.ok) return null;
-        const j = await res.json();
-        const c = j?.location?.coordinates;
-        if (c?.latitude != null && c?.longitude != null) {
-          const lat = Number(c.latitude);
-          const lon = Number(c.longitude);
-          if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+      // Geocode no browser: ViaCEP (CORS ok) → cidade/UF → Nominatim (CORS ok)
+      const fetchCoords = async (cep: string): Promise<{ lat: number; lon: number } | null> => {
+        try {
+          const vc = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+          if (!vc.ok) return null;
+          const vj = await vc.json();
+          if (vj.erro || !vj.localidade || !vj.uf) return null;
+          const q = `${vj.localidade}, ${vj.uf}, Brazil`;
+          const nm = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&limit=1&country=Brazil&q=${encodeURIComponent(q)}`,
+            {
+              headers: {
+                'User-Agent': 'vectra-cargo-flow/1.0 (contact: support@vectracargo.com.br)',
+              },
+            }
+          );
+          if (!nm.ok) return null;
+          const nj = await nm.json();
+          const item = Array.isArray(nj) ? nj[0] : null;
+          if (item?.lat && item?.lon) {
+            const lat = Number(item.lat);
+            const lon = Number(item.lon);
+            if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+          }
+        } catch {
+          // ignore
         }
         return null;
       };
 
-      const [from, to] = await Promise.all([fetchCoords(originCep), fetchCoords(destinationCep)]);
+      const from = await fetchCoords(originCep);
+      await new Promise((r) => setTimeout(r, 1100)); // Nominatim: max 1 req/s
+      const to = from ? await fetchCoords(destinationCep) : null;
 
       const body =
         from && to
