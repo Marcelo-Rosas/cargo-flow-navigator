@@ -40,11 +40,15 @@ Com `strictNullChecks: true` habilitado em `tsconfig.app.json`, o `tsc` reporta 
 9. `src/components/forms/ShipperForm.tsx`
 10. Demais arquivos (useAnttFloorRate, useShippers, etc.)
 
+## Status: Encerrada ✅
+
+Issue #4 concluída e encerrada (Fase 1 – strictNullChecks).
+
 ## Status atual (branch feat/typescript-strict)
 
 - **strictNullChecks**: ✅ Habilitado em tsconfig.app.json
 - **Utilitários**: `filterSupabaseRows`, `filterSupabaseSingle`, `asDb`, `asInsert` em `src/lib/supabase-utils.ts`
 - **Fase 1 concluída**: ✅ Todos os erros de strictNullChecks corrigidos
 - **Build**: `tsc --noEmit` e `npm run build` passam sem erros
-- **Correções adicionais**: Sidebar (filtro por role restaurado), ExportReports (formatDate para evitar Invalid Date no CSV)
+- **Correções adicionais**: Sidebar (filtro por role), ExportReports (formatDate), App (404 sem auth)
 - **Próximas fases (opcional)**: noImplicitAny, strict: true

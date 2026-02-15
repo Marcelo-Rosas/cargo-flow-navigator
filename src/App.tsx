@@ -90,14 +90,7 @@ const App = () => (
                 }
               />
 
-              <Route
-                path="*"
-                element={
-                  <ProtectedRoute>
-                    <NotFound />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </BrowserRouter>
