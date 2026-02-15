@@ -217,7 +217,7 @@ function WaitingTimeForm({
     e.preventDefault();
     onSubmit({
       vehicle_type_id: vehicleTypeId || null,
-      context,
+      context: context as 'loading' | 'unloading' | 'both',
       free_hours: parseFloat(freeHours) || 6,
       rate_per_hour: ratePerHour ? parseFloat(ratePerHour) : null,
       rate_per_day: ratePerDay ? parseFloat(ratePerDay) : null,

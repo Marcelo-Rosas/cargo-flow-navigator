@@ -2,13 +2,17 @@
 
 Base URL: `https://<project-ref>.supabase.co/functions/v1/<function-name>`
 
+## CORS e variáveis de ambiente
+
+- **ALLOWED_ORIGIN** ou **ALLOWED_ORIGINS**: domínios permitidos (ex: `https://app.vectracargo.com` ou `https://app.vectracargo.com,http://localhost:5173`). Em produção, configure no Supabase Dashboard (Edge Functions → Secrets).
+
 ## 1. calculate-freight
 
 Calcula frete rodoviário com base em origem, destino, peso, volume, valor da carga e tabela de preços (FOB Lotação, impostos "por fora", NTC).
 
 **Método:** `POST`  
-**Headers:** `Content-Type: application/json`  
-**Auth:** Não requer JWT (usa Service Role internamente).
+**Headers:** `Content-Type: application/json`, `Authorization: Bearer <jwt>`  
+**Auth:** Requer JWT válido (usuário autenticado).
 
 ### Request
 
@@ -112,6 +116,16 @@ Calcula frete rodoviário com base em origem, destino, peso, volume, valor da ca
 }
 ```
 
+### Erros (401)
+
+```json
+{
+  "success": false,
+  "status": "UNAUTHORIZED",
+  "errors": ["Authorization header obrigatório"]
+}
+```
+
 ### Erros (500)
 
 ```json
@@ -136,8 +150,8 @@ Calcula frete rodoviário com base em origem, destino, peso, volume, valor da ca
 Consulta endereço por CEP (fallback: ViaCEP → BrasilAPI v2 → OpenCEP).
 
 **Método:** `POST`  
-**Headers:** `Content-Type: application/json`  
-**Auth:** Não requer JWT.
+**Headers:** `Content-Type: application/json`, `Authorization: Bearer <jwt>`  
+**Auth:** Requer JWT válido.
 
 ### Request
 

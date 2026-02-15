@@ -36,7 +36,8 @@ const navItems = [
   },
 ];
 
-const bottomNavItems = [
+type NavItem = { path: string; icon: typeof LayoutDashboard; label: string; roles?: AppRole[] };
+const bottomNavItems: NavItem[] = [
   // { path: '/configuracoes', icon: Settings, label: 'Configurações' }, // (a implementar)
   // { path: '/integracoes', icon: Plug, label: 'Integrações' }, // (a implementar)
   // { path: '/ajuda', icon: HelpCircle, label: 'Ajuda' }, // (a implementar)
@@ -45,10 +46,6 @@ const bottomNavItems = [
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
-  const { role } = useUserRole();
-  const filteredNavItems = navItems.filter(
-    (item) => !item.roles || (role && item.roles.includes(role))
-  );
 
   return (
     <motion.aside
@@ -83,7 +80,7 @@ export function Sidebar() {
 
       {/* Main Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        {filteredNavItems.map((item) => (
+        {navItems.map((item) => (
           <NavItem
             key={item.path}
             path={item.path}

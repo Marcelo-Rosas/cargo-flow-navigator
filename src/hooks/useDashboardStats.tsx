@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface TrendData {
@@ -39,13 +40,15 @@ export function useDashboardStats() {
         .select('value, stage')
         .not('stage', 'in', '("perdido","ganho")');
 
-      const pipelineValue = quotes?.reduce((acc, q) => acc + Number(q.value), 0) || 0;
+      const validQuotes = filterSupabaseRows<{ value: number; stage: string }>(quotes);
+      const pipelineValue = validQuotes.reduce((acc, q) => acc + Number(q.value), 0);
 
       // Get conversion rate for all time
       const { data: allQuotes } = await supabase.from('quotes').select('stage, created_at');
+      const validAllQuotes = filterSupabaseRows<{ stage: string; created_at: string }>(allQuotes);
 
-      const totalQuotes = allQuotes?.length || 0;
-      const wonQuotes = allQuotes?.filter((q) => q.stage === 'ganho').length || 0;
+      const totalQuotes = validAllQuotes.length;
+      const wonQuotes = validAllQuotes.filter((q) => q.stage === 'ganho').length;
       const conversionRate = totalQuotes > 0 ? Math.round((wonQuotes / totalQuotes) * 100) : 0;
 
       // Calculate pipeline trend (current month quotes vs last month)
@@ -63,9 +66,10 @@ export function useDashboardStats() {
         .lte('created_at', lastMonth.end.toISOString())
         .not('stage', 'in', '("perdido","ganho")');
 
-      const currentMonthPipeline =
-        currentMonthQuotes?.reduce((acc, q) => acc + Number(q.value), 0) || 0;
-      const lastMonthPipeline = lastMonthQuotes?.reduce((acc, q) => acc + Number(q.value), 0) || 0;
+      const validCurrentMonth = filterSupabaseRows<{ value: number }>(currentMonthQuotes);
+      const validLastMonth = filterSupabaseRows<{ value: number }>(lastMonthQuotes);
+      const currentMonthPipeline = validCurrentMonth.reduce((acc, q) => acc + Number(q.value), 0);
+      const lastMonthPipeline = validLastMonth.reduce((acc, q) => acc + Number(q.value), 0);
 
       let pipelineTrend: TrendData | null = null;
       if (lastMonthPipeline > 0) {
@@ -78,27 +82,23 @@ export function useDashboardStats() {
       }
 
       // Calculate conversion trend (current month vs last month)
-      const currentMonthTotal =
-        allQuotes?.filter((q) => {
-          const date = new Date(q.created_at);
-          return date >= currentMonth.start && date <= currentMonth.end;
-        }).length || 0;
-      const currentMonthWon =
-        allQuotes?.filter((q) => {
-          const date = new Date(q.created_at);
-          return date >= currentMonth.start && date <= currentMonth.end && q.stage === 'ganho';
-        }).length || 0;
+      const currentMonthTotal = validAllQuotes.filter((q) => {
+        const date = new Date(q.created_at);
+        return date >= currentMonth.start && date <= currentMonth.end;
+      }).length;
+      const currentMonthWon = validAllQuotes.filter((q) => {
+        const date = new Date(q.created_at);
+        return date >= currentMonth.start && date <= currentMonth.end && q.stage === 'ganho';
+      }).length;
 
-      const lastMonthTotal =
-        allQuotes?.filter((q) => {
-          const date = new Date(q.created_at);
-          return date >= lastMonth.start && date <= lastMonth.end;
-        }).length || 0;
-      const lastMonthWon =
-        allQuotes?.filter((q) => {
-          const date = new Date(q.created_at);
-          return date >= lastMonth.start && date <= lastMonth.end && q.stage === 'ganho';
-        }).length || 0;
+      const lastMonthTotal = validAllQuotes.filter((q) => {
+        const date = new Date(q.created_at);
+        return date >= lastMonth.start && date <= lastMonth.end;
+      }).length;
+      const lastMonthWon = validAllQuotes.filter((q) => {
+        const date = new Date(q.created_at);
+        return date >= lastMonth.start && date <= lastMonth.end && q.stage === 'ganho';
+      }).length;
 
       const currentConversionRate =
         currentMonthTotal > 0 ? (currentMonthWon / currentMonthTotal) * 100 : 0;
@@ -201,6 +201,8 @@ export function useConversionChartData() {
         .select('stage, created_at')
         .gte('created_at', sixMonthsAgo.toISOString());
 
+      const validQuotesConv = filterSupabaseRows<{ stage: string; created_at: string }>(quotes);
+
       // Group by month (keep stable ordering for the last 6 months)
       const monthKeys: string[] = [];
       const monthlyData: Record<string, { total: number; won: number }> = {};
@@ -213,7 +215,7 @@ export function useConversionChartData() {
         monthlyData[key] = { total: 0, won: 0 };
       }
 
-      quotes?.forEach((quote) => {
+      validQuotesConv.forEach((quote) => {
         const key = new Date(quote.created_at).toLocaleDateString('pt-BR', {
           month: 'short',
           year: '2-digit',
@@ -227,7 +229,7 @@ export function useConversionChartData() {
         const data = monthlyData[name];
         return {
           name,
-          value: data.total > 0 ? Math.round((data.won / data.total) * 100) : 0,
+          value: data && data.total > 0 ? Math.round((data.won / data.total) * 100) : 0,
         };
       });
     },
@@ -243,11 +245,12 @@ export function useRevenueByClientData() {
         .select('client_name, value')
         .eq('stage', 'entregue');
 
-      // Group by client
+      const validOrdersRev = filterSupabaseRows<{ client_name: string | null; value: number }>(
+        orders
+      );
       const clientRevenue: Record<string, number> = {};
-
-      orders?.forEach((order) => {
-        const client = order.client_name;
+      validOrdersRev.forEach((order) => {
+        const client = order.client_name ?? 'Sem cliente';
         clientRevenue[client] = (clientRevenue[client] || 0) + Number(order.value);
       });
 

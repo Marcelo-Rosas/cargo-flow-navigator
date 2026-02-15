@@ -95,11 +95,12 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
   // CNPJ auto-lookup functions
   const sanitizeCnpj = (v: string) => v.replace(/\D/g, '');
 
-  const safeSet = (key: keyof ShipperFormData, value?: string | null) => {
-    if (!value) return;
+  const safeSet = (key: keyof ShipperFormData, value?: unknown) => {
+    const str = value != null ? String(value).trim() : '';
+    if (!str) return;
     const current = form.getValues(key);
     if (current && current.trim().length > 0) return;
-    form.setValue(key, value, { shouldValidate: true, shouldDirty: true });
+    form.setValue(key, str, { shouldValidate: true, shouldDirty: true });
   };
 
   const handleCnpjLookup = async () => {

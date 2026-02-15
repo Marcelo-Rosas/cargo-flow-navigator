@@ -35,7 +35,7 @@ import {
 } from '@/hooks/usePricingMutations';
 import { Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { ConditionalFee } from '@/types/pricing';
+import type { ConditionalFee, FeeType, FeeAppliesTo } from '@/types/pricing';
 
 type CreateConditionalFeeInput = {
   code: string;
@@ -183,7 +183,13 @@ export function ConditionalFeesSection() {
           {editingFee && (
             <ConditionalFeeForm
               fee={editingFee}
-              onSubmit={(data) => handleUpdate(editingFee.id, data)}
+              onSubmit={(data) =>
+                handleUpdate(editingFee.id, {
+                  ...data,
+                  fee_type: data.fee_type as FeeType,
+                  applies_to: data.applies_to as FeeAppliesTo,
+                })
+              }
               isLoading={updateMutation.isPending}
             />
           )}

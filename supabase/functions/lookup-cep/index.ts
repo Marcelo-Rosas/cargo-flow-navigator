@@ -1,4 +1,4 @@
-import { corsHeaders } from '../_shared/cors.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
 
 interface CepData {
   cep: string;
@@ -93,6 +93,8 @@ function formatAddress(data: CepData): string {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -124,25 +126,25 @@ Deno.serve(async (req) => {
     }
 
     if (!data) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'CEP não encontrado' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, error: 'CEP não encontrado' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     data.formatted = formatAddress(data);
     console.log('[lookup-cep] Sucesso:', data.formatted);
 
-    return new Response(
-      JSON.stringify({ success: true, data }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ success: true, data }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('[lookup-cep] Erro:', errorMessage);
-    return new Response(
-      JSON.stringify({ success: false, error: 'Erro ao buscar CEP' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ success: false, error: 'Erro ao buscar CEP' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

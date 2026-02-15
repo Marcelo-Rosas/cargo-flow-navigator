@@ -37,6 +37,7 @@ import { usePriceTable } from '@/hooks/usePriceTables';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { supabase } from '@/integrations/supabase/client';
+import { asDb, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
 import { toast } from 'sonner';
 
@@ -106,9 +107,9 @@ export function QuoteDetailModal({
       const { data } = await supabase
         .from('vehicle_types')
         .select('name, code, axes_count')
-        .eq('id', quote.vehicle_type_id)
+        .eq('id', asDb(quote.vehicle_type_id))
         .maybeSingle();
-      return data;
+      return filterSupabaseSingle<{ name: string; code: string; axes_count: number }>(data);
     },
     enabled: !!quote?.vehicle_type_id,
   });
@@ -136,9 +137,13 @@ export function QuoteDetailModal({
       const { data } = await supabase
         .from('payment_terms')
         .select('name, code, adjustment_percent')
-        .eq('id', quote.payment_term_id)
+        .eq('id', asDb(quote.payment_term_id))
         .maybeSingle();
-      return data;
+      return filterSupabaseSingle<{
+        name: string;
+        code: string;
+        adjustment_percent: number;
+      }>(data);
     },
     enabled: !!quote?.payment_term_id,
   });
@@ -224,7 +229,7 @@ export function QuoteDetailModal({
           pricing_breakdown: updatedBreakdown as unknown as typeof quote.pricing_breakdown,
           waiting_time_cost: selection.waitingTimeCost,
         })
-        .eq('id', quote.id);
+        .eq('id', asDb(quote.id));
 
       if (error) throw error;
       return updatedBreakdown;
@@ -648,7 +653,7 @@ export function QuoteDetailModal({
                                   pricing_breakdown:
                                     updated as unknown as typeof quote.pricing_breakdown,
                                 })
-                                .eq('id', quote.id);
+                                .eq('id', asDb(quote.id));
 
                               if (error) {
                                 toast.error('Erro ao salvar piso ANTT');

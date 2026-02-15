@@ -126,7 +126,7 @@ export interface FreightCalculationOutput {
     routeUfLabel: string | null;
     kmBandLabel: string | null;
     kmStatus: 'OK' | 'OUT_OF_RANGE';
-    marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
+    marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET' | 'UNKNOWN';
     marginPercent: number;
     cubageFactor: number;
     cubageWeightKg: number;
@@ -194,7 +194,7 @@ export interface StoredPricingBreakdown {
     routeUfLabel: string | null;
     kmBandLabel: string | null;
     kmStatus: 'OK' | 'OUT_OF_RANGE';
-    marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
+    marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET' | 'UNKNOWN';
     marginPercent: number;
     inputWeightUnit?: 'kg' | 'ton';
     selectedConditionalFeeIds?: string[];

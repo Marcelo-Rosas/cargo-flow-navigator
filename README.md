@@ -105,6 +105,7 @@ As Edge Functions estão documentadas em [docs/api.md](docs/api.md):
 
 - **Frontend**: conecte o repositório à Vercel e configure as variáveis de ambiente (`VITE_SUPABASE_*`).
 - **Backend**: Supabase Cloud; migrations via `supabase db push`.
+- **Edge Functions**: em produção, configure `ALLOWED_ORIGIN` (ou `ALLOWED_ORIGINS` para múltiplos) no Supabase Dashboard (Edge Functions → Secrets) com o domínio do app.
 
 ## Contribuição
 
