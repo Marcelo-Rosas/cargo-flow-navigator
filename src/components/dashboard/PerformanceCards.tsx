@@ -20,10 +20,16 @@ interface MetricCardProps {
   delay?: number;
 }
 
-function MetricCard({ title, currentValue, previousValue, format = 'number', delay = 0 }: MetricCardProps) {
+function MetricCard({
+  title,
+  currentValue,
+  previousValue,
+  format = 'number',
+  delay = 0,
+}: MetricCardProps) {
   const current = typeof currentValue === 'number' ? currentValue : parseFloat(currentValue);
   const previous = previousValue || 0;
-  
+
   const percentChange = previous > 0 ? ((current - previous) / previous) * 100 : 0;
   const isPositive = percentChange > 0;
   const isNeutral = percentChange === 0;
@@ -52,10 +58,12 @@ function MetricCard({ title, currentValue, previousValue, format = 'number', del
           {typeof currentValue === 'string' ? currentValue : formatValue(current)}
         </span>
         {previousValue !== undefined && (
-          <div className={cn(
-            "flex items-center text-sm font-medium",
-            isNeutral ? "text-muted-foreground" : isPositive ? "text-success" : "text-destructive"
-          )}>
+          <div
+            className={cn(
+              'flex items-center text-sm font-medium',
+              isNeutral ? 'text-muted-foreground' : isPositive ? 'text-success' : 'text-destructive'
+            )}
+          >
             {isNeutral ? (
               <Minus className="w-4 h-4 mr-1" />
             ) : isPositive ? (
@@ -78,7 +86,10 @@ export function PerformanceCards() {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="bg-card rounded-xl border border-border shadow-card p-5 animate-pulse">
+          <div
+            key={i}
+            className="bg-card rounded-xl border border-border shadow-card p-5 animate-pulse"
+          >
             <div className="h-4 bg-muted rounded w-24 mb-2" />
             <div className="h-8 bg-muted rounded w-16" />
           </div>

@@ -45,9 +45,9 @@ interface PriceTableImportModalProps {
 
 type ImportStep = 'upload' | 'preview' | 'importing' | 'done';
 
-export function PriceTableImportModal({ 
-  open, 
-  onOpenChange, 
+export function PriceTableImportModal({
+  open,
+  onOpenChange,
   defaultModality = 'lotacao',
   defaultTableId,
 }: PriceTableImportModalProps) {
@@ -57,9 +57,11 @@ export function PriceTableImportModal({
   const [step, setStep] = useState<ImportStep>('upload');
   const [parseResult, setParseResult] = useState<ParseResult<ParsedPriceRow> | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  
+
   // Form state
-  const [targetMode, setTargetMode] = useState<'new' | 'existing'>(defaultTableId ? 'existing' : 'new');
+  const [targetMode, setTargetMode] = useState<'new' | 'existing'>(
+    defaultTableId ? 'existing' : 'new'
+  );
   const [selectedTableId, setSelectedTableId] = useState<string>(defaultTableId || '');
   const [newTableName, setNewTableName] = useState('');
   const [modality, setModality] = useState<'lotacao' | 'fracionado'>(defaultModality);
@@ -88,11 +90,11 @@ export function PriceTableImportModal({
     if (!file) return;
 
     setSelectedFile(file);
-    
+
     try {
       const result = await parsePriceTableFile(file);
       setParseResult(result);
-      
+
       if (result.rows.length === 0) {
         toast.error('Nenhuma linha válida encontrada no arquivo');
       } else {
@@ -124,14 +126,18 @@ export function PriceTableImportModal({
       return;
     }
 
-    const priceTable: PriceTableImportInput = targetMode === 'new'
-      ? { id: 'new', name: newTableName.trim(), modality, active: setAsActive }
-      : { 
-          id: selectedTableId, 
-          name: existingTables?.find(t => t.id === selectedTableId)?.name || '', 
-          modality: existingTables?.find(t => t.id === selectedTableId)?.modality as 'lotacao' | 'fracionado' || modality,
-          active: setAsActive,
-        };
+    const priceTable: PriceTableImportInput =
+      targetMode === 'new'
+        ? { id: 'new', name: newTableName.trim(), modality, active: setAsActive }
+        : {
+            id: selectedTableId,
+            name: existingTables?.find((t) => t.id === selectedTableId)?.name || '',
+            modality:
+              (existingTables?.find((t) => t.id === selectedTableId)?.modality as
+                | 'lotacao'
+                | 'fracionado') || modality,
+            active: setAsActive,
+          };
 
     if (targetMode === 'new' && !priceTable.name) {
       toast.error('Nome da tabela é obrigatório');
@@ -149,9 +155,10 @@ export function PriceTableImportModal({
 
       if (result.success) {
         setStep('done');
-        const duplicateMsg = result.duplicatesRemoved > 0 
-          ? `, ${result.duplicatesRemoved} duplicata(s) removida(s)` 
-          : '';
+        const duplicateMsg =
+          result.duplicatesRemoved > 0
+            ? `, ${result.duplicatesRemoved} duplicata(s) removida(s)`
+            : '';
         toast.success(
           `Importação concluída: ${result.rowsInserted} inserida(s), ${result.rowsUpdated} atualizada(s)${duplicateMsg}`
         );
@@ -164,11 +171,13 @@ export function PriceTableImportModal({
       }
     } catch (error) {
       setStep('preview');
-      toast.error(`Erro ao importar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      toast.error(
+        `Erro ao importar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
+      );
     }
   };
 
-  const filteredTables = existingTables?.filter(t => t.modality === modality) || [];
+  const filteredTables = existingTables?.filter((t) => t.modality === modality) || [];
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -189,7 +198,10 @@ export function PriceTableImportModal({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Destino</Label>
-                <Select value={targetMode} onValueChange={(v) => setTargetMode(v as 'new' | 'existing')}>
+                <Select
+                  value={targetMode}
+                  onValueChange={(v) => setTargetMode(v as 'new' | 'existing')}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -202,8 +214,8 @@ export function PriceTableImportModal({
 
               <div className="space-y-2">
                 <Label>Modalidade</Label>
-                <Select 
-                  value={modality} 
+                <Select
+                  value={modality}
                   onValueChange={(v) => {
                     setModality(v as 'lotacao' | 'fracionado');
                     setSelectedTableId('');
@@ -224,8 +236,8 @@ export function PriceTableImportModal({
             {targetMode === 'new' ? (
               <div className="space-y-2">
                 <Label>Nome da Nova Tabela</Label>
-                <Input 
-                  value={newTableName} 
+                <Input
+                  value={newTableName}
                   onChange={(e) => setNewTableName(e.target.value)}
                   placeholder="Ex: Tabela Sul 2025 v2"
                 />
@@ -238,7 +250,7 @@ export function PriceTableImportModal({
                     <SelectValue placeholder="Selecione uma tabela" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredTables.map(table => (
+                    {filteredTables.map((table) => (
                       <SelectItem key={table.id} value={table.id}>
                         {table.name} (v{table.version}) {table.active && '• Ativa'}
                       </SelectItem>
@@ -252,19 +264,23 @@ export function PriceTableImportModal({
             <div
               {...getRootProps()}
               className={cn(
-                "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
-                isDragActive 
-                  ? "border-primary bg-primary/5" 
-                  : "border-border hover:border-primary/50 hover:bg-muted/30"
+                'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
+                isDragActive
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50 hover:bg-muted/30'
               )}
             >
               <input {...getInputProps()} />
-              <Upload className={cn(
-                "w-10 h-10 mx-auto mb-3 transition-colors",
-                isDragActive ? "text-primary" : "text-muted-foreground"
-              )} />
+              <Upload
+                className={cn(
+                  'w-10 h-10 mx-auto mb-3 transition-colors',
+                  isDragActive ? 'text-primary' : 'text-muted-foreground'
+                )}
+              />
               <p className="text-foreground font-medium mb-1">
-                {isDragActive ? 'Solte o arquivo aqui' : 'Arraste um arquivo ou clique para selecionar'}
+                {isDragActive
+                  ? 'Solte o arquivo aqui'
+                  : 'Arraste um arquivo ou clique para selecionar'}
               </p>
               <p className="text-sm text-muted-foreground">
                 CSV (separador ;) ou Excel (XLSX, XLSM) • Máximo 10MB
@@ -273,7 +289,10 @@ export function PriceTableImportModal({
 
             <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
               <p className="font-medium mb-1">Colunas esperadas:</p>
-              <p>km_from, km_to (ou faixa), cost_per_ton, cost_per_kg, gris_percent, tso_percent (ou ad_valorem_percent), toll_percent</p>
+              <p>
+                km_from, km_to (ou faixa), cost_per_ton, cost_per_kg, gris_percent, tso_percent (ou
+                ad_valorem_percent), toll_percent
+              </p>
             </div>
           </div>
         )}
@@ -303,7 +322,10 @@ export function PriceTableImportModal({
             <div className="flex items-center gap-4">
               <div className="flex-1 space-y-1">
                 <Label>Modo de Importação</Label>
-                <Select value={importMode} onValueChange={(v) => setImportMode(v as 'replace' | 'upsert')}>
+                <Select
+                  value={importMode}
+                  onValueChange={(v) => setImportMode(v as 'replace' | 'upsert')}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -345,7 +367,7 @@ export function PriceTableImportModal({
                 </TableHeader>
                 <TableBody>
                   {parseResult.rows.slice(0, 100).map((row, idx) => (
-                    <TableRow key={idx} className={cn(!row.isValid && "bg-destructive/10")}>
+                    <TableRow key={idx} className={cn(!row.isValid && 'bg-destructive/10')}>
                       <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                       <TableCell>{row.km_from}</TableCell>
                       <TableCell>{row.km_to}</TableCell>
@@ -402,9 +424,13 @@ export function PriceTableImportModal({
               <Button variant="outline" onClick={() => setStep('upload')}>
                 Voltar
               </Button>
-              <Button 
+              <Button
                 onClick={handleImport}
-                disabled={!parseResult || parseResult.validRows === 0 || (targetMode === 'existing' && !selectedTableId)}
+                disabled={
+                  !parseResult ||
+                  parseResult.validRows === 0 ||
+                  (targetMode === 'existing' && !selectedTableId)
+                }
               >
                 Importar {parseResult?.validRows || 0} linhas
               </Button>

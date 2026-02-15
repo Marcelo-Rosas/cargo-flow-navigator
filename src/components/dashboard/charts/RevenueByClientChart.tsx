@@ -1,13 +1,5 @@
 import { motion } from 'framer-motion';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { formatCurrency } from '@/lib/utils';
 
 interface RevenueByClientPoint {

@@ -26,10 +26,10 @@ export const ORDER_STAGE_FLOW: readonly OrderStage[] = [
  * REGRA: não herdar automaticamente do estágio anterior; requisitos são declarados por gate.
  */
 export const STAGE_NEXT_REQUIREMENTS = {
-  'ordem_criada': [],
+  ordem_criada: [],
 
   // Para sair de "busca_motorista" e ir para "documentacao"
-  'busca_motorista': [
+  busca_motorista: [
     { key: 'has_cnh', label: 'CNH', group: 'motorista' },
     { key: 'has_crlv', label: 'CRLV', group: 'motorista' },
     { key: 'has_comp_residencia', label: 'Comp.Res.', group: 'motorista' },
@@ -37,22 +37,20 @@ export const STAGE_NEXT_REQUIREMENTS = {
   ],
 
   // Para sair de "documentacao" e ir para "coleta_realizada"
-  'documentacao': [
+  documentacao: [
     { key: 'has_nfe', label: 'NF-e', group: 'fiscal' },
     { key: 'has_cte', label: 'CT-e', group: 'fiscal' },
     { key: 'has_mdfe', label: 'MDF-e', group: 'fiscal' },
   ],
 
   // Para sair de "coleta_realizada" e ir para "em_transito"
-  'coleta_realizada': [],
+  coleta_realizada: [],
 
   // Para sair de "em_transito" e ir para "entregue"
-  'em_transito': [
-    { key: 'has_pod', label: 'POD', group: 'entrega' },
-  ],
+  em_transito: [{ key: 'has_pod', label: 'POD', group: 'entrega' }],
 
   // Último estágio não tem próxima fase
-  'entregue': [],
+  entregue: [],
 } as const satisfies Record<OrderStage, readonly DocumentConfig[]>;
 
 export function getNextStage(stage: OrderStage): OrderStage | null {
@@ -71,10 +69,15 @@ export function getNextStageRequirements(stage: OrderStage): readonly DocumentCo
 /**
  * Helper para agrupar documentos por categoria
  */
-export function groupDocumentsByCategory(docs: readonly DocumentConfig[]): Record<string, DocumentConfig[]> {
-  return docs.reduce((acc, doc) => {
-    if (!acc[doc.group]) acc[doc.group] = [];
-    acc[doc.group].push(doc);
-    return acc;
-  }, {} as Record<string, DocumentConfig[]>);
+export function groupDocumentsByCategory(
+  docs: readonly DocumentConfig[]
+): Record<string, DocumentConfig[]> {
+  return docs.reduce(
+    (acc, doc) => {
+      if (!acc[doc.group]) acc[doc.group] = [];
+      acc[doc.group].push(doc);
+      return acc;
+    },
+    {} as Record<string, DocumentConfig[]>
+  );
 }

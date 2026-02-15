@@ -3,20 +3,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Calculator, 
-  Loader2, 
-  AlertTriangle, 
-  Package, 
-  Scale, 
+import {
+  Calculator,
+  Loader2,
+  AlertTriangle,
+  Package,
+  Scale,
   Truck,
   MapPin,
-  TrendingUp
+  TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -52,7 +58,7 @@ export function FreightSimulator() {
   // Result
   const [result, setResult] = useState<CalculateFreightResponse | null>(null);
 
-  const activeTables = priceTables?.filter(t => t.active) || [];
+  const activeTables = priceTables?.filter((t) => t.active) || [];
 
   const handleCalculate = async () => {
     try {
@@ -81,10 +87,8 @@ export function FreightSimulator() {
   };
 
   const toggleFee = (code: string) => {
-    setSelectedFees(prev => 
-      prev.includes(code) 
-        ? prev.filter(c => c !== code)
-        : [...prev, code]
+    setSelectedFees((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
     );
   };
 
@@ -97,9 +101,12 @@ export function FreightSimulator() {
 
   const getMarginBadgeVariant = (status: string) => {
     switch (status) {
-      case 'ABOVE_TARGET': return 'default';
-      case 'BELOW_TARGET': return 'destructive';
-      default: return 'secondary';
+      case 'ABOVE_TARGET':
+        return 'default';
+      case 'BELOW_TARGET':
+        return 'destructive';
+      default:
+        return 'secondary';
     }
   };
 
@@ -112,9 +119,7 @@ export function FreightSimulator() {
             <Calculator className="h-5 w-5" />
             Entrada
           </CardTitle>
-          <CardDescription>
-            Preencha os dados da simulação
-          </CardDescription>
+          <CardDescription>Preencha os dados da simulação</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Location */}
@@ -160,15 +165,19 @@ export function FreightSimulator() {
                     value={weightValue}
                     onChange={(e) => setWeightValue(e.target.value)}
                   />
-                  <ToggleGroup 
-                    type="single" 
-                    value={weightUnit} 
+                  <ToggleGroup
+                    type="single"
+                    value={weightUnit}
                     onValueChange={(v) => v && setWeightUnit(v as 'kg' | 'ton')}
                     size="sm"
                     className="shrink-0"
                   >
-                    <ToggleGroupItem value="kg" className="text-xs px-2">kg</ToggleGroupItem>
-                    <ToggleGroupItem value="ton" className="text-xs px-2">ton</ToggleGroupItem>
+                    <ToggleGroupItem value="kg" className="text-xs px-2">
+                      kg
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="ton" className="text-xs px-2">
+                      ton
+                    </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
               </div>
@@ -261,7 +270,8 @@ export function FreightSimulator() {
                   <SelectItem value="">Padrão (D30)</SelectItem>
                   {paymentTerms?.map((t) => (
                     <SelectItem key={t.id} value={t.code}>
-                      {t.name} ({t.adjustment_percent > 0 ? '+' : ''}{t.adjustment_percent}%)
+                      {t.name} ({t.adjustment_percent > 0 ? '+' : ''}
+                      {t.adjustment_percent}%)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -284,7 +294,9 @@ export function FreightSimulator() {
                   checked={tdeEnabled}
                   onCheckedChange={(c) => setTdeEnabled(!!c)}
                 />
-                <label htmlFor="tde" className="text-sm font-medium">TDE</label>
+                <label htmlFor="tde" className="text-sm font-medium">
+                  TDE
+                </label>
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -292,7 +304,9 @@ export function FreightSimulator() {
                   checked={tearEnabled}
                   onCheckedChange={(c) => setTearEnabled(!!c)}
                 />
-                <label htmlFor="tear" className="text-sm font-medium">TEAR</label>
+                <label htmlFor="tear" className="text-sm font-medium">
+                  TEAR
+                </label>
               </div>
             </div>
           </div>
@@ -302,9 +316,7 @@ export function FreightSimulator() {
             <>
               <Separator />
               <div className="space-y-4">
-                <div className="text-sm font-medium text-muted-foreground">
-                  Taxas Condicionais
-                </div>
+                <div className="text-sm font-medium text-muted-foreground">Taxas Condicionais</div>
                 <div className="grid grid-cols-2 gap-3">
                   {conditionalFees.map((fee) => (
                     <div key={fee.id} className="flex items-center space-x-2">
@@ -340,8 +352,8 @@ export function FreightSimulator() {
             />
           </div>
 
-          <Button 
-            onClick={handleCalculate} 
+          <Button
+            onClick={handleCalculate}
             className="w-full"
             disabled={calculateFreight.isPending}
           >
@@ -355,9 +367,7 @@ export function FreightSimulator() {
       <Card>
         <CardHeader>
           <CardTitle>Resultado</CardTitle>
-          <CardDescription>
-            Breakdown detalhado do cálculo
-          </CardDescription>
+          <CardDescription>Breakdown detalhado do cálculo</CardDescription>
         </CardHeader>
         <CardContent>
           {!result ? (
@@ -396,15 +406,26 @@ export function FreightSimulator() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground">Real</p>
-                    <p className="font-medium">{((weightUnit === 'ton' ? parseFloat(weightValue) * 1000 : parseFloat(weightValue)) || 0).toLocaleString('pt-BR')} kg</p>
+                    <p className="font-medium">
+                      {(
+                        (weightUnit === 'ton'
+                          ? parseFloat(weightValue) * 1000
+                          : parseFloat(weightValue)) || 0
+                      ).toLocaleString('pt-BR')}{' '}
+                      kg
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Cubado</p>
-                    <p className="font-medium">{result.meta.cubage_weight_kg.toLocaleString('pt-BR')} kg</p>
+                    <p className="font-medium">
+                      {result.meta.cubage_weight_kg.toLocaleString('pt-BR')} kg
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Taxável</p>
-                    <p className="font-semibold text-primary">{result.meta.billable_weight_kg.toLocaleString('pt-BR')} kg</p>
+                    <p className="font-semibold text-primary">
+                      {result.meta.billable_weight_kg.toLocaleString('pt-BR')} kg
+                    </p>
                   </div>
                 </div>
               </div>
@@ -416,14 +437,29 @@ export function FreightSimulator() {
                 <h4 className="font-medium text-sm text-muted-foreground">COMPONENTES</h4>
                 <div className="space-y-2">
                   <BreakdownRow label="Custo Base" value={result.components.base_cost} />
-                  <BreakdownRow label={`Frete Base (+${result.rates.markup_percent}%)`} value={result.components.base_freight} />
+                  <BreakdownRow
+                    label={`Frete Base (+${result.rates.markup_percent}%)`}
+                    value={result.components.base_freight}
+                  />
                   <BreakdownRow label="Pedágio" value={result.components.toll} />
-                  <BreakdownRow label={`GRIS (${result.rates.gris_percent}%)`} value={result.components.gris} />
-                  <BreakdownRow label={`TSO (${result.rates.tso_percent}%)`} value={result.components.tso} />
-                  <BreakdownRow label={`RCTR-C (${result.rates.cost_value_percent}%)`} value={result.components.rctrc} />
+                  <BreakdownRow
+                    label={`GRIS (${result.rates.gris_percent}%)`}
+                    value={result.components.gris}
+                  />
+                  <BreakdownRow
+                    label={`TSO (${result.rates.tso_percent}%)`}
+                    value={result.components.tso}
+                  />
+                  <BreakdownRow
+                    label={`RCTR-C (${result.rates.cost_value_percent}%)`}
+                    value={result.components.rctrc}
+                  />
                   <BreakdownRow label="TDE (20%)" value={result.components.tde} />
                   <BreakdownRow label="TEAR (20%)" value={result.components.tear} />
-                  <BreakdownRow label="Taxas Condicionais" value={result.components.conditional_fees_total} />
+                  <BreakdownRow
+                    label="Taxas Condicionais"
+                    value={result.components.conditional_fees_total}
+                  />
                   <BreakdownRow label="Estadia" value={result.components.waiting_time_cost} />
                 </div>
               </div>
@@ -436,13 +472,25 @@ export function FreightSimulator() {
                 <div className="space-y-2">
                   <BreakdownRow label="Receita Bruta" value={result.totals.receita_bruta} />
                   {result.totals.tac_adjustment > 0 && (
-                    <BreakdownRow label={`TAC (${result.rates.tac_percent}%)`} value={result.totals.tac_adjustment} />
+                    <BreakdownRow
+                      label={`TAC (${result.rates.tac_percent}%)`}
+                      value={result.totals.tac_adjustment}
+                    />
                   )}
                   {result.totals.payment_adjustment > 0 && (
-                    <BreakdownRow label={`Prazo (${result.rates.payment_adjustment_percent}%)`} value={result.totals.payment_adjustment} />
+                    <BreakdownRow
+                      label={`Prazo (${result.rates.payment_adjustment_percent}%)`}
+                      value={result.totals.payment_adjustment}
+                    />
                   )}
-                  <BreakdownRow label={`DAS (${result.rates.das_percent}%)`} value={result.totals.das} />
-                  <BreakdownRow label={`ICMS (${result.rates.icms_percent}%)`} value={result.totals.icms} />
+                  <BreakdownRow
+                    label={`DAS (${result.rates.das_percent}%)`}
+                    value={result.totals.das}
+                  />
+                  <BreakdownRow
+                    label={`ICMS (${result.rates.icms_percent}%)`}
+                    value={result.totals.icms}
+                  />
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
@@ -458,12 +506,22 @@ export function FreightSimulator() {
               <div className="space-y-3">
                 <h4 className="font-medium text-sm text-muted-foreground">RENTABILIDADE</h4>
                 <div className="space-y-2">
-                  <BreakdownRow label="Custos Diretos" value={result.profitability.custos_diretos} negative />
+                  <BreakdownRow
+                    label="Custos Diretos"
+                    value={result.profitability.custos_diretos}
+                    negative
+                  />
                   <BreakdownRow label="Margem Bruta" value={result.profitability.margem_bruta} />
-                  <BreakdownRow label={`Overhead (${result.rates.overhead_percent}%)`} value={result.profitability.overhead} negative />
+                  <BreakdownRow
+                    label={`Overhead (${result.rates.overhead_percent}%)`}
+                    value={result.profitability.overhead}
+                    negative
+                  />
                   <div className="flex justify-between items-center pt-2 border-t">
                     <span className="font-medium">Resultado Líquido</span>
-                    <span className={`font-bold ${result.profitability.resultado_liquido >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                    <span
+                      className={`font-bold ${result.profitability.resultado_liquido >= 0 ? 'text-green-600' : 'text-destructive'}`}
+                    >
                       {formatCurrency(result.profitability.resultado_liquido)}
                     </span>
                   </div>
@@ -506,9 +564,17 @@ export function FreightSimulator() {
   );
 }
 
-function BreakdownRow({ label, value, negative }: { label: string; value: number; negative?: boolean }) {
+function BreakdownRow({
+  label,
+  value,
+  negative,
+}: {
+  label: string;
+  value: number;
+  negative?: boolean;
+}) {
   if (value === 0) return null;
-  
+
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -520,7 +586,8 @@ function BreakdownRow({ label, value, negative }: { label: string; value: number
     <div className="flex justify-between items-center text-sm">
       <span className="text-muted-foreground">{label}</span>
       <span className={negative ? 'text-destructive' : ''}>
-        {negative ? '-' : ''}{formatCurrency(value)}
+        {negative ? '-' : ''}
+        {formatCurrency(value)}
       </span>
     </div>
   );

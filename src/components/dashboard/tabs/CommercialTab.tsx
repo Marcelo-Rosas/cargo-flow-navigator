@@ -21,7 +21,12 @@ export function CommercialTab({ chartConversionData, chartRevenueData }: Commerc
         <StageDistributionChart />
       </div>
 
-      <ConversionChart title="Evolução da Taxa de Conversão" data={chartConversionData} delay={0.2} height={300} />
+      <ConversionChart
+        title="Evolução da Taxa de Conversão"
+        data={chartConversionData}
+        delay={0.2}
+        height={300}
+      />
 
       <RevenueByClientChart
         title="Top Clientes por Faturamento"

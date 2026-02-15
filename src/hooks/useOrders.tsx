@@ -11,27 +11,29 @@ type Quote = Database['public']['Tables']['quotes']['Row'];
 
 export interface OrderWithOccurrences extends Order {
   occurrences: Occurrence[];
-  quote?: Pick<
-    Quote,
-    | 'id'
-    | 'shipper_name'
-    | 'shipper_id'
-    | 'client_name'
-    | 'client_id'
-    | 'origin'
-    | 'origin_cep'
-    | 'destination'
-    | 'destination_cep'
-    | 'freight_type'
-    | 'km_distance'
-    | 'vehicle_type_id'
-  > & {
-    vehicle_type?: {
-      axes_count: number | null;
-      code: string;
-      name: string;
-    } | null;
-  } | null;
+  quote?:
+    | (Pick<
+        Quote,
+        | 'id'
+        | 'shipper_name'
+        | 'shipper_id'
+        | 'client_name'
+        | 'client_id'
+        | 'origin'
+        | 'origin_cep'
+        | 'destination'
+        | 'destination_cep'
+        | 'freight_type'
+        | 'km_distance'
+        | 'vehicle_type_id'
+      > & {
+        vehicle_type?: {
+          axes_count: number | null;
+          code: string;
+          name: string;
+        } | null;
+      })
+    | null;
 }
 
 export function useOrders() {
@@ -40,7 +42,8 @@ export function useOrders() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select(`
+        .select(
+          `
           *,
           occurrences (*),
           quote:quotes (
@@ -57,7 +60,8 @@ export function useOrders() {
             km_distance,
             vehicle_type_id
           )
-        `)
+        `
+        )
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -72,7 +76,8 @@ export function useOrder(id: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select(`
+        .select(
+          `
           *,
           occurrences (*),
           quote:quotes (
@@ -94,7 +99,8 @@ export function useOrder(id: string) {
               name
             )
           )
-        `)
+        `
+        )
         .eq('id', id)
         .maybeSingle();
 
@@ -112,7 +118,7 @@ export function useCreateOrder() {
     mutationFn: async (order: Omit<OrderInsert, 'os_number'> & { os_number?: string }) => {
       // Generate OS number using the database function
       const { data: osNumber } = await supabase.rpc('generate_os_number');
-      
+
       const { data, error } = await supabase
         .from('orders')
         .insert({ ...order, os_number: osNumber || order.os_number || '' })
@@ -175,10 +181,7 @@ export function useDeleteOrder() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('orders')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('orders').delete().eq('id', id);
 
       if (error) throw error;
     },
@@ -203,7 +206,9 @@ export function useConvertQuoteToOrder() {
       if (quoteError) throw quoteError;
 
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       // Generate OS number
@@ -228,10 +233,7 @@ export function useConvertQuoteToOrder() {
       if (orderError) throw orderError;
 
       // Update quote stage to 'ganho'
-      await supabase
-        .from('quotes')
-        .update({ stage: 'ganho' })
-        .eq('id', quoteId);
+      await supabase.from('quotes').update({ stage: 'ganho' }).eq('id', quoteId);
 
       return order;
     },

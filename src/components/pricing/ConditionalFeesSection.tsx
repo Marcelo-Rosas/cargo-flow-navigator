@@ -3,15 +3,51 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useConditionalFees } from '@/hooks/usePricingRules';
-import { useCreateConditionalFee, useUpdateConditionalFee, useDeleteConditionalFee } from '@/hooks/usePricingMutations';
+import {
+  useCreateConditionalFee,
+  useUpdateConditionalFee,
+  useDeleteConditionalFee,
+} from '@/hooks/usePricingMutations';
 import { Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ConditionalFee } from '@/types/pricing';
+
+type CreateConditionalFeeInput = {
+  code: string;
+  name: string;
+  description?: string | null;
+  fee_type: string;
+  fee_value: number;
+  min_value?: number | null;
+  max_value?: number | null;
+  applies_to: string;
+  active?: boolean;
+};
 
 const FEE_TYPE_LABELS: Record<string, string> = {
   percentage: 'Percentual',
@@ -30,11 +66,11 @@ export function ConditionalFeesSection() {
   const createMutation = useCreateConditionalFee();
   const updateMutation = useUpdateConditionalFee();
   const deleteMutation = useDeleteConditionalFee();
-  
+
   const [editingFee, setEditingFee] = useState<ConditionalFee | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (data: CreateConditionalFeeInput) => {
     try {
       await createMutation.mutateAsync(data);
       toast.success('Taxa condicional criada');
@@ -44,7 +80,7 @@ export function ConditionalFeesSection() {
     }
   };
 
-  const handleUpdate = async (id: string, data: any) => {
+  const handleUpdate = async (id: string, data: Partial<Omit<ConditionalFee, 'conditions'>>) => {
     try {
       await updateMutation.mutateAsync({ id, updates: data });
       toast.success('Taxa atualizada');
@@ -122,11 +158,7 @@ export function ConditionalFeesSection() {
                     onCheckedChange={() => handleToggleActive(fee)}
                     disabled={updateMutation.isPending}
                   />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingFee(fee)}
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => setEditingFee(fee)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
@@ -161,10 +193,7 @@ export function ConditionalFeesSection() {
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
-          <ConditionalFeeForm
-            onSubmit={handleCreate}
-            isLoading={createMutation.isPending}
-          />
+          <ConditionalFeeForm onSubmit={handleCreate} isLoading={createMutation.isPending} />
         </DialogContent>
       </Dialog>
     </div>
@@ -177,7 +206,7 @@ function ConditionalFeeForm({
   isLoading,
 }: {
   fee?: ConditionalFee;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: CreateConditionalFeeInput) => void;
   isLoading: boolean;
 }) {
   const [code, setCode] = useState(fee?.code || '');

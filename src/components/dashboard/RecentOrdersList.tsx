@@ -58,7 +58,9 @@ export function RecentOrdersList({ orders, onViewOrder, onViewAll }: RecentOrder
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <Truck className="w-12 h-12 text-muted-foreground/50 mb-3" />
           <p className="text-muted-foreground">Nenhuma ordem de serviço encontrada</p>
-          <p className="text-sm text-muted-foreground/70">Crie sua primeira OS no board operacional</p>
+          <p className="text-sm text-muted-foreground/70">
+            Crie sua primeira OS no board operacional
+          </p>
         </div>
       </motion.div>
     );
@@ -123,7 +125,9 @@ export function RecentOrdersList({ orders, onViewOrder, onViewAll }: RecentOrder
               <div className="flex items-center gap-4">
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-medium text-foreground">{order.client_name}</p>
-                  <p className="text-xs text-muted-foreground">{order.driver_name || 'Motorista não atribuído'}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {order.driver_name || 'Motorista não atribuído'}
+                  </p>
                 </div>
 
                 <div className="flex gap-1">

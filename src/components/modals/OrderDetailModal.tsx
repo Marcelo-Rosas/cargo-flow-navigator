@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
-import { 
-  MapPin, 
-  Truck, 
-  Phone, 
-  Calendar, 
-  FileText, 
+import {
+  MapPin,
+  Truck,
+  Phone,
+  Calendar,
+  FileText,
   AlertTriangle,
   Loader2,
   CheckCircle2,
@@ -16,12 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { DocumentList } from '@/components/documents/DocumentList';
 import { OccurrenceForm } from '@/components/forms/OccurrenceForm';
@@ -39,38 +34,53 @@ type OrderStage = Database['public']['Enums']['order_stage'];
 
 interface OrderWithOccurrences extends Order {
   occurrences: Occurrence[];
-  quote?: Pick<
-    Quote,
-    | 'id'
-    | 'shipper_name'
-    | 'shipper_id'
-    | 'client_name'
-    | 'client_id'
-    | 'origin'
-    | 'origin_cep'
-    | 'destination'
-    | 'destination_cep'
-    | 'freight_type'
-    | 'km_distance'
-    | 'vehicle_type_id'
-  > & {
-    vehicle_type?: {
-      axes_count: number | null;
-      code: string;
-      name: string;
-    } | null;
-  } | null;
+  quote?:
+    | (Pick<
+        Quote,
+        | 'id'
+        | 'shipper_name'
+        | 'shipper_id'
+        | 'client_name'
+        | 'client_id'
+        | 'origin'
+        | 'origin_cep'
+        | 'destination'
+        | 'destination_cep'
+        | 'freight_type'
+        | 'km_distance'
+        | 'vehicle_type_id'
+      > & {
+        vehicle_type?: {
+          axes_count: number | null;
+          code: string;
+          name: string;
+        } | null;
+      })
+    | null;
 }
 
 interface OrderDetailModalProps {
   open: boolean;
   onClose: () => void;
   order: OrderWithOccurrences | null;
+  canManage?: boolean;
 }
 
 // Stage visibility constants
-const STAGES_WITH_DRIVER: OrderStage[] = ['busca_motorista', 'documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
-const STAGES_WITH_DOCS_TAB: OrderStage[] = ['busca_motorista', 'documentacao', 'coleta_realizada', 'em_transito', 'entregue'];
+const STAGES_WITH_DRIVER: OrderStage[] = [
+  'busca_motorista',
+  'documentacao',
+  'coleta_realizada',
+  'em_transito',
+  'entregue',
+];
+const STAGES_WITH_DOCS_TAB: OrderStage[] = [
+  'busca_motorista',
+  'documentacao',
+  'coleta_realizada',
+  'em_transito',
+  'entregue',
+];
 
 const STAGE_LABELS: Record<OrderStage, { label: string; color: string }> = {
   ordem_criada: { label: 'Ordem Criada', color: 'bg-muted text-muted-foreground' },
@@ -81,7 +91,12 @@ const STAGE_LABELS: Record<OrderStage, { label: string; color: string }> = {
   entregue: { label: 'Entregue', color: 'bg-success/10 text-success' },
 };
 
-export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps) {
+export function OrderDetailModal({
+  open,
+  onClose,
+  order,
+  canManage = true,
+}: OrderDetailModalProps) {
   const { user } = useAuth();
   const { data: occurrences } = useOccurrencesByOrder(order?.id || '');
   const resolveOccurrenceMutation = useResolveOccurrence();
@@ -97,14 +112,19 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
     axesCount,
   });
 
-  const anttCalc = (anttRate && kmDistance)
-    ? calculateAnttMinimum({ kmDistance: Number(kmDistance), ccd: Number(anttRate.ccd), cc: Number(anttRate.cc) })
-    : null;
+  const anttCalc =
+    anttRate && kmDistance
+      ? calculateAnttMinimum({
+          kmDistance: Number(kmDistance),
+          ccd: Number(anttRate.ccd),
+          cc: Number(anttRate.cc),
+        })
+      : null;
 
   if (!order) return null;
 
   const stageInfo = STAGE_LABELS[order.stage];
-  
+
   // Stage-based visibility flags
   const showDriverSection = STAGES_WITH_DRIVER.includes(order.stage);
   const showDocsTab = STAGES_WITH_DOCS_TAB.includes(order.stage);
@@ -147,13 +167,18 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-3">
                 <span className="text-2xl font-bold">{order.os_number}</span>
-                <Badge className={cn(stageInfo.color)}>
-                  {stageInfo.label}
-                </Badge>
+                <Badge className={cn(stageInfo.color)}>{stageInfo.label}</Badge>
               </DialogTitle>
-              <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)} aria-label="Editar ordem de serviço">
-                <Pencil className="w-4 h-4" />
-              </Button>
+              {canManage && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsEditFormOpen(true)}
+                  aria-label="Editar ordem de serviço"
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              )}
             </div>
           </DialogHeader>
 
@@ -203,7 +228,9 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                     </div>
                     <p className="font-medium text-foreground">{order.origin}</p>
                     {order.quote?.origin_cep && (
-                      <p className="text-xs text-muted-foreground mt-1">CEP: {order.quote.origin_cep}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        CEP: {order.quote.origin_cep}
+                      </p>
                     )}
                   </div>
                   <div className="p-4 rounded-lg bg-muted/30 border border-border">
@@ -213,7 +240,9 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                     </div>
                     <p className="font-medium text-foreground">{order.destination}</p>
                     {order.quote?.destination_cep && (
-                      <p className="text-xs text-muted-foreground mt-1">CEP: {order.quote.destination_cep}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        CEP: {order.quote.destination_cep}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -266,17 +295,21 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                           {formatCurrency(anttCalc.total)}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Tabela A • Carga Geral • {axesCount || '-'} eixos • {Number(kmDistance || 0).toLocaleString('pt-BR')} km
+                          Tabela A • Carga Geral • {axesCount || '-'} eixos •{' '}
+                          {Number(kmDistance || 0).toLocaleString('pt-BR')} km
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Memória: ({Number(kmDistance || 0).toLocaleString('pt-BR')} × {Number(anttRate?.ccd || 0).toFixed(4)}) + {Number(anttRate?.cc || 0).toFixed(2)}
+                          Memória: ({Number(kmDistance || 0).toLocaleString('pt-BR')} ×{' '}
+                          {Number(anttRate?.ccd || 0).toFixed(4)}) +{' '}
+                          {Number(anttRate?.cc || 0).toFixed(2)}
                         </p>
                       </>
                     ) : (
                       <>
                         <p className="text-xl font-bold text-foreground">—</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Cadastre CCD/CC em ANTT Floor Rates (Tabela A / Carga Geral) e preencha KM + veículo.
+                          Cadastre CCD/CC em ANTT Floor Rates (Tabela A / Carga Geral) e preencha KM
+                          + veículo.
                         </p>
                       </>
                     )}
@@ -288,13 +321,10 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                         <Calendar className="w-4 h-4" />
                         <span className="text-sm">Previsão de Entrega</span>
                       </div>
-                      <p className="font-medium text-foreground">
-                        {formatDate(order.eta)}
-                      </p>
+                      <p className="font-medium text-foreground">{formatDate(order.eta)}</p>
                     </div>
                   )}
                 </div>
-
 
                 {/* Notes */}
                 {order.notes && (
@@ -314,7 +344,7 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
 
               {showDocsTab && (
                 <TabsContent value="documents" className="m-0 space-y-6">
-                  <DocumentUpload orderId={order.id} orderStage={order.stage} />
+                  {canManage && <DocumentUpload orderId={order.id} orderStage={order.stage} />}
                   <Separator />
                   <DocumentList orderId={order.id} />
                 </TabsContent>
@@ -323,18 +353,20 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
               <TabsContent value="occurrences" className="m-0 space-y-4">
                 <div className="flex justify-between items-center">
                   <h4 className="font-semibold text-foreground">Histórico de Ocorrências</h4>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setIsOccurrenceFormOpen(true)}
-                    className="gap-2"
-                  >
-                    <AlertTriangle className="w-4 h-4" />
-                    Nova Ocorrência
-                  </Button>
+                  {canManage && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsOccurrenceFormOpen(true)}
+                      className="gap-2"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      Nova Ocorrência
+                    </Button>
+                  )}
                 </div>
 
-                {(!occurrences || occurrences.length === 0) ? (
+                {!occurrences || occurrences.length === 0 ? (
                   <div className="text-center py-8">
                     <CheckCircle2 className="w-10 h-10 mx-auto text-success mb-2" />
                     <p className="text-muted-foreground">Nenhuma ocorrência registrada</p>
@@ -342,39 +374,46 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
                 ) : (
                   <div className="space-y-3">
                     {occurrences.map((occ) => (
-                      <div 
+                      <div
                         key={occ.id}
                         className={cn(
-                          "p-4 rounded-lg border",
-                          occ.resolved_at 
-                            ? "bg-muted/30 border-border" 
-                            : occ.severity === 'critica' 
-                              ? "bg-destructive/10 border-destructive/30"
+                          'p-4 rounded-lg border',
+                          occ.resolved_at
+                            ? 'bg-muted/30 border-border'
+                            : occ.severity === 'critica'
+                              ? 'bg-destructive/10 border-destructive/30'
                               : occ.severity === 'alta'
-                                ? "bg-destructive/5 border-destructive/20"
-                                : "bg-warning/10 border-warning/30"
+                                ? 'bg-destructive/5 border-destructive/20'
+                                : 'bg-warning/10 border-warning/30'
                         )}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className={cn(
-                              "text-xs",
-                              occ.severity === 'baixa' && "bg-muted",
-                              occ.severity === 'media' && "bg-warning/20 text-warning-foreground",
-                              occ.severity === 'alta' && "bg-destructive/20 text-destructive",
-                              occ.severity === 'critica' && "bg-destructive text-destructive-foreground"
-                            )}>
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                'text-xs',
+                                occ.severity === 'baixa' && 'bg-muted',
+                                occ.severity === 'media' && 'bg-warning/20 text-warning-foreground',
+                                occ.severity === 'alta' && 'bg-destructive/20 text-destructive',
+                                occ.severity === 'critica' &&
+                                  'bg-destructive text-destructive-foreground'
+                              )}
+                            >
                               {occ.severity.toUpperCase()}
                             </Badge>
                             {occ.resolved_at && (
-                              <Badge variant="secondary" className="text-xs bg-success/20 text-success">
+                              <Badge
+                                variant="secondary"
+                                className="text-xs bg-success/20 text-success"
+                              >
                                 Resolvida
                               </Badge>
                             )}
                           </div>
-                          {!occ.resolved_at && (
-                            <Button 
-                              variant="ghost" 
+                          {canManage && !occ.resolved_at && (
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleResolveOccurrence(occ.id)}
                               disabled={resolveOccurrenceMutation.isPending}
@@ -402,8 +441,8 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
       </Dialog>
 
       {/* Occurrence Form */}
-      <OccurrenceForm 
-        open={isOccurrenceFormOpen}
+      <OccurrenceForm
+        open={canManage && isOccurrenceFormOpen}
         onClose={() => setIsOccurrenceFormOpen(false)}
         orderId={order.id}
         osNumber={order.os_number}
@@ -411,7 +450,7 @@ export function OrderDetailModal({ open, onClose, order }: OrderDetailModalProps
 
       {/* Edit Form */}
       <OrderForm
-        open={isEditFormOpen}
+        open={canManage && isEditFormOpen}
         onClose={() => setIsEditFormOpen(false)}
         order={order}
       />

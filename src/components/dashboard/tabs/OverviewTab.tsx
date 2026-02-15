@@ -38,8 +38,18 @@ export function OverviewTab({
       <PerformanceCards />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ConversionChart title="Taxa de Conversão" data={chartConversionData} delay={0.2} height={240} />
-        <RevenueByClientChart title="Faturamento por Cliente" data={chartRevenueData} delay={0.25} height={240} />
+        <ConversionChart
+          title="Taxa de Conversão"
+          data={chartConversionData}
+          delay={0.2}
+          height={240}
+        />
+        <RevenueByClientChart
+          title="Faturamento por Cliente"
+          data={chartRevenueData}
+          delay={0.25}
+          height={240}
+        />
       </div>
 
       <MonthlyTrendsChart />

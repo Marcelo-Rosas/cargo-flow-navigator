@@ -47,11 +47,7 @@ export function useCreatePriceTableRow() {
 
   return useMutation({
     mutationFn: async (row: PriceTableRowInsert) => {
-      const { data, error } = await supabase
-        .from('price_table_rows')
-        .insert(row)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('price_table_rows').insert(row).select().single();
 
       if (error) throw error;
       return data;
@@ -67,10 +63,7 @@ export function useCreatePriceTableRowsBatch() {
 
   return useMutation({
     mutationFn: async (rows: PriceTableRowInsert[]) => {
-      const { data, error } = await supabase
-        .from('price_table_rows')
-        .insert(rows)
-        .select();
+      const { data, error } = await supabase.from('price_table_rows').insert(rows).select();
 
       if (error) throw error;
       return data;
@@ -109,10 +102,7 @@ export function useDeletePriceTableRow() {
 
   return useMutation({
     mutationFn: async ({ id, priceTableId }: { id: string; priceTableId: string }) => {
-      const { error } = await supabase
-        .from('price_table_rows')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('price_table_rows').delete().eq('id', id);
 
       if (error) throw error;
       return { priceTableId };

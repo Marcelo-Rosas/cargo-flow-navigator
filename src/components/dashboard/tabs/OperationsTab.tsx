@@ -55,9 +55,7 @@ export function OperationsTab({
           transition={{ duration: 0.4, delay: 0.3 }}
           className="bg-card rounded-xl border border-border shadow-card p-6"
         >
-          <h3 className="text-lg font-semibold text-foreground mb-4">
-            Resumo de Documentação
-          </h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Resumo de Documentação</h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 bg-success/10 rounded-lg">
               <span className="font-medium text-foreground">Documentação Completa</span>

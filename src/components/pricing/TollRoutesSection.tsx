@@ -2,20 +2,68 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useTollRoutes, useVehicleTypes } from '@/hooks/usePricingRules';
-import { useCreateTollRoute, useUpdateTollRoute, useDeleteTollRoute } from '@/hooks/usePricingMutations';
+import {
+  useCreateTollRoute,
+  useUpdateTollRoute,
+  useDeleteTollRoute,
+} from '@/hooks/usePricingMutations';
 import { Pencil, Plus, Trash2, Loader2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TollRoute } from '@/types/pricing';
 
 const BRAZILIAN_STATES = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 
-  'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 
-  'SP', 'SE', 'TO'
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
 ];
 
 type TollRouteWithVehicle = TollRoute & {
@@ -28,19 +76,21 @@ export function TollRoutesSection() {
   const createMutation = useCreateTollRoute();
   const updateMutation = useUpdateTollRoute();
   const deleteMutation = useDeleteTollRoute();
-  
+
   const [editingRoute, setEditingRoute] = useState<TollRouteWithVehicle | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [filterOrigin, setFilterOrigin] = useState<string>('all');
   const [filterDestination, setFilterDestination] = useState<string>('all');
 
-  const filteredRoutes = (routes as TollRouteWithVehicle[] | undefined)?.filter(route => {
+  const filteredRoutes = (routes as TollRouteWithVehicle[] | undefined)?.filter((route) => {
     if (filterOrigin !== 'all' && route.origin_state !== filterOrigin) return false;
     if (filterDestination !== 'all' && route.destination_state !== filterDestination) return false;
     return true;
   });
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (
+    data: Omit<TollRoute, 'id' | 'created_at' | 'updated_at' | 'created_by'>
+  ) => {
     try {
       await createMutation.mutateAsync(data);
       toast.success('Rota de pedágio criada');
@@ -50,7 +100,7 @@ export function TollRoutesSection() {
     }
   };
 
-  const handleUpdate = async (id: string, data: any) => {
+  const handleUpdate = async (id: string, data: Partial<TollRoute>) => {
     try {
       await updateMutation.mutateAsync({ id, updates: data });
       toast.success('Rota atualizada');
@@ -88,7 +138,9 @@ export function TollRoutesSection() {
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
               {BRAZILIAN_STATES.map((uf) => (
-                <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                <SelectItem key={uf} value={uf}>
+                  {uf}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -100,7 +152,9 @@ export function TollRoutesSection() {
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
               {BRAZILIAN_STATES.map((uf) => (
-                <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                <SelectItem key={uf} value={uf}>
+                  {uf}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -149,22 +203,14 @@ export function TollRoutesSection() {
                   <span className="text-muted-foreground">Todos</span>
                 )}
               </TableCell>
-              <TableCell className="font-medium">
-                R$ {route.toll_value.toFixed(2)}
-              </TableCell>
-              <TableCell>
-                {route.distance_km ? `${route.distance_km} km` : '-'}
-              </TableCell>
+              <TableCell className="font-medium">R$ {route.toll_value.toFixed(2)}</TableCell>
+              <TableCell>{route.distance_km ? `${route.distance_km} km` : '-'}</TableCell>
               <TableCell className="text-muted-foreground text-sm">
                 {route.via_description || '-'}
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingRoute(route)}
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => setEditingRoute(route)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
@@ -226,7 +272,9 @@ function TollRouteForm({
 }: {
   route?: TollRouteWithVehicle;
   vehicleTypes?: { id: string; code: string; name: string }[];
-  onSubmit: (data: any) => void;
+  onSubmit: (
+    data: Omit<TollRoute, 'id' | 'created_at' | 'updated_at' | 'created_by'> | Partial<TollRoute>
+  ) => void;
   isLoading: boolean;
 }) {
   const [originState, setOriginState] = useState(route?.origin_state || '');
@@ -264,9 +312,7 @@ function TollRouteForm({
     <form onSubmit={handleSubmit}>
       <DialogHeader>
         <DialogTitle>{route ? 'Editar Rota de Pedágio' : 'Nova Rota de Pedágio'}</DialogTitle>
-        <DialogDescription>
-          Configure o valor do pedágio para uma rota específica
-        </DialogDescription>
+        <DialogDescription>Configure o valor do pedágio para uma rota específica</DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
         <div className="grid grid-cols-2 gap-4">
@@ -278,7 +324,9 @@ function TollRouteForm({
               </SelectTrigger>
               <SelectContent>
                 {BRAZILIAN_STATES.map((uf) => (
-                  <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                  <SelectItem key={uf} value={uf}>
+                    {uf}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -301,7 +349,9 @@ function TollRouteForm({
               </SelectTrigger>
               <SelectContent>
                 {BRAZILIAN_STATES.map((uf) => (
-                  <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                  <SelectItem key={uf} value={uf}>
+                    {uf}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

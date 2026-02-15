@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { 
-  DndContext, 
-  DragEndEvent, 
-  DragOverlay, 
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
   DragStartEvent,
   closestCenter,
   PointerSensor,
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useQuotes, useUpdateQuoteStage } from '@/hooks/useQuotes';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
@@ -40,6 +41,7 @@ const QUOTE_STAGES: { id: QuoteStage; label: string; color: string }[] = [
 
 export default function Commercial() {
   const { user } = useAuth();
+  const { canWrite } = useUserRole();
   const { data: quotes, isLoading, isError, error, refetch } = useQuotes();
   const updateStageMutation = useUpdateQuoteStage();
   const [activeQuote, setActiveQuote] = useState<Quote | null>(null);
@@ -47,6 +49,7 @@ export default function Commercial() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const canManageCommercial = canWrite;
 
   // Enable realtime updates
   useRealtimeSubscription(['quotes']);
@@ -95,6 +98,12 @@ export default function Commercial() {
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    if (!canManageCommercial) {
+      toast.error('Seu perfil é somente leitura para alterações');
+      setActiveQuote(null);
+      return;
+    }
+
     const { active, over } = event;
     setActiveQuote(null);
 
@@ -111,11 +120,11 @@ export default function Commercial() {
         setConvertingQuote(activeQuote);
         return;
       }
-      
+
       try {
-        await updateStageMutation.mutateAsync({ 
-          id: activeQuote.id, 
-          stage: targetStage.id 
+        await updateStageMutation.mutateAsync({
+          id: activeQuote.id,
+          stage: targetStage.id,
         });
         toast.success(`Cotação movida para ${targetStage.label}`);
       } catch (error) {
@@ -128,11 +137,13 @@ export default function Commercial() {
     const overQuote = quotes.find((q) => q.id === over.id);
     if (overQuote && activeQuote.stage !== overQuote.stage) {
       try {
-        await updateStageMutation.mutateAsync({ 
-          id: activeQuote.id, 
-          stage: overQuote.stage 
+        await updateStageMutation.mutateAsync({
+          id: activeQuote.id,
+          stage: overQuote.stage,
         });
-        toast.success(`Cotação movida para ${QUOTE_STAGES.find(s => s.id === overQuote.stage)?.label}`);
+        toast.success(
+          `Cotação movida para ${QUOTE_STAGES.find((s) => s.id === overQuote.stage)?.label}`
+        );
       } catch (error) {
         toast.error('Erro ao mover cotação');
       }
@@ -170,7 +181,9 @@ export default function Commercial() {
     return (
       <MainLayout>
         <div className="bg-card rounded-xl border border-border shadow-card p-6">
-          <h2 className="text-lg font-semibold text-foreground">Não foi possível carregar as cotações</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Não foi possível carregar as cotações
+          </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {(error instanceof Error && error.message) || 'Erro inesperado ao buscar cotações.'}
           </p>
@@ -200,7 +213,8 @@ export default function Commercial() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
-            Pipeline total: <span className="font-semibold text-primary">{formatCurrency(totalPipelineValue)}</span>
+            Pipeline total:{' '}
+            <span className="font-semibold text-primary">{formatCurrency(totalPipelineValue)}</span>
           </motion.p>
         </div>
 
@@ -217,10 +231,12 @@ export default function Commercial() {
           <Button variant="outline" size="icon" aria-label="Filtrar cotações">
             <Filter className="w-4 h-4" />
           </Button>
-          <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
-            <Plus className="w-4 h-4" />
-            Nova Cotação
-          </Button>
+          {canManageCommercial && (
+            <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Nova Cotação
+            </Button>
+          )}
         </div>
       </div>
 
@@ -248,10 +264,11 @@ export default function Commercial() {
                 items={quotesByStage[stage.id].map((q) => q.id)}
               >
                 {quotesByStage[stage.id].map((quote) => (
-                  <QuoteCard 
-                    key={quote.id} 
-                    quote={quote} 
+                  <QuoteCard
+                    key={quote.id}
+                    quote={quote}
                     onEdit={() => setSelectedQuote(quote)}
+                    canManageActions={canManageCommercial}
                   />
                 ))}
               </KanbanColumn>
@@ -259,25 +276,28 @@ export default function Commercial() {
           </div>
 
           <DragOverlay>
-            {activeQuote && <QuoteCard quote={activeQuote} />}
+            {activeQuote && (
+              <QuoteCard quote={activeQuote} canManageActions={canManageCommercial} />
+            )}
           </DragOverlay>
         </DndContext>
       )}
 
       {/* Quote Form Modal */}
       <QuoteForm open={isFormOpen} onClose={() => setIsFormOpen(false)} />
-      
+
       {/* Quote Detail Modal */}
-      <QuoteDetailModal 
-        open={!!selectedQuote} 
-        onClose={() => setSelectedQuote(null)} 
+      <QuoteDetailModal
+        open={!!selectedQuote}
+        onClose={() => setSelectedQuote(null)}
         quote={selectedQuote}
+        canManage={canManageCommercial}
       />
-      
+
       {/* Convert Quote Modal */}
-      <ConvertQuoteModal 
-        open={!!convertingQuote} 
-        onClose={() => setConvertingQuote(null)} 
+      <ConvertQuoteModal
+        open={!!convertingQuote}
+        onClose={() => setConvertingQuote(null)}
         quote={convertingQuote}
       />
     </MainLayout>

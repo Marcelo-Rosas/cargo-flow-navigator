@@ -18,13 +18,12 @@ export function useShippers(searchTerm?: string, options: UseShippersOptions = {
   return useQuery({
     queryKey: ['shippers', searchTerm],
     queryFn: async () => {
-      let query = supabase
-        .from('shippers')
-        .select('*')
-        .order('name', { ascending: true });
+      let query = supabase.from('shippers').select('*').order('name', { ascending: true });
 
       if (searchTerm) {
-        query = query.or(`name.ilike.%${searchTerm}%,cnpj.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+        query = query.or(
+          `name.ilike.%${searchTerm}%,cnpj.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`
+        );
       }
 
       const { data, error } = await query;
@@ -58,11 +57,7 @@ export function useCreateShipper() {
 
   return useMutation({
     mutationFn: async (shipper: ShipperInsert) => {
-      const { data, error } = await supabase
-        .from('shippers')
-        .insert(shipper)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('shippers').insert(shipper).select().single();
 
       if (error) throw error;
       return data;
@@ -99,10 +94,7 @@ export function useDeleteShipper() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('shippers')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('shippers').delete().eq('id', id);
 
       if (error) throw error;
     },

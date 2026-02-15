@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { GlobalSearchDialog } from '@/components/layout/GlobalSearchDialog';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface TopbarProps {
   onNewQuote?: () => void;
@@ -22,14 +23,15 @@ interface TopbarProps {
 export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
   const { setIsOpen } = useGlobalSearch();
   const { user, signOut } = useAuth();
+  const { canWrite } = useUserRole();
 
   return (
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
       {/* Global Search Dialog */}
       <GlobalSearchDialog />
-      
+
       {/* Search Trigger */}
-      <motion.button 
+      <motion.button
         className="relative flex-1 max-w-md"
         onClick={() => setIsOpen(true)}
         whileHover={{ scale: 1.01 }}
@@ -38,44 +40,38 @@ export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
         <div className="flex items-center w-full h-10 px-3 text-sm bg-background border border-input rounded-md text-muted-foreground hover:bg-accent transition-colors">
           <Search className="w-4 h-4 mr-2" />
           <span>Buscar cotações, OS, clientes...</span>
-          <kbd className="ml-auto text-xs bg-muted px-1.5 py-0.5 rounded">
-            ⌘K
-          </kbd>
+          <kbd className="ml-auto text-xs bg-muted px-1.5 py-0.5 rounded">⌘K</kbd>
         </div>
       </motion.button>
 
       {/* Actions */}
       <div className="flex items-center gap-3">
         {/* Quick Add */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Novo</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Criar Novo</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onNewQuote}>
-              Nova Cotação
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onNewOrder}>
-              Nova Ordem de Serviço
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              Novo Cliente
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {canWrite && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Novo</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Criar Novo</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onNewQuote}>Nova Cotação</DropdownMenuItem>
+              <DropdownMenuItem onClick={onNewOrder}>Nova Ordem de Serviço</DropdownMenuItem>
+              <DropdownMenuItem>Novo Cliente</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="w-5 h-5" />
-              <Badge 
-                variant="destructive" 
+              <Badge
+                variant="destructive"
                 className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs"
               >
                 3
@@ -131,10 +127,7 @@ export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
             <DropdownMenuItem>Meu Perfil</DropdownMenuItem>
             <DropdownMenuItem>Configurações</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="text-destructive"
-              onClick={() => signOut()}
-            >
+            <DropdownMenuItem className="text-destructive" onClick={() => signOut()}>
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>

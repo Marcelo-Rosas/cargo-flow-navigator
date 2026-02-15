@@ -42,11 +42,7 @@ export function useCreateDocument() {
 
   return useMutation({
     mutationFn: async (document: DocumentInsert) => {
-      const { data, error } = await supabase
-        .from('documents')
-        .insert(document)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('documents').insert(document).select().single();
 
       if (error) throw error;
       return data;
@@ -62,10 +58,7 @@ export function useDeleteDocument() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('documents')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('documents').delete().eq('id', id);
 
       if (error) throw error;
     },

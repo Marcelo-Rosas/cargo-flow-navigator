@@ -6,12 +6,7 @@ import { Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -119,7 +114,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
         setIsLookingUp(false);
         return;
       }
-      const data: any = await res.json();
+      const data = (await res.json()) as Record<string, unknown>;
 
       // Mapeamento "tolerante" a variações de chave
       safeSet('name', data.razao_social || data.nome_fantasia || data.name);
@@ -346,11 +341,11 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                 <FormItem>
                   <FormLabel>Observações</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Informações adicionais sobre o cliente..."
                       className="resize-none"
                       rows={3}
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />

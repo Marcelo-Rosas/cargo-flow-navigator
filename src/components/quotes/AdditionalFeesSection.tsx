@@ -18,7 +18,7 @@ interface AdditionalFeesSectionProps {
   selection: AdditionalFeesSelection;
   onChange: (selection: AdditionalFeesSelection) => void;
   baseFreight?: number; // For calculating fee values
-  cargoValue?: number;  // For calculating fee values
+  cargoValue?: number; // For calculating fee values
   vehicleTypeId?: string; // For filtering waiting time rules
   readOnly?: boolean;
 }
@@ -36,7 +36,7 @@ export function AdditionalFeesSection({
 
   // Get applicable waiting time rule
   const applicableWaitingRule = waitingTimeRules?.find(
-    rule => rule.vehicle_type_id === vehicleTypeId || rule.vehicle_type_id === null
+    (rule) => rule.vehicle_type_id === vehicleTypeId || rule.vehicle_type_id === null
   );
 
   // Calculate fee value based on type
@@ -58,12 +58,12 @@ export function AdditionalFeesSection({
   // Calculate waiting time cost
   const calculateWaitingCost = (hours: number): number => {
     if (!applicableWaitingRule || hours <= applicableWaitingRule.free_hours) return 0;
-    
+
     const billableHours = hours - applicableWaitingRule.free_hours;
     const hourlyRate = applicableWaitingRule.rate_per_hour || 0;
     const dailyRate = applicableWaitingRule.rate_per_day || 0;
     const minCharge = applicableWaitingRule.min_charge || 0;
-    
+
     let cost = 0;
     if (hourlyRate > 0) {
       cost = billableHours * hourlyRate;
@@ -71,15 +71,15 @@ export function AdditionalFeesSection({
       const days = Math.ceil(billableHours / 24);
       cost = days * dailyRate;
     }
-    
+
     return Math.max(cost, minCharge);
   };
 
   const handleFeeToggle = (feeId: string, checked: boolean) => {
     const newFees = checked
       ? [...selection.conditionalFees, feeId]
-      : selection.conditionalFees.filter(id => id !== feeId);
-    
+      : selection.conditionalFees.filter((id) => id !== feeId);
+
     onChange({ ...selection, conditionalFees: newFees });
   };
 
@@ -116,12 +116,12 @@ export function AdditionalFeesSection({
           <Receipt className="w-4 h-4 text-muted-foreground" />
           <h5 className="font-medium text-foreground">Taxas Condicionais</h5>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-3">
           {conditionalFees?.map((fee) => {
             const isSelected = selection.conditionalFees.includes(fee.id);
             const feeValue = calculateFeeValue(fee);
-            
+
             return (
               <div
                 key={fee.id}
@@ -134,10 +134,7 @@ export function AdditionalFeesSection({
                   disabled={readOnly}
                 />
                 <div className="flex-1 min-w-0">
-                  <Label
-                    htmlFor={`fee-${fee.id}`}
-                    className="text-sm font-medium cursor-pointer"
-                  >
+                  <Label htmlFor={`fee-${fee.id}`} className="text-sm font-medium cursor-pointer">
                     {fee.name}
                   </Label>
                   <div className="flex items-center gap-2 mt-1">
@@ -145,8 +142,8 @@ export function AdditionalFeesSection({
                       {fee.code}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      {fee.fee_type === 'percentage' 
-                        ? `${fee.fee_value}%` 
+                      {fee.fee_type === 'percentage'
+                        ? `${fee.fee_value}%`
                         : formatCurrency(fee.fee_value)}
                     </span>
                   </div>
@@ -160,11 +157,9 @@ export function AdditionalFeesSection({
             );
           })}
         </div>
-        
+
         {(!conditionalFees || conditionalFees.length === 0) && (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma taxa condicional cadastrada
-          </p>
+          <p className="text-sm text-muted-foreground">Nenhuma taxa condicional cadastrada</p>
         )}
       </div>
 
@@ -174,7 +169,7 @@ export function AdditionalFeesSection({
           <Clock className="w-4 h-4 text-muted-foreground" />
           <h5 className="font-medium text-foreground">Estadia / Hora Parada</h5>
         </div>
-        
+
         <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-4">
           <div className="flex items-start space-x-3">
             <Checkbox
@@ -184,24 +179,20 @@ export function AdditionalFeesSection({
               disabled={readOnly}
             />
             <div className="flex-1">
-              <Label
-                htmlFor="waiting-time"
-                className="text-sm font-medium cursor-pointer"
-              >
+              <Label htmlFor="waiting-time" className="text-sm font-medium cursor-pointer">
                 Aplicar cobrança de estadia
               </Label>
               {applicableWaitingRule && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Franquia: {applicableWaitingRule.free_hours}h | 
-                  Taxa: {applicableWaitingRule.rate_per_hour 
+                  Franquia: {applicableWaitingRule.free_hours}h | Taxa:{' '}
+                  {applicableWaitingRule.rate_per_hour
                     ? `${formatCurrency(applicableWaitingRule.rate_per_hour)}/h`
-                    : `${formatCurrency(applicableWaitingRule.rate_per_day || 0)}/dia`
-                  }
+                    : `${formatCurrency(applicableWaitingRule.rate_per_day || 0)}/dia`}
                 </p>
               )}
             </div>
           </div>
-          
+
           {selection.waitingTimeEnabled && (
             <div className="ml-6 space-y-3">
               <div className="flex items-center gap-3">
@@ -219,7 +210,7 @@ export function AdditionalFeesSection({
                   disabled={readOnly}
                 />
               </div>
-              
+
               {selection.waitingTimeCost > 0 && (
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">Custo de estadia:</span>
@@ -228,13 +219,14 @@ export function AdditionalFeesSection({
                   </span>
                 </div>
               )}
-              
-              {selection.waitingTimeHours > 0 && applicableWaitingRule && 
-               selection.waitingTimeHours <= applicableWaitingRule.free_hours && (
-                <p className="text-xs text-muted-foreground">
-                  Dentro da franquia de {applicableWaitingRule.free_hours}h (sem custo)
-                </p>
-              )}
+
+              {selection.waitingTimeHours > 0 &&
+                applicableWaitingRule &&
+                selection.waitingTimeHours <= applicableWaitingRule.free_hours && (
+                  <p className="text-xs text-muted-foreground">
+                    Dentro da franquia de {applicableWaitingRule.free_hours}h (sem custo)
+                  </p>
+                )}
             </div>
           )}
         </div>
@@ -248,7 +240,7 @@ export function AdditionalFeesSection({
             <span className="font-semibold text-primary">
               {formatCurrency(
                 selection.conditionalFees.reduce((sum, feeId) => {
-                  const fee = conditionalFees?.find(f => f.id === feeId);
+                  const fee = conditionalFees?.find((f) => f.id === feeId);
                   return sum + (fee ? calculateFeeValue(fee) : 0);
                 }, 0) + selection.waitingTimeCost
               )}

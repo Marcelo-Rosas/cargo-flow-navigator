@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useShippers, useDeleteShipper } from '@/hooks/useShippers';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 import { ShipperForm } from '@/components/forms/ShipperForm';
 import { Database } from '@/integrations/supabase/types';
@@ -25,16 +26,24 @@ type Shipper = Database['public']['Tables']['shippers']['Row'];
 
 export default function Shippers() {
   const { user } = useAuth();
+  const { canWrite } = useUserRole();
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  
-  const { data: shippers, isLoading, isError, error, refetch } = useShippers(debouncedSearchTerm, { enabled: !!user });
+
+  const {
+    data: shippers,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useShippers(debouncedSearchTerm, { enabled: !!user });
   const deleteShipperMutation = useDeleteShipper();
-  
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingShipper, setEditingShipper] = useState<Shipper | null>(null);
   const [deletingShipper, setDeletingShipper] = useState<Shipper | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const canManageShippers = canWrite;
 
   const handleEdit = (shipper: Shipper) => {
     setEditingShipper(shipper);
@@ -42,8 +51,9 @@ export default function Shippers() {
   };
 
   const handleDelete = async () => {
+    if (!canManageShippers) return;
     if (!deletingShipper || isDeleting) return;
-    
+
     setIsDeleting(true);
     try {
       await deleteShipperMutation.mutateAsync(deletingShipper.id);
@@ -92,7 +102,8 @@ export default function Shippers() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
-            <span className="font-semibold text-primary">{shippers?.length || 0}</span> embarcadores cadastrados
+            <span className="font-semibold text-primary">{shippers?.length || 0}</span> embarcadores
+            cadastrados
           </motion.p>
         </div>
 
@@ -106,10 +117,12 @@ export default function Shippers() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
-            <Plus className="w-4 h-4" />
-            Novo Embarcador
-          </Button>
+          {canManageShippers && (
+            <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Novo Embarcador
+            </Button>
+          )}
         </div>
       </div>
 
@@ -135,12 +148,16 @@ export default function Shippers() {
           className="bg-card rounded-xl border border-border shadow-card p-12 text-center"
         >
           <Ship className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Nenhum embarcador cadastrado</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-2">
+            Nenhum embarcador cadastrado
+          </h3>
           <p className="text-muted-foreground mb-4">Comece adicionando seu primeiro embarcador</p>
-          <Button onClick={() => setIsFormOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Adicionar Embarcador
-          </Button>
+          {canManageShippers && (
+            <Button onClick={() => setIsFormOpen(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Adicionar Embarcador
+            </Button>
+          )}
         </motion.div>
       ) : (
         <motion.div
@@ -152,11 +169,21 @@ export default function Shippers() {
             <table className="w-full">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Embarcador</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">CNPJ</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Contato</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Localização</th>
-                  <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Ações</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                    Embarcador
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                    CNPJ
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                    Contato
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                    Localização
+                  </th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
+                    Ações
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -170,7 +197,9 @@ export default function Shippers() {
                         <div>
                           <p className="font-medium text-foreground">{shipper.name}</p>
                           {shipper.notes && (
-                            <p className="text-sm text-muted-foreground truncate max-w-[200px]">{shipper.notes}</p>
+                            <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+                              {shipper.notes}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -207,24 +236,28 @@ export default function Shippers() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEdit(shipper)}
-                          aria-label="Editar embarcador"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => setDeletingShipper(shipper)}
-                          aria-label="Excluir embarcador"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {canManageShippers && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleEdit(shipper)}
+                              aria-label="Editar embarcador"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => setDeletingShipper(shipper)}
+                              aria-label="Excluir embarcador"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -236,29 +269,30 @@ export default function Shippers() {
       )}
 
       {/* Shipper Form */}
-      <ShipperForm 
-        open={isFormOpen} 
-        onClose={handleFormClose} 
+      <ShipperForm
+        open={isFormOpen && canManageShippers}
+        onClose={handleFormClose}
         shipper={editingShipper}
       />
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog 
-        open={!!deletingShipper} 
-        onOpenChange={(open) => { 
-          if (!open && !isDeleting) setDeletingShipper(null); 
+      <AlertDialog
+        open={!!deletingShipper && canManageShippers}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setDeletingShipper(null);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir embarcador?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o embarcador "{deletingShipper?.name}"? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir o embarcador "{deletingShipper?.name}"? Esta ação não
+              pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
                 handleDelete();

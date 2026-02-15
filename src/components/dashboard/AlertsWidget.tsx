@@ -141,9 +141,9 @@ export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-muted-foreground">{alert.time}</span>
                   {alert.action && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="h-7 text-xs"
                       onClick={() => {
                         if (alert.action?.onClick) return alert.action.onClick();

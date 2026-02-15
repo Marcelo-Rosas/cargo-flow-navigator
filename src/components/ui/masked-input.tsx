@@ -1,10 +1,10 @@
-import * as React from "react";
-import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
+import * as React from 'react';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 
 type MaskType = 'cep' | 'cnpj' | 'cpf' | 'phone';
 
-interface MaskedInputProps extends Omit<React.ComponentProps<"input">, 'onChange'> {
+interface MaskedInputProps extends Omit<React.ComponentProps<'input'>, 'onChange'> {
   mask: MaskType;
   onValueChange?: (rawValue: string, maskedValue: string) => void;
 }
@@ -23,8 +23,10 @@ const maskConfig: Record<MaskType, { maxDigits: number; format: (value: string) 
       let result = value;
       if (value.length > 2) result = `${value.slice(0, 2)}.${value.slice(2)}`;
       if (value.length > 5) result = `${value.slice(0, 2)}.${value.slice(2, 5)}.${value.slice(5)}`;
-      if (value.length > 8) result = `${value.slice(0, 2)}.${value.slice(2, 5)}.${value.slice(5, 8)}/${value.slice(8)}`;
-      if (value.length > 12) result = `${value.slice(0, 2)}.${value.slice(2, 5)}.${value.slice(5, 8)}/${value.slice(8, 12)}-${value.slice(12, 14)}`;
+      if (value.length > 8)
+        result = `${value.slice(0, 2)}.${value.slice(2, 5)}.${value.slice(5, 8)}/${value.slice(8)}`;
+      if (value.length > 12)
+        result = `${value.slice(0, 2)}.${value.slice(2, 5)}.${value.slice(5, 8)}/${value.slice(8, 12)}-${value.slice(12, 14)}`;
       return result;
     },
   },
@@ -34,7 +36,8 @@ const maskConfig: Record<MaskType, { maxDigits: number; format: (value: string) 
       let result = value;
       if (value.length > 3) result = `${value.slice(0, 3)}.${value.slice(3)}`;
       if (value.length > 6) result = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6)}`;
-      if (value.length > 9) result = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6, 9)}-${value.slice(9, 11)}`;
+      if (value.length > 9)
+        result = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6, 9)}-${value.slice(9, 11)}`;
       return result;
     },
   },
@@ -61,7 +64,7 @@ const MaskedInput = React.forwardRef<HTMLInputElement, MaskedInputProps>(
       const inputValue = e.target.value;
       const digits = inputValue.replace(/\D/g, '').slice(0, config.maxDigits);
       const masked = config.format(digits);
-      
+
       onValueChange?.(digits, masked);
     };
 
@@ -80,7 +83,7 @@ const MaskedInput = React.forwardRef<HTMLInputElement, MaskedInputProps>(
   }
 );
 
-MaskedInput.displayName = "MaskedInput";
+MaskedInput.displayName = 'MaskedInput';
 
 export { MaskedInput };
 export type { MaskedInputProps, MaskType };

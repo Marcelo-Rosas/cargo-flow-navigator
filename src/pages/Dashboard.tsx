@@ -1,13 +1,13 @@
 import { motion } from 'framer-motion';
-import { 
-  TrendingUp, 
-  Truck, 
-  FileText, 
+import {
+  TrendingUp,
+  Truck,
+  FileText,
   AlertTriangle,
   DollarSign,
   Target,
   Loader2,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +16,12 @@ import { ExportReports } from '@/components/dashboard/ExportReports';
 import { OverviewTab } from '@/components/dashboard/tabs/OverviewTab';
 import { CommercialTab } from '@/components/dashboard/tabs/CommercialTab';
 import { OperationsTab } from '@/components/dashboard/tabs/OperationsTab';
-import { useDashboardStats, useRecentOrders, useConversionChartData, useRevenueByClientData } from '@/hooks/useDashboardStats';
+import {
+  useDashboardStats,
+  useRecentOrders,
+  useConversionChartData,
+  useRevenueByClientData,
+} from '@/hooks/useDashboardStats';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
@@ -31,18 +36,38 @@ const emptyConversionData = [
   { name: 'Mar', value: 0 },
 ];
 
-const emptyRevenueData = [
-  { name: 'Sem dados', value: 0 },
-];
+const emptyRevenueData = [{ name: 'Sem dados', value: 0 }];
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { data: stats, isLoading: statsLoading, isError: statsIsError, error: statsError, refetch: refetchStats } = useDashboardStats();
-  const { data: recentOrders, isLoading: ordersLoading, isError: ordersIsError, error: ordersError, refetch: refetchOrders } = useRecentOrders(5);
-  const { data: conversionData, isError: conversionIsError, error: conversionError, refetch: refetchConversion } = useConversionChartData();
-  const { data: revenueData, isError: revenueIsError, error: revenueError, refetch: refetchRevenue } = useRevenueByClientData();
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsIsError,
+    error: statsError,
+    refetch: refetchStats,
+  } = useDashboardStats();
+  const {
+    data: recentOrders,
+    isLoading: ordersLoading,
+    isError: ordersIsError,
+    error: ordersError,
+    refetch: refetchOrders,
+  } = useRecentOrders(5);
+  const {
+    data: conversionData,
+    isError: conversionIsError,
+    error: conversionError,
+    refetch: refetchConversion,
+  } = useConversionChartData();
+  const {
+    data: revenueData,
+    isError: revenueIsError,
+    error: revenueError,
+    refetch: refetchRevenue,
+  } = useRevenueByClientData();
 
   // Enable realtime updates
   useRealtimeSubscription(['quotes', 'orders', 'occurrences']);
@@ -69,9 +94,12 @@ export default function Dashboard() {
     return (
       <MainLayout>
         <div className="bg-card rounded-xl border border-border shadow-card p-6">
-          <h2 className="text-lg font-semibold text-foreground">Não foi possível carregar o dashboard</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Não foi possível carregar o dashboard
+          </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {(firstError instanceof Error && firstError.message) || 'Erro inesperado ao buscar dados.'}
+            {(firstError instanceof Error && firstError.message) ||
+              'Erro inesperado ao buscar dados.'}
           </p>
           <div className="flex items-center gap-2 mt-4">
             <Button
@@ -111,14 +139,14 @@ export default function Dashboard() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <motion.h1 
+          <motion.h1
             className="text-3xl font-bold text-foreground"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
           >
             Dashboard
           </motion.h1>
-          <motion.p 
+          <motion.p
             className="text-muted-foreground mt-1"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -133,7 +161,12 @@ export default function Dashboard() {
           transition={{ delay: 0.2 }}
           className="flex items-center gap-3"
         >
-          <Button variant="outline" size="icon" onClick={handleRefresh} aria-label="Atualizar dashboard">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            aria-label="Atualizar dashboard"
+          >
             <RefreshCw className="w-4 h-4" />
           </Button>
           <ExportReports />
@@ -150,7 +183,10 @@ export default function Dashboard() {
           <>
             <KPICard
               title="Pipeline Total"
-              value={formatCurrency(stats?.pipelineValue || 0, { notation: 'compact', maximumFractionDigits: 1 })}
+              value={formatCurrency(stats?.pipelineValue || 0, {
+                notation: 'compact',
+                maximumFractionDigits: 1,
+              })}
               icon={DollarSign}
               trend={stats?.pipelineTrend || undefined}
               variant="primary"
@@ -220,7 +256,10 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="commercial" className="space-y-6">
-          <CommercialTab chartConversionData={chartConversionData} chartRevenueData={chartRevenueData} />
+          <CommercialTab
+            chartConversionData={chartConversionData}
+            chartRevenueData={chartRevenueData}
+          />
         </TabsContent>
 
         <TabsContent value="operations" className="space-y-6">

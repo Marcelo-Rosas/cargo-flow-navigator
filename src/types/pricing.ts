@@ -141,18 +141,11 @@ export const VEHICLE_TYPE_CODES = [
   'RODOTREM',
 ] as const;
 
-export type VehicleTypeCode = typeof VEHICLE_TYPE_CODES[number];
+export type VehicleTypeCode = (typeof VEHICLE_TYPE_CODES)[number];
 
-export const PAYMENT_TERM_CODES = [
-  'AVISTA',
-  'D15',
-  'D30',
-  'D45',
-  'D60',
-  'D90',
-] as const;
+export const PAYMENT_TERM_CODES = ['AVISTA', 'D15', 'D30', 'D45', 'D60', 'D90'] as const;
 
-export type PaymentTermCode = typeof PAYMENT_TERM_CODES[number];
+export type PaymentTermCode = (typeof PAYMENT_TERM_CODES)[number];
 
 export const CONDITIONAL_FEE_CODES = [
   'TDE',
@@ -163,4 +156,4 @@ export const CONDITIONAL_FEE_CODES = [
   'REDELIVERY',
 ] as const;
 
-export type ConditionalFeeCode = typeof CONDITIONAL_FEE_CODES[number];
+export type ConditionalFeeCode = (typeof CONDITIONAL_FEE_CODES)[number];

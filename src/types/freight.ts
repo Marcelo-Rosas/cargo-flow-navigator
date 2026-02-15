@@ -23,8 +23,8 @@ export interface CalculateFreightInput {
 export interface FreightMeta {
   route_uf_label: string | null;
   km_band_label: string | null;
-  km_status: "OK" | "OUT_OF_RANGE";
-  margin_status: "ABOVE_TARGET" | "BELOW_TARGET" | "AT_TARGET";
+  km_status: 'OK' | 'OUT_OF_RANGE';
+  margin_status: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
   margin_percent: number;
   cubage_factor: number;
   cubage_weight_kg: number;
@@ -79,7 +79,7 @@ export interface FreightProfitability {
 
 export interface CalculateFreightResponse {
   success: boolean;
-  status: "OK" | "OUT_OF_RANGE" | "MISSING_DATA";
+  status: 'OK' | 'OUT_OF_RANGE' | 'MISSING_DATA';
   error?: string;
   meta: FreightMeta;
   components: FreightComponents;

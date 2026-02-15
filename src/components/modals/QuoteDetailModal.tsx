@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { 
-  MapPin, 
-  Calendar, 
+import { useState, useEffect, useCallback } from 'react';
+import {
+  MapPin,
+  Calendar,
   DollarSign,
   Pencil,
   Building2,
@@ -16,26 +16,21 @@ import {
   AlertTriangle,
   TrendingUp,
   Receipt,
-  Plus
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
-import { AdditionalFeesSection, AdditionalFeesSelection, defaultAdditionalFeesSelection } from '@/components/quotes/AdditionalFeesSection';
+import {
+  AdditionalFeesSection,
+  AdditionalFeesSelection,
+  defaultAdditionalFeesSelection,
+} from '@/components/quotes/AdditionalFeesSection';
 import type { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
@@ -52,6 +47,7 @@ interface QuoteDetailModalProps {
   open: boolean;
   onClose: () => void;
   quote: Quote | null;
+  canManage?: boolean;
 }
 
 const STAGE_LABELS: Record<QuoteStage, { label: string; color: string }> = {
@@ -66,37 +62,43 @@ const STAGE_LABELS: Record<QuoteStage, { label: string; color: string }> = {
 
 const TARGET_MARGIN_PERCENT = 15;
 
-export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps) {
+export function QuoteDetailModal({
+  open,
+  onClose,
+  quote,
+  canManage = true,
+}: QuoteDetailModalProps) {
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
   const [isAdditionalFeesOpen, setIsAdditionalFeesOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Initialize additional fees selection from breakdown
-  const getInitialFeesSelection = (): AdditionalFeesSelection => {
+  const getInitialFeesSelection = useCallback((): AdditionalFeesSelection => {
     if (!quote) return defaultAdditionalFeesSelection;
-    
+
     const breakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
     if (!breakdown?.meta) return defaultAdditionalFeesSelection;
-    
+
     return {
       conditionalFees: breakdown.meta.selectedConditionalFeeIds || [],
       waitingTimeEnabled: breakdown.meta.waitingTimeEnabled || false,
       waitingTimeHours: breakdown.meta.waitingTimeHours || 0,
       waitingTimeCost: breakdown.components?.waitingTimeCost || 0,
     };
-  };
-  
-  const [additionalFeesSelection, setAdditionalFeesSelection] = useState<AdditionalFeesSelection>(getInitialFeesSelection);
+  }, [quote]);
+
+  const [additionalFeesSelection, setAdditionalFeesSelection] =
+    useState<AdditionalFeesSelection>(getInitialFeesSelection);
 
   // Update selection when quote changes
   useEffect(() => {
     setAdditionalFeesSelection(getInitialFeesSelection());
-  }, [quote?.id, quote?.pricing_breakdown]);
+  }, [getInitialFeesSelection]);
 
   // All hooks MUST be called before any conditional returns
   const { data: priceTable } = usePriceTable(quote?.price_table_id || '');
-  
+
   const { data: vehicleType } = useQuery({
     queryKey: ['vehicle-type', quote?.vehicle_type_id],
     queryFn: async () => {
@@ -111,16 +113,21 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
     enabled: !!quote?.vehicle_type_id,
   });
 
-  const axesCount = (vehicleType as any)?.axes_count ?? null;
+  const axesCount = (vehicleType as { axes_count?: number } | null)?.axes_count ?? null;
   const kmDistance = quote?.km_distance ?? null;
   const { data: anttRate } = useAnttFloorRate({
     operationTable: 'A',
     cargoType: 'carga_geral',
     axesCount,
   });
-  const anttCalc = (anttRate && kmDistance)
-    ? calculateAnttMinimum({ kmDistance: Number(kmDistance), ccd: Number(anttRate.ccd), cc: Number(anttRate.cc) })
-    : null;
+  const anttCalc =
+    anttRate && kmDistance
+      ? calculateAnttMinimum({
+          kmDistance: Number(kmDistance),
+          ccd: Number(anttRate.ccd),
+          cc: Number(anttRate.cc),
+        })
+      : null;
 
   const { data: paymentTerm } = useQuery({
     queryKey: ['payment-term', quote?.payment_term_id],
@@ -140,9 +147,9 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
   const saveAdditionalFeesMutation = useMutation({
     mutationFn: async (selection: AdditionalFeesSelection) => {
       if (!quote) throw new Error('No quote');
-      
+
       const currentBreakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
-      
+
       // Build defaults for missing fields
       const defaultMeta = {
         routeUfLabel: '',
@@ -151,7 +158,7 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
         marginStatus: 'UNKNOWN' as const,
         marginPercent: 0,
       };
-      
+
       const defaultComponents = {
         baseCost: 0,
         baseFreight: 0,
@@ -165,12 +172,29 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
         conditionalFeesTotal: 0,
         waitingTimeCost: 0,
       };
-      
+
       const defaultWeights = { cubageWeight: 0, billableWeight: 0, tonBillable: 0 };
       const defaultTotals = { receitaBruta: 0, das: 0, icms: 0, totalImpostos: 0, totalCliente: 0 };
-      const defaultProfitability = { custosCarreteiro: 0, custosDescarga: 0, custosDiretos: 0, margemBruta: 0, overhead: 0, resultadoLiquido: 0, margemPercent: 0 };
-      const defaultRates = { dasPercent: 14, markupPercent: 30, icmsPercent: 0, grisPercent: 0, tsoPercent: 0, costValuePercent: 0, overheadPercent: 15, targetMarginPercent: 15 };
-      
+      const defaultProfitability = {
+        custosCarreteiro: 0,
+        custosDescarga: 0,
+        custosDiretos: 0,
+        margemBruta: 0,
+        overhead: 0,
+        resultadoLiquido: 0,
+        margemPercent: 0,
+      };
+      const defaultRates = {
+        dasPercent: 14,
+        markupPercent: 30,
+        icmsPercent: 0,
+        grisPercent: 0,
+        tsoPercent: 0,
+        costValuePercent: 0,
+        overheadPercent: 15,
+        targetMarginPercent: 15,
+      };
+
       // Update breakdown with new selections
       const updatedBreakdown: StoredPricingBreakdown = {
         calculatedAt: currentBreakdown?.calculatedAt || new Date().toISOString(),
@@ -193,7 +217,7 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
         profitability: currentBreakdown?.profitability || defaultProfitability,
         rates: currentBreakdown?.rates || defaultRates,
       };
-      
+
       const { error } = await supabase
         .from('quotes')
         .update({
@@ -201,7 +225,7 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
           waiting_time_cost: selection.waitingTimeCost,
         })
         .eq('id', quote.id);
-      
+
       if (error) throw error;
       return updatedBreakdown;
     },
@@ -223,18 +247,21 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
   if (!quote) return null;
 
   const stageInfo = STAGE_LABELS[quote.stage];
-  
+
   // REGRA: Converter para OS só quando stage === 'ganho'
   const canConvert = quote.stage === 'ganho';
-  
+
   // Parse pricing breakdown - using new StoredPricingBreakdown type
   const breakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
-  const routeUfLabel = breakdown?.meta?.routeUfLabel || formatRouteUf(quote.origin, quote.destination);
+  const routeUfLabel =
+    breakdown?.meta?.routeUfLabel || formatRouteUf(quote.origin, quote.destination);
   const kmBandLabel = breakdown?.meta?.kmBandLabel;
   const kmStatus = breakdown?.meta?.kmStatus || 'OK';
   const marginPercent = breakdown?.meta?.marginPercent ?? breakdown?.profitability?.margemPercent;
   const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
-  const isBelowTarget = marginStatus === 'BELOW_TARGET' || (marginPercent !== undefined && marginPercent < TARGET_MARGIN_PERCENT);
+  const isBelowTarget =
+    marginStatus === 'BELOW_TARGET' ||
+    (marginPercent !== undefined && marginPercent < TARGET_MARGIN_PERCENT);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -269,9 +296,7 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-3">
                 <span className="text-xl font-bold">Cotação</span>
-                <Badge className={cn(stageInfo.color)}>
-                  {stageInfo.label}
-                </Badge>
+                <Badge className={cn(stageInfo.color)}>{stageInfo.label}</Badge>
                 {routeUfLabel && (
                   <Badge variant="outline" className="text-xs">
                     <Route className="w-3 h-3 mr-1" />
@@ -285,9 +310,9 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                 )}
               </DialogTitle>
               <div className="flex items-center gap-2">
-                {canConvert && (
-                  <Button 
-                    variant="outline" 
+                {canManage && canConvert && (
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => setIsConvertModalOpen(true)}
                     className="gap-2"
@@ -296,9 +321,11 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                     Converter para OS
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)}>
-                  <Pencil className="w-4 h-4" />
-                </Button>
+                {canManage && (
+                  <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)}>
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </DialogHeader>
@@ -306,14 +333,18 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
           <div className="space-y-6 mt-4">
             {/* Margin Alert */}
             {isBelowTarget && marginPercent !== undefined && (
-              <Alert variant="destructive" className="bg-warning/10 border-warning text-warning-foreground">
+              <Alert
+                variant="destructive"
+                className="bg-warning/10 border-warning text-warning-foreground"
+              >
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  Margem de {marginPercent.toFixed(1)}% está abaixo da meta de {TARGET_MARGIN_PERCENT}%
+                  Margem de {marginPercent.toFixed(1)}% está abaixo da meta de{' '}
+                  {TARGET_MARGIN_PERCENT}%
                 </AlertDescription>
               </Alert>
             )}
-            
+
             {/* OUT_OF_RANGE Alert */}
             {kmStatus === 'OUT_OF_RANGE' && (
               <Alert variant="destructive">
@@ -383,7 +414,9 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                 </div>
                 <p className="font-medium text-foreground">{quote.origin}</p>
                 {quote.origin_cep && (
-                  <p className="text-xs text-muted-foreground mt-1">CEP: {quote.origin_cep.replace(/(\d{5})(\d{3})/, '$1-$2')}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    CEP: {quote.origin_cep.replace(/(\d{5})(\d{3})/, '$1-$2')}
+                  </p>
                 )}
               </div>
               <div className="p-4 rounded-lg bg-muted/30 border border-border">
@@ -393,7 +426,9 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                 </div>
                 <p className="font-medium text-foreground">{quote.destination}</p>
                 {quote.destination_cep && (
-                  <p className="text-xs text-muted-foreground mt-1">CEP: {quote.destination_cep.replace(/(\d{5})(\d{3})/, '$1-$2')}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    CEP: {quote.destination_cep.replace(/(\d{5})(\d{3})/, '$1-$2')}
+                  </p>
                 )}
               </div>
             </div>
@@ -419,8 +454,8 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                         <span className="text-xs">Peso</span>
                       </div>
                       <p className="font-medium text-foreground text-sm">
-                        {Number(quote.weight) >= 1000 
-                          ? `${(Number(quote.weight) / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} t` 
+                        {Number(quote.weight) >= 1000
+                          ? `${(Number(quote.weight) / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} t`
                           : `${Number(quote.weight).toLocaleString('pt-BR')} kg`}
                       </p>
                     </div>
@@ -431,7 +466,9 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                         <Box className="w-4 h-4" />
                         <span className="text-xs">Volume</span>
                       </div>
-                      <p className="font-medium text-foreground text-sm">{Number(quote.volume).toLocaleString('pt-BR')} m³</p>
+                      <p className="font-medium text-foreground text-sm">
+                        {Number(quote.volume).toLocaleString('pt-BR')} m³
+                      </p>
                     </div>
                   )}
                 </div>
@@ -439,7 +476,12 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
             )}
 
             {/* Pricing Details */}
-            {(priceTable || vehicleType || paymentTerm || quote.km_distance || quote.freight_modality || anttCalc) && (
+            {(priceTable ||
+              vehicleType ||
+              paymentTerm ||
+              quote.km_distance ||
+              quote.freight_modality ||
+              anttCalc) && (
               <div>
                 <h4 className="font-semibold text-foreground mb-3">Detalhes de Precificação</h4>
                 <div className="grid grid-cols-2 gap-3">
@@ -458,7 +500,9 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                         <Truck className="w-4 h-4" />
                         <span className="text-xs">Veículo</span>
                       </div>
-                      <p className="font-medium text-foreground text-sm">{vehicleType.name} ({vehicleType.code})</p>
+                      <p className="font-medium text-foreground text-sm">
+                        {vehicleType.name} ({vehicleType.code})
+                      </p>
                     </div>
                   )}
                   {paymentTerm && (
@@ -471,7 +515,8 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                         {paymentTerm.name}
                         {paymentTerm.adjustment_percent !== 0 && (
                           <span className="text-muted-foreground ml-1">
-                            ({paymentTerm.adjustment_percent > 0 ? '+' : ''}{paymentTerm.adjustment_percent}%)
+                            ({paymentTerm.adjustment_percent > 0 ? '+' : ''}
+                            {paymentTerm.adjustment_percent}%)
                           </span>
                         )}
                       </p>
@@ -483,7 +528,9 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                         <Route className="w-4 h-4" />
                         <span className="text-xs">Distância</span>
                       </div>
-                      <p className="font-medium text-foreground text-sm">{Number(quote.km_distance).toLocaleString('pt-BR')} km</p>
+                      <p className="font-medium text-foreground text-sm">
+                        {Number(quote.km_distance).toLocaleString('pt-BR')} km
+                      </p>
                     </div>
                   )}
 
@@ -494,74 +541,126 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                         <DollarSign className="w-4 h-4" />
                         <span className="text-xs">Piso ANTT (carreteiro)</span>
                       </div>
-                      <Badge variant="outline" className="text-[10px]">Tabela A • Carga Geral</Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        Tabela A • Carga Geral
+                      </Badge>
                     </div>
 
                     {anttCalc ? (
                       <>
-                        <p className="font-semibold text-foreground mt-1">{formatCurrency(anttCalc.total)}</p>
+                        <p className="font-semibold text-foreground mt-1">
+                          {formatCurrency(anttCalc.total)}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {axesCount || '-'} eixos • {Number(kmDistance || 0).toLocaleString('pt-BR')} km
+                          {axesCount || '-'} eixos •{' '}
+                          {Number(kmDistance || 0).toLocaleString('pt-BR')} km
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-1">
-                          Memória: ({Number(kmDistance || 0).toLocaleString('pt-BR')} × {Number(anttRate?.ccd || 0).toFixed(4)}) + {Number(anttRate?.cc || 0).toFixed(2)}
+                          Memória: ({Number(kmDistance || 0).toLocaleString('pt-BR')} ×{' '}
+                          {Number(anttRate?.ccd || 0).toFixed(4)}) +{' '}
+                          {Number(anttRate?.cc || 0).toFixed(2)}
                         </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2"
-                          onClick={async () => {
-                            const current = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
-                            const updated: StoredPricingBreakdown = {
-                              calculatedAt: current?.calculatedAt || new Date().toISOString(),
-                              version: current?.version || '4.0-fob-lotacao-markup-scope',
-                              status: current?.status || 'OK',
-                              error: current?.error,
-                              meta: {
-                                ...(current?.meta || {
-                                  routeUfLabel: formatRouteUf(quote.origin, quote.destination),
-                                  kmBandLabel: null,
-                                  kmStatus: 'OK',
-                                  marginStatus: 'AT_TARGET',
-                                  marginPercent: 0,
-                                }),
-                                antt: {
-                                  operationTable: 'A',
-                                  cargoType: 'carga_geral',
-                                  axesCount: Number(axesCount),
-                                  kmDistance: Number(kmDistance),
-                                  ccd: Number(anttRate?.ccd || 0),
-                                  cc: Number(anttRate?.cc || 0),
-                                  ida: Number(anttCalc.ida),
-                                  retornoVazio: 0,
-                                  total: Number(anttCalc.total),
-                                  calculatedAt: new Date().toISOString(),
+                        {canManage && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                            onClick={async () => {
+                              const current =
+                                quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+                              const updated: StoredPricingBreakdown = {
+                                calculatedAt: current?.calculatedAt || new Date().toISOString(),
+                                version: current?.version || '4.0-fob-lotacao-markup-scope',
+                                status: current?.status || 'OK',
+                                error: current?.error,
+                                meta: {
+                                  ...(current?.meta || {
+                                    routeUfLabel: formatRouteUf(quote.origin, quote.destination),
+                                    kmBandLabel: null,
+                                    kmStatus: 'OK',
+                                    marginStatus: 'AT_TARGET',
+                                    marginPercent: 0,
+                                  }),
+                                  antt: {
+                                    operationTable: 'A',
+                                    cargoType: 'carga_geral',
+                                    axesCount: Number(axesCount),
+                                    kmDistance: Number(kmDistance),
+                                    ccd: Number(anttRate?.ccd || 0),
+                                    cc: Number(anttRate?.cc || 0),
+                                    ida: Number(anttCalc.ida),
+                                    retornoVazio: 0,
+                                    total: Number(anttCalc.total),
+                                    calculatedAt: new Date().toISOString(),
+                                  },
                                 },
-                              },
-                              // mantém o resto se existir; senão cria estrutura mínima
-                              weights: current?.weights || { cubageWeight: 0, billableWeight: 0, tonBillable: 0 },
-                              components: current?.components || { baseCost: 0, baseFreight: 0, toll: 0, gris: 0, tso: 0, rctrc: 0, adValorem: 0, tde: 0, tear: 0, conditionalFeesTotal: 0, waitingTimeCost: 0 },
-                              totals: current?.totals || { receitaBruta: 0, das: 0, icms: 0, totalImpostos: 0, totalCliente: 0 },
-                              profitability: current?.profitability || { custosCarreteiro: 0, custosDescarga: 0, custosDiretos: 0, margemBruta: 0, overhead: 0, resultadoLiquido: 0, margemPercent: 0 },
-                              rates: current?.rates || { dasPercent: 14, icmsPercent: 0, grisPercent: 0, tsoPercent: 0, costValuePercent: 0, markupPercent: 30, overheadPercent: 15, targetMarginPercent: 15 },
-                              conditionalFeesBreakdown: current?.conditionalFeesBreakdown,
-                            };
+                                // mantém o resto se existir; senão cria estrutura mínima
+                                weights: current?.weights || {
+                                  cubageWeight: 0,
+                                  billableWeight: 0,
+                                  tonBillable: 0,
+                                },
+                                components: current?.components || {
+                                  baseCost: 0,
+                                  baseFreight: 0,
+                                  toll: 0,
+                                  gris: 0,
+                                  tso: 0,
+                                  rctrc: 0,
+                                  adValorem: 0,
+                                  tde: 0,
+                                  tear: 0,
+                                  conditionalFeesTotal: 0,
+                                  waitingTimeCost: 0,
+                                },
+                                totals: current?.totals || {
+                                  receitaBruta: 0,
+                                  das: 0,
+                                  icms: 0,
+                                  totalImpostos: 0,
+                                  totalCliente: 0,
+                                },
+                                profitability: current?.profitability || {
+                                  custosCarreteiro: 0,
+                                  custosDescarga: 0,
+                                  custosDiretos: 0,
+                                  margemBruta: 0,
+                                  overhead: 0,
+                                  resultadoLiquido: 0,
+                                  margemPercent: 0,
+                                },
+                                rates: current?.rates || {
+                                  dasPercent: 14,
+                                  icmsPercent: 0,
+                                  grisPercent: 0,
+                                  tsoPercent: 0,
+                                  costValuePercent: 0,
+                                  markupPercent: 30,
+                                  overheadPercent: 15,
+                                  targetMarginPercent: 15,
+                                },
+                                conditionalFeesBreakdown: current?.conditionalFeesBreakdown,
+                              };
 
-                            const { error } = await supabase
-                              .from('quotes')
-                              .update({ pricing_breakdown: updated as unknown as typeof quote.pricing_breakdown })
-                              .eq('id', quote.id);
+                              const { error } = await supabase
+                                .from('quotes')
+                                .update({
+                                  pricing_breakdown:
+                                    updated as unknown as typeof quote.pricing_breakdown,
+                                })
+                                .eq('id', quote.id);
 
-                            if (error) {
-                              toast.error('Erro ao salvar piso ANTT');
-                              return;
-                            }
-                            toast.success('Piso ANTT salvo na memória de cálculo');
-                            queryClient.invalidateQueries({ queryKey: ['quotes'] });
-                          }}
-                        >
-                          Salvar no breakdown
-                        </Button>
+                              if (error) {
+                                toast.error('Erro ao salvar piso ANTT');
+                                return;
+                              }
+                              toast.success('Piso ANTT salvo na memória de cálculo');
+                              queryClient.invalidateQueries({ queryKey: ['quotes'] });
+                            }}
+                          >
+                            Salvar no breakdown
+                          </Button>
+                        )}
                       </>
                     ) : (
                       <>
@@ -583,7 +682,7 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                   <Receipt className="w-4 h-4" />
                   Breakdown do Cálculo
                 </h4>
-                
+
                 {/* Components */}
                 <div className="space-y-2 text-sm">
                   {breakdown.components && (
@@ -600,19 +699,25 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                       )}
                       {breakdown.components.rctrc > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2)}%)</span>
+                          <span className="text-muted-foreground">
+                            RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2)}%)
+                          </span>
                           <span>{formatCurrency(breakdown.components.rctrc)}</span>
                         </div>
                       )}
                       {breakdown.components.gris > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">GRIS ({breakdown.rates?.grisPercent?.toFixed(2)}%)</span>
+                          <span className="text-muted-foreground">
+                            GRIS ({breakdown.rates?.grisPercent?.toFixed(2)}%)
+                          </span>
                           <span>{formatCurrency(breakdown.components.gris)}</span>
                         </div>
                       )}
                       {breakdown.components.tso > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">TSO ({breakdown.rates?.tsoPercent?.toFixed(2)}%)</span>
+                          <span className="text-muted-foreground">
+                            TSO ({breakdown.rates?.tsoPercent?.toFixed(2)}%)
+                          </span>
                           <span>{formatCurrency(breakdown.components.tso)}</span>
                         </div>
                       )}
@@ -630,33 +735,35 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                       )}
                     </>
                   )}
-                  
+
                   <Separator className="my-2" />
-                  
+
                   {/* Totals */}
                   <div className="flex justify-between font-medium">
                     <span>Receita Bruta</span>
                     <span>{formatCurrency(breakdown.totals.receitaBruta || 0)}</span>
                   </div>
-                  
+
                   <div className="flex justify-between text-muted-foreground">
                     <span>DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)</span>
                     <span>{formatCurrency(breakdown.totals.das || 0)}</span>
                   </div>
-                  
+
                   <div className="flex justify-between text-muted-foreground">
                     <span>ICMS ({breakdown.rates?.icmsPercent?.toFixed(2)}%)</span>
                     <span>{formatCurrency(breakdown.totals.icms || 0)}</span>
                   </div>
-                  
+
                   <Separator className="my-2" />
-                  
+
                   <div className="flex justify-between font-semibold text-lg">
                     <span>Total Cliente</span>
-                    <span className="text-primary">{formatCurrency(breakdown.totals.totalCliente || 0)}</span>
+                    <span className="text-primary">
+                      {formatCurrency(breakdown.totals.totalCliente || 0)}
+                    </span>
                   </div>
                 </div>
-                
+
                 {/* Profitability */}
                 {breakdown.profitability && (
                   <>
@@ -676,17 +783,21 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                       </div>
                       <div className="flex justify-between font-medium">
                         <span>Resultado Líquido</span>
-                        <span className={cn(
-                          breakdown.profitability.resultadoLiquido >= 0 ? 'text-success' : 'text-destructive'
-                        )}>
+                        <span
+                          className={cn(
+                            breakdown.profitability.resultadoLiquido >= 0
+                              ? 'text-success'
+                              : 'text-destructive'
+                          )}
+                        >
                           {formatCurrency(breakdown.profitability.resultadoLiquido || 0)}
                         </span>
                       </div>
                       <div className="flex justify-between font-semibold">
                         <span>Margem %</span>
-                        <span className={cn(
-                          isBelowTarget ? 'text-warning-foreground' : 'text-success'
-                        )}>
+                        <span
+                          className={cn(isBelowTarget ? 'text-warning-foreground' : 'text-success')}
+                        >
                           {(breakdown.profitability.margemPercent || 0).toFixed(1)}%
                         </span>
                       </div>
@@ -700,22 +811,29 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
             <Collapsible open={isAdditionalFeesOpen} onOpenChange={setIsAdditionalFeesOpen}>
               <div className="p-4 rounded-lg bg-muted/30 border border-border">
                 <CollapsibleTrigger asChild>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     className="w-full justify-between p-0 h-auto hover:bg-transparent"
                   >
                     <h4 className="font-semibold text-foreground flex items-center gap-2">
-                      <Plus className={cn("w-4 h-4 transition-transform", isAdditionalFeesOpen && "rotate-45")} />
+                      <Plus
+                        className={cn(
+                          'w-4 h-4 transition-transform',
+                          isAdditionalFeesOpen && 'rotate-45'
+                        )}
+                      />
                       Taxas Adicionais
-                      {(additionalFeesSelection.conditionalFees.length > 0 || additionalFeesSelection.waitingTimeEnabled) && (
+                      {(additionalFeesSelection.conditionalFees.length > 0 ||
+                        additionalFeesSelection.waitingTimeEnabled) && (
                         <Badge variant="secondary" className="ml-2">
-                          {additionalFeesSelection.conditionalFees.length + (additionalFeesSelection.waitingTimeEnabled ? 1 : 0)}
+                          {additionalFeesSelection.conditionalFees.length +
+                            (additionalFeesSelection.waitingTimeEnabled ? 1 : 0)}
                         </Badge>
                       )}
                     </h4>
                   </Button>
                 </CollapsibleTrigger>
-                
+
                 <CollapsibleContent className="pt-4">
                   <AdditionalFeesSection
                     selection={additionalFeesSelection}
@@ -724,16 +842,18 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                     cargoValue={quote.cargo_value || 0}
                     vehicleTypeId={quote.vehicle_type_id || undefined}
                   />
-                  
-                  <div className="flex justify-end mt-4">
-                    <Button 
-                      size="sm"
-                      onClick={handleSaveAdditionalFees}
-                      disabled={saveAdditionalFeesMutation.isPending}
-                    >
-                      {saveAdditionalFeesMutation.isPending ? 'Salvando...' : 'Salvar Taxas'}
-                    </Button>
-                  </div>
+
+                  {canManage && (
+                    <div className="flex justify-end mt-4">
+                      <Button
+                        size="sm"
+                        onClick={handleSaveAdditionalFees}
+                        disabled={saveAdditionalFeesMutation.isPending}
+                      >
+                        {saveAdditionalFeesMutation.isPending ? 'Salvando...' : 'Salvar Taxas'}
+                      </Button>
+                    </div>
+                  )}
                 </CollapsibleContent>
               </div>
             </Collapsible>
@@ -770,13 +890,13 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
                 <h4 className="font-semibold text-foreground mb-2">Tags</h4>
                 <div className="flex flex-wrap gap-2">
                   {quote.tags.map((tag) => (
-                    <Badge 
-                      key={tag} 
+                    <Badge
+                      key={tag}
                       variant="secondary"
                       className={cn(
-                        tag === 'urgente' && "bg-destructive/10 text-destructive",
-                        tag === 'contrato' && "bg-primary/10 text-primary",
-                        tag === 'refrigerado' && "bg-accent text-accent-foreground"
+                        tag === 'urgente' && 'bg-destructive/10 text-destructive',
+                        tag === 'contrato' && 'bg-primary/10 text-primary',
+                        tag === 'refrigerado' && 'bg-accent text-accent-foreground'
                       )}
                     >
                       {tag}
@@ -806,14 +926,14 @@ export function QuoteDetailModal({ open, onClose, quote }: QuoteDetailModalProps
 
       {/* Edit Form */}
       <QuoteForm
-        open={isEditFormOpen}
+        open={canManage && isEditFormOpen}
         onClose={() => setIsEditFormOpen(false)}
         quote={quote}
       />
 
       {/* Convert Modal */}
       <ConvertQuoteModal
-        open={isConvertModalOpen}
+        open={canManage && isConvertModalOpen}
         onClose={() => setIsConvertModalOpen(false)}
         quote={quote}
       />

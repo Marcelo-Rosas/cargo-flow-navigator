@@ -7,28 +7,72 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { 
-  usePriceTables, 
-  useCreatePriceTable, 
-  useUpdatePriceTable, 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  usePriceTables,
+  useCreatePriceTable,
+  useUpdatePriceTable,
   useDeletePriceTable,
   useSetActivePriceTable,
-  useActivePriceTable
+  useActivePriceTable,
 } from '@/hooks/usePriceTables';
 import { usePriceTableRows } from '@/hooks/usePriceTableRows';
-import { 
-  useIcmsRates, 
-  useCreateIcmsRate, 
-  useUpdateIcmsRate, 
+import {
+  useIcmsRates,
+  useCreateIcmsRate,
+  useUpdateIcmsRate,
   useDeleteIcmsRate,
-  useUpsertIcmsRates
+  useUpsertIcmsRates,
 } from '@/hooks/useIcmsRates';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Check, Loader2, TableIcon, Activity, Receipt, Upload, FileSpreadsheet, Settings2, Calculator } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Check,
+  Loader2,
+  TableIcon,
+  Activity,
+  Receipt,
+  Upload,
+  FileSpreadsheet,
+  Settings2,
+  Calculator,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PriceTableImportModal } from '@/components/pricing/PriceTableImportModal';
@@ -36,11 +80,39 @@ import { PricingRulesTab } from '@/components/pricing/PricingRulesTab';
 import { FreightSimulator } from '@/components/pricing/FreightSimulator';
 import { parseIcmsFile, ParsedIcmsRow } from '@/lib/priceTableParser';
 import { cn } from '@/lib/utils';
+import type { Database } from '@/integrations/supabase/types';
+
+type PriceTableRow = Database['public']['Tables']['price_tables']['Row'];
+type IcmsRateRow = Database['public']['Tables']['icms_rates']['Row'];
 
 const BRAZILIAN_STATES = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 
-  'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 
-  'SP', 'SE', 'TO'
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
 ];
 
 export default function PriceTables() {
@@ -49,7 +121,9 @@ export default function PriceTables() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Tabelas de Preço</h1>
-          <p className="text-muted-foreground">Gerencie tabelas de preço, vigências e alíquotas de ICMS</p>
+          <p className="text-muted-foreground">
+            Gerencie tabelas de preço, vigências e alíquotas de ICMS
+          </p>
         </div>
 
         <Tabs defaultValue="tabelas" className="space-y-4">
@@ -110,13 +184,12 @@ function PriceTablesTab() {
   const setActive = useSetActivePriceTable();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingTable, setEditingTable] = useState<any>(null);
+  const [editingTable, setEditingTable] = useState<PriceTableRow | null>(null);
   const [filterModality, setFilterModality] = useState<string>('all');
   const [isImportOpen, setIsImportOpen] = useState(false);
 
-  const filteredTables = tables?.filter(t =>
-    filterModality === 'all' || t.modality === filterModality
-  ) || [];
+  const filteredTables =
+    tables?.filter((t) => filterModality === 'all' || t.modality === filterModality) || [];
 
   const handleCreate = async (data: { name: string; modality: string }) => {
     try {
@@ -152,11 +225,11 @@ function PriceTablesTab() {
     }
   };
 
-  const handleActivate = async (table: any) => {
+  const handleActivate = async (table: PriceTableRow) => {
     try {
-      await setActive.mutateAsync({ 
-        modality: table.modality as 'lotacao' | 'fracionado', 
-        id: table.id 
+      await setActive.mutateAsync({
+        modality: table.modality as 'lotacao' | 'fracionado',
+        id: table.id,
       });
       toast.success(`Tabela "${table.name}" ativada para ${table.modality}`);
     } catch (error) {
@@ -204,19 +277,14 @@ function PriceTablesTab() {
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <PriceTableForm 
-                onSubmit={handleCreate} 
-                isLoading={createTable.isPending}
-              />
+              <PriceTableForm onSubmit={handleCreate} isLoading={createTable.isPending} />
             </DialogContent>
           </Dialog>
         </div>
       </CardHeader>
       <CardContent>
         {filteredTables.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Nenhuma tabela encontrada
-          </div>
+          <div className="text-center py-8 text-muted-foreground">Nenhuma tabela encontrada</div>
         ) : (
           <Table>
             <TableHeader>
@@ -252,8 +320,8 @@ function PriceTablesTab() {
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
                       {!table.active && (
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => handleActivate(table)}
                           disabled={setActive.isPending}
@@ -262,14 +330,14 @@ function PriceTablesTab() {
                           Ativar
                         </Button>
                       )}
-                      
-                      <Dialog 
-                        open={editingTable?.id === table.id} 
+
+                      <Dialog
+                        open={editingTable?.id === table.id}
                         onOpenChange={(open) => !open && setEditingTable(null)}
                       >
                         <DialogTrigger asChild>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="icon"
                             onClick={() => setEditingTable(table)}
                           >
@@ -277,9 +345,9 @@ function PriceTablesTab() {
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
-                          <PriceTableForm 
+                          <PriceTableForm
                             initialData={table}
-                            onSubmit={(data) => handleUpdate(table.id, data)} 
+                            onSubmit={(data) => handleUpdate(table.id, data)}
                             isLoading={updateTable.isPending}
                           />
                         </DialogContent>
@@ -295,7 +363,8 @@ function PriceTablesTab() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Excluir tabela?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Esta ação não pode ser desfeita. A tabela "{table.name}" e todas as suas faixas serão excluídas permanentemente.
+                              Esta ação não pode ser desfeita. A tabela "{table.name}" e todas as
+                              suas faixas serão excluídas permanentemente.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -322,7 +391,9 @@ function PriceTablesTab() {
       <PriceTableImportModal
         open={isImportOpen}
         onOpenChange={setIsImportOpen}
-        defaultModality={filterModality !== 'all' ? filterModality as 'lotacao' | 'fracionado' : 'lotacao'}
+        defaultModality={
+          filterModality !== 'all' ? (filterModality as 'lotacao' | 'fracionado') : 'lotacao'
+        }
       />
     </Card>
   );
@@ -352,16 +423,15 @@ function PriceTableForm({ initialData, onSubmit, isLoading }: PriceTableFormProp
       <DialogHeader>
         <DialogTitle>{initialData ? 'Editar Tabela' : 'Nova Tabela de Preço'}</DialogTitle>
         <DialogDescription>
-          {initialData 
+          {initialData
             ? 'Atualize as informações da tabela de preço'
-            : 'Preencha os dados para criar uma nova tabela'
-          }
+            : 'Preencha os dados para criar uma nova tabela'}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
         <div className="space-y-2">
           <Label htmlFor="name">Nome</Label>
-          <Input 
+          <Input
             id="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -396,7 +466,8 @@ function PriceTableForm({ initialData, onSubmit, isLoading }: PriceTableFormProp
 // ======================== VIGENTES TAB ========================
 function ActiveTablesTab() {
   const { data: activeLotacao, isLoading: loadingLotacao } = useActivePriceTable('lotacao');
-  const { data: activeFracionado, isLoading: loadingFracionado } = useActivePriceTable('fracionado');
+  const { data: activeFracionado, isLoading: loadingFracionado } =
+    useActivePriceTable('fracionado');
 
   const isLoading = loadingLotacao || loadingFracionado;
 
@@ -410,23 +481,15 @@ function ActiveTablesTab() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      <ActiveTableCard 
-        title="Lotação" 
-        table={activeLotacao} 
-        variant="default"
-      />
-      <ActiveTableCard 
-        title="Fracionado" 
-        table={activeFracionado} 
-        variant="secondary"
-      />
+      <ActiveTableCard title="Lotação" table={activeLotacao} variant="default" />
+      <ActiveTableCard title="Fracionado" table={activeFracionado} variant="secondary" />
     </div>
   );
 }
 
 interface ActiveTableCardProps {
   title: string;
-  table: any;
+  table: PriceTableRow | null;
   variant: 'default' | 'secondary';
 }
 
@@ -446,9 +509,7 @@ function ActiveTableCard({ title, table, variant }: ActiveTableCardProps) {
       </CardHeader>
       <CardContent>
         {!table ? (
-          <div className="text-center py-6 text-muted-foreground">
-            Nenhuma tabela ativa
-          </div>
+          <div className="text-center py-6 text-muted-foreground">Nenhuma tabela ativa</div>
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -482,7 +543,8 @@ function ActiveTableCard({ title, table, variant }: ActiveTableCardProps) {
                 <p className="text-sm text-muted-foreground">Vigência</p>
                 <p className="font-medium">
                   {format(new Date(table.valid_from), 'dd/MM/yyyy', { locale: ptBR })}
-                  {table.valid_until && ` até ${format(new Date(table.valid_until), 'dd/MM/yyyy', { locale: ptBR })}`}
+                  {table.valid_until &&
+                    ` até ${format(new Date(table.valid_until), 'dd/MM/yyyy', { locale: ptBR })}`}
                 </p>
               </div>
             )}
@@ -502,23 +564,26 @@ function IcmsRatesTab() {
   const upsertRates = useUpsertIcmsRates();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingRate, setEditingRate] = useState<any>(null);
+  const [editingRate, setEditingRate] = useState<IcmsRateRow | null>(null);
   const [filterOrigin, setFilterOrigin] = useState<string>('all');
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importParsedRows, setImportParsedRows] = useState<ParsedIcmsRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
 
-  const filteredRates = rates?.filter(r => 
-    filterOrigin === 'all' || r.origin_state === filterOrigin
-  ) || [];
+  const filteredRates =
+    rates?.filter((r) => filterOrigin === 'all' || r.origin_state === filterOrigin) || [];
 
-  const handleCreate = async (data: { origin_state: string; destination_state: string; rate_percent: number }) => {
+  const handleCreate = async (data: {
+    origin_state: string;
+    destination_state: string;
+    rate_percent: number;
+  }) => {
     try {
       await createRate.mutateAsync(data);
       toast.success('Alíquota criada com sucesso');
       setIsCreateOpen(false);
-    } catch (error: any) {
-      if (error.message?.includes('duplicate')) {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message?.includes('duplicate')) {
         toast.error('Já existe uma alíquota para esta combinação UF');
       } else {
         toast.error('Erro ao criar alíquota');
@@ -564,14 +629,18 @@ function IcmsRatesTab() {
     }
   }, []);
 
-  const { getRootProps: getIcmsRootProps, getInputProps: getIcmsInputProps, isDragActive: isIcmsDragActive } = useDropzone({
+  const {
+    getRootProps: getIcmsRootProps,
+    getInputProps: getIcmsInputProps,
+    isDragActive: isIcmsDragActive,
+  } = useDropzone({
     onDrop: onDropIcms,
     accept: { 'text/csv': ['.csv'] },
     maxFiles: 1,
   });
 
   const handleImportIcms = async () => {
-    const validRows = importParsedRows.filter(r => r.isValid);
+    const validRows = importParsedRows.filter((r) => r.isValid);
     if (validRows.length === 0) {
       toast.error('Nenhuma linha válida para importar');
       return;
@@ -579,22 +648,26 @@ function IcmsRatesTab() {
 
     setIsImporting(true);
     try {
-      const result = await upsertRates.mutateAsync(validRows.map(r => ({
-        origin_state: r.origin_state,
-        destination_state: r.destination_state,
-        rate_percent: r.rate_percent,
-      })));
-      
+      const result = await upsertRates.mutateAsync(
+        validRows.map((r) => ({
+          origin_state: r.origin_state,
+          destination_state: r.destination_state,
+          rate_percent: r.rate_percent,
+        }))
+      );
+
       // Show detailed result
       if (result.success) {
-        toast.success(`Importação concluída: ${result.inserted} inseridas, ${result.updated} atualizadas`);
+        toast.success(
+          `Importação concluída: ${result.inserted} inseridas, ${result.updated} atualizadas`
+        );
       } else {
         toast.warning(
           `Importação parcial: ${result.inserted} inseridas, ${result.updated} atualizadas, ${result.failed} com erro`,
           { duration: 6000 }
         );
         // Log first 5 errors
-        result.errors.slice(0, 5).forEach(err => {
+        result.errors.slice(0, 5).forEach((err) => {
           toast.error(err, { duration: 5000 });
         });
         if (result.errors.length > 5) {
@@ -602,7 +675,7 @@ function IcmsRatesTab() {
           console.error('[ICMS Import Errors]', result.errors);
         }
       }
-      
+
       setIsImportOpen(false);
       setImportParsedRows([]);
     } catch (error) {
@@ -636,16 +709,21 @@ function IcmsRatesTab() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {BRAZILIAN_STATES.map(state => (
-                <SelectItem key={state} value={state}>{state}</SelectItem>
+              {BRAZILIAN_STATES.map((state) => (
+                <SelectItem key={state} value={state}>
+                  {state}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Dialog open={isImportOpen} onOpenChange={(open) => {
-            setIsImportOpen(open);
-            if (!open) setImportParsedRows([]);
-          }}>
+          <Dialog
+            open={isImportOpen}
+            onOpenChange={(open) => {
+              setIsImportOpen(open);
+              if (!open) setImportParsedRows([]);
+            }}
+          >
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Upload className="h-4 w-4 mr-2" />
@@ -662,15 +740,15 @@ function IcmsRatesTab() {
                   Faça upload de um arquivo CSV com colunas: uf_origem, uf_destino, aliquota
                 </DialogDescription>
               </DialogHeader>
-              
+
               {importParsedRows.length === 0 ? (
                 <div
                   {...getIcmsRootProps()}
                   className={cn(
-                    "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
-                    isIcmsDragActive 
-                      ? "border-primary bg-primary/5" 
-                      : "border-border hover:border-primary/50"
+                    'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
+                    isIcmsDragActive
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
                   )}
                 >
                   <input {...getIcmsInputProps()} />
@@ -685,11 +763,11 @@ function IcmsRatesTab() {
                   <div className="flex items-center gap-2">
                     <Badge variant="default">{importParsedRows.length} linhas</Badge>
                     <Badge variant="secondary">
-                      {importParsedRows.filter(r => r.isValid).length} válidas
+                      {importParsedRows.filter((r) => r.isValid).length} válidas
                     </Badge>
-                    {importParsedRows.filter(r => !r.isValid).length > 0 && (
+                    {importParsedRows.filter((r) => !r.isValid).length > 0 && (
                       <Badge variant="destructive">
-                        {importParsedRows.filter(r => !r.isValid).length} inválidas
+                        {importParsedRows.filter((r) => !r.isValid).length} inválidas
                       </Badge>
                     )}
                   </div>
@@ -704,7 +782,7 @@ function IcmsRatesTab() {
                       </thead>
                       <tbody>
                         {importParsedRows.slice(0, 20).map((row, idx) => (
-                          <tr key={idx} className={cn(!row.isValid && "bg-destructive/10")}>
+                          <tr key={idx} className={cn(!row.isValid && 'bg-destructive/10')}>
                             <td className="p-2">{row.origin_state}</td>
                             <td className="p-2">{row.destination_state}</td>
                             <td className="p-2">{row.rate_percent}</td>
@@ -729,7 +807,7 @@ function IcmsRatesTab() {
                     </Button>
                     <Button onClick={handleImportIcms} disabled={isImporting}>
                       {isImporting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Importar {importParsedRows.filter(r => r.isValid).length} alíquotas
+                      Importar {importParsedRows.filter((r) => r.isValid).length} alíquotas
                     </Button>
                   </>
                 )}
@@ -745,19 +823,14 @@ function IcmsRatesTab() {
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <IcmsRateForm 
-                onSubmit={handleCreate} 
-                isLoading={createRate.isPending}
-              />
+              <IcmsRateForm onSubmit={handleCreate} isLoading={createRate.isPending} />
             </DialogContent>
           </Dialog>
         </div>
       </CardHeader>
       <CardContent>
         {filteredRates.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Nenhuma alíquota encontrada
-          </div>
+          <div className="text-center py-8 text-muted-foreground">Nenhuma alíquota encontrada</div>
         ) : (
           <Table>
             <TableHeader>
@@ -776,30 +849,25 @@ function IcmsRatesTab() {
                   <TableCell>{rate.destination_state}</TableCell>
                   <TableCell>{rate.rate_percent}%</TableCell>
                   <TableCell>
-                    {rate.valid_from 
+                    {rate.valid_from
                       ? `${format(new Date(rate.valid_from), 'dd/MM/yy')}${rate.valid_until ? ` - ${format(new Date(rate.valid_until), 'dd/MM/yy')}` : ''}`
-                      : 'Indefinida'
-                    }
+                      : 'Indefinida'}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Dialog 
-                        open={editingRate?.id === rate.id} 
+                      <Dialog
+                        open={editingRate?.id === rate.id}
                         onOpenChange={(open) => !open && setEditingRate(null)}
                       >
                         <DialogTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => setEditingRate(rate)}
-                          >
+                          <Button variant="ghost" size="icon" onClick={() => setEditingRate(rate)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
-                          <IcmsRateForm 
+                          <IcmsRateForm
                             initialData={rate}
-                            onSubmit={(data) => handleUpdate(rate.id, data)} 
+                            onSubmit={(data) => handleUpdate(rate.id, data)}
                             isLoading={updateRate.isPending}
                           />
                         </DialogContent>
@@ -815,7 +883,8 @@ function IcmsRatesTab() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Excluir alíquota?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Esta ação não pode ser desfeita. A alíquota {rate.origin_state} → {rate.destination_state} será excluída permanentemente.
+                              Esta ação não pode ser desfeita. A alíquota {rate.origin_state} →{' '}
+                              {rate.destination_state} será excluída permanentemente.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -843,7 +912,11 @@ function IcmsRatesTab() {
 
 interface IcmsRateFormProps {
   initialData?: { origin_state: string; destination_state: string; rate_percent: number };
-  onSubmit: (data: { origin_state: string; destination_state: string; rate_percent: number }) => void;
+  onSubmit: (data: {
+    origin_state: string;
+    destination_state: string;
+    rate_percent: number;
+  }) => void;
   isLoading: boolean;
 }
 
@@ -862,10 +935,10 @@ function IcmsRateForm({ initialData, onSubmit, isLoading }: IcmsRateFormProps) {
       toast.error('Alíquota inválida');
       return;
     }
-    onSubmit({ 
-      origin_state: originState, 
-      destination_state: destinationState, 
-      rate_percent: Number(ratePercent) 
+    onSubmit({
+      origin_state: originState,
+      destination_state: destinationState,
+      rate_percent: Number(ratePercent),
     });
   };
 
@@ -874,10 +947,9 @@ function IcmsRateForm({ initialData, onSubmit, isLoading }: IcmsRateFormProps) {
       <DialogHeader>
         <DialogTitle>{initialData ? 'Editar Alíquota' : 'Nova Alíquota de ICMS'}</DialogTitle>
         <DialogDescription>
-          {initialData 
+          {initialData
             ? `Atualize a alíquota para ${initialData.origin_state} → ${initialData.destination_state}`
-            : 'Defina a alíquota de ICMS para a rota interestadual'
-          }
+            : 'Defina a alíquota de ICMS para a rota interestadual'}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
@@ -891,8 +963,10 @@ function IcmsRateForm({ initialData, onSubmit, isLoading }: IcmsRateFormProps) {
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {BRAZILIAN_STATES.map(state => (
-                      <SelectItem key={state} value={state}>{state}</SelectItem>
+                    {BRAZILIAN_STATES.map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {state}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -904,8 +978,10 @@ function IcmsRateForm({ initialData, onSubmit, isLoading }: IcmsRateFormProps) {
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {BRAZILIAN_STATES.map(state => (
-                      <SelectItem key={state} value={state}>{state}</SelectItem>
+                    {BRAZILIAN_STATES.map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {state}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -915,7 +991,7 @@ function IcmsRateForm({ initialData, onSubmit, isLoading }: IcmsRateFormProps) {
         )}
         <div className="space-y-2">
           <Label htmlFor="rate">Alíquota (%)</Label>
-          <Input 
+          <Input
             id="rate"
             type="number"
             step="0.01"

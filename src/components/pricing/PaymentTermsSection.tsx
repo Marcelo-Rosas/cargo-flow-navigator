@@ -3,11 +3,29 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { usePaymentTerms } from '@/hooks/usePricingRules';
-import { useCreatePaymentTerm, useUpdatePaymentTerm, useDeletePaymentTerm } from '@/hooks/usePricingMutations';
+import {
+  useCreatePaymentTerm,
+  useUpdatePaymentTerm,
+  useDeletePaymentTerm,
+} from '@/hooks/usePricingMutations';
 import { Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PaymentTerm } from '@/types/pricing';
@@ -17,11 +35,16 @@ export function PaymentTermsSection() {
   const createMutation = useCreatePaymentTerm();
   const updateMutation = useUpdatePaymentTerm();
   const deleteMutation = useDeletePaymentTerm();
-  
+
   const [editingTerm, setEditingTerm] = useState<PaymentTerm | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (data: {
+    code: string;
+    name: string;
+    days: number;
+    adjustment_percent: number;
+  }) => {
     try {
       await createMutation.mutateAsync(data);
       toast.success('Prazo de pagamento criado');
@@ -31,7 +54,7 @@ export function PaymentTermsSection() {
     }
   };
 
-  const handleUpdate = async (id: string, data: any) => {
+  const handleUpdate = async (id: string, data: Partial<PaymentTerm>) => {
     try {
       await updateMutation.mutateAsync({ id, updates: data });
       toast.success('Prazo atualizado');
@@ -89,10 +112,17 @@ export function PaymentTermsSection() {
               <TableCell className="font-medium">{term.name}</TableCell>
               <TableCell>{term.days === 0 ? 'À vista' : `${term.days} dias`}</TableCell>
               <TableCell>
-                <Badge 
-                  variant={term.adjustment_percent > 0 ? 'destructive' : term.adjustment_percent < 0 ? 'default' : 'secondary'}
+                <Badge
+                  variant={
+                    term.adjustment_percent > 0
+                      ? 'destructive'
+                      : term.adjustment_percent < 0
+                        ? 'default'
+                        : 'secondary'
+                  }
                 >
-                  {term.adjustment_percent > 0 ? '+' : ''}{term.adjustment_percent.toFixed(2)}%
+                  {term.adjustment_percent > 0 ? '+' : ''}
+                  {term.adjustment_percent.toFixed(2)}%
                 </Badge>
               </TableCell>
               <TableCell>
@@ -107,11 +137,7 @@ export function PaymentTermsSection() {
                     onCheckedChange={() => handleToggleActive(term)}
                     disabled={updateMutation.isPending}
                   />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingTerm(term)}
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => setEditingTerm(term)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
@@ -146,10 +172,7 @@ export function PaymentTermsSection() {
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
-          <PaymentTermForm
-            onSubmit={handleCreate}
-            isLoading={createMutation.isPending}
-          />
+          <PaymentTermForm onSubmit={handleCreate} isLoading={createMutation.isPending} />
         </DialogContent>
       </Dialog>
     </div>
@@ -162,13 +185,19 @@ function PaymentTermForm({
   isLoading,
 }: {
   term?: PaymentTerm;
-  onSubmit: (data: any) => void;
+  onSubmit: (
+    data:
+      | { code: string; name: string; days: number; adjustment_percent: number }
+      | Partial<PaymentTerm>
+  ) => void;
   isLoading: boolean;
 }) {
   const [code, setCode] = useState(term?.code || '');
   const [name, setName] = useState(term?.name || '');
   const [days, setDays] = useState(term?.days?.toString() || '');
-  const [adjustmentPercent, setAdjustmentPercent] = useState(term?.adjustment_percent?.toString() || '');
+  const [adjustmentPercent, setAdjustmentPercent] = useState(
+    term?.adjustment_percent?.toString() || ''
+  );
   const [active, setActive] = useState(term?.active ?? true);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -207,11 +236,7 @@ function PaymentTermForm({
           </div>
           <div className="space-y-2">
             <Label>Nome</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="30 dias"
-            />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="30 dias" />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">

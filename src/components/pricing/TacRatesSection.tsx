@@ -2,8 +2,22 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useTacRates } from '@/hooks/usePricingRules';
 import { useCreateTacRate, useUpdateTacRate, useDeleteTacRate } from '@/hooks/usePricingMutations';
@@ -18,11 +32,13 @@ export function TacRatesSection() {
   const createMutation = useCreateTacRate();
   const updateMutation = useUpdateTacRate();
   const deleteMutation = useDeleteTacRate();
-  
+
   const [editingRate, setEditingRate] = useState<TacRate | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (
+    data: Omit<TacRate, 'id' | 'created_at' | 'updated_at' | 'created_by'>
+  ) => {
     try {
       await createMutation.mutateAsync(data);
       toast.success('TAC criado');
@@ -32,7 +48,7 @@ export function TacRatesSection() {
     }
   };
 
-  const handleUpdate = async (id: string, data: any) => {
+  const handleUpdate = async (id: string, data: Partial<TacRate>) => {
     try {
       await updateMutation.mutateAsync({ id, updates: data });
       toast.success('TAC atualizado');
@@ -92,9 +108,7 @@ export function TacRatesSection() {
               <TableCell className="font-medium">
                 <div className="flex items-center gap-2">
                   {format(new Date(rate.reference_date), 'dd/MM/yyyy', { locale: ptBR })}
-                  {index === 0 && (
-                    <Badge variant="default">Vigente</Badge>
-                  )}
+                  {index === 0 && <Badge variant="default">Vigente</Badge>}
                 </div>
               </TableCell>
               <TableCell>R$ {rate.diesel_price_base.toFixed(3)}</TableCell>
@@ -102,14 +116,23 @@ export function TacRatesSection() {
               <TableCell>
                 <div className="flex items-center gap-1">
                   {getVariationIcon(rate.variation_percent)}
-                  <span className={rate.variation_percent > 0 ? 'text-destructive' : rate.variation_percent < 0 ? 'text-primary' : ''}>
+                  <span
+                    className={
+                      rate.variation_percent > 0
+                        ? 'text-destructive'
+                        : rate.variation_percent < 0
+                          ? 'text-primary'
+                          : ''
+                    }
+                  >
                     {rate.variation_percent?.toFixed(2)}%
                   </span>
                 </div>
               </TableCell>
               <TableCell>
                 <Badge variant={rate.adjustment_percent > 0 ? 'destructive' : 'secondary'}>
-                  {rate.adjustment_percent > 0 ? '+' : ''}{rate.adjustment_percent.toFixed(2)}%
+                  {rate.adjustment_percent > 0 ? '+' : ''}
+                  {rate.adjustment_percent.toFixed(2)}%
                 </Badge>
               </TableCell>
               <TableCell className="text-muted-foreground text-sm">
@@ -117,11 +140,7 @@ export function TacRatesSection() {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingRate(rate)}
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => setEditingRate(rate)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
@@ -156,10 +175,7 @@ export function TacRatesSection() {
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
-          <TacRateForm
-            onSubmit={handleCreate}
-            isLoading={createMutation.isPending}
-          />
+          <TacRateForm onSubmit={handleCreate} isLoading={createMutation.isPending} />
         </DialogContent>
       </Dialog>
     </div>
@@ -172,20 +188,29 @@ function TacRateForm({
   isLoading,
 }: {
   rate?: TacRate;
-  onSubmit: (data: any) => void;
+  onSubmit: (
+    data: Omit<TacRate, 'id' | 'created_at' | 'updated_at' | 'created_by'> | Partial<TacRate>
+  ) => void;
   isLoading: boolean;
 }) {
   const [referenceDate, setReferenceDate] = useState(
     rate?.reference_date || new Date().toISOString().split('T')[0]
   );
   const [dieselPriceBase, setDieselPriceBase] = useState(rate?.diesel_price_base?.toString() || '');
-  const [dieselPriceCurrent, setDieselPriceCurrent] = useState(rate?.diesel_price_current?.toString() || '');
-  const [adjustmentPercent, setAdjustmentPercent] = useState(rate?.adjustment_percent?.toString() || '');
+  const [dieselPriceCurrent, setDieselPriceCurrent] = useState(
+    rate?.diesel_price_current?.toString() || ''
+  );
+  const [adjustmentPercent, setAdjustmentPercent] = useState(
+    rate?.adjustment_percent?.toString() || ''
+  );
   const [sourceDescription, setSourceDescription] = useState(rate?.source_description || '');
 
-  const calculatedVariation = dieselPriceBase && dieselPriceCurrent
-    ? ((parseFloat(dieselPriceCurrent) - parseFloat(dieselPriceBase)) / parseFloat(dieselPriceBase)) * 100
-    : 0;
+  const calculatedVariation =
+    dieselPriceBase && dieselPriceCurrent
+      ? ((parseFloat(dieselPriceCurrent) - parseFloat(dieselPriceBase)) /
+          parseFloat(dieselPriceBase)) *
+        100
+      : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,8 +271,16 @@ function TacRateForm({
         {dieselPriceBase && dieselPriceCurrent && (
           <div className="p-3 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground">
-              Variação calculada: <span className={calculatedVariation > 0 ? 'text-destructive font-medium' : 'text-primary font-medium'}>
-                {calculatedVariation > 0 ? '+' : ''}{calculatedVariation.toFixed(2)}%
+              Variação calculada:{' '}
+              <span
+                className={
+                  calculatedVariation > 0
+                    ? 'text-destructive font-medium'
+                    : 'text-primary font-medium'
+                }
+              >
+                {calculatedVariation > 0 ? '+' : ''}
+                {calculatedVariation.toFixed(2)}%
               </span>
             </p>
           </div>

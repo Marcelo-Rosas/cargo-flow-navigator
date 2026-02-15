@@ -1,23 +1,23 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy } from 'react';
 
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/hooks/useAuth";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { Toaster as Sonner } from '@/components/ui/sonner';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { AuthProvider } from '@/hooks/useAuth';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 // Lazy routes (code-splitting)
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Commercial = lazy(() => import("./pages/Commercial"));
-const Operations = lazy(() => import("./pages/Operations"));
-const Documents = lazy(() => import("./pages/Documents"));
-const Clients = lazy(() => import("./pages/Clients"));
-const Shippers = lazy(() => import("./pages/Shippers"));
-const PriceTables = lazy(() => import("./pages/PriceTables"));
-const Auth = lazy(() => import("./pages/Auth"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Commercial = lazy(() => import('./pages/Commercial'));
+const Operations = lazy(() => import('./pages/Operations'));
+const Documents = lazy(() => import('./pages/Documents'));
+const Clients = lazy(() => import('./pages/Clients'));
+const Shippers = lazy(() => import('./pages/Shippers'));
+const PriceTables = lazy(() => import('./pages/PriceTables'));
+const Auth = lazy(() => import('./pages/Auth'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient();
 
@@ -84,7 +84,7 @@ const App = () => (
               <Route
                 path="/tabelas-preco"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRoles={['admin', 'comercial', 'fiscal']}>
                     <PriceTables />
                   </ProtectedRoute>
                 }

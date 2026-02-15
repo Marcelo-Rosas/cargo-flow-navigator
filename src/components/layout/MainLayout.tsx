@@ -13,7 +13,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       <Sidebar />
       <div className="pl-[72px] md:pl-64 transition-all duration-200">
         <Topbar />
-        <motion.main 
+        <motion.main
           className="p-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

@@ -1,1672 +1,1664 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
+    PostgrestVersion: '14.1';
+  };
   public: {
     Tables: {
       antt_floor_rates: {
         Row: {
-          axes_count: number
-          cargo_type: string
-          cc: number
-          ccd: number
-          created_at: string
-          created_by: string | null
-          id: string
-          operation_table: string
-          updated_at: string
-          valid_from: string | null
-          valid_until: string | null
-        }
+          axes_count: number;
+          cargo_type: string;
+          cc: number;
+          ccd: number;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          operation_table: string;
+          updated_at: string;
+          valid_from: string | null;
+          valid_until: string | null;
+        };
         Insert: {
-          axes_count: number
-          cargo_type: string
-          cc: number
-          ccd: number
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          operation_table: string
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-        }
+          axes_count: number;
+          cargo_type: string;
+          cc: number;
+          ccd: number;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          operation_table: string;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+        };
         Update: {
-          axes_count?: number
-          cargo_type?: string
-          cc?: number
-          ccd?: number
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          operation_table?: string
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-        }
-        Relationships: []
-      }
+          axes_count?: number;
+          cargo_type?: string;
+          cc?: number;
+          ccd?: number;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          operation_table?: string;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+        };
+        Relationships: [];
+      };
       audit_logs: {
         Row: {
-          action: string
-          created_at: string
-          id: string
-          new_values: Json | null
-          old_values: Json | null
-          record_id: string
-          table_name: string
-          user_id: string | null
-        }
+          action: string;
+          created_at: string;
+          id: string;
+          new_values: Json | null;
+          old_values: Json | null;
+          record_id: string;
+          table_name: string;
+          user_id: string | null;
+        };
         Insert: {
-          action: string
-          created_at?: string
-          id?: string
-          new_values?: Json | null
-          old_values?: Json | null
-          record_id: string
-          table_name: string
-          user_id?: string | null
-        }
+          action: string;
+          created_at?: string;
+          id?: string;
+          new_values?: Json | null;
+          old_values?: Json | null;
+          record_id: string;
+          table_name: string;
+          user_id?: string | null;
+        };
         Update: {
-          action?: string
-          created_at?: string
-          id?: string
-          new_values?: Json | null
-          old_values?: Json | null
-          record_id?: string
-          table_name?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
+          action?: string;
+          created_at?: string;
+          id?: string;
+          new_values?: Json | null;
+          old_values?: Json | null;
+          record_id?: string;
+          table_name?: string;
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
       clients: {
         Row: {
-          address: string | null
-          city: string | null
-          cnpj: string | null
-          created_at: string
-          created_by: string | null
-          email: string | null
-          id: string
-          name: string
-          notes: string | null
-          phone: string | null
-          state: string | null
-          updated_at: string
-          zip_code: string | null
-        }
+          address: string | null;
+          city: string | null;
+          cnpj: string | null;
+          created_at: string;
+          created_by: string | null;
+          email: string | null;
+          id: string;
+          name: string;
+          notes: string | null;
+          phone: string | null;
+          state: string | null;
+          updated_at: string;
+          zip_code: string | null;
+        };
         Insert: {
-          address?: string | null
-          city?: string | null
-          cnpj?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          id?: string
-          name: string
-          notes?: string | null
-          phone?: string | null
-          state?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
+          address?: string | null;
+          city?: string | null;
+          cnpj?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          phone?: string | null;
+          state?: string | null;
+          updated_at?: string;
+          zip_code?: string | null;
+        };
         Update: {
-          address?: string | null
-          city?: string | null
-          cnpj?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          id?: string
-          name?: string
-          notes?: string | null
-          phone?: string | null
-          state?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
-        Relationships: []
-      }
+          address?: string | null;
+          city?: string | null;
+          cnpj?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          phone?: string | null;
+          state?: string | null;
+          updated_at?: string;
+          zip_code?: string | null;
+        };
+        Relationships: [];
+      };
       conditional_fees: {
         Row: {
-          active: boolean
-          applies_to: string
-          code: string
-          conditions: Json | null
-          created_at: string
-          created_by: string | null
-          description: string | null
-          fee_type: string
-          fee_value: number
-          id: string
-          max_value: number | null
-          min_value: number | null
-          name: string
-          updated_at: string
-          valid_from: string | null
-          valid_until: string | null
-        }
+          active: boolean;
+          applies_to: string;
+          code: string;
+          conditions: Json | null;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          fee_type: string;
+          fee_value: number;
+          id: string;
+          max_value: number | null;
+          min_value: number | null;
+          name: string;
+          updated_at: string;
+          valid_from: string | null;
+          valid_until: string | null;
+        };
         Insert: {
-          active?: boolean
-          applies_to?: string
-          code: string
-          conditions?: Json | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          fee_type: string
-          fee_value: number
-          id?: string
-          max_value?: number | null
-          min_value?: number | null
-          name: string
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-        }
+          active?: boolean;
+          applies_to?: string;
+          code: string;
+          conditions?: Json | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          fee_type: string;
+          fee_value: number;
+          id?: string;
+          max_value?: number | null;
+          min_value?: number | null;
+          name: string;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+        };
         Update: {
-          active?: boolean
-          applies_to?: string
-          code?: string
-          conditions?: Json | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          fee_type?: string
-          fee_value?: number
-          id?: string
-          max_value?: number | null
-          min_value?: number | null
-          name?: string
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-        }
-        Relationships: []
-      }
+          active?: boolean;
+          applies_to?: string;
+          code?: string;
+          conditions?: Json | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          fee_type?: string;
+          fee_value?: number;
+          id?: string;
+          max_value?: number | null;
+          min_value?: number | null;
+          name?: string;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+        };
+        Relationships: [];
+      };
       delivery_conditions: {
         Row: {
-          active: boolean
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          label: string
-          sort_order: number
-          updated_at: string
-        }
+          active: boolean;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          id: string;
+          label: string;
+          sort_order: number;
+          updated_at: string;
+        };
         Insert: {
-          active?: boolean
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          label: string
-          sort_order?: number
-          updated_at?: string
-        }
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          label: string;
+          sort_order?: number;
+          updated_at?: string;
+        };
         Update: {
-          active?: boolean
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          label?: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          label?: string;
+          sort_order?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       discharge_checklist_items: {
         Row: {
-          active: boolean
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          label: string
-          sort_order: number
-          updated_at: string
-        }
+          active: boolean;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          id: string;
+          label: string;
+          sort_order: number;
+          updated_at: string;
+        };
         Insert: {
-          active?: boolean
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          label: string
-          sort_order?: number
-          updated_at?: string
-        }
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          label: string;
+          sort_order?: number;
+          updated_at?: string;
+        };
         Update: {
-          active?: boolean
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          label?: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          label?: string;
+          sort_order?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       documents: {
         Row: {
-          created_at: string
-          file_name: string
-          file_size: number | null
-          file_url: string
-          id: string
-          nfe_key: string | null
-          order_id: string | null
-          quote_id: string | null
-          type: Database["public"]["Enums"]["document_type"]
-          updated_at: string
-          uploaded_by: string
-          validation_status: string | null
-        }
+          created_at: string;
+          file_name: string;
+          file_size: number | null;
+          file_url: string;
+          id: string;
+          nfe_key: string | null;
+          order_id: string | null;
+          quote_id: string | null;
+          type: Database['public']['Enums']['document_type'];
+          updated_at: string;
+          uploaded_by: string;
+          validation_status: string | null;
+        };
         Insert: {
-          created_at?: string
-          file_name: string
-          file_size?: number | null
-          file_url: string
-          id?: string
-          nfe_key?: string | null
-          order_id?: string | null
-          quote_id?: string | null
-          type: Database["public"]["Enums"]["document_type"]
-          updated_at?: string
-          uploaded_by: string
-          validation_status?: string | null
-        }
+          created_at?: string;
+          file_name: string;
+          file_size?: number | null;
+          file_url: string;
+          id?: string;
+          nfe_key?: string | null;
+          order_id?: string | null;
+          quote_id?: string | null;
+          type: Database['public']['Enums']['document_type'];
+          updated_at?: string;
+          uploaded_by: string;
+          validation_status?: string | null;
+        };
         Update: {
-          created_at?: string
-          file_name?: string
-          file_size?: number | null
-          file_url?: string
-          id?: string
-          nfe_key?: string | null
-          order_id?: string | null
-          quote_id?: string | null
-          type?: Database["public"]["Enums"]["document_type"]
-          updated_at?: string
-          uploaded_by?: string
-          validation_status?: string | null
-        }
+          created_at?: string;
+          file_name?: string;
+          file_size?: number | null;
+          file_url?: string;
+          id?: string;
+          nfe_key?: string | null;
+          order_id?: string | null;
+          quote_id?: string | null;
+          type?: Database['public']['Enums']['document_type'];
+          updated_at?: string;
+          uploaded_by?: string;
+          validation_status?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "documents_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
+            foreignKeyName: 'documents_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
           },
           {
-            foreignKeyName: "documents_quote_id_fkey"
-            columns: ["quote_id"]
-            isOneToOne: false
-            referencedRelation: "quotes"
-            referencedColumns: ["id"]
+            foreignKeyName: 'documents_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
           },
-        ]
-      }
+        ];
+      };
       drivers: {
         Row: {
-          active: boolean
-          address: string | null
-          birth_date: string | null
-          city: string | null
-          cnh: string | null
-          cnh_category: string | null
-          cnh_validity: string | null
-          cpf: string | null
-          created_at: string
-          created_by: string | null
-          email: string | null
-          father_name: string | null
-          has_accident_history: boolean
-          has_robbery_history: boolean
-          id: string
-          mother_name: string | null
-          name: string
-          notes: string | null
-          owner_id: string | null
-          phone: string | null
-          phone_secondary: string | null
-          rg: string | null
-          rg_emitter: string | null
-          state: string | null
-          transported_before: boolean
-          transported_details: string | null
-          updated_at: string
-          zip_code: string | null
-        }
+          active: boolean;
+          address: string | null;
+          birth_date: string | null;
+          city: string | null;
+          cnh: string | null;
+          cnh_category: string | null;
+          cnh_validity: string | null;
+          cpf: string | null;
+          created_at: string;
+          created_by: string | null;
+          email: string | null;
+          father_name: string | null;
+          has_accident_history: boolean;
+          has_robbery_history: boolean;
+          id: string;
+          mother_name: string | null;
+          name: string;
+          notes: string | null;
+          owner_id: string | null;
+          phone: string | null;
+          phone_secondary: string | null;
+          rg: string | null;
+          rg_emitter: string | null;
+          state: string | null;
+          transported_before: boolean;
+          transported_details: string | null;
+          updated_at: string;
+          zip_code: string | null;
+        };
         Insert: {
-          active?: boolean
-          address?: string | null
-          birth_date?: string | null
-          city?: string | null
-          cnh?: string | null
-          cnh_category?: string | null
-          cnh_validity?: string | null
-          cpf?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          father_name?: string | null
-          has_accident_history?: boolean
-          has_robbery_history?: boolean
-          id?: string
-          mother_name?: string | null
-          name: string
-          notes?: string | null
-          owner_id?: string | null
-          phone?: string | null
-          phone_secondary?: string | null
-          rg?: string | null
-          rg_emitter?: string | null
-          state?: string | null
-          transported_before?: boolean
-          transported_details?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
+          active?: boolean;
+          address?: string | null;
+          birth_date?: string | null;
+          city?: string | null;
+          cnh?: string | null;
+          cnh_category?: string | null;
+          cnh_validity?: string | null;
+          cpf?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          father_name?: string | null;
+          has_accident_history?: boolean;
+          has_robbery_history?: boolean;
+          id?: string;
+          mother_name?: string | null;
+          name: string;
+          notes?: string | null;
+          owner_id?: string | null;
+          phone?: string | null;
+          phone_secondary?: string | null;
+          rg?: string | null;
+          rg_emitter?: string | null;
+          state?: string | null;
+          transported_before?: boolean;
+          transported_details?: string | null;
+          updated_at?: string;
+          zip_code?: string | null;
+        };
         Update: {
-          active?: boolean
-          address?: string | null
-          birth_date?: string | null
-          city?: string | null
-          cnh?: string | null
-          cnh_category?: string | null
-          cnh_validity?: string | null
-          cpf?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          father_name?: string | null
-          has_accident_history?: boolean
-          has_robbery_history?: boolean
-          id?: string
-          mother_name?: string | null
-          name?: string
-          notes?: string | null
-          owner_id?: string | null
-          phone?: string | null
-          phone_secondary?: string | null
-          rg?: string | null
-          rg_emitter?: string | null
-          state?: string | null
-          transported_before?: boolean
-          transported_details?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
+          active?: boolean;
+          address?: string | null;
+          birth_date?: string | null;
+          city?: string | null;
+          cnh?: string | null;
+          cnh_category?: string | null;
+          cnh_validity?: string | null;
+          cpf?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          father_name?: string | null;
+          has_accident_history?: boolean;
+          has_robbery_history?: boolean;
+          id?: string;
+          mother_name?: string | null;
+          name?: string;
+          notes?: string | null;
+          owner_id?: string | null;
+          phone?: string | null;
+          phone_secondary?: string | null;
+          rg?: string | null;
+          rg_emitter?: string | null;
+          state?: string | null;
+          transported_before?: boolean;
+          transported_details?: string | null;
+          updated_at?: string;
+          zip_code?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "drivers_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "owners"
-            referencedColumns: ["id"]
+            foreignKeyName: 'drivers_owner_id_fkey';
+            columns: ['owner_id'];
+            isOneToOne: false;
+            referencedRelation: 'owners';
+            referencedColumns: ['id'];
           },
-        ]
-      }
+        ];
+      };
       icms_rates: {
         Row: {
-          created_at: string
-          created_by: string | null
-          destination_state: string
-          id: string
-          origin_state: string
-          rate_percent: number
-          updated_at: string
-          valid_from: string | null
-          valid_until: string | null
-        }
+          created_at: string;
+          created_by: string | null;
+          destination_state: string;
+          id: string;
+          origin_state: string;
+          rate_percent: number;
+          updated_at: string;
+          valid_from: string | null;
+          valid_until: string | null;
+        };
         Insert: {
-          created_at?: string
-          created_by?: string | null
-          destination_state: string
-          id?: string
-          origin_state: string
-          rate_percent: number
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-        }
+          created_at?: string;
+          created_by?: string | null;
+          destination_state: string;
+          id?: string;
+          origin_state: string;
+          rate_percent: number;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+        };
         Update: {
-          created_at?: string
-          created_by?: string | null
-          destination_state?: string
-          id?: string
-          origin_state?: string
-          rate_percent?: number
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          created_by?: string | null;
+          destination_state?: string;
+          id?: string;
+          origin_state?: string;
+          rate_percent?: number;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+        };
+        Relationships: [];
+      };
       occurrences: {
         Row: {
-          created_at: string
-          created_by: string
-          description: string
-          id: string
-          order_id: string
-          resolved_at: string | null
-          resolved_by: string | null
-          severity: Database["public"]["Enums"]["occurrence_severity"]
-          updated_at: string
-        }
+          created_at: string;
+          created_by: string;
+          description: string;
+          id: string;
+          order_id: string;
+          resolved_at: string | null;
+          resolved_by: string | null;
+          severity: Database['public']['Enums']['occurrence_severity'];
+          updated_at: string;
+        };
         Insert: {
-          created_at?: string
-          created_by: string
-          description: string
-          id?: string
-          order_id: string
-          resolved_at?: string | null
-          resolved_by?: string | null
-          severity?: Database["public"]["Enums"]["occurrence_severity"]
-          updated_at?: string
-        }
+          created_at?: string;
+          created_by: string;
+          description: string;
+          id?: string;
+          order_id: string;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          severity?: Database['public']['Enums']['occurrence_severity'];
+          updated_at?: string;
+        };
         Update: {
-          created_at?: string
-          created_by?: string
-          description?: string
-          id?: string
-          order_id?: string
-          resolved_at?: string | null
-          resolved_by?: string | null
-          severity?: Database["public"]["Enums"]["occurrence_severity"]
-          updated_at?: string
-        }
+          created_at?: string;
+          created_by?: string;
+          description?: string;
+          id?: string;
+          order_id?: string;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          severity?: Database['public']['Enums']['occurrence_severity'];
+          updated_at?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "occurrences_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
+            foreignKeyName: 'occurrences_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
           },
-        ]
-      }
+        ];
+      };
       orders: {
         Row: {
-          assigned_to: string | null
-          client_id: string | null
-          client_name: string
-          created_at: string
-          created_by: string
-          destination: string
-          driver_id: string | null
-          driver_name: string | null
-          driver_phone: string | null
-          eta: string | null
-          has_antt: boolean | null
-          has_antt_motorista: boolean | null
-          has_cnh: boolean | null
-          has_comp_residencia: boolean | null
-          has_crlv: boolean | null
-          has_cte: boolean
-          has_gr: boolean | null
-          has_mdf: boolean | null
-          has_mdfe: boolean | null
-          has_nfe: boolean
-          has_pod: boolean
-          id: string
-          notes: string | null
-          origin: string
-          os_number: string
-          quote_id: string | null
-          stage: Database["public"]["Enums"]["order_stage"]
-          ui_last_tab: string | null
-          updated_at: string
-          value: number
-          vehicle_plate: string | null
-          waiting_time_cost: number | null
-          waiting_time_hours: number | null
-        }
+          assigned_to: string | null;
+          client_id: string | null;
+          client_name: string;
+          created_at: string;
+          created_by: string;
+          destination: string;
+          driver_id: string | null;
+          driver_name: string | null;
+          driver_phone: string | null;
+          eta: string | null;
+          has_antt: boolean | null;
+          has_antt_motorista: boolean | null;
+          has_cnh: boolean | null;
+          has_comp_residencia: boolean | null;
+          has_crlv: boolean | null;
+          has_cte: boolean;
+          has_gr: boolean | null;
+          has_mdf: boolean | null;
+          has_mdfe: boolean | null;
+          has_nfe: boolean;
+          has_pod: boolean;
+          id: string;
+          notes: string | null;
+          origin: string;
+          os_number: string;
+          quote_id: string | null;
+          stage: Database['public']['Enums']['order_stage'];
+          ui_last_tab: string | null;
+          updated_at: string;
+          value: number;
+          vehicle_plate: string | null;
+          waiting_time_cost: number | null;
+          waiting_time_hours: number | null;
+        };
         Insert: {
-          assigned_to?: string | null
-          client_id?: string | null
-          client_name: string
-          created_at?: string
-          created_by: string
-          destination: string
-          driver_id?: string | null
-          driver_name?: string | null
-          driver_phone?: string | null
-          eta?: string | null
-          has_antt?: boolean | null
-          has_antt_motorista?: boolean | null
-          has_cnh?: boolean | null
-          has_comp_residencia?: boolean | null
-          has_crlv?: boolean | null
-          has_cte?: boolean
-          has_gr?: boolean | null
-          has_mdf?: boolean | null
-          has_mdfe?: boolean | null
-          has_nfe?: boolean
-          has_pod?: boolean
-          id?: string
-          notes?: string | null
-          origin: string
-          os_number: string
-          quote_id?: string | null
-          stage?: Database["public"]["Enums"]["order_stage"]
-          ui_last_tab?: string | null
-          updated_at?: string
-          value?: number
-          vehicle_plate?: string | null
-          waiting_time_cost?: number | null
-          waiting_time_hours?: number | null
-        }
+          assigned_to?: string | null;
+          client_id?: string | null;
+          client_name: string;
+          created_at?: string;
+          created_by: string;
+          destination: string;
+          driver_id?: string | null;
+          driver_name?: string | null;
+          driver_phone?: string | null;
+          eta?: string | null;
+          has_antt?: boolean | null;
+          has_antt_motorista?: boolean | null;
+          has_cnh?: boolean | null;
+          has_comp_residencia?: boolean | null;
+          has_crlv?: boolean | null;
+          has_cte?: boolean;
+          has_gr?: boolean | null;
+          has_mdf?: boolean | null;
+          has_mdfe?: boolean | null;
+          has_nfe?: boolean;
+          has_pod?: boolean;
+          id?: string;
+          notes?: string | null;
+          origin: string;
+          os_number: string;
+          quote_id?: string | null;
+          stage?: Database['public']['Enums']['order_stage'];
+          ui_last_tab?: string | null;
+          updated_at?: string;
+          value?: number;
+          vehicle_plate?: string | null;
+          waiting_time_cost?: number | null;
+          waiting_time_hours?: number | null;
+        };
         Update: {
-          assigned_to?: string | null
-          client_id?: string | null
-          client_name?: string
-          created_at?: string
-          created_by?: string
-          destination?: string
-          driver_id?: string | null
-          driver_name?: string | null
-          driver_phone?: string | null
-          eta?: string | null
-          has_antt?: boolean | null
-          has_antt_motorista?: boolean | null
-          has_cnh?: boolean | null
-          has_comp_residencia?: boolean | null
-          has_crlv?: boolean | null
-          has_cte?: boolean
-          has_gr?: boolean | null
-          has_mdf?: boolean | null
-          has_mdfe?: boolean | null
-          has_nfe?: boolean
-          has_pod?: boolean
-          id?: string
-          notes?: string | null
-          origin?: string
-          os_number?: string
-          quote_id?: string | null
-          stage?: Database["public"]["Enums"]["order_stage"]
-          ui_last_tab?: string | null
-          updated_at?: string
-          value?: number
-          vehicle_plate?: string | null
-          waiting_time_cost?: number | null
-          waiting_time_hours?: number | null
-        }
+          assigned_to?: string | null;
+          client_id?: string | null;
+          client_name?: string;
+          created_at?: string;
+          created_by?: string;
+          destination?: string;
+          driver_id?: string | null;
+          driver_name?: string | null;
+          driver_phone?: string | null;
+          eta?: string | null;
+          has_antt?: boolean | null;
+          has_antt_motorista?: boolean | null;
+          has_cnh?: boolean | null;
+          has_comp_residencia?: boolean | null;
+          has_crlv?: boolean | null;
+          has_cte?: boolean;
+          has_gr?: boolean | null;
+          has_mdf?: boolean | null;
+          has_mdfe?: boolean | null;
+          has_nfe?: boolean;
+          has_pod?: boolean;
+          id?: string;
+          notes?: string | null;
+          origin?: string;
+          os_number?: string;
+          quote_id?: string | null;
+          stage?: Database['public']['Enums']['order_stage'];
+          ui_last_tab?: string | null;
+          updated_at?: string;
+          value?: number;
+          vehicle_plate?: string | null;
+          waiting_time_cost?: number | null;
+          waiting_time_hours?: number | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "orders_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
+            foreignKeyName: 'orders_client_id_fkey';
+            columns: ['client_id'];
+            isOneToOne: false;
+            referencedRelation: 'clients';
+            referencedColumns: ['id'];
           },
           {
-            foreignKeyName: "orders_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
+            foreignKeyName: 'orders_driver_id_fkey';
+            columns: ['driver_id'];
+            isOneToOne: false;
+            referencedRelation: 'drivers';
+            referencedColumns: ['id'];
           },
           {
-            foreignKeyName: "orders_quote_id_fkey"
-            columns: ["quote_id"]
-            isOneToOne: false
-            referencedRelation: "quotes"
-            referencedColumns: ["id"]
+            foreignKeyName: 'orders_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
           },
-        ]
-      }
+        ];
+      };
       owners: {
         Row: {
-          active: boolean
-          address: string | null
-          city: string | null
-          cpf_cnpj: string | null
-          created_at: string
-          created_by: string | null
-          email: string | null
-          id: string
-          name: string
-          notes: string | null
-          phone: string | null
-          rg: string | null
-          rg_emitter: string | null
-          state: string | null
-          updated_at: string
-          zip_code: string | null
-        }
+          active: boolean;
+          address: string | null;
+          city: string | null;
+          cpf_cnpj: string | null;
+          created_at: string;
+          created_by: string | null;
+          email: string | null;
+          id: string;
+          name: string;
+          notes: string | null;
+          phone: string | null;
+          rg: string | null;
+          rg_emitter: string | null;
+          state: string | null;
+          updated_at: string;
+          zip_code: string | null;
+        };
         Insert: {
-          active?: boolean
-          address?: string | null
-          city?: string | null
-          cpf_cnpj?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          id?: string
-          name: string
-          notes?: string | null
-          phone?: string | null
-          rg?: string | null
-          rg_emitter?: string | null
-          state?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
+          active?: boolean;
+          address?: string | null;
+          city?: string | null;
+          cpf_cnpj?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          phone?: string | null;
+          rg?: string | null;
+          rg_emitter?: string | null;
+          state?: string | null;
+          updated_at?: string;
+          zip_code?: string | null;
+        };
         Update: {
-          active?: boolean
-          address?: string | null
-          city?: string | null
-          cpf_cnpj?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          id?: string
-          name?: string
-          notes?: string | null
-          phone?: string | null
-          rg?: string | null
-          rg_emitter?: string | null
-          state?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
-        Relationships: []
-      }
+          active?: boolean;
+          address?: string | null;
+          city?: string | null;
+          cpf_cnpj?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          phone?: string | null;
+          rg?: string | null;
+          rg_emitter?: string | null;
+          state?: string | null;
+          updated_at?: string;
+          zip_code?: string | null;
+        };
+        Relationships: [];
+      };
       payment_terms: {
         Row: {
-          active: boolean
-          adjustment_percent: number
-          code: string
-          created_at: string
-          created_by: string | null
-          days: number
-          id: string
-          name: string
-          updated_at: string
-        }
+          active: boolean;
+          adjustment_percent: number;
+          code: string;
+          created_at: string;
+          created_by: string | null;
+          days: number;
+          id: string;
+          name: string;
+          updated_at: string;
+        };
         Insert: {
-          active?: boolean
-          adjustment_percent?: number
-          code: string
-          created_at?: string
-          created_by?: string | null
-          days: number
-          id?: string
-          name: string
-          updated_at?: string
-        }
+          active?: boolean;
+          adjustment_percent?: number;
+          code: string;
+          created_at?: string;
+          created_by?: string | null;
+          days: number;
+          id?: string;
+          name: string;
+          updated_at?: string;
+        };
         Update: {
-          active?: boolean
-          adjustment_percent?: number
-          code?: string
-          created_at?: string
-          created_by?: string | null
-          days?: number
-          id?: string
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
+          active?: boolean;
+          adjustment_percent?: number;
+          code?: string;
+          created_at?: string;
+          created_by?: string | null;
+          days?: number;
+          id?: string;
+          name?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       price_table_rows: {
         Row: {
-          ad_valorem_percent: number | null
-          cost_per_kg: number | null
-          cost_per_ton: number | null
-          cost_value_percent: number | null
-          created_at: string
-          gris_percent: number | null
-          id: string
-          km_from: number
-          km_to: number
-          price_table_id: string
-          toll_percent: number | null
-          tso_percent: number | null
-        }
+          ad_valorem_percent: number | null;
+          cost_per_kg: number | null;
+          cost_per_ton: number | null;
+          cost_value_percent: number | null;
+          created_at: string;
+          gris_percent: number | null;
+          id: string;
+          km_from: number;
+          km_to: number;
+          price_table_id: string;
+          toll_percent: number | null;
+          tso_percent: number | null;
+        };
         Insert: {
-          ad_valorem_percent?: number | null
-          cost_per_kg?: number | null
-          cost_per_ton?: number | null
-          cost_value_percent?: number | null
-          created_at?: string
-          gris_percent?: number | null
-          id?: string
-          km_from: number
-          km_to: number
-          price_table_id: string
-          toll_percent?: number | null
-          tso_percent?: number | null
-        }
+          ad_valorem_percent?: number | null;
+          cost_per_kg?: number | null;
+          cost_per_ton?: number | null;
+          cost_value_percent?: number | null;
+          created_at?: string;
+          gris_percent?: number | null;
+          id?: string;
+          km_from: number;
+          km_to: number;
+          price_table_id: string;
+          toll_percent?: number | null;
+          tso_percent?: number | null;
+        };
         Update: {
-          ad_valorem_percent?: number | null
-          cost_per_kg?: number | null
-          cost_per_ton?: number | null
-          cost_value_percent?: number | null
-          created_at?: string
-          gris_percent?: number | null
-          id?: string
-          km_from?: number
-          km_to?: number
-          price_table_id?: string
-          toll_percent?: number | null
-          tso_percent?: number | null
-        }
+          ad_valorem_percent?: number | null;
+          cost_per_kg?: number | null;
+          cost_per_ton?: number | null;
+          cost_value_percent?: number | null;
+          created_at?: string;
+          gris_percent?: number | null;
+          id?: string;
+          km_from?: number;
+          km_to?: number;
+          price_table_id?: string;
+          toll_percent?: number | null;
+          tso_percent?: number | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "price_table_rows_price_table_id_fkey"
-            columns: ["price_table_id"]
-            isOneToOne: false
-            referencedRelation: "price_tables"
-            referencedColumns: ["id"]
+            foreignKeyName: 'price_table_rows_price_table_id_fkey';
+            columns: ['price_table_id'];
+            isOneToOne: false;
+            referencedRelation: 'price_tables';
+            referencedColumns: ['id'];
           },
-        ]
-      }
+        ];
+      };
       price_tables: {
         Row: {
-          active: boolean
-          created_at: string
-          created_by: string | null
-          id: string
-          modality: string
-          name: string
-          updated_at: string
-          valid_from: string | null
-          valid_until: string | null
-          version: number
-        }
+          active: boolean;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          modality: string;
+          name: string;
+          updated_at: string;
+          valid_from: string | null;
+          valid_until: string | null;
+          version: number;
+        };
         Insert: {
-          active?: boolean
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          modality: string
-          name: string
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-          version?: number
-        }
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          modality: string;
+          name: string;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          version?: number;
+        };
         Update: {
-          active?: boolean
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          modality?: string
-          name?: string
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-          version?: number
-        }
-        Relationships: []
-      }
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          modality?: string;
+          name?: string;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          version?: number;
+        };
+        Relationships: [];
+      };
       pricing_parameters: {
         Row: {
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          key: string
-          unit: string | null
-          updated_at: string
-          valid_from: string | null
-          valid_until: string | null
-          value: number
-        }
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          id: string;
+          key: string;
+          unit: string | null;
+          updated_at: string;
+          valid_from: string | null;
+          valid_until: string | null;
+          value: number;
+        };
         Insert: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          key: string
-          unit?: string | null
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-          value: number
-        }
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          key: string;
+          unit?: string | null;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          value: number;
+        };
         Update: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          key?: string
-          unit?: string | null
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-          value?: number
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          key?: string;
+          unit?: string | null;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          value?: number;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
-          avatar_url: string | null
-          created_at: string
-          email: string
-          full_name: string
-          id: string
-          phone: string | null
-          updated_at: string
-          user_id: string
-        }
+          avatar_url: string | null;
+          created_at: string;
+          email: string;
+          full_name: string;
+          id: string;
+          phone: string | null;
+          updated_at: string;
+          user_id: string;
+        };
         Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          email: string
-          full_name: string
-          id?: string
-          phone?: string | null
-          updated_at?: string
-          user_id: string
-        }
+          avatar_url?: string | null;
+          created_at?: string;
+          email: string;
+          full_name: string;
+          id?: string;
+          phone?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
         Update: {
-          avatar_url?: string | null
-          created_at?: string
-          email?: string
-          full_name?: string
-          id?: string
-          phone?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
+          avatar_url?: string | null;
+          created_at?: string;
+          email?: string;
+          full_name?: string;
+          id?: string;
+          phone?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       quotes: {
         Row: {
-          assigned_to: string | null
-          billable_weight: number | null
-          cargo_type: string | null
-          cargo_value: number | null
-          client_email: string | null
-          client_id: string | null
-          client_name: string
-          conditional_fees_breakdown: Json | null
-          created_at: string
-          created_by: string
-          cubage_weight: number | null
-          delivery_conditions_selected: Json | null
-          delivery_notes: string | null
-          destination: string
-          destination_cep: string | null
-          discharge_checklist_selected: Json | null
-          freight_modality: string | null
-          freight_type: string
-          id: string
-          km_distance: number | null
-          notes: string | null
-          origin: string
-          origin_cep: string | null
-          payment_term_id: string | null
-          price_table_id: string | null
-          pricing_breakdown: Json | null
-          shipper_email: string | null
-          shipper_id: string | null
-          shipper_name: string | null
-          stage: Database["public"]["Enums"]["quote_stage"]
-          tac_percent: number | null
-          tags: string[] | null
-          toll_value: number | null
-          updated_at: string
-          validity_date: string | null
-          value: number
-          vehicle_type_id: string | null
-          volume: number | null
-          waiting_time_cost: number | null
-          weight: number | null
-        }
+          assigned_to: string | null;
+          billable_weight: number | null;
+          cargo_type: string | null;
+          cargo_value: number | null;
+          client_email: string | null;
+          client_id: string | null;
+          client_name: string;
+          conditional_fees_breakdown: Json | null;
+          created_at: string;
+          created_by: string;
+          cubage_weight: number | null;
+          delivery_conditions_selected: Json | null;
+          delivery_notes: string | null;
+          destination: string;
+          destination_cep: string | null;
+          discharge_checklist_selected: Json | null;
+          freight_modality: string | null;
+          freight_type: string;
+          id: string;
+          km_distance: number | null;
+          notes: string | null;
+          origin: string;
+          origin_cep: string | null;
+          payment_term_id: string | null;
+          price_table_id: string | null;
+          pricing_breakdown: Json | null;
+          shipper_email: string | null;
+          shipper_id: string | null;
+          shipper_name: string | null;
+          stage: Database['public']['Enums']['quote_stage'];
+          tac_percent: number | null;
+          tags: string[] | null;
+          toll_value: number | null;
+          updated_at: string;
+          validity_date: string | null;
+          value: number;
+          vehicle_type_id: string | null;
+          volume: number | null;
+          waiting_time_cost: number | null;
+          weight: number | null;
+        };
         Insert: {
-          assigned_to?: string | null
-          billable_weight?: number | null
-          cargo_type?: string | null
-          cargo_value?: number | null
-          client_email?: string | null
-          client_id?: string | null
-          client_name: string
-          conditional_fees_breakdown?: Json | null
-          created_at?: string
-          created_by: string
-          cubage_weight?: number | null
-          delivery_conditions_selected?: Json | null
-          delivery_notes?: string | null
-          destination: string
-          destination_cep?: string | null
-          discharge_checklist_selected?: Json | null
-          freight_modality?: string | null
-          freight_type?: string
-          id?: string
-          km_distance?: number | null
-          notes?: string | null
-          origin: string
-          origin_cep?: string | null
-          payment_term_id?: string | null
-          price_table_id?: string | null
-          pricing_breakdown?: Json | null
-          shipper_email?: string | null
-          shipper_id?: string | null
-          shipper_name?: string | null
-          stage?: Database["public"]["Enums"]["quote_stage"]
-          tac_percent?: number | null
-          tags?: string[] | null
-          toll_value?: number | null
-          updated_at?: string
-          validity_date?: string | null
-          value?: number
-          vehicle_type_id?: string | null
-          volume?: number | null
-          waiting_time_cost?: number | null
-          weight?: number | null
-        }
+          assigned_to?: string | null;
+          billable_weight?: number | null;
+          cargo_type?: string | null;
+          cargo_value?: number | null;
+          client_email?: string | null;
+          client_id?: string | null;
+          client_name: string;
+          conditional_fees_breakdown?: Json | null;
+          created_at?: string;
+          created_by: string;
+          cubage_weight?: number | null;
+          delivery_conditions_selected?: Json | null;
+          delivery_notes?: string | null;
+          destination: string;
+          destination_cep?: string | null;
+          discharge_checklist_selected?: Json | null;
+          freight_modality?: string | null;
+          freight_type?: string;
+          id?: string;
+          km_distance?: number | null;
+          notes?: string | null;
+          origin: string;
+          origin_cep?: string | null;
+          payment_term_id?: string | null;
+          price_table_id?: string | null;
+          pricing_breakdown?: Json | null;
+          shipper_email?: string | null;
+          shipper_id?: string | null;
+          shipper_name?: string | null;
+          stage?: Database['public']['Enums']['quote_stage'];
+          tac_percent?: number | null;
+          tags?: string[] | null;
+          toll_value?: number | null;
+          updated_at?: string;
+          validity_date?: string | null;
+          value?: number;
+          vehicle_type_id?: string | null;
+          volume?: number | null;
+          waiting_time_cost?: number | null;
+          weight?: number | null;
+        };
         Update: {
-          assigned_to?: string | null
-          billable_weight?: number | null
-          cargo_type?: string | null
-          cargo_value?: number | null
-          client_email?: string | null
-          client_id?: string | null
-          client_name?: string
-          conditional_fees_breakdown?: Json | null
-          created_at?: string
-          created_by?: string
-          cubage_weight?: number | null
-          delivery_conditions_selected?: Json | null
-          delivery_notes?: string | null
-          destination?: string
-          destination_cep?: string | null
-          discharge_checklist_selected?: Json | null
-          freight_modality?: string | null
-          freight_type?: string
-          id?: string
-          km_distance?: number | null
-          notes?: string | null
-          origin?: string
-          origin_cep?: string | null
-          payment_term_id?: string | null
-          price_table_id?: string | null
-          pricing_breakdown?: Json | null
-          shipper_email?: string | null
-          shipper_id?: string | null
-          shipper_name?: string | null
-          stage?: Database["public"]["Enums"]["quote_stage"]
-          tac_percent?: number | null
-          tags?: string[] | null
-          toll_value?: number | null
-          updated_at?: string
-          validity_date?: string | null
-          value?: number
-          vehicle_type_id?: string | null
-          volume?: number | null
-          waiting_time_cost?: number | null
-          weight?: number | null
-        }
+          assigned_to?: string | null;
+          billable_weight?: number | null;
+          cargo_type?: string | null;
+          cargo_value?: number | null;
+          client_email?: string | null;
+          client_id?: string | null;
+          client_name?: string;
+          conditional_fees_breakdown?: Json | null;
+          created_at?: string;
+          created_by?: string;
+          cubage_weight?: number | null;
+          delivery_conditions_selected?: Json | null;
+          delivery_notes?: string | null;
+          destination?: string;
+          destination_cep?: string | null;
+          discharge_checklist_selected?: Json | null;
+          freight_modality?: string | null;
+          freight_type?: string;
+          id?: string;
+          km_distance?: number | null;
+          notes?: string | null;
+          origin?: string;
+          origin_cep?: string | null;
+          payment_term_id?: string | null;
+          price_table_id?: string | null;
+          pricing_breakdown?: Json | null;
+          shipper_email?: string | null;
+          shipper_id?: string | null;
+          shipper_name?: string | null;
+          stage?: Database['public']['Enums']['quote_stage'];
+          tac_percent?: number | null;
+          tags?: string[] | null;
+          toll_value?: number | null;
+          updated_at?: string;
+          validity_date?: string | null;
+          value?: number;
+          vehicle_type_id?: string | null;
+          volume?: number | null;
+          waiting_time_cost?: number | null;
+          weight?: number | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "quotes_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
+            foreignKeyName: 'quotes_client_id_fkey';
+            columns: ['client_id'];
+            isOneToOne: false;
+            referencedRelation: 'clients';
+            referencedColumns: ['id'];
           },
           {
-            foreignKeyName: "quotes_payment_term_id_fkey"
-            columns: ["payment_term_id"]
-            isOneToOne: false
-            referencedRelation: "payment_terms"
-            referencedColumns: ["id"]
+            foreignKeyName: 'quotes_payment_term_id_fkey';
+            columns: ['payment_term_id'];
+            isOneToOne: false;
+            referencedRelation: 'payment_terms';
+            referencedColumns: ['id'];
           },
           {
-            foreignKeyName: "quotes_price_table_id_fkey"
-            columns: ["price_table_id"]
-            isOneToOne: false
-            referencedRelation: "price_tables"
-            referencedColumns: ["id"]
+            foreignKeyName: 'quotes_price_table_id_fkey';
+            columns: ['price_table_id'];
+            isOneToOne: false;
+            referencedRelation: 'price_tables';
+            referencedColumns: ['id'];
           },
           {
-            foreignKeyName: "quotes_shipper_id_fkey"
-            columns: ["shipper_id"]
-            isOneToOne: false
-            referencedRelation: "shippers"
-            referencedColumns: ["id"]
+            foreignKeyName: 'quotes_shipper_id_fkey';
+            columns: ['shipper_id'];
+            isOneToOne: false;
+            referencedRelation: 'shippers';
+            referencedColumns: ['id'];
           },
           {
-            foreignKeyName: "quotes_vehicle_type_id_fkey"
-            columns: ["vehicle_type_id"]
-            isOneToOne: false
-            referencedRelation: "vehicle_types"
-            referencedColumns: ["id"]
+            foreignKeyName: 'quotes_vehicle_type_id_fkey';
+            columns: ['vehicle_type_id'];
+            isOneToOne: false;
+            referencedRelation: 'vehicle_types';
+            referencedColumns: ['id'];
           },
-        ]
-      }
+        ];
+      };
       shippers: {
         Row: {
-          address: string | null
-          city: string | null
-          cnpj: string | null
-          created_at: string
-          created_by: string | null
-          email: string | null
-          id: string
-          name: string
-          notes: string | null
-          phone: string | null
-          state: string | null
-          updated_at: string
-          zip_code: string | null
-        }
+          address: string | null;
+          city: string | null;
+          cnpj: string | null;
+          created_at: string;
+          created_by: string | null;
+          email: string | null;
+          id: string;
+          name: string;
+          notes: string | null;
+          phone: string | null;
+          state: string | null;
+          updated_at: string;
+          zip_code: string | null;
+        };
         Insert: {
-          address?: string | null
-          city?: string | null
-          cnpj?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          id?: string
-          name: string
-          notes?: string | null
-          phone?: string | null
-          state?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
+          address?: string | null;
+          city?: string | null;
+          cnpj?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          phone?: string | null;
+          state?: string | null;
+          updated_at?: string;
+          zip_code?: string | null;
+        };
         Update: {
-          address?: string | null
-          city?: string | null
-          cnpj?: string | null
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          id?: string
-          name?: string
-          notes?: string | null
-          phone?: string | null
-          state?: string | null
-          updated_at?: string
-          zip_code?: string | null
-        }
-        Relationships: []
-      }
+          address?: string | null;
+          city?: string | null;
+          cnpj?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          phone?: string | null;
+          state?: string | null;
+          updated_at?: string;
+          zip_code?: string | null;
+        };
+        Relationships: [];
+      };
       tac_rates: {
         Row: {
-          adjustment_percent: number
-          created_at: string
-          created_by: string | null
-          diesel_price_base: number
-          diesel_price_current: number
-          id: string
-          reference_date: string
-          source_description: string | null
-          updated_at: string
-          variation_percent: number | null
-        }
+          adjustment_percent: number;
+          created_at: string;
+          created_by: string | null;
+          diesel_price_base: number;
+          diesel_price_current: number;
+          id: string;
+          reference_date: string;
+          source_description: string | null;
+          updated_at: string;
+          variation_percent: number | null;
+        };
         Insert: {
-          adjustment_percent?: number
-          created_at?: string
-          created_by?: string | null
-          diesel_price_base: number
-          diesel_price_current: number
-          id?: string
-          reference_date: string
-          source_description?: string | null
-          updated_at?: string
-          variation_percent?: number | null
-        }
+          adjustment_percent?: number;
+          created_at?: string;
+          created_by?: string | null;
+          diesel_price_base: number;
+          diesel_price_current: number;
+          id?: string;
+          reference_date: string;
+          source_description?: string | null;
+          updated_at?: string;
+          variation_percent?: number | null;
+        };
         Update: {
-          adjustment_percent?: number
-          created_at?: string
-          created_by?: string | null
-          diesel_price_base?: number
-          diesel_price_current?: number
-          id?: string
-          reference_date?: string
-          source_description?: string | null
-          updated_at?: string
-          variation_percent?: number | null
-        }
-        Relationships: []
-      }
+          adjustment_percent?: number;
+          created_at?: string;
+          created_by?: string | null;
+          diesel_price_base?: number;
+          diesel_price_current?: number;
+          id?: string;
+          reference_date?: string;
+          source_description?: string | null;
+          updated_at?: string;
+          variation_percent?: number | null;
+        };
+        Relationships: [];
+      };
       toll_routes: {
         Row: {
-          created_at: string
-          created_by: string | null
-          destination_city: string | null
-          destination_state: string
-          distance_km: number | null
-          id: string
-          origin_city: string | null
-          origin_state: string
-          toll_value: number
-          updated_at: string
-          valid_from: string | null
-          valid_until: string | null
-          vehicle_type_id: string | null
-          via_description: string | null
-        }
+          created_at: string;
+          created_by: string | null;
+          destination_city: string | null;
+          destination_state: string;
+          distance_km: number | null;
+          id: string;
+          origin_city: string | null;
+          origin_state: string;
+          toll_value: number;
+          updated_at: string;
+          valid_from: string | null;
+          valid_until: string | null;
+          vehicle_type_id: string | null;
+          via_description: string | null;
+        };
         Insert: {
-          created_at?: string
-          created_by?: string | null
-          destination_city?: string | null
-          destination_state: string
-          distance_km?: number | null
-          id?: string
-          origin_city?: string | null
-          origin_state: string
-          toll_value: number
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-          vehicle_type_id?: string | null
-          via_description?: string | null
-        }
+          created_at?: string;
+          created_by?: string | null;
+          destination_city?: string | null;
+          destination_state: string;
+          distance_km?: number | null;
+          id?: string;
+          origin_city?: string | null;
+          origin_state: string;
+          toll_value: number;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          vehicle_type_id?: string | null;
+          via_description?: string | null;
+        };
         Update: {
-          created_at?: string
-          created_by?: string | null
-          destination_city?: string | null
-          destination_state?: string
-          distance_km?: number | null
-          id?: string
-          origin_city?: string | null
-          origin_state?: string
-          toll_value?: number
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-          vehicle_type_id?: string | null
-          via_description?: string | null
-        }
+          created_at?: string;
+          created_by?: string | null;
+          destination_city?: string | null;
+          destination_state?: string;
+          distance_km?: number | null;
+          id?: string;
+          origin_city?: string | null;
+          origin_state?: string;
+          toll_value?: number;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          vehicle_type_id?: string | null;
+          via_description?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "toll_routes_vehicle_type_id_fkey"
-            columns: ["vehicle_type_id"]
-            isOneToOne: false
-            referencedRelation: "vehicle_types"
-            referencedColumns: ["id"]
+            foreignKeyName: 'toll_routes_vehicle_type_id_fkey';
+            columns: ['vehicle_type_id'];
+            isOneToOne: false;
+            referencedRelation: 'vehicle_types';
+            referencedColumns: ['id'];
           },
-        ]
-      }
+        ];
+      };
       trailers: {
         Row: {
-          active: boolean
-          brand: string | null
-          capacity_kg: number | null
-          chassis: string | null
-          city: string | null
-          color: string | null
-          created_at: string
-          created_by: string | null
-          driver_id: string | null
-          id: string
-          model: string | null
-          notes: string | null
-          plate: string
-          renavam: string | null
-          state: string | null
-          trailer_type: string | null
-          updated_at: string
-          year_manufacture: number | null
-          year_model: number | null
-        }
+          active: boolean;
+          brand: string | null;
+          capacity_kg: number | null;
+          chassis: string | null;
+          city: string | null;
+          color: string | null;
+          created_at: string;
+          created_by: string | null;
+          driver_id: string | null;
+          id: string;
+          model: string | null;
+          notes: string | null;
+          plate: string;
+          renavam: string | null;
+          state: string | null;
+          trailer_type: string | null;
+          updated_at: string;
+          year_manufacture: number | null;
+          year_model: number | null;
+        };
         Insert: {
-          active?: boolean
-          brand?: string | null
-          capacity_kg?: number | null
-          chassis?: string | null
-          city?: string | null
-          color?: string | null
-          created_at?: string
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          model?: string | null
-          notes?: string | null
-          plate: string
-          renavam?: string | null
-          state?: string | null
-          trailer_type?: string | null
-          updated_at?: string
-          year_manufacture?: number | null
-          year_model?: number | null
-        }
+          active?: boolean;
+          brand?: string | null;
+          capacity_kg?: number | null;
+          chassis?: string | null;
+          city?: string | null;
+          color?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          driver_id?: string | null;
+          id?: string;
+          model?: string | null;
+          notes?: string | null;
+          plate: string;
+          renavam?: string | null;
+          state?: string | null;
+          trailer_type?: string | null;
+          updated_at?: string;
+          year_manufacture?: number | null;
+          year_model?: number | null;
+        };
         Update: {
-          active?: boolean
-          brand?: string | null
-          capacity_kg?: number | null
-          chassis?: string | null
-          city?: string | null
-          color?: string | null
-          created_at?: string
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          model?: string | null
-          notes?: string | null
-          plate?: string
-          renavam?: string | null
-          state?: string | null
-          trailer_type?: string | null
-          updated_at?: string
-          year_manufacture?: number | null
-          year_model?: number | null
-        }
+          active?: boolean;
+          brand?: string | null;
+          capacity_kg?: number | null;
+          chassis?: string | null;
+          city?: string | null;
+          color?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          driver_id?: string | null;
+          id?: string;
+          model?: string | null;
+          notes?: string | null;
+          plate?: string;
+          renavam?: string | null;
+          state?: string | null;
+          trailer_type?: string | null;
+          updated_at?: string;
+          year_manufacture?: number | null;
+          year_model?: number | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "trailers_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
+            foreignKeyName: 'trailers_driver_id_fkey';
+            columns: ['driver_id'];
+            isOneToOne: false;
+            referencedRelation: 'drivers';
+            referencedColumns: ['id'];
           },
-        ]
-      }
+        ];
+      };
       user_roles: {
         Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
+          created_at: string;
+          id: string;
+          role: Database['public']['Enums']['app_role'];
+          user_id: string;
+        };
         Insert: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
+          created_at?: string;
+          id?: string;
+          role?: Database['public']['Enums']['app_role'];
+          user_id: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          id?: string;
+          role?: Database['public']['Enums']['app_role'];
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       vehicle_types: {
         Row: {
-          active: boolean
-          axes_count: number | null
-          capacity_kg: number | null
-          capacity_m3: number | null
-          code: string
-          created_at: string
-          id: string
-          name: string
-          updated_at: string
-        }
+          active: boolean;
+          axes_count: number | null;
+          capacity_kg: number | null;
+          capacity_m3: number | null;
+          code: string;
+          created_at: string;
+          id: string;
+          name: string;
+          updated_at: string;
+        };
         Insert: {
-          active?: boolean
-          axes_count?: number | null
-          capacity_kg?: number | null
-          capacity_m3?: number | null
-          code: string
-          created_at?: string
-          id?: string
-          name: string
-          updated_at?: string
-        }
+          active?: boolean;
+          axes_count?: number | null;
+          capacity_kg?: number | null;
+          capacity_m3?: number | null;
+          code: string;
+          created_at?: string;
+          id?: string;
+          name: string;
+          updated_at?: string;
+        };
         Update: {
-          active?: boolean
-          axes_count?: number | null
-          capacity_kg?: number | null
-          capacity_m3?: number | null
-          code?: string
-          created_at?: string
-          id?: string
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
+          active?: boolean;
+          axes_count?: number | null;
+          capacity_kg?: number | null;
+          capacity_m3?: number | null;
+          code?: string;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       vehicles: {
         Row: {
-          active: boolean
-          brand: string | null
-          capacity_kg: number | null
-          chassis: string | null
-          city: string | null
-          color: string | null
-          created_at: string
-          created_by: string | null
-          driver_id: string | null
-          id: string
-          model: string | null
-          notes: string | null
-          plate: string
-          renavam: string | null
-          state: string | null
-          updated_at: string
-          vehicle_type: string | null
-          year_manufacture: number | null
-          year_model: number | null
-        }
+          active: boolean;
+          brand: string | null;
+          capacity_kg: number | null;
+          chassis: string | null;
+          city: string | null;
+          color: string | null;
+          created_at: string;
+          created_by: string | null;
+          driver_id: string | null;
+          id: string;
+          model: string | null;
+          notes: string | null;
+          plate: string;
+          renavam: string | null;
+          state: string | null;
+          updated_at: string;
+          vehicle_type: string | null;
+          year_manufacture: number | null;
+          year_model: number | null;
+        };
         Insert: {
-          active?: boolean
-          brand?: string | null
-          capacity_kg?: number | null
-          chassis?: string | null
-          city?: string | null
-          color?: string | null
-          created_at?: string
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          model?: string | null
-          notes?: string | null
-          plate: string
-          renavam?: string | null
-          state?: string | null
-          updated_at?: string
-          vehicle_type?: string | null
-          year_manufacture?: number | null
-          year_model?: number | null
-        }
+          active?: boolean;
+          brand?: string | null;
+          capacity_kg?: number | null;
+          chassis?: string | null;
+          city?: string | null;
+          color?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          driver_id?: string | null;
+          id?: string;
+          model?: string | null;
+          notes?: string | null;
+          plate: string;
+          renavam?: string | null;
+          state?: string | null;
+          updated_at?: string;
+          vehicle_type?: string | null;
+          year_manufacture?: number | null;
+          year_model?: number | null;
+        };
         Update: {
-          active?: boolean
-          brand?: string | null
-          capacity_kg?: number | null
-          chassis?: string | null
-          city?: string | null
-          color?: string | null
-          created_at?: string
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          model?: string | null
-          notes?: string | null
-          plate?: string
-          renavam?: string | null
-          state?: string | null
-          updated_at?: string
-          vehicle_type?: string | null
-          year_manufacture?: number | null
-          year_model?: number | null
-        }
+          active?: boolean;
+          brand?: string | null;
+          capacity_kg?: number | null;
+          chassis?: string | null;
+          city?: string | null;
+          color?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          driver_id?: string | null;
+          id?: string;
+          model?: string | null;
+          notes?: string | null;
+          plate?: string;
+          renavam?: string | null;
+          state?: string | null;
+          updated_at?: string;
+          vehicle_type?: string | null;
+          year_manufacture?: number | null;
+          year_model?: number | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "vehicles_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
+            foreignKeyName: 'vehicles_driver_id_fkey';
+            columns: ['driver_id'];
+            isOneToOne: false;
+            referencedRelation: 'drivers';
+            referencedColumns: ['id'];
           },
-        ]
-      }
+        ];
+      };
       waiting_time_rules: {
         Row: {
-          context: string
-          created_at: string
-          created_by: string | null
-          free_hours: number
-          id: string
-          min_charge: number | null
-          rate_per_day: number | null
-          rate_per_hour: number | null
-          updated_at: string
-          valid_from: string | null
-          valid_until: string | null
-          vehicle_type_id: string | null
-        }
+          context: string;
+          created_at: string;
+          created_by: string | null;
+          free_hours: number;
+          id: string;
+          min_charge: number | null;
+          rate_per_day: number | null;
+          rate_per_hour: number | null;
+          updated_at: string;
+          valid_from: string | null;
+          valid_until: string | null;
+          vehicle_type_id: string | null;
+        };
         Insert: {
-          context?: string
-          created_at?: string
-          created_by?: string | null
-          free_hours?: number
-          id?: string
-          min_charge?: number | null
-          rate_per_day?: number | null
-          rate_per_hour?: number | null
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-          vehicle_type_id?: string | null
-        }
+          context?: string;
+          created_at?: string;
+          created_by?: string | null;
+          free_hours?: number;
+          id?: string;
+          min_charge?: number | null;
+          rate_per_day?: number | null;
+          rate_per_hour?: number | null;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          vehicle_type_id?: string | null;
+        };
         Update: {
-          context?: string
-          created_at?: string
-          created_by?: string | null
-          free_hours?: number
-          id?: string
-          min_charge?: number | null
-          rate_per_day?: number | null
-          rate_per_hour?: number | null
-          updated_at?: string
-          valid_from?: string | null
-          valid_until?: string | null
-          vehicle_type_id?: string | null
-        }
+          context?: string;
+          created_at?: string;
+          created_by?: string | null;
+          free_hours?: number;
+          id?: string;
+          min_charge?: number | null;
+          rate_per_day?: number | null;
+          rate_per_hour?: number | null;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          vehicle_type_id?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "waiting_time_rules_vehicle_type_id_fkey"
-            columns: ["vehicle_type_id"]
-            isOneToOne: false
-            referencedRelation: "vehicle_types"
-            referencedColumns: ["id"]
+            foreignKeyName: 'waiting_time_rules_vehicle_type_id_fkey';
+            columns: ['vehicle_type_id'];
+            isOneToOne: false;
+            referencedRelation: 'vehicle_types';
+            referencedColumns: ['id'];
           },
-        ]
-      }
-    }
+        ];
+      };
+    };
     Views: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Functions: {
-      generate_os_number: { Args: never; Returns: string }
+      generate_os_number: { Args: never; Returns: string };
       get_user_role: {
-        Args: { _user_id: string }
-        Returns: Database["public"]["Enums"]["app_role"]
-      }
+        Args: { _user_id: string };
+        Returns: Database['public']['Enums']['app_role'];
+      };
       has_any_role: {
         Args: {
-          _roles: Database["public"]["Enums"]["app_role"][]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+          _roles: Database['public']['Enums']['app_role'][];
+          _user_id: string;
+        };
+        Returns: boolean;
+      };
       has_role: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-    }
+          _role: Database['public']['Enums']['app_role'];
+          _user_id: string;
+        };
+        Returns: boolean;
+      };
+    };
     Enums: {
-      app_role: "admin" | "comercial" | "operacao" | "fiscal" | "leitura"
+      app_role: 'admin' | 'comercial' | 'operacao' | 'fiscal' | 'leitura';
       document_type:
-        | "nfe"
-        | "cte"
-        | "pod"
-        | "outros"
-        | "cnh"
-        | "crlv"
-        | "comp_residencia"
-        | "antt_motorista"
-        | "mdfe"
-      occurrence_severity: "baixa" | "media" | "alta" | "critica"
+        | 'nfe'
+        | 'cte'
+        | 'pod'
+        | 'outros'
+        | 'cnh'
+        | 'crlv'
+        | 'comp_residencia'
+        | 'antt_motorista'
+        | 'mdfe';
+      occurrence_severity: 'baixa' | 'media' | 'alta' | 'critica';
       order_stage:
-        | "ordem_criada"
-        | "busca_motorista"
-        | "documentacao"
-        | "coleta_realizada"
-        | "em_transito"
-        | "entregue"
+        | 'ordem_criada'
+        | 'busca_motorista'
+        | 'documentacao'
+        | 'coleta_realizada'
+        | 'em_transito'
+        | 'entregue';
       quote_stage:
-        | "novo_pedido"
-        | "qualificacao"
-        | "precificacao"
-        | "enviado"
-        | "negociacao"
-        | "ganho"
-        | "perdido"
-    }
+        | 'novo_pedido'
+        | 'qualificacao'
+        | 'precificacao'
+        | 'enviado'
+        | 'negociacao'
+        | 'ganho'
+        | 'perdido';
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      [_ in never]: never;
+    };
+  };
+};
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>;
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+      Row: infer R;
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+    | keyof DefaultSchema['Tables']
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+      Insert: infer I;
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+    | keyof DefaultSchema['Tables']
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+      Update: infer U;
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
+    | keyof DefaultSchema['Enums']
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
+    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+    : never;
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
+    | keyof DefaultSchema['CompositeTypes']
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
+    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+    : never;
 
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "comercial", "operacao", "fiscal", "leitura"],
+      app_role: ['admin', 'comercial', 'operacao', 'fiscal', 'leitura'],
       document_type: [
-        "nfe",
-        "cte",
-        "pod",
-        "outros",
-        "cnh",
-        "crlv",
-        "comp_residencia",
-        "antt_motorista",
-        "mdfe",
+        'nfe',
+        'cte',
+        'pod',
+        'outros',
+        'cnh',
+        'crlv',
+        'comp_residencia',
+        'antt_motorista',
+        'mdfe',
       ],
-      occurrence_severity: ["baixa", "media", "alta", "critica"],
+      occurrence_severity: ['baixa', 'media', 'alta', 'critica'],
       order_stage: [
-        "ordem_criada",
-        "busca_motorista",
-        "documentacao",
-        "coleta_realizada",
-        "em_transito",
-        "entregue",
+        'ordem_criada',
+        'busca_motorista',
+        'documentacao',
+        'coleta_realizada',
+        'em_transito',
+        'entregue',
       ],
       quote_stage: [
-        "novo_pedido",
-        "qualificacao",
-        "precificacao",
-        "enviado",
-        "negociacao",
-        "ganho",
-        "perdido",
+        'novo_pedido',
+        'qualificacao',
+        'precificacao',
+        'enviado',
+        'negociacao',
+        'ganho',
+        'perdido',
       ],
     },
   },
-} as const
+} as const;

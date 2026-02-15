@@ -6,12 +6,7 @@ import { Loader2, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -119,7 +114,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
   }, [order, form]);
 
   const handleClientSelect = (clientId: string) => {
-    const selectedClient = clients?.find(c => c.id === clientId);
+    const selectedClient = clients?.find((c) => c.id === clientId);
     if (selectedClient) {
       form.setValue('client_id', clientId);
       form.setValue('client_name', selectedClient.name);
@@ -127,7 +122,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
   };
 
   const handleDriverSelect = (driverId: string) => {
-    const selectedDriver = drivers?.find(d => d.id === driverId);
+    const selectedDriver = drivers?.find((d) => d.id === driverId);
     if (selectedDriver) {
       setSelectedDriverId(driverId);
       form.setValue('driver_id', driverId);
@@ -139,7 +134,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
   };
 
   const handleVehicleSelect = (vehicleId: string) => {
-    const selectedVehicle = vehicles?.find(v => v.id === vehicleId);
+    const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
     if (selectedVehicle) {
       form.setValue('vehicle_plate', selectedVehicle.plate);
     }
@@ -191,7 +186,9 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}</DialogTitle>
+          <DialogTitle>
+            {isEditing ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -199,14 +196,14 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
             {/* Cliente Section */}
             <div className="space-y-4">
               <h3 className="font-semibold text-foreground">Dados do Cliente</h3>
-              
+
               <FormField
                 control={form.control}
                 name="client_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cliente Existente</FormLabel>
-                    <Select 
+                    <Select
                       onValueChange={(value) => handleClientSelect(value)}
                       value={field.value}
                     >
@@ -248,7 +245,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
             {/* Rota Section */}
             <div className="space-y-4">
               <h3 className="font-semibold text-foreground">Rota</h3>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -287,8 +284,8 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                     <FormItem>
                       <FormLabel>Valor do Frete (R$)</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
+                        <Input
+                          type="number"
                           step="0.01"
                           placeholder="0,00"
                           {...field}
@@ -307,10 +304,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                     <FormItem>
                       <FormLabel>Previsão de Entrega</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="datetime-local"
-                          {...field}
-                        />
+                        <Input type="datetime-local" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -327,7 +321,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                 <Truck className="w-5 h-5 text-primary" />
                 <h3 className="font-semibold text-foreground">Dados do Transporte</h3>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -335,7 +329,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Motorista</FormLabel>
-                      <Select 
+                      <Select
                         onValueChange={(value) => handleDriverSelect(value)}
                         value={field.value}
                       >
@@ -364,7 +358,12 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                     <FormItem>
                       <FormLabel>Telefone do Motorista</FormLabel>
                       <FormControl>
-                        <Input placeholder="(11) 99999-9999" {...field} readOnly className="bg-muted/50" />
+                        <Input
+                          placeholder="(11) 99999-9999"
+                          {...field}
+                          readOnly
+                          className="bg-muted/50"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -374,24 +373,34 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
 
               <FormItem>
                 <FormLabel>Veículo</FormLabel>
-                <Select 
+                <Select
                   onValueChange={(value) => handleVehicleSelect(value)}
                   disabled={!selectedDriverId}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={selectedDriverId ? "Selecionar veículo..." : "Selecione um motorista primeiro"} />
+                    <SelectValue
+                      placeholder={
+                        selectedDriverId
+                          ? 'Selecionar veículo...'
+                          : 'Selecione um motorista primeiro'
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {vehicles?.map((vehicle) => (
                       <SelectItem key={vehicle.id} value={vehicle.id}>
-                        {vehicle.plate} {vehicle.brand && vehicle.model ? `- ${vehicle.brand} ${vehicle.model}` : ''}
+                        {vehicle.plate}{' '}
+                        {vehicle.brand && vehicle.model
+                          ? `- ${vehicle.brand} ${vehicle.model}`
+                          : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {form.watch('vehicle_plate') && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Placa selecionada: <span className="font-mono font-medium">{form.watch('vehicle_plate')}</span>
+                    Placa selecionada:{' '}
+                    <span className="font-mono font-medium">{form.watch('vehicle_plate')}</span>
                   </p>
                 )}
               </FormItem>
@@ -407,11 +416,11 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                 <FormItem>
                   <FormLabel>Observações</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Instruções especiais, pontos de referência..."
                       className="resize-none"
                       rows={3}
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />

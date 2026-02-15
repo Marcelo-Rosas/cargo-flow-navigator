@@ -3,11 +3,29 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useVehicleTypes } from '@/hooks/usePricingRules';
-import { useCreateVehicleType, useUpdateVehicleType, useDeleteVehicleType } from '@/hooks/usePricingMutations';
+import {
+  useCreateVehicleType,
+  useUpdateVehicleType,
+  useDeleteVehicleType,
+} from '@/hooks/usePricingMutations';
 import { Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { VehicleType } from '@/types/pricing';
@@ -17,7 +35,7 @@ export function VehicleTypesSection() {
   const createMutation = useCreateVehicleType();
   const updateMutation = useUpdateVehicleType();
   const deleteMutation = useDeleteVehicleType();
-  
+
   const [editingVehicle, setEditingVehicle] = useState<VehicleType | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -103,11 +121,7 @@ export function VehicleTypesSection() {
                     onCheckedChange={() => handleToggleActive(vehicle)}
                     disabled={updateMutation.isPending}
                   />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingVehicle(vehicle)}
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => setEditingVehicle(vehicle)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
@@ -142,10 +156,7 @@ export function VehicleTypesSection() {
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
-          <VehicleTypeForm
-            onSubmit={handleCreate}
-            isLoading={createMutation.isPending}
-          />
+          <VehicleTypeForm onSubmit={handleCreate} isLoading={createMutation.isPending} />
         </DialogContent>
       </Dialog>
     </div>
@@ -158,7 +169,9 @@ function VehicleTypeForm({
   isLoading,
 }: {
   vehicle?: VehicleType;
-  onSubmit: (data: any) => void;
+  onSubmit: (
+    data: Omit<VehicleType, 'id' | 'created_at' | 'updated_at'> | Partial<VehicleType>
+  ) => void;
   isLoading: boolean;
 }) {
   const [code, setCode] = useState(vehicle?.code || '');
@@ -189,7 +202,9 @@ function VehicleTypeForm({
       <DialogHeader>
         <DialogTitle>{vehicle ? 'Editar Tipo de Veículo' : 'Novo Tipo de Veículo'}</DialogTitle>
         <DialogDescription>
-          {vehicle ? 'Atualize as informações do tipo de veículo' : 'Preencha os dados do novo tipo'}
+          {vehicle
+            ? 'Atualize as informações do tipo de veículo'
+            : 'Preencha os dados do novo tipo'}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
@@ -205,11 +220,7 @@ function VehicleTypeForm({
           </div>
           <div className="space-y-2">
             <Label>Nome</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Truck"
-            />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Truck" />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4">

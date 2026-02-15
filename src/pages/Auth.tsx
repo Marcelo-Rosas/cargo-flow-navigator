@@ -29,21 +29,26 @@ export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading, signIn, signUp } = useAuth();
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginErrors, setLoginErrors] = useState<{ email?: string; password?: string }>({});
-  
+
   // Signup form state
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
-  const [signupErrors, setSignupErrors] = useState<{ firstName?: string; lastName?: string; email?: string; password?: string }>({});
+  const [signupErrors, setSignupErrors] = useState<{
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    password?: string;
+  }>({});
 
   // Redirect if already logged in
   useEffect(() => {
@@ -56,7 +61,7 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginErrors({});
-    
+
     // Validate
     const result = loginSchema.safeParse({ email: loginEmail, password: loginPassword });
     if (!result.success) {
@@ -68,11 +73,11 @@ export default function Auth() {
       setLoginErrors(errors);
       return;
     }
-    
+
     setIsLoading(true);
     const { error } = await signIn(loginEmail, loginPassword);
     setIsLoading(false);
-    
+
     if (error) {
       if (error.message.includes('Invalid login credentials')) {
         toast.error('E-mail ou senha incorretos');
@@ -83,14 +88,14 @@ export default function Auth() {
       }
       return;
     }
-    
+
     toast.success('Login realizado com sucesso!');
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignupErrors({});
-    
+
     // Validate
     const result = signupSchema.safeParse({
       firstName,
@@ -98,9 +103,10 @@ export default function Auth() {
       email: signupEmail,
       password: signupPassword,
     });
-    
+
     if (!result.success) {
-      const errors: { firstName?: string; lastName?: string; email?: string; password?: string } = {};
+      const errors: { firstName?: string; lastName?: string; email?: string; password?: string } =
+        {};
       result.error.errors.forEach((err) => {
         if (err.path[0] === 'firstName') errors.firstName = err.message;
         if (err.path[0] === 'lastName') errors.lastName = err.message;
@@ -110,12 +116,12 @@ export default function Auth() {
       setSignupErrors(errors);
       return;
     }
-    
+
     setIsLoading(true);
     const fullName = `${firstName} ${lastName}`;
     const { error } = await signUp(signupEmail, signupPassword, fullName);
     setIsLoading(false);
-    
+
     if (error) {
       if (error.message.includes('User already registered')) {
         toast.error('Este e-mail já está cadastrado. Tente fazer login.');
@@ -126,7 +132,7 @@ export default function Auth() {
       }
       return;
     }
-    
+
     toast.success('Conta criada com sucesso! Você já está logado.');
   };
 
@@ -142,7 +148,7 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex">
       {/* Left Panel - Branding */}
-      <motion.div 
+      <motion.div
         className="hidden lg:flex lg:w-1/2 bg-sidebar relative overflow-hidden"
         initial={{ opacity: 0, x: -50 }}
         animate={{ opacity: 1, x: 0 }}
@@ -176,7 +182,7 @@ export default function Auth() {
 
           {/* Hero Text */}
           <div className="max-w-md">
-            <motion.h1 
+            <motion.h1
               className="text-4xl font-bold text-sidebar-foreground leading-tight"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -184,17 +190,18 @@ export default function Auth() {
             >
               Gerencie suas operações de transporte em um só lugar
             </motion.h1>
-            <motion.p 
+            <motion.p
               className="mt-4 text-lg text-sidebar-muted"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              Do comercial ao operacional, integre cotações, ordens de serviço e documentos com automação inteligente.
+              Do comercial ao operacional, integre cotações, ordens de serviço e documentos com
+              automação inteligente.
             </motion.p>
 
             {/* Features List */}
-            <motion.ul 
+            <motion.ul
               className="mt-8 space-y-3"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -222,7 +229,7 @@ export default function Auth() {
       </motion.div>
 
       {/* Right Panel - Auth Form */}
-      <motion.div 
+      <motion.div
         className="flex-1 flex items-center justify-center p-8 bg-background"
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
@@ -247,13 +254,8 @@ export default function Auth() {
 
             {/* Login Tab */}
             <TabsContent value="login">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <h2 className="text-2xl font-bold text-foreground mb-2">
-                  Bem-vindo de volta
-                </h2>
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                <h2 className="text-2xl font-bold text-foreground mb-2">Bem-vindo de volta</h2>
                 <p className="text-muted-foreground mb-8">
                   Entre com suas credenciais para acessar o sistema
                 </p>
@@ -332,13 +334,8 @@ export default function Auth() {
 
             {/* Signup Tab */}
             <TabsContent value="signup">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <h2 className="text-2xl font-bold text-foreground mb-2">
-                  Crie sua conta
-                </h2>
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                <h2 className="text-2xl font-bold text-foreground mb-2">Crie sua conta</h2>
                 <p className="text-muted-foreground mb-8">
                   Preencha os dados para começar a usar o sistema
                 </p>
@@ -349,13 +346,13 @@ export default function Auth() {
                       <Label htmlFor="firstName">Nome</Label>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input 
-                          id="firstName" 
-                          placeholder="João" 
+                        <Input
+                          id="firstName"
+                          placeholder="João"
                           className={`pl-10 ${signupErrors.firstName ? 'border-destructive' : ''}`}
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
-                          required 
+                          required
                         />
                       </div>
                       {signupErrors.firstName && (
@@ -364,13 +361,13 @@ export default function Auth() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Sobrenome</Label>
-                      <Input 
-                        id="lastName" 
-                        placeholder="Silva" 
+                      <Input
+                        id="lastName"
+                        placeholder="Silva"
                         className={signupErrors.lastName ? 'border-destructive' : ''}
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
-                        required 
+                        required
                       />
                       {signupErrors.lastName && (
                         <p className="text-sm text-destructive">{signupErrors.lastName}</p>

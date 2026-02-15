@@ -88,20 +88,18 @@ export function DocumentList({ orderId }: DocumentListProps) {
       {documents.map((doc) => {
         const typeInfo = TYPE_LABELS[doc.type];
         return (
-          <div 
+          <div
             key={doc.id}
             className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors"
           >
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
               <FileText className="w-5 h-5 text-primary" />
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {doc.file_name}
-                </p>
-                <Badge variant="secondary" className={cn("text-xs", typeInfo.color)}>
+                <p className="text-sm font-medium text-foreground truncate">{doc.file_name}</p>
+                <Badge variant="secondary" className={cn('text-xs', typeInfo.color)}>
                   {typeInfo.label}
                 </Badge>
               </div>
@@ -111,23 +109,13 @@ export function DocumentList({ orderId }: DocumentListProps) {
             </div>
 
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                asChild
-              >
+              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                 <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="w-4 h-4" />
                 </a>
               </Button>
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                asChild
-              >
+
+              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                 <a href={doc.file_url} download={doc.file_name}>
                   <Download className="w-4 h-4" />
                 </a>
@@ -147,12 +135,13 @@ export function DocumentList({ orderId }: DocumentListProps) {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Tem certeza que deseja excluir "{doc.file_name}"? Esta ação não pode ser desfeita.
+                      Tem certeza que deseja excluir "{doc.file_name}"? Esta ação não pode ser
+                      desfeita.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction 
+                    <AlertDialogAction
                       onClick={() => handleDelete(doc)}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >

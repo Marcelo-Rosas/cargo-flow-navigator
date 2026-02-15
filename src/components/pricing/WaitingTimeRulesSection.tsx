@@ -2,12 +2,37 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useWaitingTimeRules, useVehicleTypes } from '@/hooks/usePricingRules';
-import { useCreateWaitingTimeRule, useUpdateWaitingTimeRule, useDeleteWaitingTimeRule } from '@/hooks/usePricingMutations';
+import type { WaitingTimeRule } from '@/types/pricing';
+import {
+  useCreateWaitingTimeRule,
+  useUpdateWaitingTimeRule,
+  useDeleteWaitingTimeRule,
+} from '@/hooks/usePricingMutations';
 import { Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -34,11 +59,13 @@ export function WaitingTimeRulesSection() {
   const createMutation = useCreateWaitingTimeRule();
   const updateMutation = useUpdateWaitingTimeRule();
   const deleteMutation = useDeleteWaitingTimeRule();
-  
+
   const [editingRule, setEditingRule] = useState<WaitingTimeRuleWithVehicle | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const handleCreate = async (data: any) => {
+  const handleCreate = async (
+    data: Omit<WaitingTimeRule, 'id' | 'created_at' | 'updated_at' | 'created_by'>
+  ) => {
     try {
       await createMutation.mutateAsync(data);
       toast.success('Regra de estadia criada');
@@ -48,7 +75,7 @@ export function WaitingTimeRulesSection() {
     }
   };
 
-  const handleUpdate = async (id: string, data: any) => {
+  const handleUpdate = async (id: string, data: Partial<WaitingTimeRule>) => {
     try {
       await updateMutation.mutateAsync({ id, updates: data });
       toast.success('Regra atualizada');
@@ -114,16 +141,10 @@ export function WaitingTimeRulesSection() {
               <TableCell>
                 {rule.rate_per_day ? `R$ ${rule.rate_per_day.toFixed(2)}` : '-'}
               </TableCell>
-              <TableCell>
-                {rule.min_charge ? `R$ ${rule.min_charge.toFixed(2)}` : '-'}
-              </TableCell>
+              <TableCell>{rule.min_charge ? `R$ ${rule.min_charge.toFixed(2)}` : '-'}</TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingRule(rule)}
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => setEditingRule(rule)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
@@ -178,7 +199,11 @@ function WaitingTimeForm({
 }: {
   rule?: WaitingTimeRuleWithVehicle;
   vehicleTypes?: { id: string; code: string; name: string }[];
-  onSubmit: (data: any) => void;
+  onSubmit: (
+    data:
+      | Omit<WaitingTimeRule, 'id' | 'created_at' | 'updated_at' | 'created_by'>
+      | Partial<WaitingTimeRule>
+  ) => void;
   isLoading: boolean;
 }) {
   const [vehicleTypeId, setVehicleTypeId] = useState<string>(rule?.vehicle_type_id || '');
@@ -204,9 +229,7 @@ function WaitingTimeForm({
     <form onSubmit={handleSubmit}>
       <DialogHeader>
         <DialogTitle>{rule ? 'Editar Regra de Estadia' : 'Nova Regra de Estadia'}</DialogTitle>
-        <DialogDescription>
-          Configure a franquia e valores de hora parada
-        </DialogDescription>
+        <DialogDescription>Configure a franquia e valores de hora parada</DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
         <div className="grid grid-cols-2 gap-4">

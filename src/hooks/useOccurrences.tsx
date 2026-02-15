@@ -88,7 +88,7 @@ export function useResolveOccurrence() {
     mutationFn: async ({ id, resolved_by }: { id: string; resolved_by: string }) => {
       const { data, error } = await supabase
         .from('occurrences')
-        .update({ 
+        .update({
           resolved_at: new Date().toISOString(),
           resolved_by,
         })
@@ -111,10 +111,7 @@ export function useDeleteOccurrence() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('occurrences')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('occurrences').delete().eq('id', id);
 
       if (error) throw error;
     },
