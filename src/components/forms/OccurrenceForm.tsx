@@ -4,12 +4,7 @@ import { z } from 'zod';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -34,7 +29,10 @@ import { cn } from '@/lib/utils';
 type OccurrenceSeverity = Database['public']['Enums']['occurrence_severity'];
 
 const occurrenceSchema = z.object({
-  description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres').max(1000, 'Descrição muito longa'),
+  description: z
+    .string()
+    .min(10, 'Descrição deve ter no mínimo 10 caracteres')
+    .max(1000, 'Descrição muito longa'),
   severity: z.enum(['baixa', 'media', 'alta', 'critica']),
 });
 
@@ -87,7 +85,7 @@ export function OccurrenceForm({ open, onClose, orderId, osNumber }: OccurrenceF
     }
   };
 
-  const selectedSeverity = SEVERITY_OPTIONS.find(s => s.value === form.watch('severity'));
+  const selectedSeverity = SEVERITY_OPTIONS.find((s) => s.value === form.watch('severity'));
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -123,7 +121,9 @@ export function OccurrenceForm({ open, onClose, orderId, osNumber }: OccurrenceF
                       {SEVERITY_OPTIONS.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           <div className="flex items-center gap-2">
-                            <div className={cn("w-2 h-2 rounded-full", option.color.split(' ')[0])} />
+                            <div
+                              className={cn('w-2 h-2 rounded-full', option.color.split(' ')[0])}
+                            />
                             {option.label}
                           </div>
                         </SelectItem>
@@ -136,14 +136,13 @@ export function OccurrenceForm({ open, onClose, orderId, osNumber }: OccurrenceF
             />
 
             {selectedSeverity && (
-              <div className={cn(
-                "p-3 rounded-lg text-sm",
-                selectedSeverity.color
-              )}>
+              <div className={cn('p-3 rounded-lg text-sm', selectedSeverity.color)}>
                 {selectedSeverity.value === 'baixa' && 'Problema menor que não afeta a operação.'}
-                {selectedSeverity.value === 'media' && 'Problema que pode causar atrasos moderados.'}
+                {selectedSeverity.value === 'media' &&
+                  'Problema que pode causar atrasos moderados.'}
                 {selectedSeverity.value === 'alta' && 'Problema sério que requer atenção imediata.'}
-                {selectedSeverity.value === 'critica' && 'Problema crítico que paralisa a operação!'}
+                {selectedSeverity.value === 'critica' &&
+                  'Problema crítico que paralisa a operação!'}
               </div>
             )}
 
@@ -154,10 +153,10 @@ export function OccurrenceForm({ open, onClose, orderId, osNumber }: OccurrenceF
                 <FormItem>
                   <FormLabel>Descrição da Ocorrência *</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Descreva detalhadamente o que aconteceu, quando e quais ações foram tomadas..."
                       className="resize-none min-h-[120px]"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -169,12 +168,14 @@ export function OccurrenceForm({ open, onClose, orderId, osNumber }: OccurrenceF
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={createOccurrenceMutation.isPending}
                 className="bg-warning text-warning-foreground hover:bg-warning/90"
               >
-                {createOccurrenceMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {createOccurrenceMutation.isPending && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
                 Registrar Ocorrência
               </Button>
             </div>

@@ -38,7 +38,7 @@ export function useVehicle(id: string | null | undefined) {
     queryKey: ['vehicles', 'single', id],
     queryFn: async () => {
       if (!id) return null;
-      
+
       const { data, error } = await supabase
         .from('vehicles')
         .select('id, plate, driver_id, active, brand, model')

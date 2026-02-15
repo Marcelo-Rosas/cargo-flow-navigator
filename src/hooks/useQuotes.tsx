@@ -26,11 +26,7 @@ export function useQuote(id: string) {
   return useQuery({
     queryKey: ['quotes', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('quotes')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
+      const { data, error } = await supabase.from('quotes').select('*').eq('id', id).maybeSingle();
 
       if (error) throw error;
       return data as Quote | null;
@@ -44,11 +40,7 @@ export function useCreateQuote() {
 
   return useMutation({
     mutationFn: async (quote: QuoteInsert) => {
-      const { data, error } = await supabase
-        .from('quotes')
-        .insert(quote)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('quotes').insert(quote).select().single();
 
       if (error) throw error;
       return data;
@@ -106,10 +98,7 @@ export function useDeleteQuote() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('quotes')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('quotes').delete().eq('id', id);
 
       if (error) throw error;
     },

@@ -1,7 +1,20 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { GripVertical, MoreHorizontal, Mail, Copy, Calendar, MapPin, Building2, ArrowRightLeft, Route, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
+import {
+  GripVertical,
+  MoreHorizontal,
+  Mail,
+  Copy,
+  Calendar,
+  MapPin,
+  Building2,
+  ArrowRightLeft,
+  Route,
+  AlertTriangle,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,17 +37,21 @@ interface QuoteCardProps {
   onDelete?: () => void;
   onSendEmail?: () => void;
   onConvert?: () => void;
+  canManageActions?: boolean;
 }
 
-export function QuoteCard({ quote, onEdit, onClone, onDelete, onSendEmail, onConvert }: QuoteCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: quote.id });
+export function QuoteCard({
+  quote,
+  onEdit,
+  onClone,
+  onDelete,
+  onSendEmail,
+  onConvert,
+  canManageActions = true,
+}: QuoteCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: quote.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -56,17 +73,18 @@ export function QuoteCard({ quote, onEdit, onClone, onDelete, onSendEmail, onCon
   };
 
   const tags = quote.tags || [];
-  
+
   // Extract route UF label from breakdown or generate from origin/destination
   const breakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
-  const routeUfLabel = breakdown?.meta?.routeUfLabel || formatRouteUf(quote.origin, quote.destination);
-  
+  const routeUfLabel =
+    breakdown?.meta?.routeUfLabel || formatRouteUf(quote.origin, quote.destination);
+
   // Get km band from pricing_breakdown
   const kmBandLabel = breakdown?.meta?.kmBandLabel || null;
   const kmStatus = breakdown?.meta?.kmStatus || 'OK';
   const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
   const marginPercent = breakdown?.meta?.marginPercent;
-  
+
   const canEmail = quote.stage === 'enviado' || quote.stage === 'negociacao';
   const canConvert = quote.stage === 'ganho';
 
@@ -78,103 +96,107 @@ export function QuoteCard({ quote, onEdit, onClone, onDelete, onSendEmail, onCon
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className={cn(
-        "bg-card rounded-lg border border-border shadow-card p-4 cursor-pointer group",
-        "hover:shadow-card-hover hover:border-primary/30 transition-all duration-200",
-        isDragging && "opacity-90 rotate-2 scale-[1.02] shadow-lg z-50",
-        marginStatus === 'BELOW_TARGET' && "border-l-4 border-l-warning"
+        'bg-card rounded-lg border border-border shadow-card p-4 cursor-pointer group',
+        'hover:shadow-card-hover hover:border-primary/30 transition-all duration-200',
+        isDragging && 'opacity-90 rotate-2 scale-[1.02] shadow-lg z-50',
+        marginStatus === 'BELOW_TARGET' && 'border-l-4 border-l-warning'
       )}
       onClick={onEdit}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
-          <button
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <GripVertical className="w-4 h-4 text-muted-foreground" />
-          </button>
+          {canManageActions && (
+            <button
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripVertical className="w-4 h-4 text-muted-foreground" />
+            </button>
+          )}
           <h4 className="font-semibold text-foreground truncate max-w-[160px]">
             {quote.client_name}
           </h4>
         </div>
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {/* Sempre: Editar */}
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit?.();
-              }}
-            >
-              <Pencil className="w-4 h-4 mr-2" /> Editar
-            </DropdownMenuItem>
 
-            {/* Sempre: Clonar */}
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                onClone?.();
-              }}
-            >
-              <Copy className="w-4 h-4 mr-2" /> Clonar
-            </DropdownMenuItem>
-
-            {/* Só: Enviado e Negociação */}
-            {canEmail && (
+        {canManageActions && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {/* Sempre: Editar */}
               <DropdownMenuItem
                 onClick={(e) => {
                   e.stopPropagation();
-                  onSendEmail?.();
+                  onEdit?.();
                 }}
               >
-                <Mail className="w-4 h-4 mr-2" /> Enviar E-mail
+                <Pencil className="w-4 h-4 mr-2" /> Editar
               </DropdownMenuItem>
-            )}
 
-            {/* Só: Ganho */}
-            {canConvert && (
-              <>
-                <DropdownMenuSeparator />
+              {/* Sempre: Clonar */}
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClone?.();
+                }}
+              >
+                <Copy className="w-4 h-4 mr-2" /> Clonar
+              </DropdownMenuItem>
+
+              {/* Só: Enviado e Negociação */}
+              {canEmail && (
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
-                    onConvert?.();
+                    onSendEmail?.();
                   }}
-                  className="text-success"
                 >
-                  <ArrowRightLeft className="w-4 h-4 mr-2" />
-                  Converter para OS
+                  <Mail className="w-4 h-4 mr-2" /> Enviar E-mail
                 </DropdownMenuItem>
-              </>
-            )}
+              )}
 
-            {/* Sempre: Delete */}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete?.();
-              }}
-              className="text-destructive"
-            >
-              <Trash2 className="w-4 h-4 mr-2" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {/* Só: Ganho */}
+              {canConvert && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onConvert?.();
+                    }}
+                    className="text-success"
+                  >
+                    <ArrowRightLeft className="w-4 h-4 mr-2" />
+                    Converter para OS
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {/* Sempre: Delete */}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.();
+                }}
+                className="text-destructive"
+              >
+                <Trash2 className="w-4 h-4 mr-2" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Route */}
@@ -193,20 +215,20 @@ export function QuoteCard({ quote, onEdit, onClone, onDelete, onSendEmail, onCon
             {routeUfLabel}
           </Badge>
         )}
-        
+
         {kmBandLabel && kmStatus === 'OK' && (
           <Badge variant="secondary" className="text-xs bg-muted">
             {kmBandLabel} km
           </Badge>
         )}
-        
+
         {kmStatus === 'OUT_OF_RANGE' && (
           <Badge variant="secondary" className="text-xs bg-destructive/10 text-destructive">
             <AlertTriangle className="w-3 h-3 mr-1" />
             Fora da faixa
           </Badge>
         )}
-        
+
         {marginStatus === 'BELOW_TARGET' && marginPercent !== undefined && (
           <Badge variant="secondary" className="text-xs bg-warning/10 text-warning-foreground">
             <AlertTriangle className="w-3 h-3 mr-1" />
@@ -241,14 +263,14 @@ export function QuoteCard({ quote, onEdit, onClone, onDelete, onSendEmail, onCon
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
           {tags.map((tag) => (
-            <Badge 
-              key={tag} 
-              variant="secondary" 
+            <Badge
+              key={tag}
+              variant="secondary"
               className={cn(
-                "text-xs",
-                tag === 'urgente' && "bg-destructive/10 text-destructive",
-                tag === 'contrato' && "bg-primary/10 text-primary",
-                tag === 'refrigerado' && "bg-accent text-accent-foreground"
+                'text-xs',
+                tag === 'urgente' && 'bg-destructive/10 text-destructive',
+                tag === 'contrato' && 'bg-primary/10 text-primary',
+                tag === 'refrigerado' && 'bg-accent text-accent-foreground'
               )}
             >
               {tag}

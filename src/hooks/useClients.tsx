@@ -16,13 +16,12 @@ export function useClients(searchTerm?: string, options: UseClientsOptions = {})
   return useQuery({
     queryKey: ['clients', searchTerm],
     queryFn: async () => {
-      let query = supabase
-        .from('clients')
-        .select('*')
-        .order('name', { ascending: true });
+      let query = supabase.from('clients').select('*').order('name', { ascending: true });
 
       if (searchTerm) {
-        query = query.or(`name.ilike.%${searchTerm}%,cnpj.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+        query = query.or(
+          `name.ilike.%${searchTerm}%,cnpj.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`
+        );
       }
 
       const { data, error } = await query;
@@ -38,11 +37,7 @@ export function useClient(id: string) {
   return useQuery({
     queryKey: ['clients', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
+      const { data, error } = await supabase.from('clients').select('*').eq('id', id).maybeSingle();
 
       if (error) throw error;
       return data as Client | null;
@@ -56,11 +51,7 @@ export function useCreateClient() {
 
   return useMutation({
     mutationFn: async (client: ClientInsert) => {
-      const { data, error } = await supabase
-        .from('clients')
-        .insert(client)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('clients').insert(client).select().single();
 
       if (error) throw error;
       return data;
@@ -97,10 +88,7 @@ export function useDeleteClient() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('clients').delete().eq('id', id);
 
       if (error) throw error;
     },

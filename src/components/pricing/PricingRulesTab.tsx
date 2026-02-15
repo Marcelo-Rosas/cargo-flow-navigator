@@ -6,16 +6,7 @@ import {
 } from '@/components/ui/accordion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Settings2, 
-  Truck, 
-  Clock, 
-  Receipt, 
-  Fuel, 
-  Route, 
-  CreditCard,
-  Percent
-} from 'lucide-react';
+import { Settings2, Truck, Clock, Receipt, Fuel, Route, CreditCard, Percent } from 'lucide-react';
 
 import { PricingParametersSection } from './PricingParametersSection';
 import { VehicleTypesSection } from './VehicleTypesSection';
@@ -25,14 +16,14 @@ import { TacRatesSection } from './TacRatesSection';
 import { TollRoutesSection } from './TollRoutesSection';
 import { PaymentTermsSection } from './PaymentTermsSection';
 
-import { 
-  usePricingParameters, 
-  useVehicleTypes, 
+import {
+  usePricingParameters,
+  useVehicleTypes,
   useWaitingTimeRules,
   useConditionalFees,
   useTacRates,
   useTollRoutes,
-  usePaymentTerms 
+  usePaymentTerms,
 } from '@/hooks/usePricingRules';
 
 export function PricingRulesTab() {
@@ -49,7 +40,8 @@ export function PricingRulesTab() {
       <CardHeader>
         <CardTitle>Regras de Precificação</CardTitle>
         <CardDescription>
-          Gerencie parâmetros gerais, tipos de veículo, estadia, taxas condicionais, TAC, pedágios e prazos de pagamento
+          Gerencie parâmetros gerais, tipos de veículo, estadia, taxas condicionais, TAC, pedágios e
+          prazos de pagamento
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -66,8 +58,8 @@ export function PricingRulesTab() {
               </div>
             </AccordionTrigger>
             <AccordionContent>
-              <PricingParametersSection 
-                includeKeys={['das_percent', 'markup_percent', 'overhead_percent']} 
+              <PricingParametersSection
+                includeKeys={['das_percent', 'markup_percent', 'overhead_percent']}
               />
             </AccordionContent>
           </AccordionItem>
@@ -95,7 +87,7 @@ export function PricingRulesTab() {
                 <Truck className="h-5 w-5 text-muted-foreground" />
                 <span>Tipos de Veículo</span>
                 <Badge variant="secondary" className="ml-2">
-                  {vehicleTypes?.filter(v => v.active).length || 0} ativos
+                  {vehicleTypes?.filter((v) => v.active).length || 0} ativos
                 </Badge>
               </div>
             </AccordionTrigger>
@@ -127,7 +119,7 @@ export function PricingRulesTab() {
                 <Receipt className="h-5 w-5 text-muted-foreground" />
                 <span>Taxas Condicionais</span>
                 <Badge variant="secondary" className="ml-2">
-                  {conditionalFees?.filter(f => f.active).length || 0} ativas
+                  {conditionalFees?.filter((f) => f.active).length || 0} ativas
                 </Badge>
               </div>
             </AccordionTrigger>
@@ -175,7 +167,7 @@ export function PricingRulesTab() {
                 <CreditCard className="h-5 w-5 text-muted-foreground" />
                 <span>Prazos de Pagamento</span>
                 <Badge variant="secondary" className="ml-2">
-                  {paymentTerms?.filter(t => t.active).length || 0} ativos
+                  {paymentTerms?.filter((t) => t.active).length || 0} ativos
                 </Badge>
               </div>
             </AccordionTrigger>

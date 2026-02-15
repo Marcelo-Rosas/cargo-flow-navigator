@@ -41,18 +41,21 @@ export function GlobalSearchDialog() {
     }
   };
 
-  const groupedResults = results.reduce((acc, result) => {
-    if (!acc[result.type]) {
-      acc[result.type] = [];
-    }
-    acc[result.type].push(result);
-    return acc;
-  }, {} as Record<SearchResult['type'], SearchResult[]>);
+  const groupedResults = results.reduce(
+    (acc, result) => {
+      if (!acc[result.type]) {
+        acc[result.type] = [];
+      }
+      acc[result.type].push(result);
+      return acc;
+    },
+    {} as Record<SearchResult['type'], SearchResult[]>
+  );
 
   return (
     <CommandDialog open={isOpen} onOpenChange={setIsOpen}>
-      <CommandInput 
-        placeholder="Buscar cotações, OS, clientes..." 
+      <CommandInput
+        placeholder="Buscar cotações, OS, clientes..."
         value={query}
         onValueChange={setQuery}
       />
@@ -62,7 +65,7 @@ export function GlobalSearchDialog() {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         )}
-        
+
         {!isLoading && query.length >= 2 && results.length === 0 && (
           <CommandEmpty>
             <div className="flex flex-col items-center gap-2 py-6">

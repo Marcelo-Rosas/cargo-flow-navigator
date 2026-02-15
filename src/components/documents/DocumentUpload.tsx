@@ -38,27 +38,15 @@ interface UploadingFile {
 
 // Tipos de documento disponíveis por estágio (progressivo)
 const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: string }[]> = {
-  'ordem_criada': [
-    { value: 'outros', label: 'Outros' }
-  ],
-  'busca_motorista': [
+  ordem_criada: [{ value: 'outros', label: 'Outros' }],
+  busca_motorista: [
     { value: 'cnh', label: 'CNH (Motorista)' },
     { value: 'crlv', label: 'CRLV (Veículo)' },
     { value: 'comp_residencia', label: 'Comprovante de Residência' },
     { value: 'antt_motorista', label: 'ANTT (Motorista)' },
-    { value: 'outros', label: 'Outros' }
+    { value: 'outros', label: 'Outros' },
   ],
-  'documentacao': [
-    { value: 'cnh', label: 'CNH (Motorista)' },
-    { value: 'crlv', label: 'CRLV (Veículo)' },
-    { value: 'comp_residencia', label: 'Comprovante de Residência' },
-    { value: 'antt_motorista', label: 'ANTT (Motorista)' },
-    { value: 'nfe', label: 'NF-e' },
-    { value: 'cte', label: 'CT-e' },
-    { value: 'mdfe', label: 'MDF-e' },
-    { value: 'outros', label: 'Outros' }
-  ],
-  'coleta_realizada': [
+  documentacao: [
     { value: 'cnh', label: 'CNH (Motorista)' },
     { value: 'crlv', label: 'CRLV (Veículo)' },
     { value: 'comp_residencia', label: 'Comprovante de Residência' },
@@ -66,9 +54,9 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'nfe', label: 'NF-e' },
     { value: 'cte', label: 'CT-e' },
     { value: 'mdfe', label: 'MDF-e' },
-    { value: 'outros', label: 'Outros' }
+    { value: 'outros', label: 'Outros' },
   ],
-  'em_transito': [
+  coleta_realizada: [
     { value: 'cnh', label: 'CNH (Motorista)' },
     { value: 'crlv', label: 'CRLV (Veículo)' },
     { value: 'comp_residencia', label: 'Comprovante de Residência' },
@@ -76,9 +64,19 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'nfe', label: 'NF-e' },
     { value: 'cte', label: 'CT-e' },
     { value: 'mdfe', label: 'MDF-e' },
-    { value: 'outros', label: 'Outros' }
+    { value: 'outros', label: 'Outros' },
   ],
-  'entregue': [
+  em_transito: [
+    { value: 'cnh', label: 'CNH (Motorista)' },
+    { value: 'crlv', label: 'CRLV (Veículo)' },
+    { value: 'comp_residencia', label: 'Comprovante de Residência' },
+    { value: 'antt_motorista', label: 'ANTT (Motorista)' },
+    { value: 'nfe', label: 'NF-e' },
+    { value: 'cte', label: 'CT-e' },
+    { value: 'mdfe', label: 'MDF-e' },
+    { value: 'outros', label: 'Outros' },
+  ],
+  entregue: [
     { value: 'cnh', label: 'CNH (Motorista)' },
     { value: 'crlv', label: 'CRLV (Veículo)' },
     { value: 'comp_residencia', label: 'Comprovante de Residência' },
@@ -87,21 +85,21 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'cte', label: 'CT-e' },
     { value: 'mdfe', label: 'MDF-e' },
     { value: 'pod', label: 'POD (Comprovante de Entrega)' },
-    { value: 'outros', label: 'Outros' }
-  ]
+    { value: 'outros', label: 'Outros' },
+  ],
 };
 
 // Mapeamento de tipo de documento para campo booleano da ordem
 const DOCUMENT_TYPE_TO_ORDER_FIELD: Record<string, keyof Order | null> = {
-  'cnh': 'has_cnh',
-  'crlv': 'has_crlv',
-  'comp_residencia': 'has_comp_residencia',
-  'antt_motorista': 'has_antt_motorista',
-  'nfe': 'has_nfe',
-  'cte': 'has_cte',
-  'mdfe': 'has_mdfe',
-  'pod': 'has_pod',
-  'outros': null
+  cnh: 'has_cnh',
+  crlv: 'has_crlv',
+  comp_residencia: 'has_comp_residencia',
+  antt_motorista: 'has_antt_motorista',
+  nfe: 'has_nfe',
+  cte: 'has_cte',
+  mdfe: 'has_mdfe',
+  pod: 'has_pod',
+  outros: null,
 };
 
 export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: DocumentUploadProps) {
@@ -109,115 +107,107 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
   const createDocumentMutation = useCreateDocument();
   const updateOrderMutation = useUpdateOrder();
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
-  
+
   // Pega os tipos disponíveis para o estágio atual
-  const availableTypes = orderStage 
-    ? DOCUMENT_TYPES_BY_STAGE[orderStage] 
+  const availableTypes = orderStage
+    ? DOCUMENT_TYPES_BY_STAGE[orderStage]
     : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
-  
+
   const [selectedType, setSelectedType] = useState<DocumentType>(availableTypes[0].value);
-  
+
   // Atualiza o tipo selecionado quando o estágio muda
   useEffect(() => {
-    if (availableTypes.length > 0 && !availableTypes.find(t => t.value === selectedType)) {
+    if (availableTypes.length > 0 && !availableTypes.find((t) => t.value === selectedType)) {
       setSelectedType(availableTypes[0].value);
     }
   }, [orderStage, availableTypes, selectedType]);
 
-  const uploadFile = async (file: File, type: DocumentType) => {
-    if (!user) {
-      toast.error('Você precisa estar logado para enviar documentos');
-      return;
-    }
+  const uploadFile = useCallback(
+    async (file: File, type: DocumentType) => {
+      if (!user) {
+        toast.error('Você precisa estar logado para enviar documentos');
+        return;
+      }
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-    // Update progress
-    setUploadingFiles(prev => 
-      prev.map(f => 
-        f.file === file ? { ...f, progress: 30 } : f
-      )
-    );
+      // Update progress
+      setUploadingFiles((prev) => prev.map((f) => (f.file === file ? { ...f, progress: 30 } : f)));
 
-    // Upload to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false,
+      // Upload to storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        setUploadingFiles((prev) =>
+          prev.map((f) => (f.file === file ? { ...f, status: 'error' } : f))
+        );
+        throw uploadError;
+      }
+
+      setUploadingFiles((prev) => prev.map((f) => (f.file === file ? { ...f, progress: 70 } : f)));
+
+      // Get public URL
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadData.path);
+
+      // Create document record
+      await createDocumentMutation.mutateAsync({
+        file_name: file.name,
+        file_url: urlData.publicUrl,
+        file_size: file.size,
+        type,
+        order_id: orderId || null,
+        quote_id: quoteId || null,
+        uploaded_by: user.id,
       });
 
-    if (uploadError) {
-      setUploadingFiles(prev => 
-        prev.map(f => 
-          f.file === file ? { ...f, status: 'error' } : f
-        )
+      // Update order document flags baseado no tipo
+      if (orderId) {
+        const orderField = DOCUMENT_TYPE_TO_ORDER_FIELD[type];
+        if (orderField) {
+          await updateOrderMutation.mutateAsync({
+            id: orderId,
+            updates: { [orderField]: true },
+          });
+        }
+      }
+
+      setUploadingFiles((prev) =>
+        prev.map((f) => (f.file === file ? { ...f, progress: 100, status: 'success' } : f))
       );
-      throw uploadError;
-    }
+    },
+    [user, orderId, quoteId, createDocumentMutation, updateOrderMutation]
+  );
 
-    setUploadingFiles(prev => 
-      prev.map(f => 
-        f.file === file ? { ...f, progress: 70 } : f
-      )
-    );
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      const newFiles: UploadingFile[] = acceptedFiles.map((file) => ({
+        file,
+        progress: 0,
+        status: 'uploading' as const,
+        type: selectedType,
+      }));
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('documents')
-      .getPublicUrl(uploadData.path);
+      setUploadingFiles((prev) => [...prev, ...newFiles]);
 
-    // Create document record
-    await createDocumentMutation.mutateAsync({
-      file_name: file.name,
-      file_url: urlData.publicUrl,
-      file_size: file.size,
-      type,
-      order_id: orderId || null,
-      quote_id: quoteId || null,
-      uploaded_by: user.id,
-    });
-
-    // Update order document flags baseado no tipo
-    if (orderId) {
-      const orderField = DOCUMENT_TYPE_TO_ORDER_FIELD[type];
-      if (orderField) {
-        await updateOrderMutation.mutateAsync({
-          id: orderId,
-          updates: { [orderField]: true },
-        });
+      for (const uploadingFile of newFiles) {
+        try {
+          await uploadFile(uploadingFile.file, uploadingFile.type);
+          toast.success(`${uploadingFile.file.name} enviado com sucesso`);
+        } catch (error) {
+          toast.error(`Erro ao enviar ${uploadingFile.file.name}`);
+        }
       }
-    }
 
-    setUploadingFiles(prev => 
-      prev.map(f => 
-        f.file === file ? { ...f, progress: 100, status: 'success' } : f
-      )
-    );
-  };
-
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    const newFiles: UploadingFile[] = acceptedFiles.map(file => ({
-      file,
-      progress: 0,
-      status: 'uploading' as const,
-      type: selectedType,
-    }));
-
-    setUploadingFiles(prev => [...prev, ...newFiles]);
-
-    for (const uploadingFile of newFiles) {
-      try {
-        await uploadFile(uploadingFile.file, uploadingFile.type);
-        toast.success(`${uploadingFile.file.name} enviado com sucesso`);
-      } catch (error) {
-        toast.error(`Erro ao enviar ${uploadingFile.file.name}`);
-      }
-    }
-
-    onSuccess?.();
-  }, [selectedType, orderId, quoteId, user]);
+      onSuccess?.();
+    },
+    [selectedType, onSuccess, uploadFile]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -233,7 +223,7 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
   });
 
   const removeFile = (file: File) => {
-    setUploadingFiles(prev => prev.filter(f => f.file !== file));
+    setUploadingFiles((prev) => prev.filter((f) => f.file !== file));
   };
 
   const formatFileSize = (bytes: number) => {
@@ -252,7 +242,7 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {availableTypes.map(type => (
+            {availableTypes.map((type) => (
               <SelectItem key={type.value} value={type.value}>
                 {type.label}
               </SelectItem>
@@ -265,17 +255,19 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
       <div
         {...getRootProps()}
         className={cn(
-          "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
-          isDragActive 
-            ? "border-primary bg-primary/5" 
-            : "border-border hover:border-primary/50 hover:bg-muted/30"
+          'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
+          isDragActive
+            ? 'border-primary bg-primary/5'
+            : 'border-border hover:border-primary/50 hover:bg-muted/30'
         )}
       >
         <input {...getInputProps()} />
-        <Upload className={cn(
-          "w-10 h-10 mx-auto mb-3 transition-colors",
-          isDragActive ? "text-primary" : "text-muted-foreground"
-        )} />
+        <Upload
+          className={cn(
+            'w-10 h-10 mx-auto mb-3 transition-colors',
+            isDragActive ? 'text-primary' : 'text-muted-foreground'
+          )}
+        />
         <p className="text-foreground font-medium mb-1">
           {isDragActive ? 'Solte os arquivos aqui' : 'Arraste arquivos ou clique para selecionar'}
         </p>
@@ -288,7 +280,7 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
       {uploadingFiles.length > 0 && (
         <div className="space-y-2">
           {uploadingFiles.map((uploadingFile, index) => (
-            <div 
+            <div
               key={index}
               className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border"
             >

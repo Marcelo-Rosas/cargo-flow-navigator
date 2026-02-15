@@ -16,7 +16,7 @@ import type {
 
 export function useUpdatePricingParameter() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<PricingParameter> }) => {
       const { data, error } = await supabase
@@ -37,9 +37,14 @@ export function useUpdatePricingParameter() {
 
 export function useCreatePricingParameter() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (data: { key: string; value: number; unit?: string; description?: string }) => {
+    mutationFn: async (data: {
+      key: string;
+      value: number;
+      unit?: string;
+      description?: string;
+    }) => {
       const { data: result, error } = await supabase
         .from('pricing_parameters')
         .insert(data)
@@ -57,13 +62,10 @@ export function useCreatePricingParameter() {
 
 export function useDeletePricingParameter() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('pricing_parameters')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('pricing_parameters').delete().eq('id', id);
 
       if (error) throw error;
     },
@@ -79,7 +81,7 @@ export function useDeletePricingParameter() {
 
 export function useCreateVehicleType() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: Omit<VehicleType, 'id' | 'created_at' | 'updated_at'>) => {
       const { data: result, error } = await supabase
@@ -99,7 +101,7 @@ export function useCreateVehicleType() {
 
 export function useUpdateVehicleType() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<VehicleType> }) => {
       const { data, error } = await supabase
@@ -120,13 +122,10 @@ export function useUpdateVehicleType() {
 
 export function useDeleteVehicleType() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('vehicle_types')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('vehicle_types').delete().eq('id', id);
 
       if (error) throw error;
     },
@@ -142,7 +141,7 @@ export function useDeleteVehicleType() {
 
 export function useCreateWaitingTimeRule() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: {
       vehicle_type_id?: string | null;
@@ -169,7 +168,7 @@ export function useCreateWaitingTimeRule() {
 
 export function useUpdateWaitingTimeRule() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<WaitingTimeRule> }) => {
       const { data, error } = await supabase
@@ -190,13 +189,10 @@ export function useUpdateWaitingTimeRule() {
 
 export function useDeleteWaitingTimeRule() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('waiting_time_rules')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('waiting_time_rules').delete().eq('id', id);
 
       if (error) throw error;
     },
@@ -212,7 +208,7 @@ export function useDeleteWaitingTimeRule() {
 
 export function useCreateTollRoute() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: {
       origin_state: string;
@@ -241,7 +237,7 @@ export function useCreateTollRoute() {
 
 export function useUpdateTollRoute() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<TollRoute> }) => {
       const { data, error } = await supabase
@@ -262,13 +258,10 @@ export function useUpdateTollRoute() {
 
 export function useDeleteTollRoute() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('toll_routes')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('toll_routes').delete().eq('id', id);
 
       if (error) throw error;
     },
@@ -284,7 +277,7 @@ export function useDeleteTollRoute() {
 
 export function useCreateTacRate() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: {
       reference_date: string;
@@ -293,8 +286,9 @@ export function useCreateTacRate() {
       adjustment_percent: number;
       source_description?: string | null;
     }) => {
-      const variation_percent = ((data.diesel_price_current - data.diesel_price_base) / data.diesel_price_base) * 100;
-      
+      const variation_percent =
+        ((data.diesel_price_current - data.diesel_price_base) / data.diesel_price_base) * 100;
+
       const { data: result, error } = await supabase
         .from('tac_rates')
         .insert({ ...data, variation_percent })
@@ -312,14 +306,16 @@ export function useCreateTacRate() {
 
 export function useUpdateTacRate() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<TacRate> }) => {
       let variation_percent = updates.variation_percent;
       if (updates.diesel_price_base !== undefined && updates.diesel_price_current !== undefined) {
-        variation_percent = ((updates.diesel_price_current - updates.diesel_price_base) / updates.diesel_price_base) * 100;
+        variation_percent =
+          ((updates.diesel_price_current - updates.diesel_price_base) / updates.diesel_price_base) *
+          100;
       }
-      
+
       const { data, error } = await supabase
         .from('tac_rates')
         .update({ ...updates, variation_percent })
@@ -338,13 +334,10 @@ export function useUpdateTacRate() {
 
 export function useDeleteTacRate() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('tac_rates')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('tac_rates').delete().eq('id', id);
 
       if (error) throw error;
     },
@@ -360,7 +353,7 @@ export function useDeleteTacRate() {
 
 export function useCreateConditionalFee() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: {
       code: string;
@@ -390,9 +383,15 @@ export function useCreateConditionalFee() {
 
 export function useUpdateConditionalFee() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Omit<ConditionalFee, 'conditions'>> }) => {
+    mutationFn: async ({
+      id,
+      updates,
+    }: {
+      id: string;
+      updates: Partial<Omit<ConditionalFee, 'conditions'>>;
+    }) => {
       const { data, error } = await supabase
         .from('conditional_fees')
         .update(updates)
@@ -411,13 +410,10 @@ export function useUpdateConditionalFee() {
 
 export function useDeleteConditionalFee() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('conditional_fees')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('conditional_fees').delete().eq('id', id);
 
       if (error) throw error;
     },
@@ -433,7 +429,7 @@ export function useDeleteConditionalFee() {
 
 export function useCreatePaymentTerm() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: {
       code: string;
@@ -459,7 +455,7 @@ export function useCreatePaymentTerm() {
 
 export function useUpdatePaymentTerm() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<PaymentTerm> }) => {
       const { data, error } = await supabase
@@ -480,13 +476,10 @@ export function useUpdatePaymentTerm() {
 
 export function useDeletePaymentTerm() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('payment_terms')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('payment_terms').delete().eq('id', id);
 
       if (error) throw error;
     },

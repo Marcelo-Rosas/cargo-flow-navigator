@@ -2,10 +2,28 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { usePricingParameters } from '@/hooks/usePricingRules';
-import { useUpdatePricingParameter, useCreatePricingParameter, useDeletePricingParameter } from '@/hooks/usePricingMutations';
+import {
+  useUpdatePricingParameter,
+  useCreatePricingParameter,
+  useDeletePricingParameter,
+} from '@/hooks/usePricingMutations';
 import { Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PricingParameter } from '@/types/pricing';
@@ -15,17 +33,21 @@ interface PricingParametersSectionProps {
   title?: string;
 }
 
-export function PricingParametersSection({ includeKeys, title }: PricingParametersSectionProps = {}) {
+export function PricingParametersSection({
+  includeKeys,
+  title,
+}: PricingParametersSectionProps = {}) {
   const { data: allParameters, isLoading } = usePricingParameters();
-  
+
   // Filter parameters by includeKeys if provided
-  const parameters = includeKeys && includeKeys.length > 0
-    ? allParameters?.filter(p => includeKeys.includes(p.key))
-    : allParameters;
+  const parameters =
+    includeKeys && includeKeys.length > 0
+      ? allParameters?.filter((p) => includeKeys.includes(p.key))
+      : allParameters;
   const updateMutation = useUpdatePricingParameter();
   const createMutation = useCreatePricingParameter();
   const deleteMutation = useDeletePricingParameter();
-  
+
   const [editingParam, setEditingParam] = useState<PricingParameter | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -46,7 +68,12 @@ export function PricingParametersSection({ includeKeys, title }: PricingParamete
     }
   };
 
-  const handleCreate = async (data: { key: string; value: number; unit: string; description: string }) => {
+  const handleCreate = async (data: {
+    key: string;
+    value: number;
+    unit: string;
+    description: string;
+  }) => {
     try {
       await createMutation.mutateAsync(data);
       toast.success('Parâmetro criado');
@@ -99,11 +126,7 @@ export function PricingParametersSection({ includeKeys, title }: PricingParamete
               <TableCell className="text-muted-foreground">{param.description || '-'}</TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingParam(param)}
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => setEditingParam(param)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
@@ -138,22 +161,19 @@ export function PricingParametersSection({ includeKeys, title }: PricingParamete
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
-          <CreateParameterForm
-            onCreate={handleCreate}
-            isLoading={createMutation.isPending}
-          />
+          <CreateParameterForm onCreate={handleCreate} isLoading={createMutation.isPending} />
         </DialogContent>
       </Dialog>
     </div>
   );
 }
 
-function EditParameterForm({ 
-  param, 
-  onSave, 
-  isLoading 
-}: { 
-  param: PricingParameter; 
+function EditParameterForm({
+  param,
+  onSave,
+  isLoading,
+}: {
+  param: PricingParameter;
   onSave: (id: string, value: number, description?: string) => void;
   isLoading: boolean;
 }) {

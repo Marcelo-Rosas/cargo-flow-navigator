@@ -18,10 +18,7 @@ export function usePricingParameters() {
   return useQuery({
     queryKey: ['pricing-parameters'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('pricing_parameters')
-        .select('*')
-        .order('key');
+      const { data, error } = await supabase.from('pricing_parameters').select('*').order('key');
 
       if (error) throw error;
       return data as PricingParameter[];
@@ -54,10 +51,7 @@ export function useVehicleTypes(activeOnly = true) {
   return useQuery({
     queryKey: ['vehicle-types', { activeOnly }],
     queryFn: async () => {
-      let query = supabase
-        .from('vehicle_types')
-        .select('*')
-        .order('axes_count');
+      let query = supabase.from('vehicle_types').select('*').order('axes_count');
 
       if (activeOnly) {
         query = query.eq('active', true);
@@ -155,10 +149,7 @@ export function useConditionalFees(activeOnly = true) {
   return useQuery({
     queryKey: ['conditional-fees', { activeOnly }],
     queryFn: async () => {
-      let query = supabase
-        .from('conditional_fees')
-        .select('*')
-        .order('code');
+      let query = supabase.from('conditional_fees').select('*').order('code');
 
       if (activeOnly) {
         query = query.eq('active', true);
@@ -179,10 +170,7 @@ export function usePaymentTerms(activeOnly = true) {
   return useQuery({
     queryKey: ['payment-terms', { activeOnly }],
     queryFn: async () => {
-      let query = supabase
-        .from('payment_terms')
-        .select('*')
-        .order('days');
+      let query = supabase.from('payment_terms').select('*').order('days');
 
       if (activeOnly) {
         query = query.eq('active', true);

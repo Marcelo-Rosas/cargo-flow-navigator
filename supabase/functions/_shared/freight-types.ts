@@ -2,10 +2,10 @@
  * ============================================
  * TIPOS E HELPERS COMPARTILHADOS - CÁLCULO DE FRETE
  * ============================================
- * 
+ *
  * Este arquivo define os tipos e funções utilitárias
  * compartilhados entre frontend e Edge Functions.
- * 
+ *
  * Regra de negócio: FOB Lotação, impostos "por fora"
  */
 
@@ -30,37 +30,37 @@ export const FREIGHT_CONSTANTS = {
 
 export interface CalculateFreightInput {
   // Localização
-  origin: string;              // "Cidade - UF" ou "Cidade, UF"
+  origin: string; // "Cidade - UF" ou "Cidade, UF"
   destination: string;
   km_distance: number;
-  
+
   // Carga
   weight_kg: number;
   volume_m3: number;
   cargo_value: number;
-  
+
   // Pedágio manual
   toll_value?: number;
-  
+
   // Tabela de preços
   price_table_id?: string;
-  
+
   // Tipo de veículo (para estadia)
   vehicle_type_code?: string;
-  
+
   // Prazo de pagamento
   payment_term_code?: string;
-  
+
   // Taxas NTC opcionais
   tde_enabled?: boolean;
   tear_enabled?: boolean;
-  
+
   // Taxas condicionais adicionais
   conditional_fees?: string[];
-  
+
   // Estadia
   waiting_hours?: number;
-  
+
   // Overrides (opcional)
   das_percent?: number;
   markup_percent?: number;
@@ -74,8 +74,8 @@ export interface CalculateFreightInput {
 // ============================================
 
 export interface FreightMeta {
-  route_uf_label: string | null;      // "SC→SP"
-  km_band_label: string | null;       // "1-50"
+  route_uf_label: string | null; // "SC→SP"
+  km_band_label: string | null; // "1-50"
   km_status: 'OK' | 'OUT_OF_RANGE';
   margin_status: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
   margin_percent: number;
@@ -85,13 +85,13 @@ export interface FreightMeta {
 }
 
 export interface FreightComponents {
-  base_cost: number;           // Antes do markup
-  base_freight: number;        // Após markup (= base_cost * 1.30)
+  base_cost: number; // Antes do markup
+  base_freight: number; // Após markup (= base_cost * 1.30)
   toll: number;
   gris: number;
   tso: number;
-  rctrc: number;               // RCTR-C (seguro)
-  ad_valorem: number;          // Sempre 0 (legado)
+  rctrc: number; // RCTR-C (seguro)
+  ad_valorem: number; // Sempre 0 (legado)
   tde: number;
   tear: number;
   conditional_fees_total: number;
@@ -103,7 +103,7 @@ export interface FreightRates {
   icms_percent: number;
   gris_percent: number;
   tso_percent: number;
-  cost_value_percent: number;  // Para RCTR-C
+  cost_value_percent: number; // Para RCTR-C
   markup_percent: number;
   overhead_percent: number;
   tac_percent: number;
@@ -111,13 +111,13 @@ export interface FreightRates {
 }
 
 export interface FreightTotals {
-  receita_bruta: number;       // Soma de components
+  receita_bruta: number; // Soma de components
   das: number;
   icms: number;
   tac_adjustment: number;
   payment_adjustment: number;
-  total_impostos: number;      // das + icms
-  total_cliente: number;       // receita_bruta + total_impostos
+  total_impostos: number; // das + icms
+  total_cliente: number; // receita_bruta + total_impostos
 }
 
 export interface FreightProfitability {
@@ -134,13 +134,13 @@ export interface CalculateFreightResponse {
   success: boolean;
   status: 'OK' | 'OUT_OF_RANGE' | 'MISSING_DATA';
   error?: string;
-  
+
   meta: FreightMeta;
   components: FreightComponents;
   rates: FreightRates;
   totals: FreightTotals;
   profitability: FreightProfitability;
-  
+
   // Detalhes extras
   conditional_fees_breakdown: Record<string, number>;
   fallbacks_applied: string[];
@@ -156,20 +156,20 @@ export interface CalculateFreightResponse {
  */
 export function extractUf(location: string): string | null {
   if (!location) return null;
-  
+
   // Padrão 1: "Cidade, UF" ou "Cidade - UF"
-  const match = location.match(/[,\-]\s*([A-Z]{2})\s*$/i);
+  const match = location.match(/[,-]\s*([A-Z]{2})\s*$/i);
   if (match) {
     return match[1].toUpperCase();
   }
-  
+
   // Fallback: últimos 2 caracteres se forem letras
   const trimmed = location.trim();
   const lastTwo = trimmed.slice(-2);
   if (/^[A-Z]{2}$/i.test(lastTwo)) {
     return lastTwo.toUpperCase();
   }
-  
+
   return null;
 }
 
@@ -178,8 +178,8 @@ export function extractUf(location: string): string | null {
  */
 export function extractCity(location: string): string | null {
   if (!location) return null;
-  
-  const match = location.match(/^(.+?)\s*[,\-]\s*[A-Z]{2}\s*$/i);
+
+  const match = location.match(/^(.+?)\s*[,-]\s*[A-Z]{2}\s*$/i);
   return match ? match[1].trim() : null;
 }
 
@@ -189,11 +189,11 @@ export function extractCity(location: string): string | null {
 export function formatRouteUf(origin: string, destination: string): string | null {
   const originUf = extractUf(origin);
   const destUf = extractUf(destination);
-  
+
   if (originUf && destUf) {
     return `${originUf}→${destUf}`;
   }
-  
+
   return null;
 }
 
@@ -205,31 +205,31 @@ export function formatRouteUf(origin: string, destination: string): string | nul
  */
 export function normalizeIcmsRate(rate: number): number {
   if (rate === 0) return 0;
-  
+
   // Já está na escala correta (3-25)
   if (rate >= 3 && rate <= 25) return rate;
-  
+
   // Decimal pequeno: 0 < x < 1
   if (rate > 0 && rate < 1) {
     const times100 = rate * 100;
     if (times100 >= 3 && times100 <= 25) return times100;
-    
+
     const times10 = rate * 10;
     if (times10 >= 3 && times10 <= 25) return times10;
   }
-  
+
   // Entre 1 e 3: pode ser 1.2 = 12%
   if (rate >= 1 && rate < 3) {
     const times10 = rate * 10;
     if (times10 >= 3 && times10 <= 25) return times10;
   }
-  
+
   // Muito alto: > 25
   if (rate > 25 && rate <= 250) {
     const divided = rate / 10;
     if (divided >= 3 && divided <= 25) return divided;
   }
-  
+
   // Fallback: retorna o valor original
   return rate;
 }
@@ -259,9 +259,11 @@ export function roundCurrency(value: number): number {
 /**
  * Determina status da margem vs target
  */
-export function getMarginStatus(marginPercent: number): 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET' {
+export function getMarginStatus(
+  marginPercent: number
+): 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET' {
   const target = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
-  
+
   if (marginPercent > target + 0.5) return 'ABOVE_TARGET';
   if (marginPercent < target - 0.5) return 'BELOW_TARGET';
   return 'AT_TARGET';

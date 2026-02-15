@@ -1,73 +1,111 @@
-# Welcome to your Lovable project
+# Cargo Flow Navigator
 
-## Project info
+CRM logístico da **Vectra Cargo** para gestão de cotações, pedidos, clientes, embarcadores e documentos, com cálculo de frete integrado (tabelas de preço, GRIS, TSO, TAC, NTC) e painel comercial/operacional.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Stack tecnológica
 
-## How can I edit this code?
+- **Frontend**: React 18, TypeScript, Vite 7, Tailwind CSS, shadcn/ui (Radix), TanStack Query, Framer Motion, Recharts
+- **Backend**: Supabase (PostgreSQL, Auth, RLS, Edge Functions)
+- **Deploy**: Vercel (frontend), Supabase Cloud (backend)
 
-There are several ways of editing your application.
+## Pré-requisitos
 
-**Use Lovable**
+- **Node.js 22+** — [nvm](https://github.com/nvm-sh/nvm) ou [nodejs.org](https://nodejs.org)
+- **Supabase CLI** — `npm i -g supabase` ou [docs](https://supabase.com/docs/guides/cli)
+- **Git**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Setup local
 
-Changes made via Lovable will be committed automatically to this repo.
+### 1. Clonar o repositório
 
-**Use your preferred IDE**
+```bash
+git clone https://github.com/Marcelo-Rosas/cargo-flow-navigator.git
+cd cargo-flow-navigator
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 2. Variáveis de ambiente
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Crie `.env` na raiz do projeto (use `.env.example` como referência):
 
-Follow these steps:
+```bash
+cp .env.example .env
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Edite `.env` e preencha com as credenciais do Supabase:
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- `VITE_SUPABASE_URL` — URL do projeto (ex: `https://xxx.supabase.co`)
+- `VITE_SUPABASE_PUBLISHABLE_KEY` — chave anon/public
 
-# Step 3: Install the necessary dependencies.
-npm i
+> As credenciais estão no painel Supabase em **Settings > API**.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### 3. Supabase local (opcional)
+
+Para rodar o backend localmente:
+
+```bash
+supabase start
+```
+
+Copie o output (`API URL`, `anon key`) para `.env` local. Migrations são aplicadas automaticamente pelo `supabase start`.
+
+Para aplicar migrations em um projeto remoto:
+
+```bash
+supabase link --project-ref <project-ref>
+supabase db push
+```
+
+### 4. Dependências e dev server
+
+```bash
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Acesse `http://localhost:5173`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Scripts disponíveis
 
-**Use GitHub Codespaces**
+| Comando         | Descrição                                  |
+|-----------------|--------------------------------------------|
+| `npm run dev`   | Inicia servidor de desenvolvimento (Vite)  |
+| `npm run build` | Build de produção                          |
+| `npm run build:dev` | Build em modo development              |
+| `npm run preview`   | Preview do build local                  |
+| `npm run lint`      | ESLint                                  |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Estrutura de pastas (resumida)
 
-## What technologies are used for this project?
+```
+├── src/
+│   ├── components/     # Componentes React (auth, dashboard, boards, modals...)
+│   ├── hooks/         # Hooks customizados (useAuth, useCalculateFreight...)
+│   ├── integrations/  # Cliente Supabase e tipos
+│   ├── lib/           # Utilitários (utils, priceTableParser)
+│   ├── pages/         # Páginas da aplicação
+│   └── types/         # Tipos compartilhados (freight, pricing)
+├── supabase/
+│   ├── functions/     # Edge Functions (calculate-freight, lookup-cep, import-price-table)
+│   ├── migrations/    # Migrations SQL
+│   └── config.toml    # Configuração do projeto
+├── .env.example       # Template de variáveis de ambiente
+└── docs/
+    └── api.md         # Documentação das Edge Functions
+```
 
-This project is built with:
+## Documentação da API
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+As Edge Functions estão documentadas em [docs/api.md](docs/api.md):
 
-## How can I deploy this project?
+- `calculate-freight` — Cálculo de frete (peso, volume, tabela de preço, GRIS, TSO, TAC, NTC)
+- `lookup-cep` — Consulta de CEP (ViaCEP, BrasilAPI, OpenCEP)
+- `import-price-table` — Importação de tabelas de preço (Excel/CSV)
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## Deploy
 
-## Can I connect a custom domain to my Lovable project?
+- **Frontend**: conecte o repositório à Vercel e configure as variáveis de ambiente (`VITE_SUPABASE_*`).
+- **Backend**: Supabase Cloud; migrations via `supabase db push`.
 
-Yes, you can!
+## Contribuição
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para padrões de código e fluxo de contribuição.

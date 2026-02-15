@@ -34,8 +34,8 @@ export function useImportPriceTable() {
     mutationFn: async (params: ImportPriceTableParams): Promise<ImportPriceTableResult> => {
       // Filter only valid rows and map to the expected format
       const validRows = params.rows
-        .filter(row => row.isValid)
-        .map(row => ({
+        .filter((row) => row.isValid)
+        .map((row) => ({
           km_from: row.km_from,
           km_to: row.km_to,
           cost_per_ton: row.cost_per_ton,

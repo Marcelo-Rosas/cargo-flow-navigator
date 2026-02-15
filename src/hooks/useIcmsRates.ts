@@ -89,7 +89,9 @@ export function useUpdateIcmsRate() {
       const normalizedUpdates = {
         ...updates,
         ...(updates.origin_state && { origin_state: updates.origin_state.toUpperCase() }),
-        ...(updates.destination_state && { destination_state: updates.destination_state.toUpperCase() }),
+        ...(updates.destination_state && {
+          destination_state: updates.destination_state.toUpperCase(),
+        }),
       };
 
       const { data, error } = await supabase
@@ -113,10 +115,7 @@ export function useDeleteIcmsRate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('icms_rates')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('icms_rates').delete().eq('id', id);
 
       if (error) throw error;
     },
@@ -153,27 +152,32 @@ export function useUpsertIcmsRates() {
       for (let batchStart = 0; batchStart < rates.length; batchStart += BATCH_SIZE) {
         const batch = rates.slice(batchStart, batchStart + BATCH_SIZE);
         const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
-        
+
         for (let i = 0; i < batch.length; i++) {
           const rate = batch[i];
           const rowNum = batchStart + i + 1;
-          
+
           try {
             const originState = rate.origin_state.toUpperCase().trim();
             const destState = rate.destination_state.toUpperCase().trim();
-            
+
             // Validate state format
             if (!/^[A-Z]{2}$/.test(originState) || !/^[A-Z]{2}$/.test(destState)) {
               result.failed++;
               result.errors.push(`Linha ${rowNum}: UF inválida (${originState} → ${destState})`);
               continue;
             }
-            
+
             // Validate rate_percent is in expected range (0-25)
             const ratePercent = Number(rate.rate_percent);
-            if (isNaN(ratePercent) || (ratePercent !== 0 && (ratePercent < 3 || ratePercent > 25))) {
+            if (
+              isNaN(ratePercent) ||
+              (ratePercent !== 0 && (ratePercent < 3 || ratePercent > 25))
+            ) {
               result.failed++;
-              result.errors.push(`Linha ${rowNum}: Alíquota ${ratePercent} fora do intervalo 3-25%`);
+              result.errors.push(
+                `Linha ${rowNum}: Alíquota ${ratePercent} fora do intervalo 3-25%`
+              );
               continue;
             }
 
@@ -204,15 +208,13 @@ export function useUpsertIcmsRates() {
               }
             } else {
               // Insert new record
-              const { error } = await supabase
-                .from('icms_rates')
-                .insert({
-                  origin_state: originState,
-                  destination_state: destState,
-                  rate_percent: ratePercent,
-                  valid_from: rate.valid_from,
-                  valid_until: rate.valid_until,
-                });
+              const { error } = await supabase.from('icms_rates').insert({
+                origin_state: originState,
+                destination_state: destState,
+                rate_percent: ratePercent,
+                valid_from: rate.valid_from,
+                valid_until: rate.valid_until,
+              });
 
               if (error) {
                 result.failed++;

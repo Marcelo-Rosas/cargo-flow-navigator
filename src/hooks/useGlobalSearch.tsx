@@ -28,7 +28,9 @@ export function useGlobalSearch() {
       const { data: quotes } = await supabase
         .from('quotes')
         .select('id, client_name, origin, destination, stage')
-        .or(`client_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm}`)
+        .or(
+          `client_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm}`
+        )
         .limit(5);
 
       if (quotes) {
@@ -47,7 +49,9 @@ export function useGlobalSearch() {
       const { data: orders } = await supabase
         .from('orders')
         .select('id, os_number, client_name, origin, destination')
-        .or(`client_name.ilike.${searchTerm},os_number.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm}`)
+        .or(
+          `client_name.ilike.${searchTerm},os_number.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm}`
+        )
         .limit(5);
 
       if (orders) {
@@ -75,7 +79,9 @@ export function useGlobalSearch() {
             id: c.id,
             type: 'client',
             title: c.name,
-            subtitle: c.cnpj ? `${c.cnpj} - ${c.city || ''}/${c.state || ''}` : `${c.city || ''}/${c.state || ''}`,
+            subtitle: c.cnpj
+              ? `${c.cnpj} - ${c.city || ''}/${c.state || ''}`
+              : `${c.city || ''}/${c.state || ''}`,
             url: '/clientes',
           });
         });

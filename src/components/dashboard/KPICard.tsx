@@ -30,16 +30,14 @@ export function KPICard({
   icon: Icon,
   trend,
   variant = 'default',
-  delay = 0
+  delay = 0,
 }: KPICardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: [0.22, 0.9, 0.32, 1] }}
-      className={cn(
-        "h-full p-6 rounded-xl border border-border bg-card shadow-card card-hover"
-      )}
+      className={cn('h-full p-6 rounded-xl border border-border bg-card shadow-card card-hover')}
     >
       <div className="flex items-start justify-between gap-4 h-full">
         <div className="flex flex-col gap-2 min-w-0 flex-1">
@@ -58,22 +56,21 @@ export function KPICard({
             {trend && (
               <span
                 className={cn(
-                  "text-sm font-medium tabular-nums",
-                  trend.isPositive ? "text-success" : "text-destructive"
+                  'text-sm font-medium tabular-nums',
+                  trend.isPositive ? 'text-success' : 'text-destructive'
                 )}
               >
-                {trend.isPositive ? '+' : ''}{trend.value}%
+                {trend.isPositive ? '+' : ''}
+                {trend.value}%
               </span>
             )}
           </div>
 
           {/* reserva sempre a linha para manter equidade de altura */}
-          <p className="text-sm text-muted-foreground min-h-[20px]">
-            {subtitle ?? " "}
-          </p>
+          <p className="text-sm text-muted-foreground min-h-[20px]">{subtitle ?? ' '}</p>
         </div>
 
-        <div className={cn("shrink-0 p-3 rounded-lg", iconVariantStyles[variant])}>
+        <div className={cn('shrink-0 p-3 rounded-lg', iconVariantStyles[variant])}>
           <Icon className="w-5 h-5" />
         </div>
       </div>

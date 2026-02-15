@@ -1,16 +1,16 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { 
-  GripVertical, 
-  MoreHorizontal, 
-  Truck, 
-  Phone, 
-  MapPin, 
+import {
+  GripVertical,
+  MoreHorizontal,
+  Truck,
+  Phone,
+  MapPin,
   Calendar,
   AlertTriangle,
   CheckCircle,
-  FileText
+  FileText,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
-import { DocumentConfig, getNextStage, getNextStageRequirements, groupDocumentsByCategory } from '@/lib/order-documents';
+import {
+  DocumentConfig,
+  getNextStage,
+  getNextStageRequirements,
+  groupDocumentsByCategory,
+} from '@/lib/order-documents';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -37,17 +42,19 @@ interface OrderCardProps {
   onEdit?: () => void;
   onRegisterOccurrence?: () => void;
   onUploadDocument?: () => void;
+  canManageActions?: boolean;
 }
 
-export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocument }: OrderCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: order.id });
+export function OrderCard({
+  order,
+  onEdit,
+  onRegisterOccurrence,
+  onUploadDocument,
+  canManageActions = true,
+}: OrderCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: order.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -81,10 +88,9 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
 
   // Calcula progresso (somente requisitos do próximo estágio)
   const totalDocs = requirements.length;
-  const completedDocs = requirements.filter(doc => order[doc.key as keyof Order]).length;
+  const completedDocs = requirements.filter((doc) => order[doc.key as keyof Order]).length;
   const progressPercentage = totalDocs > 0 ? (completedDocs / totalDocs) * 100 : 0;
-  const hasPendingDocs = requirements.some(doc => !order[doc.key as keyof Order]);
-
+  const hasPendingDocs = requirements.some((doc) => !order[doc.key as keyof Order]);
 
   return (
     <motion.div
@@ -94,26 +100,28 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className={cn(
-        "bg-card rounded-lg border shadow-sm p-4 cursor-pointer group",
-        "hover:shadow-md hover:border-primary/40 transition-all duration-200",
-        isDragging && "opacity-90 rotate-1 scale-[1.02] shadow-xl z-50",
-        hasOccurrences && "border-l-4 border-l-warning",
-        hasPendingDocs && hasDocumentsToShow && "border-l-4 border-l-amber-400",
-        !hasPendingDocs && hasDocumentsToShow && "border-l-4 border-l-success"
+        'bg-card rounded-lg border shadow-sm p-4 cursor-pointer group',
+        'hover:shadow-md hover:border-primary/40 transition-all duration-200',
+        isDragging && 'opacity-90 rotate-1 scale-[1.02] shadow-xl z-50',
+        hasOccurrences && 'border-l-4 border-l-warning',
+        hasPendingDocs && hasDocumentsToShow && 'border-l-4 border-l-amber-400',
+        !hasPendingDocs && hasDocumentsToShow && 'border-l-4 border-l-success'
       )}
       onClick={onEdit}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
-          <button
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <GripVertical className="w-4 h-4 text-muted-foreground" />
-          </button>
+          {canManageActions && (
+            <button
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripVertical className="w-4 h-4 text-muted-foreground" />
+            </button>
+          )}
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-semibold text-foreground">{order.os_number}</h4>
@@ -123,10 +131,10 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
                 <Badge
                   variant="outline"
                   className={cn(
-                    "text-[10px] px-2 py-0.5",
+                    'text-[10px] px-2 py-0.5',
                     order.stage === 'em_transito'
-                      ? "border-amber-500/40 text-amber-700 bg-amber-500/10"
-                      : "border-amber-500/40 text-amber-700 bg-amber-500/10"
+                      ? 'border-amber-500/40 text-amber-700 bg-amber-500/10'
+                      : 'border-amber-500/40 text-amber-700 bg-amber-500/10'
                   )}
                 >
                   {order.stage === 'em_transito'
@@ -142,7 +150,9 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
               {hasDocumentsToShow && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <FileText className="w-3 h-3" />
-                  <span className="font-medium">{completedDocs}/{totalDocs}</span>
+                  <span className="font-medium">
+                    {completedDocs}/{totalDocs}
+                  </span>
                 </div>
               )}
             </div>
@@ -151,40 +161,50 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
             </p>
           </div>
         </div>
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => e.stopPropagation()}
-              aria-label="Ações da ordem de serviço"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUploadDocument?.(); }}>
-              <FileText className="w-4 h-4 mr-2" /> Anexar Documento
-            </DropdownMenuItem>
-            {order.driver_phone && (
-              <DropdownMenuItem asChild>
-                <a href={`tel:${order.driver_phone}`} onClick={(e) => e.stopPropagation()}>
-                  <Phone className="w-4 h-4 mr-2" /> Contatar Motorista
-                </a>
+
+        {canManageActions && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+                aria-label="Ações da ordem de serviço"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUploadDocument?.();
+                }}
+              >
+                <FileText className="w-4 h-4 mr-2" /> Anexar Documento
               </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="text-warning"
-              onClick={(e) => { e.stopPropagation(); onRegisterOccurrence?.(); }}
-            >
-              <AlertTriangle className="w-4 h-4 mr-2" />
-              Registrar Ocorrência
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {order.driver_phone && (
+                <DropdownMenuItem asChild>
+                  <a href={`tel:${order.driver_phone}`} onClick={(e) => e.stopPropagation()}>
+                    <Phone className="w-4 h-4 mr-2" /> Contatar Motorista
+                  </a>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-warning"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRegisterOccurrence?.();
+                }}
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Registrar Ocorrência
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Route */}
@@ -202,9 +222,7 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
             <Truck className="w-4 h-4 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
-              {order.driver_name}
-            </p>
+            <p className="text-sm font-medium text-foreground truncate">{order.driver_name}</p>
             <p className="text-xs text-muted-foreground">{order.vehicle_plate}</p>
           </div>
         </div>
@@ -213,7 +231,10 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
       {/* Alerts - Ocorrências */}
       {hasOccurrences && (
         <div className="flex flex-wrap gap-1 mb-3">
-          <Badge variant="secondary" className="text-xs bg-warning/10 text-warning-foreground gap-1">
+          <Badge
+            variant="secondary"
+            className="text-xs bg-warning/10 text-warning-foreground gap-1"
+          >
             <AlertTriangle className="w-3 h-3" />
             {occurrences.length} ocorrência{occurrences.length !== 1 ? 's' : ''}
           </Badge>
@@ -226,17 +247,17 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
           {Object.entries(documentsByGroup).map(([group, docs]) => (
             <div key={group} className="space-y-1">
               <div className="flex flex-wrap gap-1.5">
-                {docs.map(doc => {
+                {docs.map((doc) => {
                   const hasDoc = order[doc.key as keyof Order];
                   return (
-                    <Badge 
+                    <Badge
                       key={doc.key}
-                      variant={hasDoc ? "default" : "outline"} 
+                      variant={hasDoc ? 'default' : 'outline'}
                       className={cn(
-                        "text-xs font-medium transition-all",
-                        hasDoc 
-                          ? "bg-success/15 text-success border-success/40 hover:bg-success/20" 
-                          : "border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 bg-background"
+                        'text-xs font-medium transition-all',
+                        hasDoc
+                          ? 'bg-success/15 text-success border-success/40 hover:bg-success/20'
+                          : 'border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 bg-background'
                       )}
                     >
                       {hasDoc && <CheckCircle className="w-3 h-3 mr-1" />}
@@ -247,15 +268,15 @@ export function OrderCard({ order, onEdit, onRegisterOccurrence, onUploadDocumen
               </div>
             </div>
           ))}
-          
+
           {/* Barra de Progresso */}
           {totalDocs > 0 && (
             <div className="flex items-center gap-2 pt-1">
               <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                <div 
+                <div
                   className={cn(
-                    "h-full transition-all duration-300 rounded-full",
-                    progressPercentage === 100 ? "bg-success" : "bg-primary"
+                    'h-full transition-all duration-300 rounded-full',
+                    progressPercentage === 100 ? 'bg-success' : 'bg-primary'
                   )}
                   style={{ width: `${progressPercentage}%` }}
                 />

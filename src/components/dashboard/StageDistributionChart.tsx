@@ -1,14 +1,10 @@
 import { motion } from 'framer-motion';
-import { useQuoteStageDistribution, useOrderStageDistribution } from '@/hooks/useAdvancedDashboardStats';
-import { Loader2 } from 'lucide-react';
 import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Legend,
-  Tooltip,
-} from 'recharts';
+  useQuoteStageDistribution,
+  useOrderStageDistribution,
+} from '@/hooks/useAdvancedDashboardStats';
+import { Loader2 } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function StageDistributionChart() {
@@ -88,12 +84,8 @@ export function StageDistributionChart() {
             <TabsTrigger value="orders">OS</TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value="quotes">
-          {renderPieChart(quoteDistribution)}
-        </TabsContent>
-        <TabsContent value="orders">
-          {renderPieChart(orderDistribution)}
-        </TabsContent>
+        <TabsContent value="quotes">{renderPieChart(quoteDistribution)}</TabsContent>
+        <TabsContent value="orders">{renderPieChart(orderDistribution)}</TabsContent>
       </Tabs>
     </motion.div>
   );

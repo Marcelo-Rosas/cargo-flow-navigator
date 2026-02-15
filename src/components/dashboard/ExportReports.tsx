@@ -29,12 +29,17 @@ export function ExportReports() {
     }).format(value);
   };
 
-  const exportToCSV = (data: any[], filename: string, headers: string[], keys: string[]) => {
+  const exportToCSV = (
+    data: Record<string, unknown>[],
+    filename: string,
+    headers: string[],
+    keys: string[]
+  ) => {
     const csvRows = [headers.join(';')];
 
     data.forEach((item) => {
       const values = keys.map((key) => {
-        let value = item[key];
+        const value = item[key];
         if (value === null || value === undefined) return '';
         if (typeof value === 'number') return value.toString().replace('.', ',');
         if (typeof value === 'string' && value.includes(';')) return `"${value}"`;
@@ -70,8 +75,30 @@ export function ExportReports() {
               value: q.value,
             })),
             'cotacoes',
-            ['Cliente', 'Email', 'Origem', 'Destino', 'Valor', 'Estágio', 'Tipo Carga', 'Peso', 'Volume', 'Data Criação'],
-            ['client_name', 'client_email', 'origin', 'destination', 'value', 'stage', 'cargo_type', 'weight', 'volume', 'created_at']
+            [
+              'Cliente',
+              'Email',
+              'Origem',
+              'Destino',
+              'Valor',
+              'Estágio',
+              'Tipo Carga',
+              'Peso',
+              'Volume',
+              'Data Criação',
+            ],
+            [
+              'client_name',
+              'client_email',
+              'origin',
+              'destination',
+              'value',
+              'stage',
+              'cargo_type',
+              'weight',
+              'volume',
+              'created_at',
+            ]
           );
         }
       }
@@ -94,8 +121,36 @@ export function ExportReports() {
               has_pod: o.has_pod ? 'Sim' : 'Não',
             })),
             'ordens_servico',
-            ['Número OS', 'Cliente', 'Origem', 'Destino', 'Valor', 'Estágio', 'Motorista', 'Placa', 'NF-e', 'CT-e', 'POD', 'ETA', 'Data Criação'],
-            ['os_number', 'client_name', 'origin', 'destination', 'value', 'stage', 'driver_name', 'vehicle_plate', 'has_nfe', 'has_cte', 'has_pod', 'eta', 'created_at']
+            [
+              'Número OS',
+              'Cliente',
+              'Origem',
+              'Destino',
+              'Valor',
+              'Estágio',
+              'Motorista',
+              'Placa',
+              'NF-e',
+              'CT-e',
+              'POD',
+              'ETA',
+              'Data Criação',
+            ],
+            [
+              'os_number',
+              'client_name',
+              'origin',
+              'destination',
+              'value',
+              'stage',
+              'driver_name',
+              'vehicle_plate',
+              'has_nfe',
+              'has_cte',
+              'has_pod',
+              'eta',
+              'created_at',
+            ]
           );
         }
       }
@@ -120,9 +175,7 @@ export function ExportReports() {
       }
 
       toast.success(
-        type === 'full' 
-          ? 'Relatórios exportados com sucesso!' 
-          : 'Relatório exportado com sucesso!'
+        type === 'full' ? 'Relatórios exportados com sucesso!' : 'Relatório exportado com sucesso!'
       );
     } catch (error) {
       toast.error('Erro ao exportar relatório');
@@ -152,32 +205,20 @@ export function ExportReports() {
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>Exportar Relatórios</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem 
-            onClick={() => handleExport('quotes')}
-            disabled={!!exporting}
-          >
+          <DropdownMenuItem onClick={() => handleExport('quotes')} disabled={!!exporting}>
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Cotações (CSV)
           </DropdownMenuItem>
-          <DropdownMenuItem 
-            onClick={() => handleExport('orders')}
-            disabled={!!exporting}
-          >
+          <DropdownMenuItem onClick={() => handleExport('orders')} disabled={!!exporting}>
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Ordens de Serviço (CSV)
           </DropdownMenuItem>
-          <DropdownMenuItem 
-            onClick={() => handleExport('clients')}
-            disabled={!!exporting}
-          >
+          <DropdownMenuItem onClick={() => handleExport('clients')} disabled={!!exporting}>
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Clientes (CSV)
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem 
-            onClick={() => handleExport('full')}
-            disabled={!!exporting}
-          >
+          <DropdownMenuItem onClick={() => handleExport('full')} disabled={!!exporting}>
             <FileText className="w-4 h-4 mr-2" />
             Relatório Completo
           </DropdownMenuItem>

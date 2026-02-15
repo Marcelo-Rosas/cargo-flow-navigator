@@ -11,13 +11,13 @@ export interface User {
 }
 
 // Quote/Deal Types
-export type QuoteStage = 
-  | 'novo_pedido' 
-  | 'qualificacao' 
-  | 'precificacao' 
-  | 'enviado' 
-  | 'negociacao' 
-  | 'ganho' 
+export type QuoteStage =
+  | 'novo_pedido'
+  | 'qualificacao'
+  | 'precificacao'
+  | 'enviado'
+  | 'negociacao'
+  | 'ganho'
   | 'perdido';
 
 export interface Quote {
@@ -39,12 +39,12 @@ export interface Quote {
 }
 
 // Service Order Types
-export type OrderStage = 
-  | 'ordem_criada' 
-  | 'busca_motorista' 
-  | 'documentacao' 
-  | 'coleta_realizada' 
-  | 'em_transito' 
+export type OrderStage =
+  | 'ordem_criada'
+  | 'busca_motorista'
+  | 'documentacao'
+  | 'coleta_realizada'
+  | 'em_transito'
   | 'entregue';
 
 export interface ServiceOrder {

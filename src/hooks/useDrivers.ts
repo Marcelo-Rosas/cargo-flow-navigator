@@ -29,7 +29,7 @@ export function useDriver(id: string | null | undefined) {
     queryKey: ['drivers', id],
     queryFn: async () => {
       if (!id) return null;
-      
+
       const { data, error } = await supabase
         .from('drivers')
         .select('id, name, phone, active')

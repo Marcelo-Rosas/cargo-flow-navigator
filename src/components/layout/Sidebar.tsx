@@ -1,22 +1,24 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  TrendingUp, 
-  Truck, 
-  FileText, 
+import {
+  LayoutDashboard,
+  TrendingUp,
+  Truck,
+  FileText,
   Users,
   ChevronLeft,
   ChevronRight,
   LogOut,
   Package,
-  Ship
+  Ship,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { BrandLogo } from '@/components/BrandLogo';
+import { useUserRole } from '@/hooks/useUserRole';
+import { AppRole } from '@/hooks/useUserRole';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -26,7 +28,12 @@ const navItems = [
   // { path: '/relatorios', icon: BarChart3, label: 'Relatórios' }, // (a implementar)
   { path: '/clientes', icon: Users, label: 'Clientes' },
   { path: '/embarcadores', icon: Ship, label: 'Embarcadores' },
-  { path: '/tabelas-preco', icon: Package, label: 'Tabelas de Preço' },
+  {
+    path: '/tabelas-preco',
+    icon: Package,
+    label: 'Tabelas de Preço',
+    roles: ['admin', 'comercial', 'fiscal'] as AppRole[],
+  },
 ];
 
 const bottomNavItems = [
@@ -38,6 +45,10 @@ const bottomNavItems = [
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
+  const { role } = useUserRole();
+  const filteredNavItems = navItems.filter(
+    (item) => !item.roles || (role && item.roles.includes(role))
+  );
 
   return (
     <motion.aside
@@ -72,10 +83,12 @@ export function Sidebar() {
 
       {/* Main Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavItem 
+        {filteredNavItems.map((item) => (
+          <NavItem
             key={item.path}
-            {...item}
+            path={item.path}
+            icon={item.icon}
+            label={item.label}
             isCollapsed={isCollapsed}
             isActive={location.pathname === item.path}
           />
@@ -85,31 +98,29 @@ export function Sidebar() {
       {/* Bottom Navigation */}
       <div className="py-4 px-3 border-t border-sidebar-border space-y-1">
         {bottomNavItems.map((item) => (
-          <NavItem 
+          <NavItem
             key={item.path}
             {...item}
             isCollapsed={isCollapsed}
             isActive={location.pathname === item.path}
           />
         ))}
-        
+
         {/* Logout Button */}
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               className={cn(
-                "w-full justify-start gap-3 text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent",
-                isCollapsed && "justify-center px-2"
+                'w-full justify-start gap-3 text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent',
+                isCollapsed && 'justify-center px-2'
               )}
             >
               <LogOut className="w-5 h-5 shrink-0" />
               {!isCollapsed && <span>Sair</span>}
             </Button>
           </TooltipTrigger>
-          {isCollapsed && (
-            <TooltipContent side="right">Sair</TooltipContent>
-          )}
+          {isCollapsed && <TooltipContent side="right">Sair</TooltipContent>}
         </Tooltip>
       </div>
 
@@ -120,11 +131,7 @@ export function Sidebar() {
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-sidebar border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent shadow-md"
       >
-        {isCollapsed ? (
-          <ChevronRight className="w-4 h-4" />
-        ) : (
-          <ChevronLeft className="w-4 h-4" />
-        )}
+        {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
       </Button>
     </motion.aside>
   );
@@ -145,10 +152,10 @@ function NavItem({ path, icon: Icon, label, isCollapsed, isActive }: NavItemProp
         <NavLink to={path}>
           <motion.div
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative",
-              "text-sidebar-muted hover:text-sidebar-foreground",
-              isActive && "bg-sidebar-accent text-sidebar-foreground",
-              isCollapsed && "justify-center px-2"
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative',
+              'text-sidebar-muted hover:text-sidebar-foreground',
+              isActive && 'bg-sidebar-accent text-sidebar-foreground',
+              isCollapsed && 'justify-center px-2'
             )}
             whileHover={{ x: isCollapsed ? 0 : 4 }}
             transition={{ duration: 0.15 }}
@@ -178,9 +185,7 @@ function NavItem({ path, icon: Icon, label, isCollapsed, isActive }: NavItemProp
           </motion.div>
         </NavLink>
       </TooltipTrigger>
-      {isCollapsed && (
-        <TooltipContent side="right">{label}</TooltipContent>
-      )}
+      {isCollapsed && <TooltipContent side="right">{label}</TooltipContent>}
     </Tooltip>
   );
 }

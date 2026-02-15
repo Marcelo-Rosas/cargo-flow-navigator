@@ -62,9 +62,7 @@ export function useSalesFunnel() {
   return useQuery({
     queryKey: ['sales-funnel'],
     queryFn: async () => {
-      const { data: quotes } = await supabase
-        .from('quotes')
-        .select('stage, value');
+      const { data: quotes } = await supabase.from('quotes').select('stage, value');
 
       if (!quotes) return [];
 
@@ -87,7 +85,7 @@ export function useSalesFunnel() {
       });
 
       const maxCount = Math.max(...stageData.map((d) => d.count), 1);
-      
+
       return stageData.map((d) => ({
         ...d,
         percentage: Math.round((d.count / maxCount) * 100),
@@ -130,13 +128,13 @@ export function useMonthlyTrends() {
       }
 
       // Count quotes
-      let wonQuotesPerMonth: Record<string, number> = {};
-      let totalQuotesPerMonth: Record<string, number> = {};
+      const wonQuotesPerMonth: Record<string, number> = {};
+      const totalQuotesPerMonth: Record<string, number> = {};
 
       quotes?.forEach((quote) => {
-        const monthKey = new Date(quote.created_at).toLocaleDateString('pt-BR', { 
-          month: 'short', 
-          year: '2-digit' 
+        const monthKey = new Date(quote.created_at).toLocaleDateString('pt-BR', {
+          month: 'short',
+          year: '2-digit',
         });
         if (monthlyData[monthKey]) {
           monthlyData[monthKey].quotes++;
@@ -149,9 +147,9 @@ export function useMonthlyTrends() {
 
       // Count orders and revenue
       orders?.forEach((order) => {
-        const monthKey = new Date(order.created_at).toLocaleDateString('pt-BR', { 
-          month: 'short', 
-          year: '2-digit' 
+        const monthKey = new Date(order.created_at).toLocaleDateString('pt-BR', {
+          month: 'short',
+          year: '2-digit',
         });
         if (monthlyData[monthKey]) {
           monthlyData[monthKey].orders++;
@@ -209,12 +207,14 @@ export function usePerformanceMetrics() {
       // Calculate averages
       const allQuotes = quotesThisMonth || [];
       const allOrders = ordersThisMonth || [];
-      const avgQuoteValue = allQuotes.length > 0 
-        ? allQuotes.reduce((acc, q) => acc + Number(q.value), 0) / allQuotes.length 
-        : 0;
-      const avgOrderValue = allOrders.length > 0 
-        ? allOrders.reduce((acc, o) => acc + Number(o.value), 0) / allOrders.length 
-        : 0;
+      const avgQuoteValue =
+        allQuotes.length > 0
+          ? allQuotes.reduce((acc, q) => acc + Number(q.value), 0) / allQuotes.length
+          : 0;
+      const avgOrderValue =
+        allOrders.length > 0
+          ? allOrders.reduce((acc, o) => acc + Number(o.value), 0) / allOrders.length
+          : 0;
 
       // Revenue calculations
       const revenueThisMonth = (ordersThisMonth || [])
@@ -244,9 +244,7 @@ export function useQuoteStageDistribution() {
   return useQuery({
     queryKey: ['quote-stage-distribution'],
     queryFn: async () => {
-      const { data: quotes } = await supabase
-        .from('quotes')
-        .select('stage');
+      const { data: quotes } = await supabase.from('quotes').select('stage');
 
       if (!quotes) return [];
 
@@ -279,9 +277,7 @@ export function useOrderStageDistribution() {
   return useQuery({
     queryKey: ['order-stage-distribution'],
     queryFn: async () => {
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('stage');
+      const { data: orders } = await supabase.from('orders').select('stage');
 
       if (!orders) return [];
 
@@ -310,9 +306,9 @@ export function useOrderStageDistribution() {
 }
 
 export interface ExportData {
-  quotes: any[];
-  orders: any[];
-  clients: any[];
+  quotes: Record<string, unknown>[];
+  orders: Record<string, unknown>[];
+  clients: Record<string, unknown>[];
 }
 
 export function useExportData() {

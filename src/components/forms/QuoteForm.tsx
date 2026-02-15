@@ -6,12 +6,7 @@ import { Loader2, Calculator, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -56,11 +51,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
-import { 
-  calculateFreight, 
-  buildStoredBreakdown, 
+import {
+  calculateFreight,
+  buildStoredBreakdown,
   formatRouteUf,
-  extractUf
+  extractUf,
 } from '@/lib/freightCalculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
@@ -121,11 +116,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   // Track if user manually edited origin/destination
   const userEditedOrigin = useRef(false);
   const userEditedDestination = useRef(false);
-  
+
   // Loading states for CEP lookups
   const [isLoadingOriginCep, setIsLoadingOriginCep] = useState(false);
   const [isLoadingDestinationCep, setIsLoadingDestinationCep] = useState(false);
-  
+
   // Weight unit toggle: kg or ton
   const [weightUnit, setWeightUnit] = useState<'kg' | 'ton'>('ton');
 
@@ -183,9 +178,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const icmsRate = icmsRateData?.rate_percent ?? 12;
 
   // Normalize weight to kg based on selected unit
-  const effectiveWeightKg = weightUnit === 'ton' 
-    ? (watchedWeight || 0) * 1000 
-    : (watchedWeight || 0);
+  const effectiveWeightKg = weightUnit === 'ton' ? (watchedWeight || 0) * 1000 : watchedWeight || 0;
 
   // Calculate freight using the pure function
   const calculationResult = useMemo(() => {
@@ -205,23 +198,22 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   }, [
     watchedOrigin,
     watchedDestination,
-    effectiveWeightKg, 
-    watchedVolume, 
-    watchedCargoValue, 
+    effectiveWeightKg,
+    watchedVolume,
+    watchedCargoValue,
     watchedToll,
-    watchedKmDistance, 
-    priceTableRow, 
+    watchedKmDistance,
+    priceTableRow,
     icmsRate,
     watchedTdeEnabled,
-    watchedTearEnabled
+    watchedTearEnabled,
   ]);
-
 
   useEffect(() => {
     // Reset user edit flags when form opens/closes
     userEditedOrigin.current = false;
     userEditedDestination.current = false;
-    
+
     if (quote) {
       form.reset({
         client_id: quote.client_id || '',
@@ -280,7 +272,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   }, [quote, form]);
 
   const handleClientSelect = (clientId: string) => {
-    const selectedClient = clients?.find(c => c.id === clientId);
+    const selectedClient = clients?.find((c) => c.id === clientId);
     if (selectedClient) {
       form.setValue('client_id', clientId);
       form.setValue('client_name', selectedClient.name);
@@ -288,7 +280,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
       // CEP destino vem do cadastro do Cliente
       if (selectedClient.zip_code) {
-        form.setValue('destination_cep', sanitizeCep(selectedClient.zip_code), { shouldDirty: true });
+        form.setValue('destination_cep', sanitizeCep(selectedClient.zip_code), {
+          shouldDirty: true,
+        });
         // Atualiza destino (Cidade - UF) via lookup de CEP, respeitando edição manual
         void handleDestinationCepBlur();
       }
@@ -296,7 +290,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   };
 
   const handleShipperSelect = (shipperId: string) => {
-    const selectedShipper = shippers?.find(s => s.id === shipperId);
+    const selectedShipper = shippers?.find((s) => s.id === shipperId);
     if (selectedShipper) {
       form.setValue('shipper_id', shipperId);
       form.setValue('shipper_name', selectedShipper.name);
@@ -366,7 +360,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   const handleDelete = async () => {
     if (!quote) return;
-    
+
     try {
       await deleteQuoteMutation.mutateAsync(quote.id);
       toast.success('Cotação excluída com sucesso');
@@ -429,7 +423,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         toll_value: data.toll || null,
         cargo_value: data.cargo_value || null,
         value: calculationResult.totals.totalCliente,
-        pricing_breakdown: pricingBreakdown as unknown as Database['public']['Tables']['quotes']['Row']['pricing_breakdown'],
+        pricing_breakdown:
+          pricingBreakdown as unknown as Database['public']['Tables']['quotes']['Row']['pricing_breakdown'],
         notes: data.notes || null,
       };
 
@@ -452,7 +447,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     }
   };
 
-  const isLoading = createQuoteMutation.isPending || updateQuoteMutation.isPending || deleteQuoteMutation.isPending;
+  const isLoading =
+    createQuoteMutation.isPending || updateQuoteMutation.isPending || deleteQuoteMutation.isPending;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -484,7 +480,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  {calculationResult.error || 'Distância fora da faixa de quilometragem da tabela selecionada'}
+                  {calculationResult.error ||
+                    'Distância fora da faixa de quilometragem da tabela selecionada'}
                 </AlertDescription>
               </Alert>
             )}
@@ -494,7 +491,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               <Alert className="bg-warning/10 border-warning">
                 <AlertTriangle className="h-4 w-4 text-warning-foreground" />
                 <AlertDescription className="text-warning-foreground">
-                  Margem de {calculationResult.profitability.margemPercent.toFixed(1)}% abaixo da meta de 15%
+                  Margem de {calculationResult.profitability.margemPercent.toFixed(1)}% abaixo da
+                  meta de 15%
                 </AlertDescription>
               </Alert>
             )}
@@ -502,7 +500,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             {/* Cliente Section */}
             <div className="space-y-4">
               <h3 className="font-semibold text-foreground">Dados do Cliente</h3>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -510,7 +508,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Cliente Existente</FormLabel>
-                      <Select 
+                      <Select
                         onValueChange={(value) => handleClientSelect(value)}
                         value={field.value}
                       >
@@ -567,7 +565,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             {/* Embarcador Section */}
             <div className="space-y-4">
               <h3 className="font-semibold text-foreground">Embarcador</h3>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -575,7 +573,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Embarcador Existente</FormLabel>
-                      <Select 
+                      <Select
                         onValueChange={(value) => handleShipperSelect(value)}
                         value={field.value}
                       >
@@ -656,7 +654,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             {/* Rota e Carga Section */}
             <div className="space-y-4">
               <h3 className="font-semibold text-foreground">Rota e Carga</h3>
-              
+
               {/* CEP Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -727,9 +725,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     <FormItem>
                       <FormLabel>Origem *</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="Cidade - UF" 
-                          {...field} 
+                        <Input
+                          placeholder="Cidade - UF"
+                          {...field}
                           onChange={(e) => {
                             field.onChange(e);
                             userEditedOrigin.current = true;
@@ -748,8 +746,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     <FormItem>
                       <FormLabel>Destino *</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="Cidade - UF" 
+                        <Input
+                          placeholder="Cidade - UF"
                           {...field}
                           onChange={(e) => {
                             field.onChange(e);
@@ -786,22 +784,26 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                       <FormLabel>Peso ({weightUnit})</FormLabel>
                       <div className="flex gap-2">
                         <FormControl>
-                          <Input 
-                            type="number" 
+                          <Input
+                            type="number"
                             placeholder="0"
                             {...field}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                           />
                         </FormControl>
-                        <ToggleGroup 
-                          type="single" 
-                          value={weightUnit} 
+                        <ToggleGroup
+                          type="single"
+                          value={weightUnit}
                           onValueChange={(v) => v && setWeightUnit(v as 'kg' | 'ton')}
                           size="sm"
                           className="shrink-0"
                         >
-                          <ToggleGroupItem value="kg" className="text-xs px-2">kg</ToggleGroupItem>
-                          <ToggleGroupItem value="ton" className="text-xs px-2">ton</ToggleGroupItem>
+                          <ToggleGroupItem value="kg" className="text-xs px-2">
+                            kg
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="ton" className="text-xs px-2">
+                            ton
+                          </ToggleGroupItem>
                         </ToggleGroup>
                       </div>
                       <FormMessage />
@@ -816,8 +818,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     <FormItem>
                       <FormLabel>Volume (m³)</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
+                        <Input
+                          type="number"
                           step="0.01"
                           placeholder="0"
                           {...field}
@@ -839,7 +841,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   </div>
                   <div className="flex justify-between font-medium">
                     <span>Peso Faturável</span>
-                    <span>{calculationResult.meta.billableWeightKg.toLocaleString('pt-BR')} kg</span>
+                    <span>
+                      {calculationResult.meta.billableWeightKg.toLocaleString('pt-BR')} kg
+                    </span>
                   </div>
                 </div>
               )}
@@ -862,10 +866,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Modalidade de Frete</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value || ''}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecionar modalidade..." />
@@ -887,10 +888,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tabela de Preços</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value || ''}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecionar tabela..." />
@@ -899,7 +897,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                         <SelectContent>
                           {priceTables?.map((table) => (
                             <SelectItem key={table.id} value={table.id}>
-                              {table.name} ({table.modality === 'lotacao' ? 'Lotação' : 'Fracionado'})
+                              {table.name} (
+                              {table.modality === 'lotacao' ? 'Lotação' : 'Fracionado'})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -917,10 +916,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo de Veículo</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value || ''}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecionar veículo..." />
@@ -945,10 +941,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Prazo de Pagamento</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value || ''}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecionar prazo..." />
@@ -957,7 +950,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                         <SelectContent>
                           {paymentTerms?.map((term) => (
                             <SelectItem key={term.id} value={term.id}>
-                              {term.name} {term.adjustment_percent !== 0 && `(${term.adjustment_percent > 0 ? '+' : ''}${term.adjustment_percent}%)`}
+                              {term.name}{' '}
+                              {term.adjustment_percent !== 0 &&
+                                `(${term.adjustment_percent > 0 ? '+' : ''}${term.adjustment_percent}%)`}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -974,8 +969,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     <FormItem>
                       <FormLabel>Distância (km) *</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
+                        <Input
+                          type="number"
                           placeholder="0"
                           value={field.value ?? ''}
                           onChange={(e) => {
@@ -998,7 +993,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               )}
 
               <Separator className="my-2" />
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -1007,8 +1002,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     <FormItem>
                       <FormLabel>Valor da Mercadoria (R$)</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
+                        <Input
+                          type="number"
                           step="0.01"
                           placeholder="0,00"
                           {...field}
@@ -1027,8 +1022,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     <FormItem>
                       <FormLabel>Pedágio (R$)</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
+                        <Input
+                          type="number"
                           step="0.01"
                           placeholder="0,00"
                           {...field}
@@ -1049,14 +1044,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   render={({ field }) => (
                     <FormItem className="flex items-center gap-2">
                       <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
-                      <FormLabel className="!mt-0 text-sm font-normal">
-                        TDE (20%)
-                      </FormLabel>
+                      <FormLabel className="!mt-0 text-sm font-normal">TDE (20%)</FormLabel>
                     </FormItem>
                   )}
                 />
@@ -1067,14 +1057,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   render={({ field }) => (
                     <FormItem className="flex items-center gap-2">
                       <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
-                      <FormLabel className="!mt-0 text-sm font-normal">
-                        TEAR (20%)
-                      </FormLabel>
+                      <FormLabel className="!mt-0 text-sm font-normal">TEAR (20%)</FormLabel>
                     </FormItem>
                   )}
                 />
@@ -1084,76 +1069,116 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Frete Base</span>
-                  <span className="text-foreground">{formatCurrency(calculationResult.components.baseFreight)}</span>
+                  <span className="text-foreground">
+                    {formatCurrency(calculationResult.components.baseFreight)}
+                  </span>
                 </div>
                 {calculationResult.components.toll > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Pedágio</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.components.toll)}</span>
+                    <span className="text-foreground">
+                      {formatCurrency(calculationResult.components.toll)}
+                    </span>
                   </div>
                 )}
                 {calculationResult.components.gris > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">GRIS ({calculationResult.rates.grisPercent.toFixed(2)}%)</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.components.gris)}</span>
+                    <span className="text-muted-foreground">
+                      GRIS ({calculationResult.rates.grisPercent.toFixed(2)}%)
+                    </span>
+                    <span className="text-foreground">
+                      {formatCurrency(calculationResult.components.gris)}
+                    </span>
                   </div>
                 )}
                 {calculationResult.components.tso > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">TSO ({calculationResult.rates.tsoPercent.toFixed(2)}%)</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.components.tso)}</span>
+                    <span className="text-muted-foreground">
+                      TSO ({calculationResult.rates.tsoPercent.toFixed(2)}%)
+                    </span>
+                    <span className="text-foreground">
+                      {formatCurrency(calculationResult.components.tso)}
+                    </span>
                   </div>
                 )}
                 {calculationResult.components.rctrc > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">RCTR-C ({calculationResult.rates.costValuePercent.toFixed(2)}%)</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.components.rctrc)}</span>
+                    <span className="text-muted-foreground">
+                      RCTR-C ({calculationResult.rates.costValuePercent.toFixed(2)}%)
+                    </span>
+                    <span className="text-foreground">
+                      {formatCurrency(calculationResult.components.rctrc)}
+                    </span>
                   </div>
                 )}
                 {calculationResult.components.tde > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">TDE (NTC)</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.components.tde)}</span>
+                    <span className="text-foreground">
+                      {formatCurrency(calculationResult.components.tde)}
+                    </span>
                   </div>
                 )}
                 {calculationResult.components.tear > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">TEAR (NTC)</span>
-                    <span className="text-foreground">{formatCurrency(calculationResult.components.tear)}</span>
+                    <span className="text-foreground">
+                      {formatCurrency(calculationResult.components.tear)}
+                    </span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between text-sm font-medium">
                   <span className="text-foreground">Receita Bruta</span>
-                  <span className="text-foreground">{formatCurrency(calculationResult.totals.receitaBruta)}</span>
+                  <span className="text-foreground">
+                    {formatCurrency(calculationResult.totals.receitaBruta)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)</span>
-                  <span className="text-foreground">{formatCurrency(calculationResult.totals.das)}</span>
+                  <span className="text-muted-foreground">
+                    DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
+                  </span>
+                  <span className="text-foreground">
+                    {formatCurrency(calculationResult.totals.das)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">ICMS ({calculationResult.rates.icmsPercent.toFixed(2)}%)</span>
-                  <span className="text-foreground">{formatCurrency(calculationResult.totals.icms)}</span>
+                  <span className="text-muted-foreground">
+                    ICMS ({calculationResult.rates.icmsPercent.toFixed(2)}%)
+                  </span>
+                  <span className="text-foreground">
+                    {formatCurrency(calculationResult.totals.icms)}
+                  </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span className="text-foreground">Total Cliente</span>
-                  <span className="text-primary text-lg">{formatCurrency(calculationResult.totals.totalCliente)}</span>
+                  <span className="text-primary text-lg">
+                    {formatCurrency(calculationResult.totals.totalCliente)}
+                  </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Resultado Líquido</span>
-                  <span className={cn(
-                    calculationResult.profitability.resultadoLiquido >= 0 ? 'text-success' : 'text-destructive'
-                  )}>
+                  <span
+                    className={cn(
+                      calculationResult.profitability.resultadoLiquido >= 0
+                        ? 'text-success'
+                        : 'text-destructive'
+                    )}
+                  >
                     {formatCurrency(calculationResult.profitability.resultadoLiquido)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm font-medium">
                   <span className="text-foreground">Margem</span>
-                  <span className={cn(
-                    calculationResult.meta.marginStatus === 'BELOW_TARGET' ? 'text-warning-foreground' : 'text-success'
-                  )}>
+                  <span
+                    className={cn(
+                      calculationResult.meta.marginStatus === 'BELOW_TARGET'
+                        ? 'text-warning-foreground'
+                        : 'text-success'
+                    )}
+                  >
                     {calculationResult.profitability.margemPercent.toFixed(1)}%
                   </span>
                 </div>
@@ -1170,11 +1195,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 <FormItem>
                   <FormLabel>Observações</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Condições especiais, requisitos do cliente..."
                       className="resize-none"
                       rows={3}
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -1196,12 +1221,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Excluir cotação?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Tem certeza que deseja excluir esta cotação? Esta ação não pode ser desfeita.
+                        Tem certeza que deseja excluir esta cotação? Esta ação não pode ser
+                        desfeita.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction 
+                      <AlertDialogAction
                         onClick={handleDelete}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
@@ -1216,8 +1242,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 <Button type="button" variant="outline" onClick={onClose}>
                   Cancelar
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={isLoading || calculationResult.status === 'OUT_OF_RANGE'}
                 >
                   {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

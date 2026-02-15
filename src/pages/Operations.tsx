@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
-import { 
-  DndContext, 
-  DragEndEvent, 
-  DragOverlay, 
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
   DragStartEvent,
   closestCenter,
   PointerSensor,
@@ -20,6 +20,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOrders, useUpdateOrderStage, OrderWithOccurrences } from '@/hooks/useOrders';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
@@ -51,6 +52,7 @@ export default function Operations() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const { canWrite } = useUserRole();
   const { data: orders, isLoading, isError, error, refetch } = useOrders();
   const updateStageMutation = useUpdateOrderStage();
   const [activeOrder, setActiveOrder] = useState<OrderWithOccurrences | null>(null);
@@ -59,6 +61,7 @@ export default function Operations() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderWithOccurrences | null>(null);
   const [occurrenceOrder, setOccurrenceOrder] = useState<OrderWithOccurrences | null>(null);
+  const canManageOperations = canWrite;
 
   // Enable realtime updates
   useRealtimeSubscription(['orders', 'occurrences']);
@@ -118,6 +121,12 @@ export default function Operations() {
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    if (!canManageOperations) {
+      toast.error('Seu perfil é somente leitura para alterações');
+      setActiveOrder(null);
+      return;
+    }
+
     const { active, over } = event;
     setActiveOrder(null);
 
@@ -134,16 +143,19 @@ export default function Operations() {
         toast.error('É necessário anexar o comprovante de entrega (POD) antes de finalizar');
         return;
       }
-      
+
       try {
-        await updateStageMutation.mutateAsync({ 
-          id: activeOrder.id, 
-          stage: targetStage.id 
+        await updateStageMutation.mutateAsync({
+          id: activeOrder.id,
+          stage: targetStage.id,
         });
         toast.success(`OS movida para ${targetStage.label}`);
-      } catch (error: any) {
-        const msg = (error?.message || error?.toString?.() || '').toString();
-        if (msg.toLowerCase().includes('pod obrigatório') || msg.toLowerCase().includes('pod obrigatorio')) {
+      } catch (error: unknown) {
+        const msg = (error instanceof Error ? error.message : String(error)).toString();
+        if (
+          msg.toLowerCase().includes('pod obrigatório') ||
+          msg.toLowerCase().includes('pod obrigatorio')
+        ) {
           toast.error('Anexe o comprovante de entrega (POD) antes de finalizar');
         } else {
           toast.error('Erro ao mover OS');
@@ -161,14 +173,19 @@ export default function Operations() {
       }
 
       try {
-        await updateStageMutation.mutateAsync({ 
-          id: activeOrder.id, 
-          stage: overOrder.stage 
+        await updateStageMutation.mutateAsync({
+          id: activeOrder.id,
+          stage: overOrder.stage,
         });
-        toast.success(`OS movida para ${ORDER_STAGES.find(s => s.id === overOrder.stage)?.label}`);
-      } catch (error: any) {
-        const msg = (error?.message || error?.toString?.() || '').toString();
-        if (msg.toLowerCase().includes('pod obrigatório') || msg.toLowerCase().includes('pod obrigatorio')) {
+        toast.success(
+          `OS movida para ${ORDER_STAGES.find((s) => s.id === overOrder.stage)?.label}`
+        );
+      } catch (error: unknown) {
+        const msg = (error instanceof Error ? error.message : String(error)).toString();
+        if (
+          msg.toLowerCase().includes('pod obrigatório') ||
+          msg.toLowerCase().includes('pod obrigatorio')
+        ) {
           toast.error('Anexe o comprovante de entrega (POD) antes de finalizar');
         } else {
           toast.error('Erro ao mover OS');
@@ -199,7 +216,8 @@ export default function Operations() {
         <div className="bg-card rounded-xl border border-border shadow-card p-6">
           <h2 className="text-lg font-semibold text-foreground">Não foi possível carregar as OS</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {(error instanceof Error && error.message) || 'Erro inesperado ao buscar ordens de serviço.'}
+            {(error instanceof Error && error.message) ||
+              'Erro inesperado ao buscar ordens de serviço.'}
           </p>
           <div className="mt-4">
             <Button onClick={() => refetch()}>Tentar novamente</Button>
@@ -227,7 +245,8 @@ export default function Operations() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
-            <span className="font-semibold text-primary">{activeOrdersCount}</span> ordens ativas • <span className="font-semibold text-warning">{pendingDeliveries}</span> em trânsito
+            <span className="font-semibold text-primary">{activeOrdersCount}</span> ordens ativas •{' '}
+            <span className="font-semibold text-warning">{pendingDeliveries}</span> em trânsito
           </motion.p>
         </div>
 
@@ -257,10 +276,12 @@ export default function Operations() {
           <Button variant="outline" size="icon" aria-label="Filtrar ordens de serviço">
             <Filter className="w-4 h-4" />
           </Button>
-          <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
-            <Plus className="w-4 h-4" />
-            Nova OS
-          </Button>
+          {canManageOperations && (
+            <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Nova OS
+            </Button>
+          )}
         </div>
       </div>
 
@@ -290,11 +311,14 @@ export default function Operations() {
                     items={ordersByStage[stage.id].map((o) => o.id)}
                   >
                     {ordersByStage[stage.id].map((order) => (
-                      <OrderCard 
-                        key={order.id} 
-                        order={order} 
+                      <OrderCard
+                        key={order.id}
+                        order={order}
                         onEdit={() => setSelectedOrder(order)}
-                        onRegisterOccurrence={() => setOccurrenceOrder(order)}
+                        onRegisterOccurrence={
+                          canManageOperations ? () => setOccurrenceOrder(order) : undefined
+                        }
+                        canManageActions={canManageOperations}
                       />
                     ))}
                   </KanbanColumn>
@@ -302,7 +326,9 @@ export default function Operations() {
               </div>
 
               <DragOverlay>
-                {activeOrder && <OrderCard order={activeOrder} />}
+                {activeOrder && (
+                  <OrderCard order={activeOrder} canManageActions={canManageOperations} />
+                )}
               </DragOverlay>
             </DndContext>
           )}
@@ -323,13 +349,27 @@ export default function Operations() {
                   <table className="w-full">
                     <thead className="bg-muted/50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">OS</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Cliente</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Rota</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Motorista</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Status</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Docs</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Valor</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          OS
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Cliente
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Rota
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Motorista
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Docs
+                        </th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
+                          Valor
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -341,7 +381,9 @@ export default function Operations() {
                             className="hover:bg-muted/30 cursor-pointer transition-colors"
                             onClick={() => setSelectedOrder(order)}
                           >
-                            <td className="px-4 py-3 font-medium text-foreground">{order.os_number}</td>
+                            <td className="px-4 py-3 font-medium text-foreground">
+                              {order.os_number}
+                            </td>
                             <td className="px-4 py-3 text-foreground">{order.client_name}</td>
                             <td className="px-4 py-3 text-muted-foreground">
                               {order.origin} → {order.destination}
@@ -350,19 +392,33 @@ export default function Operations() {
                               {order.driver_name || '-'}
                             </td>
                             <td className="px-4 py-3">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${stageColors[order.stage]} bg-opacity-20`}>
+                              <span
+                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${stageColors[order.stage]} bg-opacity-20`}
+                              >
                                 {stage?.label}
                               </span>
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex gap-1">
-                                <span className={`w-2 h-2 rounded-full ${order.has_nfe ? 'bg-success' : 'bg-muted'}`} title="NF-e" />
-                                <span className={`w-2 h-2 rounded-full ${order.has_cte ? 'bg-success' : 'bg-muted'}`} title="CT-e" />
-                                <span className={`w-2 h-2 rounded-full ${order.has_pod ? 'bg-success' : 'bg-muted'}`} title="POD" />
+                                <span
+                                  className={`w-2 h-2 rounded-full ${order.has_nfe ? 'bg-success' : 'bg-muted'}`}
+                                  title="NF-e"
+                                />
+                                <span
+                                  className={`w-2 h-2 rounded-full ${order.has_cte ? 'bg-success' : 'bg-muted'}`}
+                                  title="CT-e"
+                                />
+                                <span
+                                  className={`w-2 h-2 rounded-full ${order.has_pod ? 'bg-success' : 'bg-muted'}`}
+                                  title="POD"
+                                />
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right font-medium text-foreground">
-                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(order.value))}
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              }).format(Number(order.value))}
                             </td>
                           </tr>
                         );
@@ -378,20 +434,21 @@ export default function Operations() {
 
       {/* Order Form Modal */}
       <OrderForm open={isFormOpen} onClose={() => setIsFormOpen(false)} />
-      
+
       {/* Order Detail Modal */}
-      <OrderDetailModal 
-        open={!!selectedOrder} 
+      <OrderDetailModal
+        open={!!selectedOrder}
         onClose={() => {
           setSelectedOrder(null);
           // If opened via deep-link, clean the URL
           if (searchParams.get('orderId')) {
             navigate('/operacional', { replace: true });
           }
-        }} 
+        }}
         order={selectedOrder}
+        canManage={canManageOperations}
       />
-      
+
       {/* Occurrence Form */}
       {occurrenceOrder && (
         <OccurrenceForm

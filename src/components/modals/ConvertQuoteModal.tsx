@@ -28,7 +28,7 @@ export function ConvertQuoteModal({ open, onClose, quote }: ConvertQuoteModalPro
 
   const handleConvert = async () => {
     if (!quote) return;
-    
+
     setIsLoading(true);
     try {
       await convertMutation.mutateAsync(quote.id);
@@ -74,7 +74,9 @@ export function ConvertQuoteModal({ open, onClose, quote }: ConvertQuoteModalPro
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Rota</span>
-              <span className="text-foreground">{quote.origin} → {quote.destination}</span>
+              <span className="text-foreground">
+                {quote.origin} → {quote.destination}
+              </span>
             </div>
             {quote.cargo_type && (
               <div className="flex justify-between">
@@ -85,12 +87,16 @@ export function ConvertQuoteModal({ open, onClose, quote }: ConvertQuoteModalPro
             {quote.weight && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Peso</span>
-                <span className="text-foreground">{Number(quote.weight).toLocaleString('pt-BR')} kg</span>
+                <span className="text-foreground">
+                  {Number(quote.weight).toLocaleString('pt-BR')} kg
+                </span>
               </div>
             )}
             <div className="flex justify-between pt-2 border-t border-border">
               <span className="font-medium text-foreground">Valor Total</span>
-              <span className="font-semibold text-primary text-lg">{formatCurrency(Number(quote.value))}</span>
+              <span className="font-semibold text-primary text-lg">
+                {formatCurrency(Number(quote.value))}
+              </span>
             </div>
           </div>
 

@@ -46,14 +46,8 @@ export function MonthlyTrendsChart() {
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={trendsData}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-          <XAxis
-            dataKey="month"
-            tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-          />
-          <YAxis
-            yAxisId="left"
-            tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-          />
+          <XAxis dataKey="month" tick={{ fill: 'hsl(210, 15%, 46.9%)' }} />
+          <YAxis yAxisId="left" tick={{ fill: 'hsl(210, 15%, 46.9%)' }} />
           <YAxis
             yAxisId="right"
             orientation="right"

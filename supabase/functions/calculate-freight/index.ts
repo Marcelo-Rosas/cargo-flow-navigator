@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
   FREIGHT_CONSTANTS,
@@ -35,7 +35,13 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const input: CalculateFreightInput = await req.json();
-    console.log('[calculate-freight] Request:', input.origin, '→', input.destination, `${input.km_distance}km`);
+    console.log(
+      '[calculate-freight] Request:',
+      input.origin,
+      '→',
+      input.destination,
+      `${input.km_distance}km`
+    );
 
     const fallbacksApplied: string[] = [];
     const errors: string[] = [];
@@ -43,56 +49,72 @@ Deno.serve(async (req) => {
     // =====================================================
     // VALIDATION
     // =====================================================
-    
+
     if (!input.origin) errors.push('Campo "origin" é obrigatório');
     if (!input.destination) errors.push('Campo "destination" é obrigatório');
-    if (input.weight_kg === undefined || input.weight_kg < 0) errors.push('Campo "weight_kg" inválido');
-    if (input.volume_m3 === undefined || input.volume_m3 < 0) errors.push('Campo "volume_m3" inválido');
-    if (input.cargo_value === undefined || input.cargo_value < 0) errors.push('Campo "cargo_value" inválido');
-    if (input.weight_kg === 0 && input.volume_m3 === 0) errors.push('weight_kg e volume_m3 não podem ser ambos zero');
+    if (input.weight_kg === undefined || input.weight_kg < 0)
+      errors.push('Campo "weight_kg" inválido');
+    if (input.volume_m3 === undefined || input.volume_m3 < 0)
+      errors.push('Campo "volume_m3" inválido');
+    if (input.cargo_value === undefined || input.cargo_value < 0)
+      errors.push('Campo "cargo_value" inválido');
+    if (input.weight_kg === 0 && input.volume_m3 === 0)
+      errors.push('weight_kg e volume_m3 não podem ser ambos zero');
 
     if (errors.length > 0) {
-      return new Response(
-        JSON.stringify({ success: false, status: 'MISSING_DATA', errors }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, status: 'MISSING_DATA', errors }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // =====================================================
     // GET GLOBAL PARAMETERS
     // =====================================================
-    
-    const { data: allParams } = await supabase
-      .from('pricing_parameters')
-      .select('key, value');
+
+    const { data: allParams } = await supabase.from('pricing_parameters').select('key, value');
 
     const paramsMap = new Map<string, number>();
-    allParams?.forEach(p => paramsMap.set(p.key, Number(p.value)));
+    allParams?.forEach((p) => paramsMap.set(p.key, Number(p.value)));
 
     const cubageFactor = paramsMap.get('cubage_factor') ?? FREIGHT_CONSTANTS.CUBAGE_FACTOR_KG_M3;
-    const dasPercent = input.das_percent ?? paramsMap.get('das_percent') ?? FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT;
-    const markupPercent = input.markup_percent ?? paramsMap.get('markup_percent') ?? FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT;
-    const overheadPercent = input.overhead_percent ?? paramsMap.get('overhead_percent') ?? FREIGHT_CONSTANTS.DEFAULT_OVERHEAD_PERCENT;
+    const dasPercent =
+      input.das_percent ?? paramsMap.get('das_percent') ?? FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT;
+    const markupPercent =
+      input.markup_percent ??
+      paramsMap.get('markup_percent') ??
+      FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT;
+    const overheadPercent =
+      input.overhead_percent ??
+      paramsMap.get('overhead_percent') ??
+      FREIGHT_CONSTANTS.DEFAULT_OVERHEAD_PERCENT;
     const carreteiroPercent = input.carreteiro_percent ?? paramsMap.get('carreteiro_percent') ?? 0;
     const descargaValue = input.descarga_value ?? 0;
 
     const correctionFactor = paramsMap.get('correction_factor_inctf') ?? 1.0;
 
-    if (!paramsMap.has('das_percent')) fallbacksApplied.push(`das_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT}%`);
-    if (!paramsMap.has('markup_percent')) fallbacksApplied.push(`markup_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT}%`);
-    if (!paramsMap.has('correction_factor_inctf')) fallbacksApplied.push('correction_factor_inctf: não encontrado, usando 1.0');
+    if (!paramsMap.has('das_percent'))
+      fallbacksApplied.push(
+        `das_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT}%`
+      );
+    if (!paramsMap.has('markup_percent'))
+      fallbacksApplied.push(
+        `markup_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT}%`
+      );
+    if (!paramsMap.has('correction_factor_inctf'))
+      fallbacksApplied.push('correction_factor_inctf: não encontrado, usando 1.0');
 
     // =====================================================
     // CALCULATE WEIGHTS
     // =====================================================
-    
+
     const cubageWeightKg = input.volume_m3 * cubageFactor;
     const billableWeightKg = Math.max(input.weight_kg, cubageWeightKg);
 
     // =====================================================
     // GET PRICE TABLE ROW
     // =====================================================
-    
+
     let baseCost = 0;
     let grisPercent = 0;
     let tsoPercent = 0;
@@ -111,7 +133,7 @@ Deno.serve(async (req) => {
 
       if (priceRow) {
         kmBandLabel = `${priceRow.km_from}-${priceRow.km_to}`;
-        
+
         // FOB Lotação: usar cost_per_ton
         const costPerTon = Number(priceRow.cost_per_ton) || 0;
         baseCost = (billableWeightKg / 1000) * costPerTon;
@@ -120,7 +142,9 @@ Deno.serve(async (req) => {
         tsoPercent = Number(priceRow.tso_percent) || 0;
         costValuePercent = Number(priceRow.cost_value_percent) || 0;
 
-        console.log(`[calculate-freight] Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, baseCost: ${baseCost}`);
+        console.log(
+          `[calculate-freight] Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, baseCost: ${baseCost}`
+        );
       } else {
         kmStatus = 'OUT_OF_RANGE';
         fallbacksApplied.push(`price_table_row: nenhuma faixa para ${input.km_distance} km`);
@@ -139,7 +163,7 @@ Deno.serve(async (req) => {
     // =====================================================
     // CALCULATE COMPONENTS ON CARGO VALUE
     // =====================================================
-    
+
     const gris = input.cargo_value * (grisPercent / 100);
     const tso = input.cargo_value * (tsoPercent / 100);
     const rctrc = input.cargo_value * (costValuePercent / 100);
@@ -148,20 +172,20 @@ Deno.serve(async (req) => {
     // =====================================================
     // TOLL VALUE (manual)
     // =====================================================
-    
+
     const toll = input.toll_value ?? 0;
 
     // =====================================================
     // NTC FEES (TDE/TEAR - 20% sobre baseFreight)
     // =====================================================
-    
+
     const tde = input.tde_enabled ? baseFreight * (FREIGHT_CONSTANTS.NTC_TDE_PERCENT / 100) : 0;
     const tear = input.tear_enabled ? baseFreight * (FREIGHT_CONSTANTS.NTC_TEAR_PERCENT / 100) : 0;
 
     // =====================================================
     // CONDITIONAL FEES
     // =====================================================
-    
+
     const conditionalFeesBreakdown: Record<string, number> = {};
     let conditionalFeesTotal = 0;
 
@@ -173,8 +197,8 @@ Deno.serve(async (req) => {
         .eq('active', true);
 
       for (const feeCode of input.conditional_fees) {
-        const fee = fees?.find(f => f.code === feeCode);
-        
+        const fee = fees?.find((f) => f.code === feeCode);
+
         if (fee) {
           let feeValue = 0;
           const feeBase = fee.applies_to === 'cargo_value' ? input.cargo_value : baseFreight;
@@ -192,8 +216,10 @@ Deno.serve(async (req) => {
           }
 
           // Apply min/max (use != null to avoid falsy-zero bug)
-          if (fee.min_value != null && feeValue < Number(fee.min_value)) feeValue = Number(fee.min_value);
-          if (fee.max_value != null && feeValue > Number(fee.max_value)) feeValue = Number(fee.max_value);
+          if (fee.min_value != null && feeValue < Number(fee.min_value))
+            feeValue = Number(fee.min_value);
+          if (fee.max_value != null && feeValue > Number(fee.max_value))
+            feeValue = Number(fee.max_value);
 
           conditionalFeesBreakdown[feeCode] = roundCurrency(feeValue);
           conditionalFeesTotal += feeValue;
@@ -206,7 +232,7 @@ Deno.serve(async (req) => {
     // =====================================================
     // WAITING TIME
     // =====================================================
-    
+
     let waitingTimeCost = 0;
     let vehicleTypeId: string | null = null;
 
@@ -247,7 +273,8 @@ Deno.serve(async (req) => {
 
         if (excessHours > 0) {
           const ratePerHour = Number(waitingRule.rate_per_hour) || 146.44; // NTC: Truck
-          const ratePerDay = waitingRule.rate_per_day != null ? Number(waitingRule.rate_per_day) : null;
+          const ratePerDay =
+            waitingRule.rate_per_day != null ? Number(waitingRule.rate_per_day) : null;
 
           // NTC: se excede 24h da franquia, cobrar diária inteira
           if (ratePerDay && excessHours >= 24) {
@@ -272,7 +299,7 @@ Deno.serve(async (req) => {
     // =====================================================
     // GET ICMS RATE
     // =====================================================
-    
+
     const originUf = extractUf(input.origin);
     const destUf = extractUf(input.destination);
     let icmsPercent: number = FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT;
@@ -288,13 +315,17 @@ Deno.serve(async (req) => {
       if (icmsRow?.rate_percent !== undefined) {
         icmsPercent = normalizeIcmsRate(Number(icmsRow.rate_percent));
       } else {
-        fallbacksApplied.push(`icms_rates: ${originUf}→${destUf} não encontrada, usando ${FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT}%`);
+        fallbacksApplied.push(
+          `icms_rates: ${originUf}→${destUf} não encontrada, usando ${FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT}%`
+        );
       }
     }
 
     // Validate ICMS rate to prevent invalid calculations
     if (icmsPercent >= 100) {
-      fallbacksApplied.push(`icms_percent ${icmsPercent}% inválida (>= 100%), usando ${FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT}%`);
+      fallbacksApplied.push(
+        `icms_percent ${icmsPercent}% inválida (>= 100%), usando ${FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT}%`
+      );
       icmsPercent = FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT;
     }
 
@@ -328,9 +359,9 @@ Deno.serve(async (req) => {
     // =====================================================
     // GET PAYMENT TERM ADJUSTMENT (optional)
     // =====================================================
-    
+
     let paymentAdjustmentPercent = 0;
-    let paymentTermCode = input.payment_term_code ?? 'D30';
+    const paymentTermCode = input.payment_term_code ?? 'D30';
 
     const { data: paymentTerm } = await supabase
       .from('payment_terms')
@@ -346,17 +377,17 @@ Deno.serve(async (req) => {
     // =====================================================
     // CALCULATE RECEITA BRUTA
     // =====================================================
-    
-    const receitaBruta = 
-      baseFreight + 
-      toll + 
-      gris + 
-      tso + 
-      rctrc + 
-      adValorem + 
-      tde + 
-      tear + 
-      conditionalFeesTotal + 
+
+    const receitaBruta =
+      baseFreight +
+      toll +
+      gris +
+      tso +
+      rctrc +
+      adValorem +
+      tde +
+      tear +
+      conditionalFeesTotal +
       waitingTimeCost;
 
     // =====================================================
@@ -369,14 +400,14 @@ Deno.serve(async (req) => {
     // =====================================================
     // APPLY PAYMENT TERM ADJUSTMENT
     // =====================================================
-    
+
     const paymentAdjustment = receitaComTac * (paymentAdjustmentPercent / 100);
     const receitaFinal = receitaComTac + paymentAdjustment;
 
     // =====================================================
     // CALCULATE TAXES "POR FORA" (no gross-up)
     // =====================================================
-    
+
     const das = receitaFinal * (dasPercent / 100);
     const icms = receitaFinal * (icmsPercent / 100);
     const totalImpostos = das + icms;
@@ -384,13 +415,13 @@ Deno.serve(async (req) => {
     // =====================================================
     // CALCULATE TOTAL CLIENTE
     // =====================================================
-    
+
     const totalCliente = receitaFinal + totalImpostos;
 
     // =====================================================
     // CALCULATE PROFITABILITY
     // =====================================================
-    
+
     const custosCarreteiro = receitaFinal * (carreteiroPercent / 100);
     const custosDescarga = descargaValue;
     const custosDiretos = custosCarreteiro + custosDescarga;
@@ -399,14 +430,12 @@ Deno.serve(async (req) => {
     const overhead = margemBruta * (overheadPercent / 100);
     const resultadoLiquido = margemBruta - overhead;
 
-    const margemPercent = receitaFinal > 0 
-      ? (resultadoLiquido / receitaFinal) * 100 
-      : 0;
+    const margemPercent = receitaFinal > 0 ? (resultadoLiquido / receitaFinal) * 100 : 0;
 
     // =====================================================
     // BUILD RESPONSE
     // =====================================================
-    
+
     const routeUfLabel = formatRouteUf(input.origin, input.destination);
     const marginStatus = getMarginStatus(margemPercent);
 
@@ -470,7 +499,8 @@ Deno.serve(async (req) => {
     const response: CalculateFreightResponse = {
       success: true,
       status: kmStatus === 'OUT_OF_RANGE' ? 'OUT_OF_RANGE' : 'OK',
-      error: kmStatus === 'OUT_OF_RANGE' ? `Distância ${input.km_distance} km fora da faixa` : undefined,
+      error:
+        kmStatus === 'OUT_OF_RANGE' ? `Distância ${input.km_distance} km fora da faixa` : undefined,
       meta,
       components,
       rates,
@@ -487,15 +517,14 @@ Deno.serve(async (req) => {
       status: response.status,
     });
 
-    return new Response(
-      JSON.stringify(response),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error) {
     console.error('[calculate-freight] Error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     return new Response(
       JSON.stringify({
         success: false,

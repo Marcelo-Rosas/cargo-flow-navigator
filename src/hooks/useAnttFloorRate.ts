@@ -6,7 +6,7 @@ export interface AnttFloorRate {
   cargo_type: string;
   axes_count: number;
   ccd: number; // R$/km
-  cc: number;  // R$
+  cc: number; // R$
   valid_from: string | null;
   valid_until: string | null;
 }
