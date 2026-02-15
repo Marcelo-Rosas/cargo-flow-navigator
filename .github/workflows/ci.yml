@@ -24,3 +24,17 @@ jobs:
       - run: npm run lint
 
       - run: npm run build
+
+  # Valida migrations via Session pooler (IPv4). Requer secret SUPABASE_DB_URL.
+  # Obtenha em: Supabase Dashboard → Connect → Session pooler (porta 5432)
+  supabase-migrate-check:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SUPABASE_DB_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Supabase migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          npx supabase db push --db-url "$SUPABASE_DB_URL" --dry-run

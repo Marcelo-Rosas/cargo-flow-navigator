@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { calculateFreightInputSchema } from '../_shared/freight-schema.ts';
 import {
@@ -19,6 +19,13 @@ import {
   roundCurrency,
   getMarginStatus,
 } from '../_shared/freight-types.ts';
+
+type WaitingRuleRow = {
+  free_hours?: number | null;
+  rate_per_hour?: number | null;
+  rate_per_day?: number | null;
+  min_charge?: number | null;
+};
 
 // =====================================================
 // MAIN HANDLER
@@ -302,13 +309,13 @@ Deno.serve(async (req) => {
       }
 
       if (waitingRule) {
-        const freeHours = Number(waitingRule.free_hours) || 5; // NTC 2.3: 5h franquia
+        const rule = waitingRule as WaitingRuleRow;
+        const freeHours = Number(rule.free_hours) || 5; // NTC 2.3: 5h franquia
         const excessHours = Math.max(0, input.waiting_hours - freeHours);
 
         if (excessHours > 0) {
-          const ratePerHour = Number(waitingRule.rate_per_hour) || 146.44; // NTC: Truck
-          const ratePerDay =
-            waitingRule.rate_per_day != null ? Number(waitingRule.rate_per_day) : null;
+          const ratePerHour = Number(rule.rate_per_hour) || 146.44; // NTC: Truck
+          const ratePerDay = rule.rate_per_day != null ? Number(rule.rate_per_day) : null;
 
           // NTC: se excede 24h da franquia, cobrar diária inteira
           if (ratePerDay && excessHours >= 24) {
@@ -318,8 +325,8 @@ Deno.serve(async (req) => {
             waitingTimeCost = excessHours * ratePerHour;
           }
 
-          if (waitingRule.min_charge != null && waitingTimeCost < Number(waitingRule.min_charge)) {
-            waitingTimeCost = Number(waitingRule.min_charge);
+          if (rule.min_charge != null && waitingTimeCost < Number(rule.min_charge)) {
+            waitingTimeCost = Number(rule.min_charge);
           }
         }
       } else {
