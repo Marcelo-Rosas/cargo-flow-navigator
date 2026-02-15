@@ -383,9 +383,28 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
     setIsCalculatingKm(true);
     try {
-      const { data, error } = await supabase.functions.invoke('calculate-distance', {
-        body: { origin_cep: originCep, destination_cep: destinationCep },
-      });
+      // Geocode no browser (BrasilAPI permite CORS); Edge pode falhar acessando APIs BR
+      const fetchCoords = async (cep: string) => {
+        const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
+        if (!res.ok) return null;
+        const j = await res.json();
+        const c = j?.location?.coordinates;
+        if (c?.latitude != null && c?.longitude != null) {
+          const lat = Number(c.latitude);
+          const lon = Number(c.longitude);
+          if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+        }
+        return null;
+      };
+
+      const [from, to] = await Promise.all([fetchCoords(originCep), fetchCoords(destinationCep)]);
+
+      const body =
+        from && to
+          ? { origin: from, destination: to }
+          : { origin_cep: originCep, destination_cep: destinationCep };
+
+      const { data, error } = await supabase.functions.invoke('calculate-distance', { body });
 
       if (error || !data?.success) {
         toast.error(data?.error || error?.message || 'Erro ao calcular distância');
