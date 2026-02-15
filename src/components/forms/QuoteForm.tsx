@@ -69,8 +69,15 @@ const quoteSchema = z.object({
   shipper_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   freight_type: z.enum(['CIF', 'FOB']).default('FOB'),
   freight_modality: z.enum(['lotacao', 'fracionado']).optional(),
-  origin_cep: z.string().optional(),
-  destination_cep: z.string().optional(),
+  // MaskedInput pode devolver number; coerce para string pra evitar erro do Zod.
+  origin_cep: z
+    .union([z.string(), z.number()])
+    .transform((v) => (v == null ? '' : String(v)))
+    .optional(),
+  destination_cep: z
+    .union([z.string(), z.number()])
+    .transform((v) => (v == null ? '' : String(v)))
+    .optional(),
   origin: z.string().min(2, 'Origem obrigatória'),
   destination: z.string().min(2, 'Destino obrigatório'),
   cargo_type: z.string().optional(),
@@ -669,7 +676,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                             mask="cep"
                             placeholder="00000-000"
                             value={field.value || ''}
-                            onValueChange={(rawValue) => field.onChange(rawValue)}
+                            onValueChange={(rawValue) => field.onChange(String(rawValue ?? ''))}
                             onBlur={() => {
                               field.onBlur();
                               handleOriginCepBlur();
@@ -698,7 +705,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                             mask="cep"
                             placeholder="00000-000"
                             value={field.value || ''}
-                            onValueChange={(rawValue) => field.onChange(rawValue)}
+                            onValueChange={(rawValue) => field.onChange(String(rawValue ?? ''))}
                             onBlur={() => {
                               field.onBlur();
                               handleDestinationCepBlur();
