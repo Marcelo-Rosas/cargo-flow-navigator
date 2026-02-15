@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { asDb, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,15 +22,16 @@ export function useUserRole() {
         return data as AppRole;
       }
 
-      const { data: roleRow, error: roleError } = await supabase
+      const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
+        .eq('user_id', asDb(user.id))
         .limit(1)
         .maybeSingle();
 
       if (roleError) throw roleError;
-      return (roleRow?.role as AppRole | undefined) ?? null;
+      const roleRow = filterSupabaseSingle<{ role: AppRole }>(roleData);
+      return roleRow?.role ?? null;
     },
   });
 

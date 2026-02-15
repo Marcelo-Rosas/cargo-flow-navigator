@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -17,7 +18,7 @@ export function useIcmsRates() {
         .order('destination_state', { ascending: true });
 
       if (error) throw error;
-      return data as IcmsRate[];
+      return filterSupabaseRows<IcmsRate>(data);
     },
   });
 }
@@ -29,12 +30,12 @@ export function useIcmsRate(originState: string, destinationState: string) {
       const { data, error } = await supabase
         .from('icms_rates')
         .select('*')
-        .eq('origin_state', originState.toUpperCase())
-        .eq('destination_state', destinationState.toUpperCase())
+        .eq('origin_state', asDb(originState.toUpperCase()))
+        .eq('destination_state', asDb(destinationState.toUpperCase()))
         .maybeSingle();
 
       if (error) throw error;
-      return data as IcmsRate | null;
+      return filterSupabaseSingle<IcmsRate>(data);
     },
     enabled: !!originState && !!destinationState,
   });
@@ -47,11 +48,11 @@ export function useIcmsRatesByOrigin(originState: string) {
       const { data, error } = await supabase
         .from('icms_rates')
         .select('*')
-        .eq('origin_state', originState.toUpperCase())
+        .eq('origin_state', asDb(originState.toUpperCase()))
         .order('destination_state', { ascending: true });
 
       if (error) throw error;
-      return data as IcmsRate[];
+      return filterSupabaseRows<IcmsRate>(data);
     },
     enabled: !!originState,
   });
@@ -64,11 +65,13 @@ export function useCreateIcmsRate() {
     mutationFn: async (rate: IcmsRateInsert) => {
       const { data, error } = await supabase
         .from('icms_rates')
-        .insert({
-          ...rate,
-          origin_state: rate.origin_state.toUpperCase(),
-          destination_state: rate.destination_state.toUpperCase(),
-        })
+        .insert(
+          asInsert({
+            ...rate,
+            origin_state: rate.origin_state.toUpperCase(),
+            destination_state: rate.destination_state.toUpperCase(),
+          })
+        )
         .select()
         .single();
 
@@ -96,8 +99,8 @@ export function useUpdateIcmsRate() {
 
       const { data, error } = await supabase
         .from('icms_rates')
-        .update(normalizedUpdates)
-        .eq('id', id)
+        .update(asInsert(normalizedUpdates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -115,7 +118,7 @@ export function useDeleteIcmsRate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('icms_rates').delete().eq('id', id);
+      const { error } = await supabase.from('icms_rates').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },
@@ -182,23 +185,26 @@ export function useUpsertIcmsRates() {
             }
 
             // Check if record exists
-            const { data: existing } = await supabase
+            const { data: existingData } = await supabase
               .from('icms_rates')
               .select('id')
-              .eq('origin_state', originState)
-              .eq('destination_state', destState)
+              .eq('origin_state', asDb(originState))
+              .eq('destination_state', asDb(destState))
               .maybeSingle();
 
+            const existing = filterSupabaseSingle<{ id: string }>(existingData);
             if (existing) {
               // Update existing record
               const { error } = await supabase
                 .from('icms_rates')
-                .update({
-                  rate_percent: ratePercent,
-                  valid_from: rate.valid_from,
-                  valid_until: rate.valid_until,
-                })
-                .eq('id', existing.id);
+                .update(
+                  asInsert({
+                    rate_percent: ratePercent,
+                    valid_from: rate.valid_from,
+                    valid_until: rate.valid_until,
+                  })
+                )
+                .eq('id', asDb(existing.id));
 
               if (error) {
                 result.failed++;
@@ -208,13 +214,15 @@ export function useUpsertIcmsRates() {
               }
             } else {
               // Insert new record
-              const { error } = await supabase.from('icms_rates').insert({
-                origin_state: originState,
-                destination_state: destState,
-                rate_percent: ratePercent,
-                valid_from: rate.valid_from,
-                valid_until: rate.valid_until,
-              });
+              const { error } = await supabase.from('icms_rates').insert(
+                asInsert({
+                  origin_state: originState,
+                  destination_state: destState,
+                  rate_percent: ratePercent,
+                  valid_from: rate.valid_from,
+                  valid_until: rate.valid_until,
+                })
+              );
 
               if (error) {
                 result.failed++;
@@ -252,14 +260,14 @@ export function useIcmsRateForPricing(originState?: string, destinationState?: s
       const { data, error } = await supabase
         .from('icms_rates')
         .select('*')
-        .eq('origin_state', originState.toUpperCase())
-        .eq('destination_state', destinationState.toUpperCase())
+        .eq('origin_state', asDb(originState.toUpperCase()))
+        .eq('destination_state', asDb(destinationState.toUpperCase()))
         .or(`valid_from.is.null,valid_from.lte.${today}`)
         .or(`valid_until.is.null,valid_until.gte.${today}`)
         .maybeSingle();
 
       if (error) throw error;
-      return data as IcmsRate | null;
+      return filterSupabaseSingle<IcmsRate>(data);
     },
     enabled: !!originState && !!destinationState,
   });

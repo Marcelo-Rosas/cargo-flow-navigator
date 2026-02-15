@@ -72,8 +72,8 @@ export function ExportReports() {
           exportToCSV(
             validQuotes.map((q) => ({
               ...q,
-              created_at: formatDate(String(q.created_at ?? '')),
-              updated_at: formatDate(String(q.updated_at ?? '')),
+              created_at: q.created_at ? formatDate(String(q.created_at)) : '',
+              updated_at: q.updated_at ? formatDate(String(q.updated_at)) : '',
               value: q.value,
             })),
             'cotacoes',
@@ -116,8 +116,8 @@ export function ExportReports() {
           exportToCSV(
             validOrders.map((o) => ({
               ...o,
-              created_at: formatDate(String(o.created_at ?? '')),
-              updated_at: formatDate(String(o.updated_at ?? '')),
+              created_at: o.created_at ? formatDate(String(o.created_at)) : '',
+              updated_at: o.updated_at ? formatDate(String(o.updated_at)) : '',
               eta: o.eta ? formatDate(String(o.eta)) : '',
               has_nfe: o.has_nfe ? 'Sim' : 'Não',
               has_cte: o.has_cte ? 'Sim' : 'Não',
@@ -169,7 +169,7 @@ export function ExportReports() {
           exportToCSV(
             validClients.map((c) => ({
               ...c,
-              created_at: formatDate(String(c.created_at ?? '')),
+              created_at: c.created_at ? formatDate(String(c.created_at)) : '',
             })),
             'clientes',
             ['Nome', 'CNPJ', 'Email', 'Telefone', 'Cidade', 'Estado', 'Endereço', 'Data Criação'],

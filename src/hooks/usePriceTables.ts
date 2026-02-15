@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -16,7 +17,7 @@ export function usePriceTables() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as PriceTable[];
+      return filterSupabaseRows<PriceTable>(data);
     },
   });
 }
@@ -28,11 +29,11 @@ export function usePriceTable(id: string) {
       const { data, error } = await supabase
         .from('price_tables')
         .select('*')
-        .eq('id', id)
+        .eq('id', asDb(id))
         .maybeSingle();
 
       if (error) throw error;
-      return data as PriceTable | null;
+      return filterSupabaseSingle<PriceTable>(data);
     },
     enabled: !!id,
   });
@@ -45,11 +46,11 @@ export function usePriceTablesByModality(modality: 'lotacao' | 'fracionado') {
       const { data, error } = await supabase
         .from('price_tables')
         .select('*')
-        .eq('modality', modality)
+        .eq('modality', asDb(modality))
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as PriceTable[];
+      return filterSupabaseRows<PriceTable>(data);
     },
     enabled: !!modality,
   });
@@ -62,12 +63,12 @@ export function useActivePriceTable(modality: 'lotacao' | 'fracionado') {
       const { data, error } = await supabase
         .from('price_tables')
         .select('*')
-        .eq('modality', modality)
-        .eq('active', true)
+        .eq('modality', asDb(modality))
+        .eq('active', asDb(true))
         .maybeSingle();
 
       if (error) throw error;
-      return data as PriceTable | null;
+      return filterSupabaseSingle<PriceTable>(data);
     },
     enabled: !!modality,
   });
@@ -80,7 +81,7 @@ export function useCreatePriceTable() {
     mutationFn: async (priceTable: PriceTableInsert) => {
       const { data, error } = await supabase
         .from('price_tables')
-        .insert(priceTable)
+        .insert(asInsert(priceTable))
         .select()
         .single();
 
@@ -100,8 +101,8 @@ export function useUpdatePriceTable() {
     mutationFn: async ({ id, updates }: { id: string; updates: PriceTableUpdate }) => {
       const { data, error } = await supabase
         .from('price_tables')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -119,7 +120,7 @@ export function useDeletePriceTable() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('price_tables').delete().eq('id', id);
+      const { error } = await supabase.from('price_tables').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },
@@ -137,17 +138,17 @@ export function useSetActivePriceTable() {
       // First, deactivate all tables of the same modality
       const { error: deactivateError } = await supabase
         .from('price_tables')
-        .update({ active: false })
-        .eq('modality', modality)
-        .neq('id', id);
+        .update(asInsert({ active: false }))
+        .eq('modality', asDb(modality))
+        .neq('id', asDb(id));
 
       if (deactivateError) throw deactivateError;
 
       // Then, activate the target table
       const { data, error: activateError } = await supabase
         .from('price_tables')
-        .update({ active: true })
-        .eq('id', id)
+        .update(asInsert({ active: true }))
+        .eq('id', asDb(id))
         .select()
         .single();
 

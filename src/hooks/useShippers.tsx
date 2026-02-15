@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { asDb, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
+import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
@@ -58,7 +58,11 @@ export function useCreateShipper() {
 
   return useMutation({
     mutationFn: async (shipper: ShipperInsert) => {
-      const { data, error } = await supabase.from('shippers').insert(shipper).select().single();
+      const { data, error } = await supabase
+        .from('shippers')
+        .insert(asInsert(shipper))
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
@@ -76,7 +80,7 @@ export function useUpdateShipper() {
     mutationFn: async ({ id, updates }: { id: string; updates: ShipperUpdate }) => {
       const { data, error } = await supabase
         .from('shippers')
-        .update(updates)
+        .update(asInsert(updates))
         .eq('id', asDb(id))
         .select()
         .single();

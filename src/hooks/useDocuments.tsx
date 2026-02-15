@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { asDb, asInsert, filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -15,7 +16,7 @@ export function useDocuments() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Document[];
+      return filterSupabaseRows<Document>(data);
     },
   });
 }
@@ -27,11 +28,11 @@ export function useDocumentsByOrder(orderId: string) {
       const { data, error } = await supabase
         .from('documents')
         .select('*')
-        .eq('order_id', orderId)
+        .eq('order_id', asDb(orderId))
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Document[];
+      return filterSupabaseRows<Document>(data);
     },
     enabled: !!orderId,
   });
@@ -42,7 +43,11 @@ export function useCreateDocument() {
 
   return useMutation({
     mutationFn: async (document: DocumentInsert) => {
-      const { data, error } = await supabase.from('documents').insert(document).select().single();
+      const { data, error } = await supabase
+        .from('documents')
+        .insert(asInsert(document))
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
@@ -58,7 +63,7 @@ export function useDeleteDocument() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('documents').delete().eq('id', id);
+      const { error } = await supabase.from('documents').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },

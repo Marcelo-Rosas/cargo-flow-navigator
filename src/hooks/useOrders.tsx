@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -65,7 +66,7 @@ export function useOrders() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as OrderWithOccurrences[];
+      return filterSupabaseRows<OrderWithOccurrences>(data);
     },
   });
 }
@@ -101,11 +102,11 @@ export function useOrder(id: string) {
           )
         `
         )
-        .eq('id', id)
+        .eq('id', asDb(id))
         .maybeSingle();
 
       if (error) throw error;
-      return data as OrderWithOccurrences | null;
+      return filterSupabaseSingle<OrderWithOccurrences>(data);
     },
     enabled: !!id,
   });
@@ -121,7 +122,7 @@ export function useCreateOrder() {
 
       const { data, error } = await supabase
         .from('orders')
-        .insert({ ...order, os_number: osNumber || order.os_number || '' })
+        .insert(asInsert({ ...order, os_number: osNumber || order.os_number || '' }))
         .select()
         .single();
 
@@ -141,8 +142,8 @@ export function useUpdateOrder() {
     mutationFn: async ({ id, updates }: { id: string; updates: OrderUpdate }) => {
       const { data, error } = await supabase
         .from('orders')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -162,8 +163,8 @@ export function useUpdateOrderStage() {
     mutationFn: async ({ id, stage }: { id: string; stage: OrderStage }) => {
       const { data, error } = await supabase
         .from('orders')
-        .update({ stage })
-        .eq('id', id)
+        .update(asInsert({ stage }))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -181,7 +182,7 @@ export function useDeleteOrder() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('orders').delete().eq('id', id);
+      const { error } = await supabase.from('orders').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },
@@ -197,13 +198,23 @@ export function useConvertQuoteToOrder() {
   return useMutation({
     mutationFn: async (quoteId: string) => {
       // Get the quote data
-      const { data: quote, error: quoteError } = await supabase
+      const { data: quoteData, error: quoteError } = await supabase
         .from('quotes')
         .select('*')
-        .eq('id', quoteId)
+        .eq('id', asDb(quoteId))
         .single();
 
       if (quoteError) throw quoteError;
+
+      const quote = filterSupabaseSingle<{
+        id: string;
+        client_id: string;
+        client_name: string;
+        origin: string;
+        destination: string;
+        value: number;
+      }>(quoteData);
+      if (!quote) throw new Error('Quote not found');
 
       // Get current user
       const {
@@ -217,23 +228,28 @@ export function useConvertQuoteToOrder() {
       // Create order from quote
       const { data: order, error: orderError } = await supabase
         .from('orders')
-        .insert({
-          os_number: osNumber || '',
-          quote_id: quote.id,
-          client_id: quote.client_id,
-          client_name: quote.client_name,
-          origin: quote.origin,
-          destination: quote.destination,
-          value: quote.value,
-          created_by: user.id,
-        })
+        .insert(
+          asInsert({
+            os_number: osNumber || '',
+            quote_id: quote.id,
+            client_id: quote.client_id,
+            client_name: quote.client_name,
+            origin: quote.origin,
+            destination: quote.destination,
+            value: quote.value,
+            created_by: user.id,
+          })
+        )
         .select()
         .single();
 
       if (orderError) throw orderError;
 
       // Update quote stage to 'ganho'
-      await supabase.from('quotes').update({ stage: 'ganho' }).eq('id', quoteId);
+      await supabase
+        .from('quotes')
+        .update(asInsert({ stage: 'ganho' }))
+        .eq('id', asDb(quoteId));
 
       return order;
     },

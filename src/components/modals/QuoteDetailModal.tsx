@@ -37,7 +37,7 @@ import { usePriceTable } from '@/hooks/usePriceTables';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { supabase } from '@/integrations/supabase/client';
-import { asDb, filterSupabaseSingle } from '@/lib/supabase-utils';
+import { asDb, asInsert, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
 import { toast } from 'sonner';
 
@@ -225,10 +225,12 @@ export function QuoteDetailModal({
 
       const { error } = await supabase
         .from('quotes')
-        .update({
-          pricing_breakdown: updatedBreakdown as unknown as typeof quote.pricing_breakdown,
-          waiting_time_cost: selection.waitingTimeCost,
-        })
+        .update(
+          asInsert({
+            pricing_breakdown: updatedBreakdown as unknown as typeof quote.pricing_breakdown,
+            waiting_time_cost: selection.waitingTimeCost,
+          })
+        )
         .eq('id', asDb(quote.id));
 
       if (error) throw error;
@@ -649,10 +651,12 @@ export function QuoteDetailModal({
 
                               const { error } = await supabase
                                 .from('quotes')
-                                .update({
-                                  pricing_breakdown:
-                                    updated as unknown as typeof quote.pricing_breakdown,
-                                })
+                                .update(
+                                  asInsert({
+                                    pricing_breakdown:
+                                      updated as unknown as typeof quote.pricing_breakdown,
+                                  })
+                                )
                                 .eq('id', asDb(quote.id));
 
                               if (error) {

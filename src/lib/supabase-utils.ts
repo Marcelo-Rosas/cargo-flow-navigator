@@ -26,3 +26,11 @@ export function filterSupabaseSingle<T>(data: unknown): T | null {
 export function asDb<T>(value: T): any {
   return value;
 }
+
+/**
+ * Escape hatch for insert/update payloads when Supabase Insert/Update types are overly strict.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function asInsert<T>(payload: T): any {
+  return payload;
+}

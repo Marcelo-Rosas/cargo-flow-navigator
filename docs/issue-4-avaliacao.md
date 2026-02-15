@@ -43,7 +43,8 @@ Com `strictNullChecks: true` habilitado em `tsconfig.app.json`, o `tsc` reporta 
 ## Status atual (branch feat/typescript-strict)
 
 - **strictNullChecks**: ✅ Habilitado em tsconfig.app.json
-- **Utilitários**: `filterSupabaseRows`, `filterSupabaseSingle`, `asDb` em `src/lib/supabase-utils.ts`
-- **Arquivos corrigidos**: useAdvancedDashboardStats, useDashboardStats, ExportReports, useClients, useAuditLogs, useShippers, ClientForm, ShipperForm, Sidebar, QuoteDetailModal, ConditionalFeesSection, WaitingTimeRulesSection, useAnttFloorRate, freightCalculator
-- **Erros restantes**: ~162 (hooks: useQuotes, useOrders, useDocuments, usePricingRules, usePricingMutations, etc.)
-- **Padrão para corrigir**: `filterSupabaseRows<T>(data)` para arrays, `filterSupabaseSingle<T>(data)` para maybeSingle, `asDb(value)` em .eq() quando value é variável
+- **Utilitários**: `filterSupabaseRows`, `filterSupabaseSingle`, `asDb`, `asInsert` em `src/lib/supabase-utils.ts`
+- **Fase 1 concluída**: ✅ Todos os erros de strictNullChecks corrigidos
+- **Build**: `tsc --noEmit` e `npm run build` passam sem erros
+- **Correções adicionais**: Sidebar (filtro por role restaurado), ExportReports (formatDate para evitar Invalid Date no CSV)
+- **Próximas fases (opcional)**: noImplicitAny, strict: true

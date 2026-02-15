@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { filterSupabaseRows } from '@/lib/supabase-utils';
+import { asDb, filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface TrendData {
@@ -117,7 +117,7 @@ export function useDashboardStats() {
       const { data: activeOrdersData } = await supabase
         .from('orders')
         .select('id')
-        .neq('stage', 'entregue');
+        .neq('stage', asDb('entregue'));
 
       const activeOrders = activeOrdersData?.length || 0;
 
@@ -140,7 +140,7 @@ export function useDashboardStats() {
         .from('orders')
         .select('id')
         .or('has_nfe.eq.false,has_cte.eq.false,has_pod.eq.false')
-        .neq('stage', 'entregue');
+        .neq('stage', asDb('entregue'));
 
       const pendingDocuments = ordersWithoutDocs?.length || 0;
 
@@ -148,7 +148,7 @@ export function useDashboardStats() {
       const { data: criticalOccurrences } = await supabase
         .from('occurrences')
         .select('id')
-        .eq('severity', 'critica')
+        .eq('severity', asDb('critica'))
         .is('resolved_at', null);
 
       const criticalAlerts = criticalOccurrences?.length || 0;
@@ -243,7 +243,7 @@ export function useRevenueByClientData() {
       const { data: orders } = await supabase
         .from('orders')
         .select('client_name, value')
-        .eq('stage', 'entregue');
+        .eq('stage', asDb('entregue'));
 
       const validOrdersRev = filterSupabaseRows<{ client_name: string | null; value: number }>(
         orders

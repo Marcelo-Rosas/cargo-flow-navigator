@@ -46,6 +46,10 @@ const bottomNavItems: NavItem[] = [
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
+  const { role } = useUserRole();
+  const filteredNavItems = navItems.filter(
+    (item) => !item.roles || (role != null && item.roles?.includes(role))
+  );
 
   return (
     <motion.aside
@@ -80,7 +84,7 @@ export function Sidebar() {
 
       {/* Main Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
+        {filteredNavItems.map((item) => (
           <NavItem
             key={item.path}
             path={item.path}

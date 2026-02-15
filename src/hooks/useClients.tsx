@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { asDb, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
+import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -56,7 +56,11 @@ export function useCreateClient() {
 
   return useMutation({
     mutationFn: async (client: ClientInsert) => {
-      const { data, error } = await supabase.from('clients').insert(client).select().single();
+      const { data, error } = await supabase
+        .from('clients')
+        .insert(asInsert(client))
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
@@ -74,7 +78,7 @@ export function useUpdateClient() {
     mutationFn: async ({ id, updates }: { id: string; updates: ClientUpdate }) => {
       const { data, error } = await supabase
         .from('clients')
-        .update(updates)
+        .update(asInsert(updates))
         .eq('id', asDb(id))
         .select()
         .single();
