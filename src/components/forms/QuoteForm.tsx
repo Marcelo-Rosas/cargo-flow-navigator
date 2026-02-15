@@ -127,6 +127,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   // Loading states for CEP lookups
   const [isLoadingOriginCep, setIsLoadingOriginCep] = useState(false);
   const [isLoadingDestinationCep, setIsLoadingDestinationCep] = useState(false);
+  const [isCalculatingKm, setIsCalculatingKm] = useState(false);
 
   // Weight unit toggle: kg or ton
   const [weightUnit, setWeightUnit] = useState<'kg' | 'ton'>('ton');
@@ -362,6 +363,41 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       toast.error('Erro ao buscar CEP de destino');
     } finally {
       setIsLoadingDestinationCep(false);
+    }
+  };
+
+  const handleCalculateKm = async () => {
+    const originCep = sanitizeCep(form.getValues('origin_cep') || '');
+    const destinationCep = sanitizeCep(form.getValues('destination_cep') || '');
+
+    if (originCep.length !== 8 || destinationCep.length !== 8) {
+      toast.error('Preencha os CEPs de origem e destino para calcular a distância');
+      return;
+    }
+
+    setIsCalculatingKm(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('calculate-distance', {
+        body: { origin_cep: originCep, destination_cep: destinationCep },
+      });
+
+      if (error || !data?.success) {
+        toast.error(data?.error || error?.message || 'Erro ao calcular distância');
+        return;
+      }
+
+      const km = Number(data.data.km_distance);
+      if (!Number.isFinite(km) || km <= 0) {
+        toast.error('Distância inválida retornada pela API');
+        return;
+      }
+
+      form.setValue('km_distance', km, { shouldDirty: true, shouldValidate: true });
+      toast.success(`Distância calculada: ${km.toLocaleString('pt-BR')} km`);
+    } catch {
+      toast.error('Erro ao calcular distância');
+    } finally {
+      setIsCalculatingKm(false);
     }
   };
 
@@ -721,6 +757,19 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCalculateKm}
+                  disabled={isCalculatingKm || isLoadingOriginCep || isLoadingDestinationCep}
+                >
+                  {isCalculatingKm && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Calcular KM
+                </Button>
               </div>
 
               {/* City/State Fields */}
