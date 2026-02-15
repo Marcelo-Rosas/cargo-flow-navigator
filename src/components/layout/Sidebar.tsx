@@ -36,7 +36,8 @@ const navItems = [
   },
 ];
 
-const bottomNavItems = [
+type NavItem = { path: string; icon: typeof LayoutDashboard; label: string; roles?: AppRole[] };
+const bottomNavItems: NavItem[] = [
   // { path: '/configuracoes', icon: Settings, label: 'Configurações' }, // (a implementar)
   // { path: '/integracoes', icon: Plug, label: 'Integrações' }, // (a implementar)
   // { path: '/ajuda', icon: HelpCircle, label: 'Ajuda' }, // (a implementar)
@@ -47,7 +48,7 @@ export function Sidebar() {
   const location = useLocation();
   const { role } = useUserRole();
   const filteredNavItems = navItems.filter(
-    (item) => !item.roles || (role && item.roles.includes(role))
+    (item) => !item.roles || (role != null && item.roles?.includes(role))
   );
 
   return (

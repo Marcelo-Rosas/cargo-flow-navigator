@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -27,7 +28,7 @@ export function useClients(searchTerm?: string, options: UseClientsOptions = {})
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as Client[];
+      return filterSupabaseRows<Client>(data);
     },
     enabled,
   });
@@ -37,10 +38,14 @@ export function useClient(id: string) {
   return useQuery({
     queryKey: ['clients', id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('clients').select('*').eq('id', id).maybeSingle();
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', asDb(id))
+        .maybeSingle();
 
       if (error) throw error;
-      return data as Client | null;
+      return filterSupabaseSingle<Client>(data);
     },
     enabled: !!id,
   });
@@ -51,7 +56,11 @@ export function useCreateClient() {
 
   return useMutation({
     mutationFn: async (client: ClientInsert) => {
-      const { data, error } = await supabase.from('clients').insert(client).select().single();
+      const { data, error } = await supabase
+        .from('clients')
+        .insert(asInsert(client))
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
@@ -69,8 +78,8 @@ export function useUpdateClient() {
     mutationFn: async ({ id, updates }: { id: string; updates: ClientUpdate }) => {
       const { data, error } = await supabase
         .from('clients')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -88,7 +97,7 @@ export function useDeleteClient() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('clients').delete().eq('id', id);
+      const { error } = await supabase.from('clients').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,7 +30,7 @@ export function useShippers(searchTerm?: string, options: UseShippersOptions = {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as Shipper[];
+      return filterSupabaseRows<Shipper>(data);
     },
     enabled: enabled && !!user,
   });
@@ -42,11 +43,11 @@ export function useShipper(id: string) {
       const { data, error } = await supabase
         .from('shippers')
         .select('*')
-        .eq('id', id)
+        .eq('id', asDb(id))
         .maybeSingle();
 
       if (error) throw error;
-      return data as Shipper | null;
+      return filterSupabaseSingle<Shipper>(data);
     },
     enabled: !!id,
   });
@@ -57,7 +58,11 @@ export function useCreateShipper() {
 
   return useMutation({
     mutationFn: async (shipper: ShipperInsert) => {
-      const { data, error } = await supabase.from('shippers').insert(shipper).select().single();
+      const { data, error } = await supabase
+        .from('shippers')
+        .insert(asInsert(shipper))
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
@@ -75,8 +80,8 @@ export function useUpdateShipper() {
     mutationFn: async ({ id, updates }: { id: string; updates: ShipperUpdate }) => {
       const { data, error } = await supabase
         .from('shippers')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -94,7 +99,7 @@ export function useDeleteShipper() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('shippers').delete().eq('id', id);
+      const { error } = await supabase.from('shippers').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },

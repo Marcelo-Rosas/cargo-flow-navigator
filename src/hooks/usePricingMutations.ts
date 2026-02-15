@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { asDb, asInsert } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import type {
   PricingParameter,
@@ -21,8 +22,8 @@ export function useUpdatePricingParameter() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<PricingParameter> }) => {
       const { data, error } = await supabase
         .from('pricing_parameters')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -47,7 +48,7 @@ export function useCreatePricingParameter() {
     }) => {
       const { data: result, error } = await supabase
         .from('pricing_parameters')
-        .insert(data)
+        .insert(asInsert(data))
         .select()
         .single();
 
@@ -65,7 +66,7 @@ export function useDeletePricingParameter() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('pricing_parameters').delete().eq('id', id);
+      const { error } = await supabase.from('pricing_parameters').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },
@@ -86,7 +87,7 @@ export function useCreateVehicleType() {
     mutationFn: async (data: Omit<VehicleType, 'id' | 'created_at' | 'updated_at'>) => {
       const { data: result, error } = await supabase
         .from('vehicle_types')
-        .insert(data)
+        .insert(asInsert(data))
         .select()
         .single();
 
@@ -106,8 +107,8 @@ export function useUpdateVehicleType() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<VehicleType> }) => {
       const { data, error } = await supabase
         .from('vehicle_types')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -125,7 +126,7 @@ export function useDeleteVehicleType() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('vehicle_types').delete().eq('id', id);
+      const { error } = await supabase.from('vehicle_types').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },
@@ -153,7 +154,7 @@ export function useCreateWaitingTimeRule() {
     }) => {
       const { data: result, error } = await supabase
         .from('waiting_time_rules')
-        .insert(data)
+        .insert(asInsert(data))
         .select()
         .single();
 
@@ -173,8 +174,8 @@ export function useUpdateWaitingTimeRule() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<WaitingTimeRule> }) => {
       const { data, error } = await supabase
         .from('waiting_time_rules')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -192,7 +193,7 @@ export function useDeleteWaitingTimeRule() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('waiting_time_rules').delete().eq('id', id);
+      const { error } = await supabase.from('waiting_time_rules').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },
@@ -222,7 +223,7 @@ export function useCreateTollRoute() {
     }) => {
       const { data: result, error } = await supabase
         .from('toll_routes')
-        .insert(data)
+        .insert(asInsert(data))
         .select()
         .single();
 
@@ -242,8 +243,8 @@ export function useUpdateTollRoute() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<TollRoute> }) => {
       const { data, error } = await supabase
         .from('toll_routes')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -261,7 +262,7 @@ export function useDeleteTollRoute() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('toll_routes').delete().eq('id', id);
+      const { error } = await supabase.from('toll_routes').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },
@@ -291,7 +292,7 @@ export function useCreateTacRate() {
 
       const { data: result, error } = await supabase
         .from('tac_rates')
-        .insert({ ...data, variation_percent })
+        .insert(asInsert({ ...data, variation_percent }))
         .select()
         .single();
 
@@ -318,8 +319,8 @@ export function useUpdateTacRate() {
 
       const { data, error } = await supabase
         .from('tac_rates')
-        .update({ ...updates, variation_percent })
-        .eq('id', id)
+        .update(asInsert({ ...updates, variation_percent }))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -337,7 +338,7 @@ export function useDeleteTacRate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('tac_rates').delete().eq('id', id);
+      const { error } = await supabase.from('tac_rates').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },
@@ -368,7 +369,7 @@ export function useCreateConditionalFee() {
     }) => {
       const { data: result, error } = await supabase
         .from('conditional_fees')
-        .insert(data)
+        .insert(asInsert(data))
         .select()
         .single();
 
@@ -394,8 +395,8 @@ export function useUpdateConditionalFee() {
     }) => {
       const { data, error } = await supabase
         .from('conditional_fees')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -413,7 +414,7 @@ export function useDeleteConditionalFee() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('conditional_fees').delete().eq('id', id);
+      const { error } = await supabase.from('conditional_fees').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },
@@ -440,7 +441,7 @@ export function useCreatePaymentTerm() {
     }) => {
       const { data: result, error } = await supabase
         .from('payment_terms')
-        .insert(data)
+        .insert(asInsert(data))
         .select()
         .single();
 
@@ -460,8 +461,8 @@ export function useUpdatePaymentTerm() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<PaymentTerm> }) => {
       const { data, error } = await supabase
         .from('payment_terms')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -479,7 +480,7 @@ export function useDeletePaymentTerm() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('payment_terms').delete().eq('id', id);
+      const { error } = await supabase.from('payment_terms').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },

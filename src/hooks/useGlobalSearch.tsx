@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -33,17 +34,21 @@ export function useGlobalSearch() {
         )
         .limit(5);
 
-      if (quotes) {
-        quotes.forEach((q) => {
-          allResults.push({
-            id: q.id,
-            type: 'quote',
-            title: `Cotação - ${q.client_name}`,
-            subtitle: `${q.origin} → ${q.destination}`,
-            url: '/comercial',
-          });
+      const validQuotes = filterSupabaseRows<{
+        id: string;
+        client_name: string;
+        origin: string;
+        destination: string;
+      }>(quotes);
+      validQuotes.forEach((q) => {
+        allResults.push({
+          id: q.id,
+          type: 'quote',
+          title: `Cotação - ${q.client_name}`,
+          subtitle: `${q.origin} → ${q.destination}`,
+          url: '/comercial',
         });
-      }
+      });
 
       // Search orders
       const { data: orders } = await supabase
@@ -54,17 +59,22 @@ export function useGlobalSearch() {
         )
         .limit(5);
 
-      if (orders) {
-        orders.forEach((o) => {
-          allResults.push({
-            id: o.id,
-            type: 'order',
-            title: `${o.os_number} - ${o.client_name}`,
-            subtitle: `${o.origin} → ${o.destination}`,
-            url: '/operacional',
-          });
+      const validOrders = filterSupabaseRows<{
+        id: string;
+        os_number: string;
+        client_name: string;
+        origin: string;
+        destination: string;
+      }>(orders);
+      validOrders.forEach((o) => {
+        allResults.push({
+          id: o.id,
+          type: 'order',
+          title: `${o.os_number} - ${o.client_name}`,
+          subtitle: `${o.origin} → ${o.destination}`,
+          url: '/operacional',
         });
-      }
+      });
 
       // Search clients
       const { data: clients } = await supabase
@@ -73,19 +83,24 @@ export function useGlobalSearch() {
         .or(`name.ilike.${searchTerm},cnpj.ilike.${searchTerm},city.ilike.${searchTerm}`)
         .limit(5);
 
-      if (clients) {
-        clients.forEach((c) => {
-          allResults.push({
-            id: c.id,
-            type: 'client',
-            title: c.name,
-            subtitle: c.cnpj
-              ? `${c.cnpj} - ${c.city || ''}/${c.state || ''}`
-              : `${c.city || ''}/${c.state || ''}`,
-            url: '/clientes',
-          });
+      const validClients = filterSupabaseRows<{
+        id: string;
+        name: string;
+        cnpj: string | null;
+        city: string | null;
+        state: string | null;
+      }>(clients);
+      validClients.forEach((c) => {
+        allResults.push({
+          id: c.id,
+          type: 'client',
+          title: c.name,
+          subtitle: c.cnpj
+            ? `${c.cnpj} - ${c.city || ''}/${c.state || ''}`
+            : `${c.city || ''}/${c.state || ''}`,
+          url: '/clientes',
         });
-      }
+      });
 
       return allResults;
     },

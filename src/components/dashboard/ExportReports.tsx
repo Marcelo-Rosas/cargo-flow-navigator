@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -66,12 +67,13 @@ export function ExportReports() {
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (quotes) {
+        const validQuotes = filterSupabaseRows<Record<string, unknown>>(quotes);
+        if (validQuotes.length > 0) {
           exportToCSV(
-            quotes.map((q) => ({
+            validQuotes.map((q) => ({
               ...q,
-              created_at: formatDate(q.created_at),
-              updated_at: formatDate(q.updated_at),
+              created_at: q.created_at ? formatDate(String(q.created_at)) : '',
+              updated_at: q.updated_at ? formatDate(String(q.updated_at)) : '',
               value: q.value,
             })),
             'cotacoes',
@@ -109,13 +111,14 @@ export function ExportReports() {
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (orders) {
+        const validOrders = filterSupabaseRows<Record<string, unknown>>(orders);
+        if (validOrders.length > 0) {
           exportToCSV(
-            orders.map((o) => ({
+            validOrders.map((o) => ({
               ...o,
-              created_at: formatDate(o.created_at),
-              updated_at: formatDate(o.updated_at),
-              eta: o.eta ? formatDate(o.eta) : '',
+              created_at: o.created_at ? formatDate(String(o.created_at)) : '',
+              updated_at: o.updated_at ? formatDate(String(o.updated_at)) : '',
+              eta: o.eta ? formatDate(String(o.eta)) : '',
               has_nfe: o.has_nfe ? 'Sim' : 'Não',
               has_cte: o.has_cte ? 'Sim' : 'Não',
               has_pod: o.has_pod ? 'Sim' : 'Não',
@@ -161,11 +164,12 @@ export function ExportReports() {
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (clients) {
+        const validClients = filterSupabaseRows<Record<string, unknown>>(clients);
+        if (validClients.length > 0) {
           exportToCSV(
-            clients.map((c) => ({
+            validClients.map((c) => ({
               ...c,
-              created_at: formatDate(c.created_at),
+              created_at: c.created_at ? formatDate(String(c.created_at)) : '',
             })),
             'clientes',
             ['Nome', 'CNPJ', 'Email', 'Telefone', 'Cidade', 'Estado', 'Endereço', 'Data Criação'],

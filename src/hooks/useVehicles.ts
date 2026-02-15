@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { asDb, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Vehicle {
@@ -17,18 +18,18 @@ export function useVehicles(driverId?: string | null) {
       let query = supabase
         .from('vehicles')
         .select('id, plate, driver_id, active, brand, model')
-        .eq('active', true)
+        .eq('active', asDb(true))
         .order('plate', { ascending: true });
 
       // Optionally filter by driver_id
       if (driverId) {
-        query = query.eq('driver_id', driverId);
+        query = query.eq('driver_id', asDb(driverId));
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as Vehicle[];
+      return filterSupabaseRows<Vehicle>(data);
     },
   });
 }
@@ -42,11 +43,11 @@ export function useVehicle(id: string | null | undefined) {
       const { data, error } = await supabase
         .from('vehicles')
         .select('id, plate, driver_id, active, brand, model')
-        .eq('id', id)
+        .eq('id', asDb(id))
         .maybeSingle();
 
       if (error) throw error;
-      return data as Vehicle | null;
+      return filterSupabaseSingle<Vehicle>(data);
     },
     enabled: !!id,
   });

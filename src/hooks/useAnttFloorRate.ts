@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { asDb } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface AnttFloorRate {
@@ -35,9 +36,9 @@ export function useAnttFloorRate(params: UseAnttFloorRateParams) {
       const { data, error } = await supabase
         .from('antt_floor_rates')
         .select('operation_table,cargo_type,axes_count,ccd,cc,valid_from,valid_until')
-        .eq('operation_table', operationTable)
-        .eq('cargo_type', cargoType)
-        .eq('axes_count', axesCount)
+        .eq('operation_table', asDb(operationTable))
+        .eq('cargo_type', asDb(cargoType))
+        .eq('axes_count', asDb(axesCount))
         .order('valid_from', { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();

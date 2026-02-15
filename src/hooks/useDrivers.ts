@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { asDb, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Driver {
@@ -15,11 +16,11 @@ export function useDrivers() {
       const { data, error } = await supabase
         .from('drivers')
         .select('id, name, phone, active')
-        .eq('active', true)
+        .eq('active', asDb(true))
         .order('name', { ascending: true });
 
       if (error) throw error;
-      return data as Driver[];
+      return filterSupabaseRows<Driver>(data);
     },
   });
 }
@@ -33,11 +34,11 @@ export function useDriver(id: string | null | undefined) {
       const { data, error } = await supabase
         .from('drivers')
         .select('id, name, phone, active')
-        .eq('id', id)
+        .eq('id', asDb(id))
         .maybeSingle();
 
       if (error) throw error;
-      return data as Driver | null;
+      return filterSupabaseSingle<Driver>(data);
     },
     enabled: !!id,
   });

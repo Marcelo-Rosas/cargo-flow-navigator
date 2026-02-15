@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsHeaders } from '../_shared/cors.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { calculateFreightInputSchema } from '../_shared/freight-schema.ts';
 import {
   FREIGHT_CONSTANTS,
   type CalculateFreightInput,
@@ -24,17 +25,73 @@ import {
 // =====================================================
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    // Use ANON_KEY + user JWT (respects RLS); requires verify_jwt = true
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          status: 'UNAUTHORIZED',
+          errors: ['Authorization header obrigatório'],
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    const input: CalculateFreightInput = await req.json();
+    // Verify user is authenticated
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          status: 'UNAUTHORIZED',
+          errors: ['Usuário não autenticado'],
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Parse and validate payload with Zod
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          status: 'MISSING_DATA',
+          errors: ['Payload JSON inválido'],
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const parseResult = calculateFreightInputSchema.safeParse(body);
+    if (!parseResult.success) {
+      const errors = parseResult.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`);
+      return new Response(JSON.stringify({ success: false, status: 'MISSING_DATA', errors }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const input: CalculateFreightInput = parseResult.data;
+
     console.log(
       '[calculate-freight] Request:',
       input.origin,
@@ -44,29 +101,6 @@ Deno.serve(async (req) => {
     );
 
     const fallbacksApplied: string[] = [];
-    const errors: string[] = [];
-
-    // =====================================================
-    // VALIDATION
-    // =====================================================
-
-    if (!input.origin) errors.push('Campo "origin" é obrigatório');
-    if (!input.destination) errors.push('Campo "destination" é obrigatório');
-    if (input.weight_kg === undefined || input.weight_kg < 0)
-      errors.push('Campo "weight_kg" inválido');
-    if (input.volume_m3 === undefined || input.volume_m3 < 0)
-      errors.push('Campo "volume_m3" inválido');
-    if (input.cargo_value === undefined || input.cargo_value < 0)
-      errors.push('Campo "cargo_value" inválido');
-    if (input.weight_kg === 0 && input.volume_m3 === 0)
-      errors.push('weight_kg e volume_m3 não podem ser ambos zero');
-
-    if (errors.length > 0) {
-      return new Response(JSON.stringify({ success: false, status: 'MISSING_DATA', errors }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
 
     // =====================================================
     // GET GLOBAL PARAMETERS

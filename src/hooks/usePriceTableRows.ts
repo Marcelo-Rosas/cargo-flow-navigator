@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -13,11 +14,11 @@ export function usePriceTableRows(priceTableId: string) {
       const { data, error } = await supabase
         .from('price_table_rows')
         .select('*')
-        .eq('price_table_id', priceTableId)
+        .eq('price_table_id', asDb(priceTableId))
         .order('km_from', { ascending: true });
 
       if (error) throw error;
-      return data as PriceTableRow[];
+      return filterSupabaseRows<PriceTableRow>(data);
     },
     enabled: !!priceTableId,
   });
@@ -30,13 +31,13 @@ export function usePriceTableRowByKmRange(priceTableId: string, kmDistance: numb
       const { data, error } = await supabase
         .from('price_table_rows')
         .select('*')
-        .eq('price_table_id', priceTableId)
-        .lte('km_from', kmDistance)
-        .gte('km_to', kmDistance)
+        .eq('price_table_id', asDb(priceTableId))
+        .lte('km_from', asDb(kmDistance))
+        .gte('km_to', asDb(kmDistance))
         .maybeSingle();
 
       if (error) throw error;
-      return data as PriceTableRow | null;
+      return filterSupabaseSingle<PriceTableRow>(data);
     },
     enabled: !!priceTableId && kmDistance >= 0,
   });
@@ -47,13 +48,19 @@ export function useCreatePriceTableRow() {
 
   return useMutation({
     mutationFn: async (row: PriceTableRowInsert) => {
-      const { data, error } = await supabase.from('price_table_rows').insert(row).select().single();
+      const { data, error } = await supabase
+        .from('price_table_rows')
+        .insert(asInsert(row))
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['price_table_rows', data.price_table_id] });
+      const row = filterSupabaseSingle<{ price_table_id: string }>(data);
+      if (row)
+        queryClient.invalidateQueries({ queryKey: ['price_table_rows', row.price_table_id] });
     },
   });
 }
@@ -63,14 +70,20 @@ export function useCreatePriceTableRowsBatch() {
 
   return useMutation({
     mutationFn: async (rows: PriceTableRowInsert[]) => {
-      const { data, error } = await supabase.from('price_table_rows').insert(rows).select();
+      const { data, error } = await supabase
+        .from('price_table_rows')
+        .insert(asInsert(rows))
+        .select();
 
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
-      if (data && data.length > 0) {
-        queryClient.invalidateQueries({ queryKey: ['price_table_rows', data[0].price_table_id] });
+      const validRows = filterSupabaseRows<{ price_table_id: string }>(data);
+      if (validRows.length > 0) {
+        queryClient.invalidateQueries({
+          queryKey: ['price_table_rows', validRows[0].price_table_id],
+        });
       }
     },
   });
@@ -83,8 +96,8 @@ export function useUpdatePriceTableRow() {
     mutationFn: async ({ id, updates }: { id: string; updates: PriceTableRowUpdate }) => {
       const { data, error } = await supabase
         .from('price_table_rows')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -92,7 +105,9 @@ export function useUpdatePriceTableRow() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['price_table_rows', data.price_table_id] });
+      const row = filterSupabaseSingle<{ price_table_id: string }>(data);
+      if (row)
+        queryClient.invalidateQueries({ queryKey: ['price_table_rows', row.price_table_id] });
     },
   });
 }
@@ -102,7 +117,7 @@ export function useDeletePriceTableRow() {
 
   return useMutation({
     mutationFn: async ({ id, priceTableId }: { id: string; priceTableId: string }) => {
-      const { error } = await supabase.from('price_table_rows').delete().eq('id', id);
+      const { error } = await supabase.from('price_table_rows').delete().eq('id', asDb(id));
 
       if (error) throw error;
       return { priceTableId };
@@ -121,7 +136,7 @@ export function useDeleteRowsByTableId() {
       const { error } = await supabase
         .from('price_table_rows')
         .delete()
-        .eq('price_table_id', priceTableId);
+        .eq('price_table_id', asDb(priceTableId));
 
       if (error) throw error;
       return { priceTableId };

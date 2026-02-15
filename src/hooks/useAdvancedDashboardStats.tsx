@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -63,8 +64,8 @@ export function useSalesFunnel() {
     queryKey: ['sales-funnel'],
     queryFn: async () => {
       const { data: quotes } = await supabase.from('quotes').select('stage, value');
-
-      if (!quotes) return [];
+      const validQuotes = filterSupabaseRows<{ stage: string; value: number }>(quotes);
+      if (validQuotes.length === 0) return [];
 
       const stageOrder: QuoteStage[] = [
         'novo_pedido',
@@ -76,7 +77,7 @@ export function useSalesFunnel() {
       ];
 
       const stageData = stageOrder.map((stage) => {
-        const stageQuotes = quotes.filter((q) => q.stage === stage);
+        const stageQuotes = validQuotes.filter((q) => q.stage === stage);
         return {
           stage: QUOTE_STAGE_LABELS[stage],
           count: stageQuotes.length,
@@ -111,6 +112,13 @@ export function useMonthlyTrends() {
         .select('value, created_at, stage')
         .gte('created_at', sixMonthsAgo.toISOString());
 
+      const validQuotes = filterSupabaseRows<{ stage: string; value: number; created_at: string }>(
+        quotes
+      );
+      const validOrders = filterSupabaseRows<{ value: number; created_at: string; stage: string }>(
+        orders
+      );
+
       const monthlyData: Record<string, MonthlyTrend> = {};
 
       // Initialize last 6 months
@@ -131,7 +139,7 @@ export function useMonthlyTrends() {
       const wonQuotesPerMonth: Record<string, number> = {};
       const totalQuotesPerMonth: Record<string, number> = {};
 
-      quotes?.forEach((quote) => {
+      validQuotes.forEach((quote) => {
         const monthKey = new Date(quote.created_at).toLocaleDateString('pt-BR', {
           month: 'short',
           year: '2-digit',
@@ -146,7 +154,7 @@ export function useMonthlyTrends() {
       });
 
       // Count orders and revenue
-      orders?.forEach((order) => {
+      validOrders.forEach((order) => {
         const monthKey = new Date(order.created_at).toLocaleDateString('pt-BR', {
           month: 'short',
           year: '2-digit',
@@ -205,8 +213,8 @@ export function usePerformanceMetrics() {
         .lt('created_at', thisMonthStart.toISOString());
 
       // Calculate averages
-      const allQuotes = quotesThisMonth || [];
-      const allOrders = ordersThisMonth || [];
+      const allQuotes = filterSupabaseRows<{ value: number }>(quotesThisMonth);
+      const allOrders = filterSupabaseRows<{ value: number; stage: string }>(ordersThisMonth);
       const avgQuoteValue =
         allQuotes.length > 0
           ? allQuotes.reduce((acc, q) => acc + Number(q.value), 0) / allQuotes.length
@@ -217,11 +225,17 @@ export function usePerformanceMetrics() {
           : 0;
 
       // Revenue calculations
-      const revenueThisMonth = (ordersThisMonth || [])
+      const validOrdersThisMonth = filterSupabaseRows<{ value: number; stage: string }>(
+        ordersThisMonth
+      );
+      const validOrdersLastMonth = filterSupabaseRows<{ value: number; stage: string }>(
+        ordersLastMonth
+      );
+      const revenueThisMonth = validOrdersThisMonth
         .filter((o) => o.stage === 'entregue')
         .reduce((acc, o) => acc + Number(o.value), 0);
 
-      const revenueLastMonth = (ordersLastMonth || [])
+      const revenueLastMonth = validOrdersLastMonth
         .filter((o) => o.stage === 'entregue')
         .reduce((acc, o) => acc + Number(o.value), 0);
 
@@ -229,11 +243,11 @@ export function usePerformanceMetrics() {
         avgDeliveryTime: 3.5, // Placeholder - would need delivery date tracking
         avgQuoteValue,
         avgOrderValue,
-        quotesThisMonth: quotesThisMonth?.length || 0,
-        ordersThisMonth: ordersThisMonth?.length || 0,
+        quotesThisMonth: allQuotes.length,
+        ordersThisMonth: allOrders.length,
         revenueThisMonth,
-        quotesLastMonth: quotesLastMonth?.length || 0,
-        ordersLastMonth: ordersLastMonth?.length || 0,
+        quotesLastMonth: filterSupabaseRows<{ value: number }>(quotesLastMonth).length,
+        ordersLastMonth: validOrdersLastMonth.length,
         revenueLastMonth,
       } as PerformanceMetrics;
     },
@@ -245,11 +259,11 @@ export function useQuoteStageDistribution() {
     queryKey: ['quote-stage-distribution'],
     queryFn: async () => {
       const { data: quotes } = await supabase.from('quotes').select('stage');
-
-      if (!quotes) return [];
+      const validQuotes = filterSupabaseRows<{ stage: string }>(quotes);
+      if (validQuotes.length === 0) return [];
 
       const stageCounts: Record<string, number> = {};
-      quotes.forEach((q) => {
+      validQuotes.forEach((q) => {
         stageCounts[q.stage] = (stageCounts[q.stage] || 0) + 1;
       });
 
@@ -278,11 +292,11 @@ export function useOrderStageDistribution() {
     queryKey: ['order-stage-distribution'],
     queryFn: async () => {
       const { data: orders } = await supabase.from('orders').select('stage');
-
-      if (!orders) return [];
+      const validOrders = filterSupabaseRows<{ stage: string }>(orders);
+      if (validOrders.length === 0) return [];
 
       const stageCounts: Record<string, number> = {};
-      orders.forEach((o) => {
+      validOrders.forEach((o) => {
         stageCounts[o.stage] = (stageCounts[o.stage] || 0) + 1;
       });
 
@@ -331,9 +345,9 @@ export function useExportData() {
         .order('created_at', { ascending: false });
 
       return {
-        quotes: quotes || [],
-        orders: orders || [],
-        clients: clients || [],
+        quotes: filterSupabaseRows<Record<string, unknown>>(quotes),
+        orders: filterSupabaseRows<Record<string, unknown>>(orders),
+        clients: filterSupabaseRows<Record<string, unknown>>(clients),
       } as ExportData;
     },
     enabled: false, // Only fetch when needed

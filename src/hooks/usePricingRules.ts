@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { asDb, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import type {
   PricingParameter,
@@ -21,7 +22,7 @@ export function usePricingParameters() {
       const { data, error } = await supabase.from('pricing_parameters').select('*').order('key');
 
       if (error) throw error;
-      return data as PricingParameter[];
+      return filterSupabaseRows<PricingParameter>(data);
     },
   });
 }
@@ -33,11 +34,11 @@ export function usePricingParameter(key: string) {
       const { data, error } = await supabase
         .from('pricing_parameters')
         .select('*')
-        .eq('key', key)
+        .eq('key', asDb(key))
         .maybeSingle();
 
       if (error) throw error;
-      return data as PricingParameter | null;
+      return filterSupabaseSingle<PricingParameter>(data);
     },
     enabled: !!key,
   });
@@ -54,12 +55,12 @@ export function useVehicleTypes(activeOnly = true) {
       let query = supabase.from('vehicle_types').select('*').order('axes_count');
 
       if (activeOnly) {
-        query = query.eq('active', true);
+        query = query.eq('active', asDb(true));
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as VehicleType[];
+      return filterSupabaseRows<VehicleType>(data);
     },
   });
 }
@@ -78,7 +79,9 @@ export function useWaitingTimeRules() {
         .order('vehicle_type_id', { nullsFirst: true });
 
       if (error) throw error;
-      return data as (WaitingTimeRule & { vehicle_types: { code: string; name: string } | null })[];
+      return filterSupabaseRows<
+        WaitingTimeRule & { vehicle_types: { code: string; name: string } | null }
+      >(data);
     },
   });
 }
@@ -98,7 +101,9 @@ export function useTollRoutes() {
         .order('destination_state');
 
       if (error) throw error;
-      return data as (TollRoute & { vehicle_types: { code: string; name: string } | null })[];
+      return filterSupabaseRows<
+        TollRoute & { vehicle_types: { code: string; name: string } | null }
+      >(data);
     },
   });
 }
@@ -117,7 +122,7 @@ export function useTacRates() {
         .order('reference_date', { ascending: false });
 
       if (error) throw error;
-      return data as TacRate[];
+      return filterSupabaseRows<TacRate>(data);
     },
   });
 }
@@ -136,7 +141,7 @@ export function useLatestTacRate() {
         .maybeSingle();
 
       if (error) throw error;
-      return data as TacRate | null;
+      return filterSupabaseSingle<TacRate>(data);
     },
   });
 }
@@ -152,12 +157,12 @@ export function useConditionalFees(activeOnly = true) {
       let query = supabase.from('conditional_fees').select('*').order('code');
 
       if (activeOnly) {
-        query = query.eq('active', true);
+        query = query.eq('active', asDb(true));
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as ConditionalFee[];
+      return filterSupabaseRows<ConditionalFee>(data);
     },
   });
 }
@@ -173,12 +178,12 @@ export function usePaymentTerms(activeOnly = true) {
       let query = supabase.from('payment_terms').select('*').order('days');
 
       if (activeOnly) {
-        query = query.eq('active', true);
+        query = query.eq('active', asDb(true));
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as PaymentTerm[];
+      return filterSupabaseRows<PaymentTerm>(data);
     },
   });
 }

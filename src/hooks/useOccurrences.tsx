@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { asDb, asInsert, filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -16,7 +17,7 @@ export function useOccurrences() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Occurrence[];
+      return filterSupabaseRows<Occurrence>(data);
     },
   });
 }
@@ -28,11 +29,11 @@ export function useOccurrencesByOrder(orderId: string) {
       const { data, error } = await supabase
         .from('occurrences')
         .select('*')
-        .eq('order_id', orderId)
+        .eq('order_id', asDb(orderId))
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Occurrence[];
+      return filterSupabaseRows<Occurrence>(data);
     },
     enabled: !!orderId,
   });
@@ -45,7 +46,7 @@ export function useCreateOccurrence() {
     mutationFn: async (occurrence: OccurrenceInsert) => {
       const { data, error } = await supabase
         .from('occurrences')
-        .insert(occurrence)
+        .insert(asInsert(occurrence))
         .select()
         .single();
 
@@ -66,8 +67,8 @@ export function useUpdateOccurrence() {
     mutationFn: async ({ id, updates }: { id: string; updates: OccurrenceUpdate }) => {
       const { data, error } = await supabase
         .from('occurrences')
-        .update(updates)
-        .eq('id', id)
+        .update(asInsert(updates))
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -88,11 +89,13 @@ export function useResolveOccurrence() {
     mutationFn: async ({ id, resolved_by }: { id: string; resolved_by: string }) => {
       const { data, error } = await supabase
         .from('occurrences')
-        .update({
-          resolved_at: new Date().toISOString(),
-          resolved_by,
-        })
-        .eq('id', id)
+        .update(
+          asInsert({
+            resolved_at: new Date().toISOString(),
+            resolved_by,
+          })
+        )
+        .eq('id', asDb(id))
         .select()
         .single();
 
@@ -111,7 +114,7 @@ export function useDeleteOccurrence() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('occurrences').delete().eq('id', id);
+      const { error } = await supabase.from('occurrences').delete().eq('id', asDb(id));
 
       if (error) throw error;
     },
