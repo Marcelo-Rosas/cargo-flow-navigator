@@ -10,4 +10,4 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.calculate-distance]
-verify_jwt = true
+verify_jwt = false  # utilitário público (geocode+rota), sem dados sensíveis
