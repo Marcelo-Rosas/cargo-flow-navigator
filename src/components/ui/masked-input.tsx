@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 
-type MaskType = 'cep' | 'cnpj' | 'cpf' | 'phone';
+type MaskType = 'cep' | 'cnpj' | 'cpf' | 'phone' | 'currency';
 
 interface MaskedInputProps extends Omit<React.ComponentProps<'input'>, 'onChange'> {
   mask: MaskType;
@@ -47,6 +47,16 @@ const maskConfig: Record<MaskType, { maxDigits: number; format: (value: string) 
       if (value.length <= 2) return value.length > 0 ? `(${value}` : '';
       if (value.length <= 7) return `(${value.slice(0, 2)}) ${value.slice(2)}`;
       return `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7, 11)}`;
+    },
+  },
+  currency: {
+    maxDigits: 14,
+    format: (value: string) => {
+      if (value.length === 0) return '';
+      const cents = value.slice(-2).padStart(2, '0');
+      const reais = value.slice(0, -2) || '0';
+      const formatted = reais.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      return `${formatted},${cents}`;
     },
   },
 };

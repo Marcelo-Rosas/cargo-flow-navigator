@@ -44,7 +44,7 @@ import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { usePriceTables } from '@/hooks/usePriceTables';
 import { useVehicleTypes, usePaymentTerms } from '@/hooks/usePricingRules';
-import { usePriceTableRowByKmRange } from '@/hooks/usePriceTableRows';
+import { usePriceTableRows } from '@/hooks/usePriceTableRows';
 import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -179,11 +179,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedTdeEnabled = form.watch('tde_enabled');
   const watchedTearEnabled = form.watch('tear_enabled');
 
-  // Get price table row for the km distance
-  const { data: priceTableRow, isLoading: isLoadingPriceRow } = usePriceTableRowByKmRange(
-    watchedPriceTableId || '',
-    watchedKmDistance || 0
+  // Fetch all price table rows and resolve band client-side (evita 22P02 no PostgREST)
+  const { data: priceTableRows, isLoading: isLoadingPriceRow } = usePriceTableRows(
+    watchedPriceTableId || ''
   );
+  const kmRounded = Math.round(Number(watchedKmDistance || 0));
+  const priceTableRow =
+    priceTableRows?.find((r) => r.km_from <= kmRounded && r.km_to >= kmRounded) ?? null;
 
   // Get ICMS rate for origin/destination states
   const originUf = extractUf(watchedOrigin || '');
@@ -1069,15 +1071,23 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   name="cargo_value"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Valor da Mercadoria (R$)</FormLabel>
+                      <FormLabel>Valor da Mercadoria</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0,00"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            R$
+                          </span>
+                          <MaskedInput
+                            mask="currency"
+                            placeholder="0,00"
+                            className="pl-10"
+                            value={String(Math.round((field.value || 0) * 100))}
+                            onValueChange={(rawValue) =>
+                              field.onChange(parseInt(rawValue || '0', 10) / 100)
+                            }
+                            onBlur={field.onBlur}
+                          />
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1089,15 +1099,23 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   name="toll"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Pedágio (R$)</FormLabel>
+                      <FormLabel>Pedágio</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0,00"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            R$
+                          </span>
+                          <MaskedInput
+                            mask="currency"
+                            placeholder="0,00"
+                            className="pl-10"
+                            value={String(Math.round((field.value || 0) * 100))}
+                            onValueChange={(rawValue) =>
+                              field.onChange(parseInt(rawValue || '0', 10) / 100)
+                            }
+                            onBlur={field.onBlur}
+                          />
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

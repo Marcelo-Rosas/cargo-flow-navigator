@@ -189,13 +189,18 @@ Deno.serve(async (req) => {
     let kmStatus: 'OK' | 'OUT_OF_RANGE' = 'OK';
 
     if (input.price_table_id && input.km_distance !== undefined) {
-      const { data: priceRow } = await supabase
+      // Buscar todas as faixas e filtrar no código (evita 22P02 no PostgREST)
+      const kmForBand = Math.round(Number(input.km_distance));
+      const { data: allRows } = await supabase
         .from('price_table_rows')
         .select('*')
         .eq('price_table_id', input.price_table_id)
-        .lte('km_from', input.km_distance)
-        .gte('km_to', input.km_distance)
-        .maybeSingle();
+        .order('km_from', { ascending: true });
+
+      const priceRow =
+        allRows?.find(
+          (r: { km_from: number; km_to: number }) => r.km_from <= kmForBand && r.km_to >= kmForBand
+        ) ?? null;
 
       if (priceRow) {
         kmBandLabel = `${priceRow.km_from}-${priceRow.km_to}`;
