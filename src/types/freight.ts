@@ -29,6 +29,8 @@ export interface FreightMeta {
   cubage_factor: number;
   cubage_weight_kg: number;
   billable_weight_kg: number;
+  km_band_used?: number;
+  price_table_row_id?: string;
 }
 
 export interface FreightComponents {

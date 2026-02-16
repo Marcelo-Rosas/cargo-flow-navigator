@@ -186,41 +186,60 @@ Deno.serve(async (req) => {
     let costValuePercent = 0;
     let kmBandLabel: string | null = null;
     let kmStatus: 'OK' | 'OUT_OF_RANGE' = 'OK';
+    let responseStatus: 'OK' | 'OUT_OF_RANGE' | 'MISSING_DATA' = 'OK';
+    let responseError: string | undefined;
+    let kmBandUsed: number | undefined;
+    let priceTableRowId: string | undefined;
 
-    if (input.price_table_id && input.km_distance !== undefined) {
-      // Buscar todas as faixas e filtrar no código (evita 22P02 no PostgREST)
-      const kmForBand = Math.round(Number(input.km_distance));
-      const { data: allRows } = await supabase
+    if (!input.price_table_id) {
+      responseStatus = 'MISSING_DATA';
+      responseError = 'Tabela de preços não selecionada';
+      fallbacksApplied.push('price_table: não informada');
+    } else if (input.km_distance === undefined) {
+      responseStatus = 'MISSING_DATA';
+      responseError = 'Tabela de preços não selecionada';
+      fallbacksApplied.push('price_table: km_distance ausente');
+    } else {
+      const kmBand = Math.round(Number(input.km_distance));
+      kmBandUsed = kmBand;
+
+      const { data: allRows, error: rowsError } = await supabase
         .from('price_table_rows')
         .select('*')
         .eq('price_table_id', input.price_table_id)
         .order('km_from', { ascending: true });
 
-      const priceRow =
-        allRows?.find(
-          (r: { km_from: number; km_to: number }) => r.km_from <= kmForBand && r.km_to >= kmForBand
-        ) ?? null;
-
-      if (priceRow) {
-        kmBandLabel = `${priceRow.km_from}-${priceRow.km_to}`;
-
-        // FOB Lotação: usar cost_per_ton
-        const costPerTon = Number(priceRow.cost_per_ton) || 0;
-        baseCost = (billableWeightKg / 1000) * costPerTon;
-
-        grisPercent = Number(priceRow.gris_percent) || 0;
-        tsoPercent = Number(priceRow.tso_percent) || 0;
-        costValuePercent = Number(priceRow.cost_value_percent) || 0;
-
-        console.log(
-          `[calculate-freight] Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, baseCost: ${baseCost}`
-        );
+      if (rowsError) {
+        responseStatus = 'MISSING_DATA';
+        responseError = 'Erro ao consultar linhas da tabela de preços';
+        fallbacksApplied.push(`price_table_row: ${rowsError.message}`);
       } else {
-        kmStatus = 'OUT_OF_RANGE';
-        fallbacksApplied.push(`price_table_row: nenhuma faixa para ${input.km_distance} km`);
+        const priceRow =
+          allRows?.find(
+            (r: { km_from: number; km_to: number }) => r.km_from <= kmBand && r.km_to >= kmBand
+          ) ?? null;
+
+        if (priceRow) {
+          kmBandLabel = `${priceRow.km_from}-${priceRow.km_to}`;
+          priceTableRowId = priceRow.id;
+
+          const costPerTon = Number(priceRow.cost_per_ton) || 0;
+          baseCost = (billableWeightKg / 1000) * costPerTon;
+
+          grisPercent = Number(priceRow.gris_percent) || 0;
+          tsoPercent = Number(priceRow.tso_percent) || 0;
+          costValuePercent = Number(priceRow.cost_value_percent) || 0;
+
+          console.log(
+            `[calculate-freight] Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, baseCost: ${baseCost}`
+          );
+        } else {
+          kmStatus = 'OUT_OF_RANGE';
+          responseStatus = 'OUT_OF_RANGE';
+          responseError = `Não existe faixa para ${kmBand} km nessa tabela`;
+          fallbacksApplied.push(`price_table_row: nenhuma faixa para ${kmBand} km`);
+        }
       }
-    } else {
-      fallbacksApplied.push('price_table: não informada');
     }
 
     // =====================================================
@@ -518,6 +537,8 @@ Deno.serve(async (req) => {
       cubage_factor: cubageFactor,
       cubage_weight_kg: roundCurrency(cubageWeightKg),
       billable_weight_kg: roundCurrency(billableWeightKg),
+      ...(kmBandUsed !== undefined && { km_band_used: kmBandUsed }),
+      ...(priceTableRowId && { price_table_row_id: priceTableRowId }),
     };
 
     const components: FreightComponents = {
@@ -568,9 +589,8 @@ Deno.serve(async (req) => {
 
     const response: CalculateFreightResponse = {
       success: true,
-      status: kmStatus === 'OUT_OF_RANGE' ? 'OUT_OF_RANGE' : 'OK',
-      error:
-        kmStatus === 'OUT_OF_RANGE' ? `Distância ${input.km_distance} km fora da faixa` : undefined,
+      status: responseStatus,
+      error: responseError,
       meta,
       components,
       rates,

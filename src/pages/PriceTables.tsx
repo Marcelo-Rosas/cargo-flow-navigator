@@ -479,10 +479,18 @@ function ActiveTablesTab() {
     );
   }
 
+  // Corrigindo comportamento: se ambas estão vazias, mensagem amigável.
+  if (!activeLotacao && !activeFracionado) {
+    return (
+      <div className="flex items-center justify-center py-12 text-muted-foreground">
+        Nenhuma tabela ativa encontrada para as modalidades Lotação e Fracionado.
+      </div>
+    );
+  }
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      <ActiveTableCard title="Lotação" table={activeLotacao} variant="default" />
-      <ActiveTableCard title="Fracionado" table={activeFracionado} variant="secondary" />
+      <ActiveTableCard title="Lotação" table={activeLotacao ?? null} variant="default" />
+      <ActiveTableCard title="Fracionado" table={activeFracionado ?? null} variant="secondary" />
     </div>
   );
 }

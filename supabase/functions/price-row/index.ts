@@ -1,118 +1,169 @@
-import { createClient } from '@supabase/supabase-js';
-import { getCorsHeaders } from '../_shared/cors.ts';
-
 // Edge Function: price-row
-// Contrato: 200 { row } | 404 { row: null, error } | 400 validação | 500 erro interno
-// Recebe { price_table_id: uuid, km: number, rounding?: 'ceil'|'floor'|'round' }
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const VALID_ROUNDING = ['ceil', 'floor', 'round'] as const;
-
-function jsonResponse(body: object, status: number, corsHeaders: Record<string, string>) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json', Connection: 'keep-alive' },
+// Contrato de resposta:
+// 200: { row }
+// 404: { row: null, error }
+// 4xx/5xx: { error }
+// Validações 400: km inválido/negativo, table_id ausente/uuid inválido, rounding inválido
+import { createClient } from '@supabase/supabase-js';
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+}
+const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  auth: {
+    persistSession: false,
+  },
+});
+// Utilidades
+const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isUuid = (s) => !!s && /^[0-9a-f-]{36}$/i.test(s);
+const validRoundings = new Set(['ceil', 'floor', 'round']);
+function json(res, init = {}) {
+  return new Response(JSON.stringify(res), {
+    headers: {
+      'Content-Type': 'application/json',
+      Connection: 'keep-alive',
+    },
+    ...init,
   });
 }
-
-Deno.serve(async (req: Request) => {
-  const corsHeaders = getCorsHeaders(req);
-
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
+// Opcional: métrica assíncrona
+async function logMetric(params) {
+  try {
+    // Exemplo: você pode enviar para uma tabela de logs ou observabilidade externa
+    // Aqui deixamos como no-op comentado para evitar dependências externas
+    // await fetch('https://example-log', { method: 'POST', body: JSON.stringify(params) });
+  } catch (_) {}
+}
+Deno.serve(async (req) => {
   try {
     if (req.method !== 'POST') {
-      return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
-    }
-
-    const contentType = req.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-      return jsonResponse({ error: 'Content-Type must be application/json' }, 415, corsHeaders);
-    }
-
-    const { price_table_id, km, rounding } = await req.json().catch(() => ({}));
-
-    // Validação antecipada 400
-    if (!price_table_id) {
-      return jsonResponse({ error: 'Missing required field: price_table_id' }, 400, corsHeaders);
-    }
-    if (typeof price_table_id !== 'string' || !UUID_REGEX.test(price_table_id)) {
-      return jsonResponse(
-        { error: 'Invalid price_table_id: must be a valid UUID' },
-        400,
-        corsHeaders
+      return json(
+        {
+          error: 'Method not allowed',
+        },
+        {
+          status: 405,
+        }
       );
     }
-    if (typeof km !== 'number' || !Number.isFinite(km)) {
-      return jsonResponse(
-        { error: 'Missing or invalid field: km must be a finite number' },
-        400,
-        corsHeaders
+    const contentType = req.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return json(
+        {
+          error: 'Content-Type must be application/json',
+        },
+        {
+          status: 415,
+        }
+      );
+    }
+    const body = await req.json().catch(() => null);
+    const tableId = body?.p_price_table_id ?? '';
+    const rawKm = body?.p_km_numeric;
+    const rounding = body?.p_rounding ?? 'ceil';
+    // Validações 400
+    if (!tableId || !isUuid(tableId)) {
+      return json(
+        {
+          error: 'p_price_table_id ausente ou inválido',
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+    const km = typeof rawKm === 'string' ? Number(rawKm) : Number(rawKm);
+    if (!Number.isFinite(km)) {
+      return json(
+        {
+          error: 'p_km_numeric inválido',
+        },
+        {
+          status: 400,
+        }
       );
     }
     if (km < 0) {
-      return jsonResponse({ error: 'km must be >= 0' }, 400, corsHeaders);
-    }
-    const roundVal = rounding ?? 'round';
-    if (!VALID_ROUNDING.includes(roundVal)) {
-      return jsonResponse(
-        { error: `rounding must be one of: ${VALID_ROUNDING.join(', ')}` },
-        400,
-        corsHeaders
+      return json(
+        {
+          error: 'p_km_numeric não pode ser negativo',
+        },
+        {
+          status: 400,
+        }
       );
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: req.headers.get('Authorization') || '' } },
-    });
-
-    const { data: rpcData, error: rpcError } = await supabase.rpc('find_price_row_by_km', {
-      p_price_table_id: price_table_id,
+    if (!validRoundings.has(rounding)) {
+      return json(
+        {
+          error: 'p_rounding inválido. Use ceil | floor | round',
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+    const { data, error } = await supabase.rpc('find_price_row_by_km', {
+      p_price_table_id: tableId,
       p_km_numeric: km,
-      p_rounding: roundVal,
+      p_rounding: rounding,
     });
-
-    if (rpcError) {
-      console.error('[price-row] RPC error', rpcError);
-      return jsonResponse(
-        { error: 'Erro ao buscar faixa no banco', details: (rpcError as Error).message },
-        500,
-        corsHeaders
+    // Logs assíncronos (não bloqueantes)
+    // deno-lint-ignore no-explicit-any
+    globalThis.EdgeRuntime?.waitUntil?.(
+      logMetric({
+        fn: 'price-row',
+        tableId,
+        km,
+        rounding,
+        hasError: !!error,
+        rows: Array.isArray(data) ? data.length : null,
+        t: Date.now(),
+      })
+    );
+    if (error) {
+      // Erro do banco/sistema -> 500
+      return json(
+        {
+          error: error.message ?? 'Erro interno',
+        },
+        {
+          status: 500,
+        }
       );
     }
-
-    const first = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-    if (!first?.id) {
-      return jsonResponse(
-        { row: null, error: `Nenhuma faixa encontrada para ${km} km na tabela especificada` },
-        404,
-        corsHeaders
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return json(
+        {
+          row: null,
+          error: `Nenhuma faixa encontrada para ${km} km na tabela especificada`,
+        },
+        {
+          status: 404,
+        }
       );
     }
-
-    const { data: fullRow, error: fetchError } = await supabase
-      .from('price_table_rows')
-      .select('*')
-      .eq('id', first.id)
-      .single();
-
-    if (fetchError) {
-      console.error('[price-row] Fetch full row error', fetchError);
-      return jsonResponse(
-        { error: 'Erro ao obter dados da faixa', details: (fetchError as Error).message },
-        500,
-        corsHeaders
-      );
-    }
-
-    return jsonResponse({ row: fullRow }, 200, corsHeaders);
+    // Sucesso 200
+    const row = data[0];
+    return json(
+      {
+        row,
+      },
+      {
+        status: 200,
+      }
+    );
   } catch (e) {
-    console.error('[price-row] Unhandled error', e);
-    return jsonResponse({ error: 'Internal error' }, 500, corsHeaders);
+    const message = e instanceof Error ? e.message : String(e);
+    return json(
+      {
+        error: message || 'Erro interno',
+      },
+      {
+        status: 500,
+      }
+    );
   }
 });

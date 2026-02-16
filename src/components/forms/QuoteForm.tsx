@@ -416,7 +416,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       });
 
       if (error || !data?.success) {
-        toast.error(data?.error || error?.message || 'Erro ao calcular distância');
+        const errMsg = data?.error || (error as Error)?.message || 'Erro ao calcular distância';
+        const isFetchError = /failed to send|fetch error|network/i.test(String(errMsg));
+        toast.error(
+          isFetchError
+            ? 'Falha de conexão com o servidor. Verifique sua internet e tente novamente.'
+            : errMsg
+        );
         return;
       }
 
@@ -428,8 +434,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
       form.setValue('km_distance', km, { shouldDirty: true, shouldValidate: true });
       toast.success(`Distância calculada: ${km.toLocaleString('pt-BR')} km`);
-    } catch {
-      toast.error('Erro ao calcular distância');
+    } catch (e) {
+      const msg = (e as Error)?.message || '';
+      const isFetchError = /failed to send|fetch error|network/i.test(msg);
+      toast.error(
+        isFetchError
+          ? 'Falha de conexão com o servidor. Verifique sua internet e tente novamente.'
+          : 'Erro ao calcular distância'
+      );
     } finally {
       setIsCalculatingKm(false);
     }

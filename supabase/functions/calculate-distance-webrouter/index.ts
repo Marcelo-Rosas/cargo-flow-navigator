@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 
 type Input = {
@@ -47,7 +46,7 @@ const ERROR_MAP: Record<string, { status: number; message: string }> = {
   ERRO_CALCULO_ROTEIRO: { status: 422, message: 'Erro ao calcular rota' },
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
