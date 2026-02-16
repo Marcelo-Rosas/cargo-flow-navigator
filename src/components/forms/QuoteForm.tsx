@@ -124,6 +124,9 @@ interface QuoteFormProps {
 // Utility: sanitize CEP to 8 digits
 const sanitizeCep = (value: string) => value.replace(/\D/g, '').slice(0, 8);
 
+const kgToUnit = (kg: number, unit: 'kg' | 'ton') => (unit === 'ton' ? kg / 1000 : kg);
+const unitToKg = (value: number, unit: 'kg' | 'ton') => (unit === 'ton' ? value * 1000 : value);
+
 export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { user } = useAuth();
   const { data: clients } = useClients();
@@ -218,8 +221,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const icmsRate = icmsRateData?.rate_percent ?? 12;
 
   // Normalize weight to kg; clamp to DECIMAL(10,2) max (99.999.999,99)
-  const rawKg = weightUnit === 'ton' ? (watchedWeight || 0) * 1000 : watchedWeight || 0;
-  const effectiveWeightKg = Math.min(rawKg, 99_999_999.99);
+  const effectiveWeightKg = Math.min(unitToKg(watchedWeight || 0, weightUnit), 99_999_999.99);
 
   // Calculate freight using the pure function
   const calculationResult = useMemo(() => {
@@ -258,6 +260,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     userEditedDestination.current = false;
 
     if (quote) {
+      const quoteWeightKg = Number(quote.weight) || 0;
+      const weightInUnit = kgToUnit(quoteWeightKg, weightUnit);
       form.reset({
         client_id: quote.client_id || '',
         client_name: quote.client_name,
@@ -272,7 +276,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         origin: quote.origin,
         destination: quote.destination,
         cargo_type: quote.cargo_type || '',
-        weight: Number(quote.weight) || 0,
+        weight: Number.isFinite(weightInUnit) ? weightInUnit : 0,
         volume: Number(quote.volume) || 0,
         price_table_id: quote.price_table_id || '',
         vehicle_type_id: quote.vehicle_type_id || '',
@@ -312,7 +316,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         notes: '',
       });
     }
-  }, [quote, form]);
+  }, [quote, form, weightUnit]);
 
   const handleClientSelect = (clientId: string) => {
     const selectedClient = clients?.find((c) => c.id === clientId);
@@ -957,7 +961,18 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                         <ToggleGroup
                           type="single"
                           value={weightUnit}
-                          onValueChange={(v) => v && setWeightUnit(v as 'kg' | 'ton')}
+                          onValueChange={(v) => {
+                            if (!v) return;
+                            const nextUnit = v as 'kg' | 'ton';
+                            const currentUnit = weightUnit;
+                            const currentValue = Number(form.getValues('weight') || 0);
+                            const kg = unitToKg(currentValue, currentUnit);
+                            const nextValue = kgToUnit(kg, nextUnit);
+                            setWeightUnit(nextUnit);
+                            form.setValue('weight', Number.isFinite(nextValue) ? nextValue : 0, {
+                              shouldDirty: true,
+                            });
+                          }}
                           size="sm"
                           className="shrink-0"
                         >
