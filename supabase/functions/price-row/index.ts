@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.45.3';
+import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
 
 // Edge Function: price-row
@@ -60,14 +60,20 @@ Deno.serve(async (req: Request) => {
 
     const first = Array.isArray(rpcData) ? rpcData[0] : rpcData;
     if (!first?.id) {
-      return new Response(JSON.stringify({ row: null }), {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-          Connection: 'keep-alive',
-        },
-      });
+      return new Response(
+        JSON.stringify({
+          row: null,
+          error: `Nenhuma faixa encontrada para ${km} km na tabela especificada`,
+        }),
+        {
+          status: 404,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            Connection: 'keep-alive',
+          },
+        }
+      );
     }
 
     const { data: fullRow, error: fetchError } = await supabase

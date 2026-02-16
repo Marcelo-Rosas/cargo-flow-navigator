@@ -197,8 +197,15 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   // Busca faixa via Edge Function price-row (RPC find_price_row_by_km)
   const kmForRpc = Number(watchedKmDistance || 0);
-  const { data: priceTableRowFromEdgeFn, isLoading: isLoadingPriceRow } =
-    usePriceTableRowByKmFromEdgeFn(watchedPriceTableId || '', kmForRpc);
+  const {
+    data: priceTableRowFromEdgeFn,
+    isLoading: isLoadingPriceRow,
+    error: priceRowError,
+  } = usePriceTableRowByKmFromEdgeFn(
+    watchedPriceTableId || '',
+    kmForRpc,
+    watchedFreightModality ?? undefined
+  );
   const { data: priceTableRows } = usePriceTableRows(watchedPriceTableId || '');
   const priceTableRow = priceTableRowFromEdgeFn ?? null;
   const kmRounded = Math.round(kmForRpc);
@@ -587,7 +594,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription className="space-y-1">
                   <span className="block">
-                    {calculationResult.error ||
+                    {priceRowError?.message ||
+                      calculationResult.error ||
                       'Distância fora da faixa de quilometragem da tabela selecionada'}
                   </span>
                   {priceTableRows && priceTableRows.length > 0 && (
