@@ -44,7 +44,7 @@ import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { usePriceTables } from '@/hooks/usePriceTables';
 import { useVehicleTypes, usePaymentTerms } from '@/hooks/usePricingRules';
-import { usePriceTableRows } from '@/hooks/usePriceTableRows';
+import { usePriceTableRows, usePriceTableRowByKmFromEdgeFn } from '@/hooks/usePriceTableRows';
 import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -195,13 +195,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedTdeEnabled = form.watch('tde_enabled');
   const watchedTearEnabled = form.watch('tear_enabled');
 
-  // Fetch all price table rows and resolve band client-side (evita 22P02 no PostgREST)
-  const { data: priceTableRows, isLoading: isLoadingPriceRow } = usePriceTableRows(
-    watchedPriceTableId || ''
-  );
-  const kmRounded = Math.round(Number(watchedKmDistance || 0));
-  const priceTableRow =
-    priceTableRows?.find((r) => r.km_from <= kmRounded && r.km_to >= kmRounded) ?? null;
+  // Busca faixa via Edge Function price-row (RPC find_price_row_by_km)
+  const kmForRpc = Number(watchedKmDistance || 0);
+  const { data: priceTableRowFromEdgeFn, isLoading: isLoadingPriceRow } =
+    usePriceTableRowByKmFromEdgeFn(watchedPriceTableId || '', kmForRpc);
+  const { data: priceTableRows } = usePriceTableRows(watchedPriceTableId || '');
+  const priceTableRow = priceTableRowFromEdgeFn ?? null;
+  const kmRounded = Math.round(kmForRpc);
 
   // Get ICMS rate for origin/destination states
   const originUf = extractUf(watchedOrigin || '');
@@ -585,9 +585,18 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             {calculationResult.status === 'OUT_OF_RANGE' && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  {calculationResult.error ||
-                    'Distância fora da faixa de quilometragem da tabela selecionada'}
+                <AlertDescription className="space-y-1">
+                  <span className="block">
+                    {calculationResult.error ||
+                      'Distância fora da faixa de quilometragem da tabela selecionada'}
+                  </span>
+                  {priceTableRows && priceTableRows.length > 0 && (
+                    <span className="block text-sm mt-2 opacity-90">
+                      Faixas disponíveis na tabela:{' '}
+                      {priceTableRows.map((r) => `${r.km_from}-${r.km_to} km`).join(', ')}. Adicione
+                      uma faixa que inclua {kmRounded} km ou selecione outra tabela.
+                    </span>
+                  )}
                 </AlertDescription>
               </Alert>
             )}

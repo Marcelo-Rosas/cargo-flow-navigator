@@ -27,7 +27,9 @@ git show 1fd1ae2
 git status
 
 # Commit + push + deploy (após correções)
-git add -A && git commit -m "fix: descrição" && git push && npx supabase functions deploy calculate-freight
+git add -A && git commit -m "fix: descrição" && git push
+supabase functions deploy price-row
+supabase functions deploy calculate-freight
 ```
 
 ---
@@ -81,6 +83,17 @@ git add -A && git commit -m "fix: descrição" && git push && npx supabase funct
 | `QuoteForm.tsx` | Modalidade muda mas `price_table_id` pode ficar incoerente | Limpar `price_table_id` ao mudar modalidade se tabela não pertencer à nova |
 
 **Causa:** Tabela sem linhas em `price_table_rows` (rows=0) ou tabela de modalidade diferente; mensagem enganosa por falta de `priceTableId`.
+
+### 6. OUT_OF_RANGE / faixa por km via RPC e Edge Function
+
+| Item | Descrição |
+|------|-----------|
+| RPC `find_price_row_by_km` | Criada no Supabase (borda exclusiva no fim, rounding configurável) |
+| Edge Function `price-row` | CORS, full row fetch, default rounding `round` |
+| `usePriceTableRowByKmFromEdgeFn` | Hook que chama Edge Function price-row |
+| `QuoteForm.tsx` | Usa Edge Function em vez de `.find()` em todas as linhas — alerta some e botão habilita quando faixa existe |
+
+**Causa:** Distância (ex.: 1718.9 km) não encontrava faixa com lógica client-side inclusiva; RPC usa borda exclusiva no fim, permitindo match correto.
 
 ---
 

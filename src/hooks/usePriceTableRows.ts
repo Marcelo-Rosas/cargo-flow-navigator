@@ -44,6 +44,27 @@ export function usePriceTableRowByKmRange(priceTableId: string, kmDistance: numb
   });
 }
 
+/** Busca faixa via Edge Function price-row (usa RPC find_price_row_by_km) */
+export function usePriceTableRowByKmFromEdgeFn(priceTableId: string, kmDistance: number) {
+  return useQuery({
+    queryKey: ['price_table_rows', 'edgefn', priceTableId, kmDistance],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('price-row', {
+        body: {
+          price_table_id: asDb(priceTableId),
+          km: Number(kmDistance),
+          rounding: 'round',
+        },
+      });
+
+      if (error) throw error;
+      const row = data?.row ?? data?.rows?.[0] ?? null;
+      return row ? filterSupabaseSingle<PriceTableRow>(row) : null;
+    },
+    enabled: !!priceTableId && kmDistance > 0,
+  });
+}
+
 export function useCreatePriceTableRow() {
   const queryClient = useQueryClient();
 
