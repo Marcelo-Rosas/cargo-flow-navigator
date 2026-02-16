@@ -87,8 +87,18 @@ const quoteSchema = z.object({
   origin: z.string().min(2, 'Origem obrigatória'),
   destination: z.string().min(2, 'Destino obrigatório'),
   cargo_type: z.string().optional(),
-  weight: z.number().min(0, 'Peso inválido').optional().default(0),
-  volume: z.number().min(0, 'Volume inválido').optional().default(0),
+  weight: z
+    .number()
+    .min(0, 'Peso inválido')
+    .max(99_999_999, 'Peso excede o limite (99.999.999)')
+    .optional()
+    .default(0),
+  volume: z
+    .number()
+    .min(0, 'Volume inválido')
+    .max(99_999_999, 'Volume excede o limite (99.999.999)')
+    .optional()
+    .default(0),
   // Pricing selectors
   price_table_id: idString,
   vehicle_type_id: idString,
@@ -193,8 +203,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: icmsRateData } = useIcmsRateForPricing(originUf || '', destUf || '');
   const icmsRate = icmsRateData?.rate_percent ?? 12;
 
-  // Normalize weight to kg based on selected unit
-  const effectiveWeightKg = weightUnit === 'ton' ? (watchedWeight || 0) * 1000 : watchedWeight || 0;
+  // Normalize weight to kg; clamp to DECIMAL(10,2) max (99.999.999,99)
+  const rawKg = weightUnit === 'ton' ? (watchedWeight || 0) * 1000 : watchedWeight || 0;
+  const effectiveWeightKg = Math.min(rawKg, 99_999_999.99);
 
   // Calculate freight using the pure function
   const calculationResult = useMemo(() => {
@@ -463,10 +474,24 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         origin: data.origin,
         destination: data.destination,
         cargo_type: data.cargo_type || null,
-        weight: effectiveWeightKg || null,
-        volume: data.volume || null,
-        cubage_weight: calculationResult.meta.cubageWeightKg || null,
-        billable_weight: calculationResult.meta.billableWeightKg || null,
+        weight:
+          effectiveWeightKg != null && Number.isFinite(effectiveWeightKg)
+            ? Math.min(effectiveWeightKg, 99_999_999.99)
+            : null,
+        volume:
+          data.volume != null && Number.isFinite(data.volume)
+            ? Math.min(Number(data.volume), 99_999_999.99)
+            : null,
+        cubage_weight:
+          calculationResult.meta.cubageWeightKg != null &&
+          Number.isFinite(calculationResult.meta.cubageWeightKg)
+            ? calculationResult.meta.cubageWeightKg
+            : null,
+        billable_weight:
+          calculationResult.meta.billableWeightKg != null &&
+          Number.isFinite(calculationResult.meta.billableWeightKg)
+            ? calculationResult.meta.billableWeightKg
+            : null,
         price_table_id: data.price_table_id || null,
         vehicle_type_id: data.vehicle_type_id || null,
         payment_term_id: data.payment_term_id || null,
@@ -858,6 +883,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                           <Input
                             type="number"
                             placeholder="0"
+                            min={0}
+                            max={weightUnit === 'ton' ? 99_999 : 99_999_999}
+                            step={weightUnit === 'ton' ? 0.001 : 1}
                             {...field}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                           />
