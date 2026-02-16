@@ -81,7 +81,15 @@ export type Database = {
           table_name?: string;
           user_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'audit_logs_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
       };
       clients: {
         Row: {
@@ -97,6 +105,7 @@ export type Database = {
           phone: string | null;
           state: string | null;
           updated_at: string;
+          user_id: string;
           zip_code: string | null;
         };
         Insert: {
@@ -112,6 +121,7 @@ export type Database = {
           phone?: string | null;
           state?: string | null;
           updated_at?: string;
+          user_id?: string;
           zip_code?: string | null;
         };
         Update: {
@@ -127,9 +137,25 @@ export type Database = {
           phone?: string | null;
           state?: string | null;
           updated_at?: string;
+          user_id?: string;
           zip_code?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'clients_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
+            foreignKeyName: 'clients_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
       };
       conditional_fees: {
         Row: {
@@ -147,6 +173,7 @@ export type Database = {
           min_value: number | null;
           name: string;
           updated_at: string;
+          user_id: string | null;
           valid_from: string | null;
           valid_until: string | null;
         };
@@ -165,6 +192,7 @@ export type Database = {
           min_value?: number | null;
           name: string;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
         };
@@ -183,6 +211,7 @@ export type Database = {
           min_value?: number | null;
           name?: string;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
         };
@@ -312,106 +341,12 @@ export type Database = {
             referencedRelation: 'quotes';
             referencedColumns: ['id'];
           },
-        ];
-      };
-      drivers: {
-        Row: {
-          active: boolean;
-          address: string | null;
-          birth_date: string | null;
-          city: string | null;
-          cnh: string | null;
-          cnh_category: string | null;
-          cnh_validity: string | null;
-          cpf: string | null;
-          created_at: string;
-          created_by: string | null;
-          email: string | null;
-          father_name: string | null;
-          has_accident_history: boolean;
-          has_robbery_history: boolean;
-          id: string;
-          mother_name: string | null;
-          name: string;
-          notes: string | null;
-          owner_id: string | null;
-          phone: string | null;
-          phone_secondary: string | null;
-          rg: string | null;
-          rg_emitter: string | null;
-          state: string | null;
-          transported_before: boolean;
-          transported_details: string | null;
-          updated_at: string;
-          zip_code: string | null;
-        };
-        Insert: {
-          active?: boolean;
-          address?: string | null;
-          birth_date?: string | null;
-          city?: string | null;
-          cnh?: string | null;
-          cnh_category?: string | null;
-          cnh_validity?: string | null;
-          cpf?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          email?: string | null;
-          father_name?: string | null;
-          has_accident_history?: boolean;
-          has_robbery_history?: boolean;
-          id?: string;
-          mother_name?: string | null;
-          name: string;
-          notes?: string | null;
-          owner_id?: string | null;
-          phone?: string | null;
-          phone_secondary?: string | null;
-          rg?: string | null;
-          rg_emitter?: string | null;
-          state?: string | null;
-          transported_before?: boolean;
-          transported_details?: string | null;
-          updated_at?: string;
-          zip_code?: string | null;
-        };
-        Update: {
-          active?: boolean;
-          address?: string | null;
-          birth_date?: string | null;
-          city?: string | null;
-          cnh?: string | null;
-          cnh_category?: string | null;
-          cnh_validity?: string | null;
-          cpf?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          email?: string | null;
-          father_name?: string | null;
-          has_accident_history?: boolean;
-          has_robbery_history?: boolean;
-          id?: string;
-          mother_name?: string | null;
-          name?: string;
-          notes?: string | null;
-          owner_id?: string | null;
-          phone?: string | null;
-          phone_secondary?: string | null;
-          rg?: string | null;
-          rg_emitter?: string | null;
-          state?: string | null;
-          transported_before?: boolean;
-          transported_details?: string | null;
-          updated_at?: string;
-          zip_code?: string | null;
-        };
-        Relationships: [
           {
-            foreignKeyName: 'drivers_owner_id_fkey';
-            columns: ['owner_id'];
+            foreignKeyName: 'documents_uploaded_by_fkey';
+            columns: ['uploaded_by'];
             isOneToOne: false;
-            referencedRelation: 'owners';
-            referencedColumns: ['id'];
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
           },
         ];
       };
@@ -424,6 +359,7 @@ export type Database = {
           origin_state: string;
           rate_percent: number;
           updated_at: string;
+          user_id: string | null;
           valid_from: string | null;
           valid_until: string | null;
         };
@@ -435,6 +371,7 @@ export type Database = {
           origin_state: string;
           rate_percent: number;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
         };
@@ -446,10 +383,19 @@ export type Database = {
           origin_state?: string;
           rate_percent?: number;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'icms_rates_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
       };
       occurrences: {
         Row: {
@@ -487,11 +433,25 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: 'occurrences_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
             foreignKeyName: 'occurrences_order_id_fkey';
             columns: ['order_id'];
             isOneToOne: false;
             referencedRelation: 'orders';
             referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'occurrences_resolved_by_fkey';
+            columns: ['resolved_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
           },
         ];
       };
@@ -503,7 +463,6 @@ export type Database = {
           created_at: string;
           created_by: string;
           destination: string;
-          driver_id: string | null;
           driver_name: string | null;
           driver_phone: string | null;
           eta: string | null;
@@ -524,7 +483,6 @@ export type Database = {
           os_number: string;
           quote_id: string | null;
           stage: Database['public']['Enums']['order_stage'];
-          ui_last_tab: string | null;
           updated_at: string;
           value: number;
           vehicle_plate: string | null;
@@ -538,7 +496,6 @@ export type Database = {
           created_at?: string;
           created_by: string;
           destination: string;
-          driver_id?: string | null;
           driver_name?: string | null;
           driver_phone?: string | null;
           eta?: string | null;
@@ -559,7 +516,6 @@ export type Database = {
           os_number: string;
           quote_id?: string | null;
           stage?: Database['public']['Enums']['order_stage'];
-          ui_last_tab?: string | null;
           updated_at?: string;
           value?: number;
           vehicle_plate?: string | null;
@@ -573,7 +529,6 @@ export type Database = {
           created_at?: string;
           created_by?: string;
           destination?: string;
-          driver_id?: string | null;
           driver_name?: string | null;
           driver_phone?: string | null;
           eta?: string | null;
@@ -594,7 +549,6 @@ export type Database = {
           os_number?: string;
           quote_id?: string | null;
           stage?: Database['public']['Enums']['order_stage'];
-          ui_last_tab?: string | null;
           updated_at?: string;
           value?: number;
           vehicle_plate?: string | null;
@@ -603,6 +557,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: 'orders_assigned_to_fkey';
+            columns: ['assigned_to'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
             foreignKeyName: 'orders_client_id_fkey';
             columns: ['client_id'];
             isOneToOne: false;
@@ -610,11 +571,11 @@ export type Database = {
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'orders_driver_id_fkey';
-            columns: ['driver_id'];
+            foreignKeyName: 'orders_created_by_fkey';
+            columns: ['created_by'];
             isOneToOne: false;
-            referencedRelation: 'drivers';
-            referencedColumns: ['id'];
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
           },
           {
             foreignKeyName: 'orders_quote_id_fkey';
@@ -624,63 +585,6 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
-      };
-      owners: {
-        Row: {
-          active: boolean;
-          address: string | null;
-          city: string | null;
-          cpf_cnpj: string | null;
-          created_at: string;
-          created_by: string | null;
-          email: string | null;
-          id: string;
-          name: string;
-          notes: string | null;
-          phone: string | null;
-          rg: string | null;
-          rg_emitter: string | null;
-          state: string | null;
-          updated_at: string;
-          zip_code: string | null;
-        };
-        Insert: {
-          active?: boolean;
-          address?: string | null;
-          city?: string | null;
-          cpf_cnpj?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          email?: string | null;
-          id?: string;
-          name: string;
-          notes?: string | null;
-          phone?: string | null;
-          rg?: string | null;
-          rg_emitter?: string | null;
-          state?: string | null;
-          updated_at?: string;
-          zip_code?: string | null;
-        };
-        Update: {
-          active?: boolean;
-          address?: string | null;
-          city?: string | null;
-          cpf_cnpj?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          email?: string | null;
-          id?: string;
-          name?: string;
-          notes?: string | null;
-          phone?: string | null;
-          rg?: string | null;
-          rg_emitter?: string | null;
-          state?: string | null;
-          updated_at?: string;
-          zip_code?: string | null;
-        };
-        Relationships: [];
       };
       payment_terms: {
         Row: {
@@ -693,6 +597,7 @@ export type Database = {
           id: string;
           name: string;
           updated_at: string;
+          user_id: string | null;
         };
         Insert: {
           active?: boolean;
@@ -704,6 +609,7 @@ export type Database = {
           id?: string;
           name: string;
           updated_at?: string;
+          user_id?: string | null;
         };
         Update: {
           active?: boolean;
@@ -715,6 +621,7 @@ export type Database = {
           id?: string;
           name?: string;
           updated_at?: string;
+          user_id?: string | null;
         };
         Relationships: [];
       };
@@ -732,6 +639,7 @@ export type Database = {
           price_table_id: string;
           toll_percent: number | null;
           tso_percent: number | null;
+          user_id: string | null;
         };
         Insert: {
           ad_valorem_percent?: number | null;
@@ -746,6 +654,7 @@ export type Database = {
           price_table_id: string;
           toll_percent?: number | null;
           tso_percent?: number | null;
+          user_id?: string | null;
         };
         Update: {
           ad_valorem_percent?: number | null;
@@ -760,6 +669,7 @@ export type Database = {
           price_table_id?: string;
           toll_percent?: number | null;
           tso_percent?: number | null;
+          user_id?: string | null;
         };
         Relationships: [
           {
@@ -780,6 +690,7 @@ export type Database = {
           modality: string;
           name: string;
           updated_at: string;
+          user_id: string | null;
           valid_from: string | null;
           valid_until: string | null;
           version: number;
@@ -792,6 +703,7 @@ export type Database = {
           modality: string;
           name: string;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
           version?: number;
@@ -804,11 +716,20 @@ export type Database = {
           modality?: string;
           name?: string;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
           version?: number;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'price_tables_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
       };
       pricing_parameters: {
         Row: {
@@ -819,6 +740,7 @@ export type Database = {
           key: string;
           unit: string | null;
           updated_at: string;
+          user_id: string | null;
           valid_from: string | null;
           valid_until: string | null;
           value: number;
@@ -831,6 +753,7 @@ export type Database = {
           key: string;
           unit?: string | null;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
           value: number;
@@ -843,6 +766,7 @@ export type Database = {
           key?: string;
           unit?: string | null;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
           value?: number;
@@ -853,34 +777,45 @@ export type Database = {
         Row: {
           avatar_url: string | null;
           created_at: string;
-          email: string;
+          email: string | null;
           full_name: string;
           id: string;
+          perfil: Database['public']['Enums']['user_profile'] | null;
           phone: string | null;
           updated_at: string;
-          user_id: string;
+          user_id: string | null;
         };
         Insert: {
           avatar_url?: string | null;
           created_at?: string;
-          email: string;
+          email?: string | null;
           full_name: string;
           id?: string;
+          perfil?: Database['public']['Enums']['user_profile'] | null;
           phone?: string | null;
           updated_at?: string;
-          user_id: string;
+          user_id?: string | null;
         };
         Update: {
           avatar_url?: string | null;
           created_at?: string;
-          email?: string;
+          email?: string | null;
           full_name?: string;
           id?: string;
+          perfil?: Database['public']['Enums']['user_profile'] | null;
           phone?: string | null;
           updated_at?: string;
-          user_id?: string;
+          user_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'profiles_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: true;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
       };
       quotes: {
         Row: {
@@ -901,7 +836,7 @@ export type Database = {
           destination_cep: string | null;
           discharge_checklist_selected: Json | null;
           freight_modality: string | null;
-          freight_type: string;
+          freight_type: string | null;
           id: string;
           km_distance: number | null;
           notes: string | null;
@@ -943,7 +878,7 @@ export type Database = {
           destination_cep?: string | null;
           discharge_checklist_selected?: Json | null;
           freight_modality?: string | null;
-          freight_type?: string;
+          freight_type?: string | null;
           id?: string;
           km_distance?: number | null;
           notes?: string | null;
@@ -985,7 +920,7 @@ export type Database = {
           destination_cep?: string | null;
           discharge_checklist_selected?: Json | null;
           freight_modality?: string | null;
-          freight_type?: string;
+          freight_type?: string | null;
           id?: string;
           km_distance?: number | null;
           notes?: string | null;
@@ -1011,11 +946,25 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: 'quotes_assigned_to_fkey';
+            columns: ['assigned_to'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
             foreignKeyName: 'quotes_client_id_fkey';
             columns: ['client_id'];
             isOneToOne: false;
             referencedRelation: 'clients';
             referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'quotes_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
           },
           {
             foreignKeyName: 'quotes_payment_term_id_fkey';
@@ -1093,7 +1042,15 @@ export type Database = {
           updated_at?: string;
           zip_code?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'shippers_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
       };
       tac_rates: {
         Row: {
@@ -1106,6 +1063,7 @@ export type Database = {
           reference_date: string;
           source_description: string | null;
           updated_at: string;
+          user_id: string | null;
           variation_percent: number | null;
         };
         Insert: {
@@ -1118,6 +1076,7 @@ export type Database = {
           reference_date: string;
           source_description?: string | null;
           updated_at?: string;
+          user_id?: string | null;
           variation_percent?: number | null;
         };
         Update: {
@@ -1130,6 +1089,7 @@ export type Database = {
           reference_date?: string;
           source_description?: string | null;
           updated_at?: string;
+          user_id?: string | null;
           variation_percent?: number | null;
         };
         Relationships: [];
@@ -1146,6 +1106,7 @@ export type Database = {
           origin_state: string;
           toll_value: number;
           updated_at: string;
+          user_id: string | null;
           valid_from: string | null;
           valid_until: string | null;
           vehicle_type_id: string | null;
@@ -1162,6 +1123,7 @@ export type Database = {
           origin_state: string;
           toll_value: number;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
           vehicle_type_id?: string | null;
@@ -1178,6 +1140,7 @@ export type Database = {
           origin_state?: string;
           toll_value?: number;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
           vehicle_type_id?: string | null;
@@ -1189,80 +1152,6 @@ export type Database = {
             columns: ['vehicle_type_id'];
             isOneToOne: false;
             referencedRelation: 'vehicle_types';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
-      trailers: {
-        Row: {
-          active: boolean;
-          brand: string | null;
-          capacity_kg: number | null;
-          chassis: string | null;
-          city: string | null;
-          color: string | null;
-          created_at: string;
-          created_by: string | null;
-          driver_id: string | null;
-          id: string;
-          model: string | null;
-          notes: string | null;
-          plate: string;
-          renavam: string | null;
-          state: string | null;
-          trailer_type: string | null;
-          updated_at: string;
-          year_manufacture: number | null;
-          year_model: number | null;
-        };
-        Insert: {
-          active?: boolean;
-          brand?: string | null;
-          capacity_kg?: number | null;
-          chassis?: string | null;
-          city?: string | null;
-          color?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          driver_id?: string | null;
-          id?: string;
-          model?: string | null;
-          notes?: string | null;
-          plate: string;
-          renavam?: string | null;
-          state?: string | null;
-          trailer_type?: string | null;
-          updated_at?: string;
-          year_manufacture?: number | null;
-          year_model?: number | null;
-        };
-        Update: {
-          active?: boolean;
-          brand?: string | null;
-          capacity_kg?: number | null;
-          chassis?: string | null;
-          city?: string | null;
-          color?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          driver_id?: string | null;
-          id?: string;
-          model?: string | null;
-          notes?: string | null;
-          plate?: string;
-          renavam?: string | null;
-          state?: string | null;
-          trailer_type?: string | null;
-          updated_at?: string;
-          year_manufacture?: number | null;
-          year_model?: number | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'trailers_driver_id_fkey';
-            columns: ['driver_id'];
-            isOneToOne: false;
-            referencedRelation: 'drivers';
             referencedColumns: ['id'];
           },
         ];
@@ -1286,7 +1175,15 @@ export type Database = {
           role?: Database['public']['Enums']['app_role'];
           user_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'user_roles_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
       };
       vehicle_types: {
         Row: {
@@ -1299,6 +1196,7 @@ export type Database = {
           id: string;
           name: string;
           updated_at: string;
+          user_id: string | null;
         };
         Insert: {
           active?: boolean;
@@ -1310,6 +1208,7 @@ export type Database = {
           id?: string;
           name: string;
           updated_at?: string;
+          user_id?: string | null;
         };
         Update: {
           active?: boolean;
@@ -1321,82 +1220,9 @@ export type Database = {
           id?: string;
           name?: string;
           updated_at?: string;
+          user_id?: string | null;
         };
         Relationships: [];
-      };
-      vehicles: {
-        Row: {
-          active: boolean;
-          brand: string | null;
-          capacity_kg: number | null;
-          chassis: string | null;
-          city: string | null;
-          color: string | null;
-          created_at: string;
-          created_by: string | null;
-          driver_id: string | null;
-          id: string;
-          model: string | null;
-          notes: string | null;
-          plate: string;
-          renavam: string | null;
-          state: string | null;
-          updated_at: string;
-          vehicle_type: string | null;
-          year_manufacture: number | null;
-          year_model: number | null;
-        };
-        Insert: {
-          active?: boolean;
-          brand?: string | null;
-          capacity_kg?: number | null;
-          chassis?: string | null;
-          city?: string | null;
-          color?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          driver_id?: string | null;
-          id?: string;
-          model?: string | null;
-          notes?: string | null;
-          plate: string;
-          renavam?: string | null;
-          state?: string | null;
-          updated_at?: string;
-          vehicle_type?: string | null;
-          year_manufacture?: number | null;
-          year_model?: number | null;
-        };
-        Update: {
-          active?: boolean;
-          brand?: string | null;
-          capacity_kg?: number | null;
-          chassis?: string | null;
-          city?: string | null;
-          color?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          driver_id?: string | null;
-          id?: string;
-          model?: string | null;
-          notes?: string | null;
-          plate?: string;
-          renavam?: string | null;
-          state?: string | null;
-          updated_at?: string;
-          vehicle_type?: string | null;
-          year_manufacture?: number | null;
-          year_model?: number | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'vehicles_driver_id_fkey';
-            columns: ['driver_id'];
-            isOneToOne: false;
-            referencedRelation: 'drivers';
-            referencedColumns: ['id'];
-          },
-        ];
       };
       waiting_time_rules: {
         Row: {
@@ -1409,6 +1235,7 @@ export type Database = {
           rate_per_day: number | null;
           rate_per_hour: number | null;
           updated_at: string;
+          user_id: string | null;
           valid_from: string | null;
           valid_until: string | null;
           vehicle_type_id: string | null;
@@ -1423,6 +1250,7 @@ export type Database = {
           rate_per_day?: number | null;
           rate_per_hour?: number | null;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
           vehicle_type_id?: string | null;
@@ -1437,6 +1265,7 @@ export type Database = {
           rate_per_day?: number | null;
           rate_per_hour?: number | null;
           updated_at?: string;
+          user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
           vehicle_type_id?: string | null;
@@ -1453,9 +1282,27 @@ export type Database = {
       };
     };
     Views: {
-      [_ in never]: never;
+      valid_users: {
+        Row: {
+          email: string | null;
+          user_id: string | null;
+        };
+        Insert: {
+          email?: string | null;
+          user_id?: string | null;
+        };
+        Update: {
+          email?: string | null;
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
+      current_user_profile: {
+        Args: never;
+        Returns: Database['public']['Enums']['user_profile'];
+      };
       generate_os_number: { Args: never; Returns: string };
       get_user_role: {
         Args: { _user_id: string };
@@ -1474,6 +1321,14 @@ export type Database = {
           _user_id: string;
         };
         Returns: boolean;
+      };
+      is_admin: { Args: never; Returns: boolean };
+      set_user_profile: {
+        Args: {
+          new_profile: Database['public']['Enums']['user_profile'];
+          target_user_id: string;
+        };
+        Returns: undefined;
       };
     };
     Enums: {
@@ -1504,6 +1359,7 @@ export type Database = {
         | 'negociacao'
         | 'ganho'
         | 'perdido';
+      user_profile: 'admin' | 'operacional' | 'financeiro';
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -1659,6 +1515,7 @@ export const Constants = {
         'ganho',
         'perdido',
       ],
+      user_profile: ['admin', 'operacional', 'financeiro'],
     },
   },
 } as const;

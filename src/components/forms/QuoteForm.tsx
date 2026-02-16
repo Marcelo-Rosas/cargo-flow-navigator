@@ -178,8 +178,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     },
   });
 
+  const watchedFreightModality = form.watch('freight_modality');
   const watchedPriceTableId = form.watch('price_table_id');
   const watchedKmDistance = form.watch('km_distance');
+
+  // Filtrar tabelas pela modalidade (lotação → só lotação; fracionado → só fracionado)
+  const priceTablesFiltered =
+    priceTables?.filter((t) => !watchedFreightModality || t.modality === watchedFreightModality) ??
+    [];
   const watchedOrigin = form.watch('origin');
   const watchedDestination = form.watch('destination');
   const watchedWeight = form.watch('weight');
@@ -218,6 +224,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       tollValue: watchedToll || 0,
       kmDistance: watchedKmDistance || 0,
       priceTableRow: priceTableRow || null,
+      priceTableId: watchedPriceTableId || undefined,
       icmsRatePercent: icmsRate,
       tdeEnabled: watchedTdeEnabled || false,
       tearEnabled: watchedTearEnabled || false,
@@ -230,6 +237,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     watchedCargoValue,
     watchedToll,
     watchedKmDistance,
+    watchedPriceTableId,
     priceTableRow,
     icmsRate,
     watchedTdeEnabled,
@@ -444,6 +452,21 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       return;
     }
 
+    // Block if MISSING_DATA (tabela sem faixas ou não selecionada)
+    if (calculationResult.status === 'MISSING_DATA') {
+      toast.error(
+        calculationResult.error ||
+          'Selecione a tabela de preços e verifique se ela possui faixas de km cadastradas'
+      );
+      return;
+    }
+
+    // Block se price_table_rows ainda carregando
+    if (isLoadingPriceRow) {
+      toast.error('Aguardando carregamento da tabela de preços...');
+      return;
+    }
+
     try {
       // Build pricing breakdown for storage
       const pricingBreakdown = buildStoredBreakdown(calculationResult, {
@@ -565,6 +588,17 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 <AlertDescription>
                   {calculationResult.error ||
                     'Distância fora da faixa de quilometragem da tabela selecionada'}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* MISSING_DATA Alert — tabela sem faixas ou não selecionada */}
+            {calculationResult.status === 'MISSING_DATA' && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {calculationResult.error ||
+                    'Selecione a tabela de preços e verifique se ela possui faixas de km cadastradas'}
                 </AlertDescription>
               </Alert>
             )}
@@ -965,7 +999,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Modalidade de Frete</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <Select
+                        onValueChange={(v) => {
+                          field.onChange(v);
+                          // Limpar tabela ao mudar modalidade (tabela pode ser de outra modalidade)
+                          form.setValue('price_table_id', '');
+                        }}
+                        value={field.value || ''}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecionar modalidade..." />
@@ -994,7 +1035,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {priceTables?.map((table) => (
+                          {priceTablesFiltered.map((table) => (
                             <SelectItem key={table.id} value={table.id}>
                               {table.name} (
                               {table.modality === 'lotacao' ? 'Lotação' : 'Fracionado'})
@@ -1359,7 +1400,12 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isLoading || calculationResult.status === 'OUT_OF_RANGE'}
+                  disabled={
+                    isLoading ||
+                    isLoadingPriceRow ||
+                    calculationResult.status === 'OUT_OF_RANGE' ||
+                    calculationResult.status === 'MISSING_DATA'
+                  }
                 >
                   {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {isEditing ? 'Salvar' : 'Criar Cotação'}

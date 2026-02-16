@@ -25,15 +25,16 @@ export function usePriceTableRows(priceTableId: string) {
 }
 
 export function usePriceTableRowByKmRange(priceTableId: string, kmDistance: number) {
+  const kmRounded = Math.round(kmDistance);
   return useQuery({
-    queryKey: ['price_table_rows', priceTableId, 'km', kmDistance],
+    queryKey: ['price_table_rows', priceTableId, 'km', kmRounded],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('price_table_rows')
         .select('*')
         .eq('price_table_id', asDb(priceTableId))
-        .lte('km_from', asDb(kmDistance))
-        .gte('km_to', asDb(kmDistance))
+        .lte('km_from', asDb(kmRounded))
+        .gte('km_to', asDb(kmRounded))
         .maybeSingle();
 
       if (error) throw error;

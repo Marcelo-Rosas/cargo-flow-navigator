@@ -45,7 +45,6 @@ Deno.serve(async (req) => {
 
     // Use Deno.env only if running in Deno, fallback for other runtimes (e.g., Node test or local dev)
     const getEnvSafe = (key: string) => {
-      // @ts-expect-error Deno global may be undefined in Node
       if (typeof Deno !== 'undefined' && Deno.env && typeof Deno.env.get === 'function') {
         return Deno.env.get(key);
       } else if (typeof process !== 'undefined' && process.env) {

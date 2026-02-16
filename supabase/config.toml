@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.calculate-distance]
 verify_jwt = false  # utilitário público (geocode+rota), sem dados sensíveis
+
+[functions.calculate-distance-webrouter]
+verify_jwt = false  # utilitário público (distância CEP→CEP), sem dados sensíveis

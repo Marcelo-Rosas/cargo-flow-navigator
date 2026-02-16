@@ -71,6 +71,17 @@ git add -A && git commit -m "fix: descrição" && git push && npx supabase funct
 
 **Causa:** `quotes.weight` e `quotes.volume` são `DECIMAL(10,2)` — máx. 99.999.999,99.
 
+### 5. MISSING_DATA / tabela lotação + price_table_rows (cálculo zerado)
+
+| Arquivo | Problema | Solução |
+|---------|----------|---------|
+| `QuoteForm.tsx` | Dropdown mostra todas as tabelas; tabela lotação sem rows retorna cálculo zerado | Filtrar tabelas por `freight_modality` (só lotação ou fracionado) |
+| `QuoteForm.tsx` | `priceTableId` não passado → mensagem errada "Tabela não selecionada" | Passar `priceTableId` para `calculateFreight` |
+| `QuoteForm.tsx` | Permitir save com MISSING_DATA | Bloquear submit quando `status === 'MISSING_DATA'` ou `isLoadingPriceRow` |
+| `QuoteForm.tsx` | Modalidade muda mas `price_table_id` pode ficar incoerente | Limpar `price_table_id` ao mudar modalidade se tabela não pertencer à nova |
+
+**Causa:** Tabela sem linhas em `price_table_rows` (rows=0) ou tabela de modalidade diferente; mensagem enganosa por falta de `priceTableId`.
+
 ---
 
 ## Correções pendentes

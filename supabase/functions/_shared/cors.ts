@@ -26,11 +26,17 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   const origins = allowed.split(',').map((o) => o.trim());
   const requestOrigin = req.headers.get('Origin');
 
-  const allowOrigin = requestOrigin && origins.includes(requestOrigin) ? requestOrigin : origins[0];
+  const inAllowlist = requestOrigin && origins.includes(requestOrigin);
 
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
+  const headers: Record<string, string> = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   };
+
+  if (inAllowlist) {
+    headers['Access-Control-Allow-Origin'] = requestOrigin!;
+    headers['Vary'] = 'Origin';
+  }
+
+  return headers;
 }

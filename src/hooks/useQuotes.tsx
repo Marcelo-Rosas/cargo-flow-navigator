@@ -51,7 +51,10 @@ export function useCreateQuote() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        const extra = [error.details, error.hint, error.code].filter(Boolean).join(' | ');
+        throw new Error(extra ? `${error.message} — ${extra}` : error.message);
+      }
       return data;
     },
     onSuccess: () => {
