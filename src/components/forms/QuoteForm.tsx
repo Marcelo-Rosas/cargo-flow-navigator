@@ -383,46 +383,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
     setIsCalculatingKm(true);
     try {
-      // Geocode no browser: ViaCEP (CORS ok) → cidade/UF → Nominatim (CORS ok)
-      const fetchCoords = async (cep: string): Promise<{ lat: number; lon: number } | null> => {
-        try {
-          const vc = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-          if (!vc.ok) return null;
-          const vj = await vc.json();
-          if (vj.erro || !vj.localidade || !vj.uf) return null;
-          const q = `${vj.localidade}, ${vj.uf}, Brazil`;
-          const nm = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&limit=1&country=Brazil&q=${encodeURIComponent(q)}`,
-            {
-              headers: {
-                'User-Agent': 'vectra-cargo-flow/1.0 (contact: support@vectracargo.com.br)',
-              },
-            }
-          );
-          if (!nm.ok) return null;
-          const nj = await nm.json();
-          const item = Array.isArray(nj) ? nj[0] : null;
-          if (item?.lat && item?.lon) {
-            const lat = Number(item.lat);
-            const lon = Number(item.lon);
-            if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
-          }
-        } catch {
-          // ignore
-        }
-        return null;
-      };
-
-      const from = await fetchCoords(originCep);
-      await new Promise((r) => setTimeout(r, 1100)); // Nominatim: max 1 req/s
-      const to = from ? await fetchCoords(destinationCep) : null;
-
-      const body =
-        from && to
-          ? { origin: from, destination: to }
-          : { origin_cep: originCep, destination_cep: destinationCep };
-
-      const { data, error } = await supabase.functions.invoke('calculate-distance', { body });
+      const { data, error } = await supabase.functions.invoke('calculate-distance-webrouter', {
+        body: { origin_cep: originCep, destination_cep: destinationCep },
+      });
 
       if (error || !data?.success) {
         toast.error(data?.error || error?.message || 'Erro ao calcular distância');
@@ -505,7 +468,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         price_table_id: data.price_table_id || null,
         vehicle_type_id: data.vehicle_type_id || null,
         payment_term_id: data.payment_term_id || null,
-        km_distance: data.km_distance || null,
+        km_distance:
+          data.km_distance != null && Number.isFinite(Number(data.km_distance))
+            ? Math.round(Number(data.km_distance))
+            : null,
         toll_value: data.toll || null,
         cargo_value: data.cargo_value || null,
         value: calculationResult.totals.totalCliente,
@@ -529,7 +495,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       }
       onClose();
     } catch (error) {
-      toast.error(isEditing ? 'Erro ao atualizar cotação' : 'Erro ao criar cotação');
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('[QuoteForm] Erro ao salvar cotação:', error);
+      toast.error(isEditing ? 'Erro ao atualizar cotação' : 'Erro ao criar cotação', {
+        description: msg,
+      });
     }
   };
 
