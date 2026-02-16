@@ -204,7 +204,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   } = usePriceTableRowByKmFromEdgeFn(
     watchedPriceTableId || '',
     kmForRpc,
-    watchedFreightModality ?? undefined
+    watchedFreightModality ?? undefined,
+    !!user
   );
   const { data: priceTableRows } = usePriceTableRows(watchedPriceTableId || '');
   const priceTableRow = priceTableRowFromEdgeFn ?? null;

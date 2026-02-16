@@ -53,11 +53,12 @@ function roundingForModality(modality?: 'lotacao' | 'fracionado'): 'ceil' | 'flo
 export function usePriceTableRowByKmFromEdgeFn(
   priceTableId: string,
   kmDistance: number,
-  modality?: 'lotacao' | 'fracionado'
+  modality?: 'lotacao' | 'fracionado',
+  isAuthenticated?: boolean
 ) {
   const rounding = roundingForModality(modality);
   return useQuery({
-    queryKey: ['price_table_rows', 'edgefn', priceTableId, kmDistance, rounding],
+    queryKey: ['price_table_rows', 'edgefn', priceTableId, kmDistance, rounding, isAuthenticated],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('price-row', {
         body: {
@@ -79,7 +80,15 @@ export function usePriceTableRowByKmFromEdgeFn(
       const row = data?.row ?? data?.rows?.[0] ?? null;
       return row ? filterSupabaseSingle<PriceTableRow>(row) : null;
     },
-    enabled: !!priceTableId && kmDistance > 0,
+    // Só chama a Edge Function se usuário autenticado, tabela definida e KM > 0
+    enabled: !!isAuthenticated && !!priceTableId && kmDistance > 0,
+    // Evita ficar insistindo em erros de autenticação
+    retry: (failureCount, error) => {
+      const msg = (error as Error)?.message || '';
+      if (/401|403|unauthoriz/i.test(msg)) return false;
+      return failureCount < 3;
+    },
+    refetchOnWindowFocus: false,
   });
 }
 
