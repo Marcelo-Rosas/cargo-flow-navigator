@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FunctionsHttpError } from '@supabase/functions-js';
 import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
@@ -69,9 +68,10 @@ export function usePriceTableRowByKmFromEdgeFn(
       });
 
       if (error) {
-        if (error instanceof FunctionsHttpError && error.context) {
-          const body = await (error.context as Response).json().catch(() => ({}));
-          const msg = (body as { error?: string })?.error ?? error.message;
+        const ctx = (error as { name?: string; context?: Response }).context;
+        if (ctx && typeof (ctx as Response).json === 'function') {
+          const body = (await (ctx as Response).json().catch(() => ({}))) as { error?: string };
+          const msg = body?.error ?? (error as Error).message;
           throw new Error(msg);
         }
         throw error;
