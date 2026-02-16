@@ -210,6 +210,7 @@ Deno.serve(async (req) => {
         .order('km_from', { ascending: true });
 
       if (rowsError) {
+        kmStatus = 'OUT_OF_RANGE';
         responseStatus = 'MISSING_DATA';
         responseError = 'Erro ao consultar linhas da tabela de preços';
         fallbacksApplied.push(`price_table_row: ${rowsError.message}`);

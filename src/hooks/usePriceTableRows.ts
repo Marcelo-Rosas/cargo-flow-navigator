@@ -61,9 +61,9 @@ export function usePriceTableRowByKmFromEdgeFn(
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('price-row', {
         body: {
-          price_table_id: asDb(priceTableId),
-          km: Number(kmDistance),
-          rounding,
+          p_price_table_id: asDb(priceTableId),
+          p_km_numeric: Number(kmDistance),
+          p_rounding: rounding,
         },
       });
 
