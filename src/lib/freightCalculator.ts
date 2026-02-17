@@ -131,6 +131,8 @@ export interface FreightCalculationOutput {
     cubageFactor: number;
     cubageWeightKg: number;
     billableWeightKg: number;
+    /** KM inteiro usado no cálculo (paridade com backend km_band_used) */
+    kmBandUsed?: number;
   };
 
   components: {
@@ -196,6 +198,7 @@ export interface StoredPricingBreakdown {
     kmStatus: 'OK' | 'OUT_OF_RANGE';
     marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET' | 'UNKNOWN';
     marginPercent: number;
+    kmBandUsed?: number;
     inputWeightUnit?: 'kg' | 'ton';
     selectedConditionalFeeIds?: string[];
     waitingTimeEnabled?: boolean;
@@ -347,6 +350,7 @@ function resolveDirectCosts(input: FreightCalculationInput, receitaBruta: number
 export function calculateFreight(input: FreightCalculationInput): FreightCalculationOutput {
   const params = resolveParams(input);
   const icmsPercent = normalizeIcmsRate(input.icmsRatePercent);
+  const kmBandUsed = Math.round(Number(input.kmDistance || 0));
 
   // Empty result factory
   const makeEmpty = (
@@ -364,6 +368,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       cubageFactor: params.cubageFactor,
       cubageWeightKg: 0,
       billableWeightKg: 0,
+      kmBandUsed,
     },
     components: {
       baseCost: 0,
@@ -405,10 +410,10 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   // ---- VALIDATION ----
   if (!input.priceTableRow) {
     // Distinguish MISSING_DATA vs OUT_OF_RANGE
-    if (input.priceTableId && input.kmDistance > 0) {
+    if (input.priceTableId && kmBandUsed > 0) {
       return makeEmpty(
         'OUT_OF_RANGE',
-        `Distância ${input.kmDistance} km não encontrou faixa na tabela selecionada`
+        `Distância ${kmBandUsed} km não encontrou faixa na tabela selecionada`
       );
     }
     return makeEmpty('MISSING_DATA', 'Tabela de preços não selecionada');
@@ -418,10 +423,10 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const kmFrom = Number(row.km_from);
   const kmTo = Number(row.km_to);
 
-  if (input.kmDistance < kmFrom || input.kmDistance > kmTo) {
+  if (kmBandUsed < kmFrom || kmBandUsed > kmTo) {
     const r = makeEmpty(
       'OUT_OF_RANGE',
-      `Distância ${input.kmDistance} km fora da faixa ${kmFrom}-${kmTo} km`
+      `Distância ${kmBandUsed} km fora da faixa ${kmFrom}-${kmTo} km`
     );
     r.meta.kmBandLabel = `${kmFrom}-${kmTo}`;
     return r;
@@ -509,6 +514,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       cubageFactor: params.cubageFactor,
       cubageWeightKg,
       billableWeightKg,
+      kmBandUsed,
     },
     components: {
       baseCost,
@@ -568,6 +574,7 @@ export function buildStoredBreakdown(
       kmStatus: output.meta.kmStatus,
       marginStatus: output.meta.marginStatus,
       marginPercent: output.meta.marginPercent,
+      kmBandUsed: output.meta.kmBandUsed,
       selectedConditionalFeeIds: input.extras?.conditionalFees?.ids,
       waitingTimeEnabled: input.extras?.waitingTimeEnabled,
       waitingTimeHours: input.extras?.waitingTimeHours,
