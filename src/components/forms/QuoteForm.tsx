@@ -44,7 +44,7 @@ import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { usePriceTables } from '@/hooks/usePriceTables';
 import { useVehicleTypes, usePaymentTerms } from '@/hooks/usePricingRules';
-import { usePriceTableRows } from '@/hooks/usePriceTableRows';
+import { usePriceTableRowByKmRange, usePriceTableRows } from '@/hooks/usePriceTableRows';
 import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -198,25 +198,32 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedTdeEnabled = form.watch('tde_enabled');
   const watchedTearEnabled = form.watch('tear_enabled');
 
-  // Busca faixas via REST (price_table_rows) e seleciona localmente a faixa do km.
-  // Isso evita o 401/Invalid JWT da Edge Function price-row.
+  // Busca faixas via REST (price_table_rows) e seleciona a faixa do km via query (lte/gte)
   const kmForBand = Number(watchedKmDistance || 0);
   const kmBand = Math.ceil(kmForBand);
 
+  // Lista de faixas (usada só para exibir no alerta de OUT_OF_RANGE)
+  const { data: priceTableRows } = usePriceTableRows(watchedPriceTableId || '');
+
+  // Busca a faixa correta (1 row) via REST (mais confiável do que find local)
   const {
-    data: priceTableRows,
-    isLoading: isLoadingPriceRows,
-    error: priceRowsError,
-  } = usePriceTableRows(watchedPriceTableId || '');
+    data: priceTableRow,
+    isLoading: isLoadingPriceRow,
+    error: priceRowError,
+  } = usePriceTableRowByKmRange(watchedPriceTableId || '', kmBand);
 
-  const priceTableRow =
-    watchedPriceTableId && kmBand > 0 && priceTableRows?.length
-      ? (priceTableRows.find((r) => r.km_from <= kmBand && r.km_to >= kmBand) ?? null)
-      : null;
-
-  const isLoadingPriceRow = isLoadingPriceRows;
-  const priceRowError = (priceRowsError as Error | null) ?? null;
   const kmRounded = kmBand;
+
+  // Label da faixa de km (a partir do km_distance + price_table_rows) para o badge
+  const faixaLabel =
+    priceTableRow != null
+      ? `${priceTableRow.km_from}-${priceTableRow.km_to}`
+      : priceTableRows?.length && kmBand > 0
+        ? (() => {
+            const r = priceTableRows.find((r) => r.km_from <= kmBand && r.km_to >= kmBand);
+            return r ? `${r.km_from}-${r.km_to}` : null;
+          })()
+        : null;
 
   // Get ICMS rate for origin/destination states
   const originUf = extractUf(watchedOrigin || '');
@@ -1174,10 +1181,15 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 />
               </div>
 
-              {/* Km Band Info */}
-              {calculationResult.meta.kmBandLabel && calculationResult.status === 'OK' && (
+              {/* Km Band Info: faixa derivada do km_distance (WebRouter/manual) + price_table_rows */}
+              {isLoadingPriceRow && kmBand > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  Buscando faixa...
+                </Badge>
+              )}
+              {!isLoadingPriceRow && faixaLabel && (
                 <Badge variant="outline" className="text-xs">
-                  Faixa: {calculationResult.meta.kmBandLabel} km
+                  Faixa: {faixaLabel} km
                 </Badge>
               )}
 
