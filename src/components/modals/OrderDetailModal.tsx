@@ -315,6 +315,56 @@ export function OrderDetailModal({
                     )}
                   </div>
 
+                  {/* Carreteiro (persistido na OS) */}
+                  {(order.carreteiro_antt != null || order.carreteiro_real != null) && (
+                    <div className="p-4 rounded-lg bg-muted/30 border border-border col-span-2">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                        <DollarSign className="w-4 h-4" />
+                        <span className="text-sm">Carreteiro (OS)</span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">ANTT (base)</p>
+                          <p className="font-semibold text-foreground">
+                            {order.carreteiro_antt != null
+                              ? formatCurrency(Number(order.carreteiro_antt))
+                              : '—'}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-muted-foreground">Real (fechado)</p>
+                          <p className="font-semibold text-foreground">
+                            {order.carreteiro_real != null
+                              ? formatCurrency(Number(order.carreteiro_real))
+                              : '—'}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-muted-foreground">Diferença</p>
+                          {order.carreteiro_real != null && order.carreteiro_antt != null ? (
+                            <p
+                              className={cn(
+                                'font-semibold',
+                                Number(order.carreteiro_real) - Number(order.carreteiro_antt) > 0
+                                  ? 'text-warning-foreground'
+                                  : 'text-success'
+                              )}
+                            >
+                              {formatCurrency(
+                                Number(order.carreteiro_real) - Number(order.carreteiro_antt)
+                              )}
+                            </p>
+                          ) : (
+                            <p className="font-semibold text-foreground">—</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {order.eta && (
                     <div className="p-4 rounded-lg bg-muted/30 border border-border col-span-2">
                       <div className="flex items-center gap-2 text-muted-foreground mb-1">
