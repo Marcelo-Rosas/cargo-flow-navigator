@@ -44,7 +44,7 @@ import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { usePriceTables } from '@/hooks/usePriceTables';
 import { useVehicleTypes, usePaymentTerms } from '@/hooks/usePricingRules';
-import { usePriceTableRows, usePriceTableRowByKmFromEdgeFn } from '@/hooks/usePriceTableRows';
+import { usePriceTableRows } from '@/hooks/usePriceTableRows';
 import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -198,21 +198,25 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedTdeEnabled = form.watch('tde_enabled');
   const watchedTearEnabled = form.watch('tear_enabled');
 
-  // Busca faixa via Edge Function price-row (RPC find_price_row_by_km)
-  const kmForRpc = Number(watchedKmDistance || 0);
+  // Busca faixas via REST (price_table_rows) e seleciona localmente a faixa do km.
+  // Isso evita o 401/Invalid JWT da Edge Function price-row.
+  const kmForBand = Number(watchedKmDistance || 0);
+  const kmBand = Math.ceil(kmForBand);
+
   const {
-    data: priceTableRowFromEdgeFn,
-    isLoading: isLoadingPriceRow,
-    error: priceRowError,
-  } = usePriceTableRowByKmFromEdgeFn(
-    watchedPriceTableId || '',
-    kmForRpc,
-    watchedFreightModality ?? undefined,
-    !!user
-  );
-  const { data: priceTableRows } = usePriceTableRows(watchedPriceTableId || '');
-  const priceTableRow = priceTableRowFromEdgeFn ?? null;
-  const kmRounded = Math.round(kmForRpc);
+    data: priceTableRows,
+    isLoading: isLoadingPriceRows,
+    error: priceRowsError,
+  } = usePriceTableRows(watchedPriceTableId || '');
+
+  const priceTableRow =
+    watchedPriceTableId && kmBand > 0 && priceTableRows?.length
+      ? (priceTableRows.find((r) => r.km_from <= kmBand && r.km_to >= kmBand) ?? null)
+      : null;
+
+  const isLoadingPriceRow = isLoadingPriceRows;
+  const priceRowError = (priceRowsError as Error | null) ?? null;
+  const kmRounded = kmBand;
 
   // Get ICMS rate for origin/destination states
   const originUf = extractUf(watchedOrigin || '');
