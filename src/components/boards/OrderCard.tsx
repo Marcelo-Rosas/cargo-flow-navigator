@@ -289,6 +289,16 @@ export function OrderCard({
         </div>
       )}
 
+      {/* Carreteiro (Real > ANTT) */}
+      {(order.carreteiro_real != null || order.carreteiro_antt != null) && (
+        <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+          <span>Carreteiro ({order.carreteiro_real != null ? 'real' : 'ANTT'})</span>
+          <span className="font-medium text-foreground">
+            {formatCurrency(Number(order.carreteiro_real ?? order.carreteiro_antt))}
+          </span>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-border">
         <span className="text-lg font-bold text-foreground">
