@@ -236,7 +236,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       volumeM3: watchedVolume || 0,
       cargoValue: watchedCargoValue || 0,
       tollValue: watchedToll || 0,
-      kmDistance: watchedKmDistance || 0,
+      kmDistance: kmBand,
       priceTableRow: priceTableRow || null,
       priceTableId: watchedPriceTableId || undefined,
       icmsRatePercent: icmsRate,
