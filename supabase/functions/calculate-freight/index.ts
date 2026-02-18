@@ -271,6 +271,10 @@ Deno.serve(async (req) => {
     const tde = 0;
     const tear = 0;
 
+    // Base para taxas condicionais que aplicam sobre frete: mantém comportamento anterior
+    // (correction + markup) para não alterar cobrança de fees já cadastrados
+    const conditionalFeeFreightBase = frete_peso * correctionFactor * (1 + markupPercent / 100);
+
     // =====================================================
     // CONDITIONAL FEES
     // =====================================================
@@ -290,7 +294,8 @@ Deno.serve(async (req) => {
 
         if (fee) {
           let feeValue = 0;
-          const feeBase = fee.applies_to === 'cargo_value' ? input.cargo_value : frete_peso;
+          const feeBase =
+            fee.applies_to === 'cargo_value' ? input.cargo_value : conditionalFeeFreightBase;
 
           switch (fee.fee_type) {
             case 'percentage':
@@ -539,7 +544,7 @@ Deno.serve(async (req) => {
       billable_weight_kg: roundCurrency(billableWeightKg),
       ...(kmBandUsed !== undefined && { km_band_used: kmBandUsed }),
       ...(priceTableRowId && { price_table_row_id: priceTableRowId }),
-      ntc_base: roundCurrency(ntc_base),
+      ...(priceTableRowId && { ntc_base: roundCurrency(ntc_base) }),
     };
 
     const components: FreightComponents = {
