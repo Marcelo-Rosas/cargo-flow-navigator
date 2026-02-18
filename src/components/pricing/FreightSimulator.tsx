@@ -461,10 +461,6 @@ export function FreightSimulator() {
                     value={result.components.conditional_fees_total}
                   />
                   <BreakdownRow label="Estadia" value={result.components.waiting_time_cost} />
-                  <BreakdownRow
-                    label={`Provisão DAS (${result.rates.das_percent}%)`}
-                    value={result.components.das_provision}
-                  />
                 </div>
               </div>
 

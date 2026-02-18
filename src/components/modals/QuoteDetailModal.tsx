@@ -34,6 +34,7 @@ import {
 import type { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
+import { usePricingParameter } from '@/hooks/usePricingRules';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { supabase } from '@/integrations/supabase/client';
@@ -99,6 +100,9 @@ export function QuoteDetailModal({
 
   // All hooks MUST be called before any conditional returns
   const { data: priceTable } = usePriceTable(quote?.price_table_id || '');
+  const { data: taxRegimeParam } = usePricingParameter('tax_regime_simples');
+  const isSimplesNacional =
+    taxRegimeParam?.value != null ? Number(taxRegimeParam.value) === 1 : true;
 
   const { data: vehicleType } = useQuery({
     queryKey: ['vehicle-type', quote?.vehicle_type_id],
@@ -744,14 +748,6 @@ export function QuoteDetailModal({
                           <span>{formatCurrency(breakdown.components.tear)}</span>
                         </div>
                       )}
-                      {(breakdown.components.dasProvision ?? 0) > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Provisão DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)
-                          </span>
-                          <span>{formatCurrency(breakdown.components.dasProvision ?? 0)}</span>
-                        </div>
-                      )}
                     </>
                   )}
 
@@ -769,8 +765,16 @@ export function QuoteDetailModal({
                   </div>
 
                   <div className="flex justify-between text-muted-foreground">
-                    <span>ICMS ({breakdown.rates?.icmsPercent?.toFixed(2)}%)</span>
-                    <span>{formatCurrency(breakdown.totals.icms || 0)}</span>
+                    <span>
+                      ICMS (
+                      {isSimplesNacional
+                        ? '0.00'
+                        : (breakdown.rates?.icmsPercent?.toFixed(2) ?? '0.00')}
+                      %)
+                    </span>
+                    <span>
+                      {formatCurrency(isSimplesNacional ? 0 : breakdown.totals.icms || 0)}
+                    </span>
                   </div>
 
                   <Separator className="my-2" />
@@ -778,7 +782,11 @@ export function QuoteDetailModal({
                   <div className="flex justify-between font-semibold text-lg">
                     <span>Total Cliente</span>
                     <span className="text-primary">
-                      {formatCurrency(breakdown.totals.totalCliente || 0)}
+                      {formatCurrency(
+                        isSimplesNacional && breakdown?.totals
+                          ? (breakdown.totals.receitaBruta || 0) + (breakdown.totals.das || 0)
+                          : breakdown.totals?.totalCliente || 0
+                      )}
                     </span>
                   </div>
                 </div>

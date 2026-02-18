@@ -158,7 +158,8 @@ Deno.serve(async (req) => {
 
     const correctionFactor = paramsMap.get('correction_factor_inctf') ?? 1.0;
 
-    // Regime tributário: 1 = Simples Nacional (ICMS 0%, DAS = provisão por frete)
+    // Regime tributário global: tabela pricing_parameters, key = tax_regime_simples.
+    // 1 = Simples Nacional (ICMS 0%, DAS = provisão por frete). Default = 1 quando a chave não existe.
     const isSimples = (paramsMap.get('tax_regime_simples') ?? 1) === 1;
     const dasProvisionPercent =
       paramsMap.get('das_provision_percent') ?? FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT;

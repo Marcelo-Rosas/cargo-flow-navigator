@@ -1367,17 +1367,25 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    ICMS ({calculationResult.rates.icmsPercent.toFixed(2)}%)
+                    ICMS (
+                    {taxRegimeSimples === 1
+                      ? '0.00'
+                      : calculationResult.rates.icmsPercent.toFixed(2)}
+                    %)
                   </span>
                   <span className="text-foreground">
-                    {formatCurrency(calculationResult.totals.icms)}
+                    {formatCurrency(taxRegimeSimples === 1 ? 0 : calculationResult.totals.icms)}
                   </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span className="text-foreground">Total Cliente</span>
                   <span className="text-primary text-lg">
-                    {formatCurrency(calculationResult.totals.totalCliente)}
+                    {formatCurrency(
+                      taxRegimeSimples === 1
+                        ? calculationResult.totals.receitaBruta + calculationResult.totals.das
+                        : calculationResult.totals.totalCliente
+                    )}
                   </span>
                 </div>
                 <Separator />
