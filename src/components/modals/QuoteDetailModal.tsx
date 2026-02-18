@@ -703,7 +703,7 @@ export function QuoteDetailModal({
                   {breakdown.components && (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Frete Valor</span>
+                        <span className="text-muted-foreground">Frete Base</span>
                         <span>{formatCurrency(breakdown.components.baseFreight || 0)}</span>
                       </div>
                       {breakdown.components.toll > 0 && (
@@ -767,7 +767,7 @@ export function QuoteDetailModal({
                   </div>
 
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Provisionamento DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)</span>
+                    <span>DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)</span>
                     <span>{formatCurrency(breakdown.totals.das || 0)}</span>
                   </div>
 
@@ -798,6 +798,36 @@ export function QuoteDetailModal({
                   </div>
                 </div>
 
+                {/* Custos Diretos (ANTT + Carga e Descarga) — deduzidos para chegar na margem */}
+                {((breakdown?.meta?.antt?.total != null && breakdown.meta.antt.total > 0) ||
+                  (anttCalc?.total != null && anttCalc.total > 0) ||
+                  (breakdown?.profitability?.custosDescarga != null &&
+                    breakdown.profitability.custosDescarga > 0)) && (
+                  <>
+                    <Separator className="my-4" />
+                    <h5 className="font-medium text-foreground mb-2">Custos Diretos</h5>
+                    <div className="space-y-2 text-sm">
+                      {Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Piso ANTT (carreteiro)</span>
+                          <span>
+                            {formatCurrency(
+                              Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0)
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      {breakdown?.profitability?.custosDescarga != null &&
+                        breakdown.profitability.custosDescarga > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Carga e Descarga</span>
+                            <span>{formatCurrency(breakdown.profitability.custosDescarga)}</span>
+                          </div>
+                        )}
+                    </div>
+                  </>
+                )}
+
                 {/* Profitability */}
                 {breakdown.profitability && (
                   <>
@@ -815,25 +845,31 @@ export function QuoteDetailModal({
                         <span className="text-muted-foreground">Overhead</span>
                         <span>{formatCurrency(breakdown.profitability.overhead || 0)}</span>
                       </div>
-                      <div className="flex justify-between font-medium">
+                      <div className="flex justify-between font-medium items-center gap-2">
                         <span>Resultado Líquido</span>
-                        <span
-                          className={cn(
+                        <Badge
+                          variant={
                             breakdown.profitability.resultadoLiquido >= 0
-                              ? 'text-success'
-                              : 'text-destructive'
-                          )}
+                              ? 'default'
+                              : 'destructive'
+                          }
+                          className={
+                            breakdown.profitability.resultadoLiquido >= 0
+                              ? 'bg-success text-success-foreground'
+                              : ''
+                          }
                         >
                           {formatCurrency(breakdown.profitability.resultadoLiquido || 0)}
-                        </span>
+                        </Badge>
                       </div>
-                      <div className="flex justify-between font-semibold">
+                      <div className="flex justify-between font-semibold items-center gap-2">
                         <span>Margem %</span>
-                        <span
-                          className={cn(isBelowTarget ? 'text-warning-foreground' : 'text-success')}
+                        <Badge
+                          variant={isBelowTarget ? 'destructive' : 'default'}
+                          className={!isBelowTarget ? 'bg-success text-success-foreground' : ''}
                         >
                           {(breakdown.profitability.margemPercent || 0).toFixed(1)}%
-                        </span>
+                        </Badge>
                       </div>
                     </div>
                   </>

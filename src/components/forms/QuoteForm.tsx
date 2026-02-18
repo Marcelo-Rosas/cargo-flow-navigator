@@ -1369,7 +1369,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               {/* Calculated Values */}
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Frete Valor</span>
+                  <span className="text-muted-foreground">Frete Base</span>
                   <span className="text-foreground">
                     {formatCurrency(calculationResult.components.baseFreight)}
                   </span>
@@ -1437,7 +1437,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    Provisionamento DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
+                    DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
                   </span>
                   <span className="text-foreground">
                     {formatCurrency(calculationResult.totals.das)}
