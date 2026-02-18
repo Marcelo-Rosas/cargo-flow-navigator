@@ -703,7 +703,7 @@ export function QuoteDetailModal({
                   {breakdown.components && (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Frete Base</span>
+                        <span className="text-muted-foreground">Frete Valor</span>
                         <span>{formatCurrency(breakdown.components.baseFreight || 0)}</span>
                       </div>
                       {breakdown.components.toll > 0 && (
@@ -748,6 +748,13 @@ export function QuoteDetailModal({
                           <span>{formatCurrency(breakdown.components.tear)}</span>
                         </div>
                       )}
+                      {breakdown.profitability?.custosDescarga != null &&
+                        breakdown.profitability.custosDescarga > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Carga e Descarga</span>
+                            <span>{formatCurrency(breakdown.profitability.custosDescarga)}</span>
+                          </div>
+                        )}
                     </>
                   )}
 
@@ -760,7 +767,7 @@ export function QuoteDetailModal({
                   </div>
 
                   <div className="flex justify-between text-muted-foreground">
-                    <span>DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)</span>
+                    <span>Provisionamento DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)</span>
                     <span>{formatCurrency(breakdown.totals.das || 0)}</span>
                   </div>
 

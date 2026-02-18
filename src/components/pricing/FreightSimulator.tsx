@@ -438,7 +438,7 @@ export function FreightSimulator() {
                 <div className="space-y-2">
                   <BreakdownRow label="Custo Base" value={result.components.base_cost} />
                   <BreakdownRow
-                    label={`Frete Base (+${result.rates.markup_percent}%)`}
+                    label={`Frete Valor (+${result.rates.markup_percent}%)`}
                     value={result.components.base_freight}
                   />
                   <BreakdownRow label="Pedágio" value={result.components.toll} />
@@ -484,7 +484,7 @@ export function FreightSimulator() {
                     />
                   )}
                   <BreakdownRow
-                    label={`DAS (${result.rates.das_percent}%)`}
+                    label={`Provisionamento DAS (${result.rates.das_percent}%)`}
                     value={result.totals.das}
                   />
                   <BreakdownRow

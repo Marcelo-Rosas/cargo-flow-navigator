@@ -108,6 +108,7 @@ const quoteSchema = z.object({
   // Pricing components
   cargo_value: z.number().min(0, 'Valor inválido').optional().default(0),
   toll: z.number().min(0, 'Valor inválido').optional().default(0),
+  descarga: z.number().min(0, 'Valor inválido').optional().default(0),
   // NTC flags
   tde_enabled: z.boolean().optional().default(false),
   tear_enabled: z.boolean().optional().default(false),
@@ -176,6 +177,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       km_distance: undefined,
       cargo_value: 0,
       toll: 0,
+      descarga: 0,
       tde_enabled: false,
       tear_enabled: false,
       notes: '',
@@ -197,6 +199,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedVolume = form.watch('volume');
   const watchedCargoValue = form.watch('cargo_value');
   const watchedToll = form.watch('toll');
+  const watchedDescarga = form.watch('descarga');
   const watchedTdeEnabled = form.watch('tde_enabled');
   const watchedTearEnabled = form.watch('tear_enabled');
 
@@ -260,6 +263,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       volumeM3: watchedVolume || 0,
       cargoValue: watchedCargoValue || 0,
       tollValue: watchedToll || 0,
+      descargaValue: watchedDescarga ?? 0,
       kmDistance: kmBand,
       priceTableRow: priceTableRow || null,
       priceTableId: watchedPriceTableId || undefined,
@@ -275,6 +279,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     watchedVolume,
     watchedCargoValue,
     watchedToll,
+    watchedDescarga,
     watchedKmDistance,
     watchedPriceTableId,
     priceTableRow,
@@ -314,6 +319,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         km_distance: quote.km_distance ? Number(quote.km_distance) : undefined,
         cargo_value: Number(quote.cargo_value) || 0,
         toll: Number(quote.toll_value) || 0,
+        descarga:
+          (quote.pricing_breakdown as { profitability?: { custosDescarga?: number } } | null)
+            ?.profitability?.custosDescarga ?? 0,
         tde_enabled: false,
         tear_enabled: false,
         notes: quote.notes || '',
@@ -341,6 +349,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         km_distance: undefined,
         cargo_value: 0,
         toll: 0,
+        descarga: 0,
         tde_enabled: false,
         tear_enabled: false,
         notes: '',
@@ -1298,6 +1307,34 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="descarga"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Carga e Descarga</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            R$
+                          </span>
+                          <MaskedInput
+                            mask="currency"
+                            placeholder="0,00"
+                            className="pl-10"
+                            value={String(Math.round((field.value || 0) * 100))}
+                            onValueChange={(rawValue) =>
+                              field.onChange(parseInt(rawValue || '0', 10) / 100)
+                            }
+                            onBlur={field.onBlur}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               {/* NTC Taxes */}
@@ -1332,7 +1369,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               {/* Calculated Values */}
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Frete Base</span>
+                  <span className="text-muted-foreground">Frete Valor</span>
                   <span className="text-foreground">
                     {formatCurrency(calculationResult.components.baseFreight)}
                   </span>
@@ -1400,7 +1437,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
+                    Provisionamento DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
                   </span>
                   <span className="text-foreground">
                     {formatCurrency(calculationResult.totals.das)}
