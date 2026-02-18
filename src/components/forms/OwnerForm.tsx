@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -49,6 +49,7 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
   const createOwnerMutation = useCreateOwner();
   const updateOwnerMutation = useUpdateOwner();
   const isEditing = !!owner;
+  const [isLookingUp, setIsLookingUp] = useState(false);
 
   const form = useForm<OwnerFormData>({
     resolver: zodResolver(ownerSchema),
@@ -101,6 +102,56 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
       });
     }
   }, [owner, form]);
+
+  const sanitizeCnpj = (v: string) => v.replace(/\D/g, '');
+
+  const safeSet = (key: keyof OwnerFormData, value?: unknown) => {
+    const str = value != null ? String(value).trim() : '';
+    if (!str) return;
+    const current = form.getValues(key);
+    if (current && current.trim().length > 0) return;
+    form.setValue(key, str, { shouldValidate: true, shouldDirty: true });
+  };
+
+  const handleCnpjLookup = async () => {
+    const raw = form.getValues('cpf_cnpj') || '';
+    const cnpj = sanitizeCnpj(raw);
+    if (cnpj.length !== 14) return;
+
+    setIsLookingUp(true);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      if (!res.ok) {
+        setIsLookingUp(false);
+        return;
+      }
+      const data = (await res.json()) as Record<string, unknown>;
+
+      safeSet('name', data.razao_social || data.nome_fantasia || data.name);
+      safeSet('email', data.email || data.email_contato);
+      safeSet('phone', data.ddd_telefone_1 || data.telefone || data.phone);
+
+      const street = data.logradouro || data.endereco || data.street;
+      const number = data.numero || data.number;
+      const district = data.bairro || data.distrito || data.neighborhood;
+      const composedAddress = [street, number, district].filter(Boolean).join(', ');
+      safeSet('address', composedAddress);
+
+      safeSet('city', data.municipio || data.cidade || data.city);
+
+      const uf = (data.uf || data.estado || data.state || '').toString().toUpperCase();
+      safeSet('state', uf?.slice(0, 2));
+
+      const cep = (data.cep || data.codigo_postal || data.zip_code || '').toString();
+      safeSet('zip_code', cep);
+
+      toast.success('Dados preenchidos automaticamente pelo CNPJ');
+    } catch {
+      // API pode estar indisponível
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
 
   const onSubmit = async (data: OwnerFormData) => {
     try {
@@ -179,7 +230,27 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
                   <FormItem>
                     <FormLabel>CPF/CNPJ</FormLabel>
                     <FormControl>
-                      <Input placeholder="000.000.000-00 ou CNPJ" {...field} />
+                      <div className="relative">
+                        <Input
+                          placeholder="00.000.000/0000-00 ou CPF"
+                          {...field}
+                          onBlur={async (e) => {
+                            field.onBlur();
+                            await handleCnpjLookup();
+                          }}
+                          className="pr-10"
+                        />
+                        {isLookingUp && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
+                        {!isLookingUp && field.value && sanitizeCnpj(field.value).length === 14 && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <Search className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

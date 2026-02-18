@@ -16,6 +16,7 @@ const Documents = lazy(() => import('./pages/Documents'));
 const Clients = lazy(() => import('./pages/Clients'));
 const Shippers = lazy(() => import('./pages/Shippers'));
 const Owners = lazy(() => import('./pages/Owners'));
+const Drivers = lazy(() => import('./pages/Drivers'));
 const Vehicles = lazy(() => import('./pages/Vehicles'));
 const PriceTables = lazy(() => import('./pages/PriceTables'));
 const Auth = lazy(() => import('./pages/Auth'));
@@ -88,6 +89,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Owners />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/motoristas"
+                element={
+                  <ProtectedRoute>
+                    <Drivers />
                   </ProtectedRoute>
                 }
               />

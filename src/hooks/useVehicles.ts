@@ -17,6 +17,9 @@ export interface VehicleWithRelations extends VehicleRow {
 const selectWithRelations =
   'id, plate, driver_id, owner_id, active, brand, model, owner:owners(id,name,phone), driver:drivers(id,name)';
 
+const selectBase = 'id, plate, driver_id, active, brand, model';
+const selectWithDriverOnly = `${selectBase}, driver:drivers(id,name)`;
+
 export function useVehicles(driverId?: string | null) {
   return useQuery({
     queryKey: ['vehicles', driverId],
@@ -33,7 +36,33 @@ export function useVehicles(driverId?: string | null) {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        const msg = error.message || '';
+        const fallback =
+          msg.includes('owner_id') ||
+          msg.includes('owners') ||
+          msg.includes('column') ||
+          msg.includes('relation');
+        if (fallback) {
+          let fallbackQuery = supabase
+            .from('vehicles')
+            .select(selectWithDriverOnly)
+            .eq('active', asDb(true))
+            .order('plate', { ascending: true });
+          if (driverId) {
+            fallbackQuery = fallbackQuery.eq('driver_id', asDb(driverId));
+          }
+          const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+          if (fallbackError) throw fallbackError;
+          return (filterSupabaseRows<VehicleWithRelations>(fallbackData) || []).map((row) => ({
+            ...row,
+            owner_id: null,
+            owner: null,
+            driver: (row as { driver?: { id: string; name: string } | null }).driver ?? null,
+          }));
+        }
+        throw error;
+      }
       return filterSupabaseRows<VehicleWithRelations>(data);
     },
   });
@@ -51,7 +80,26 @@ export function useVehicle(id: string | null | undefined) {
         .eq('id', asDb(id))
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        const msg = error.message || '';
+        if (
+          msg.includes('owner_id') ||
+          msg.includes('owners') ||
+          msg.includes('column') ||
+          msg.includes('relation')
+        ) {
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('vehicles')
+            .select(selectWithDriverOnly)
+            .eq('id', asDb(id))
+            .maybeSingle();
+          if (fallbackError) throw fallbackError;
+          const row = filterSupabaseSingle<VehicleWithRelations>(fallbackData);
+          if (!row) return null;
+          return { ...row, owner_id: null, owner: null };
+        }
+        throw error;
+      }
       return filterSupabaseSingle<VehicleWithRelations>(data);
     },
     enabled: !!id,
