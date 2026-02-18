@@ -17,7 +17,12 @@ import { OrderCard } from '@/components/boards/OrderCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useOrders, useUpdateOrderStage, OrderWithOccurrences } from '@/hooks/useOrders';
+import {
+  useOrders,
+  useUpdateOrderStage,
+  useUpdateOrder,
+  OrderWithOccurrences,
+} from '@/hooks/useOrders';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -27,6 +32,15 @@ import { toast } from 'sonner';
 import { OrderForm } from '@/components/forms/OrderForm';
 import { OrderDetailModal } from '@/components/modals/OrderDetailModal';
 import { OccurrenceForm } from '@/components/forms/OccurrenceForm';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { MaskedInput } from '@/components/ui/masked-input';
 
 type OrderStage = Database['public']['Enums']['order_stage'];
 
@@ -55,7 +69,14 @@ export default function Operations() {
   const { canWrite } = useUserRole();
   const { data: orders, isLoading, isError, error, refetch } = useOrders();
   const updateStageMutation = useUpdateOrderStage();
+  const updateOrderMutation = useUpdateOrder();
   const [activeOrder, setActiveOrder] = useState<OrderWithOccurrences | null>(null);
+  const [pendingMove, setPendingMove] = useState<{
+    orderId: string;
+    order: OrderWithOccurrences;
+    newStage: OrderStage;
+  } | null>(null);
+  const [carreteiroRealCents, setCarreteiroRealCents] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -144,6 +165,21 @@ export default function Operations() {
         return;
       }
 
+      // Busca motorista -> Documentação: exige carreteiro real via modal
+      if (activeOrder.stage === 'busca_motorista' && targetStage.id === 'documentacao') {
+        setPendingMove({
+          orderId: activeOrder.id,
+          order: activeOrder,
+          newStage: targetStage.id,
+        });
+        setCarreteiroRealCents(
+          activeOrder.carreteiro_antt != null
+            ? String(Math.round(Number(activeOrder.carreteiro_antt) * 100))
+            : ''
+        );
+        return;
+      }
+
       try {
         await updateStageMutation.mutateAsync({
           id: activeOrder.id,
@@ -157,9 +193,24 @@ export default function Operations() {
           msg.toLowerCase().includes('pod obrigatorio')
         ) {
           toast.error('Anexe o comprovante de entrega (POD) antes de finalizar');
-        } else {
-          toast.error('Erro ao mover OS');
+          return;
         }
+        if (
+          msg.toLowerCase().includes('carreteiro real') ||
+          msg.toLowerCase().includes('documentação') ||
+          msg.toLowerCase().includes('documentacao')
+        ) {
+          setPendingMove({
+            orderId: activeOrder.id,
+            order: activeOrder,
+            newStage: 'documentacao',
+          });
+          const antt = Number(activeOrder.carreteiro_antt ?? 0);
+          setCarreteiroRealCents(antt > 0 ? String(Math.round(antt * 100)) : '');
+          toast.error('Informe o carreteiro real para avançar para Documentação');
+          return;
+        }
+        toast.error('Erro ao mover OS');
       }
       return;
     }
@@ -169,6 +220,20 @@ export default function Operations() {
     if (overOrder && activeOrder.stage !== overOrder.stage) {
       if (overOrder.stage === 'entregue' && !activeOrder.has_pod) {
         toast.error('É necessário anexar o comprovante de entrega (POD) antes de finalizar');
+        return;
+      }
+
+      if (activeOrder.stage === 'busca_motorista' && overOrder.stage === 'documentacao') {
+        setPendingMove({
+          orderId: activeOrder.id,
+          order: activeOrder,
+          newStage: overOrder.stage,
+        });
+        setCarreteiroRealCents(
+          activeOrder.carreteiro_antt != null
+            ? String(Math.round(Number(activeOrder.carreteiro_antt) * 100))
+            : ''
+        );
         return;
       }
 
@@ -187,10 +252,46 @@ export default function Operations() {
           msg.toLowerCase().includes('pod obrigatorio')
         ) {
           toast.error('Anexe o comprovante de entrega (POD) antes de finalizar');
-        } else {
-          toast.error('Erro ao mover OS');
+          return;
         }
+        if (
+          msg.toLowerCase().includes('carreteiro real') ||
+          msg.toLowerCase().includes('documentação') ||
+          msg.toLowerCase().includes('documentacao')
+        ) {
+          setPendingMove({
+            orderId: activeOrder.id,
+            order: activeOrder,
+            newStage: 'documentacao',
+          });
+          const antt = Number(activeOrder.carreteiro_antt ?? 0);
+          setCarreteiroRealCents(antt > 0 ? String(Math.round(antt * 100)) : '');
+          toast.error('Informe o carreteiro real para avançar para Documentação');
+          return;
+        }
+        toast.error('Erro ao mover OS');
       }
+    }
+  };
+
+  const handleConfirmCarreteiroReal = async () => {
+    if (!pendingMove) return;
+    const valueReais = carreteiroRealCents ? Number(carreteiroRealCents) / 100 : 0;
+    if (valueReais <= 0) {
+      toast.error('Informe o valor do carreteiro real para avançar.');
+      return;
+    }
+    try {
+      await updateOrderMutation.mutateAsync({
+        id: pendingMove.orderId,
+        updates: { stage: pendingMove.newStage, carreteiro_real: valueReais },
+      });
+      toast.success('OS movida para Documentação');
+      setPendingMove(null);
+      setCarreteiroRealCents('');
+    } catch (error: unknown) {
+      const msg = (error instanceof Error ? error.message : String(error)).toString();
+      toast.error(msg || 'Erro ao atualizar OS');
     }
   };
 
@@ -458,6 +559,55 @@ export default function Operations() {
           osNumber={occurrenceOrder.os_number}
         />
       )}
+
+      {/* Modal: Carreteiro real ao mover Busca Motorista -> Documentação */}
+      <Dialog
+        open={!!pendingMove}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingMove(null);
+            setCarreteiroRealCents('');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Carreteiro real</DialogTitle>
+            <DialogDescription>
+              Para avançar para Documentação é obrigatório informar o valor do carreteiro real (R$).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium text-foreground">Valor (R$)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  R$
+                </span>
+                <MaskedInput
+                  mask="currency"
+                  placeholder="0,00"
+                  className="pl-10"
+                  value={carreteiroRealCents}
+                  onValueChange={(rawValue) => setCarreteiroRealCents(rawValue)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPendingMove(null);
+                setCarreteiroRealCents('');
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmCarreteiroReal}>Confirmar e mover</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

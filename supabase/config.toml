@@ -7,7 +7,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.lookup-cep]
-verify_jwt = true
+verify_jwt = false  # utilitário público (consulta ViaCEP/BrasilAPI/OpenCEP), sem dados sensíveis
 
 [functions.calculate-distance]
 verify_jwt = false  # utilitário público (geocode+rota), sem dados sensíveis

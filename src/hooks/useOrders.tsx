@@ -216,6 +216,22 @@ export function useConvertQuoteToOrder() {
       }>(quoteData);
       if (!quote) throw new Error('Quote not found');
 
+      const anttTotalRaw =
+        (quoteData as { pricing_breakdown?: { meta?: { antt?: { total?: unknown } } } })
+          ?.pricing_breakdown?.meta?.antt?.total ?? null;
+      const anttTotal =
+        anttTotalRaw == null
+          ? null
+          : Number.isFinite(Number(anttTotalRaw))
+            ? Number(anttTotalRaw)
+            : null;
+
+      if (anttTotalRaw != null && anttTotal == null) {
+        throw new Error(
+          'Cotação com ANTT inválido (meta.antt.total). Recalcule e salve a cotação antes de converter para OS.'
+        );
+      }
+
       // Get current user
       const {
         data: { user },
@@ -238,6 +254,8 @@ export function useConvertQuoteToOrder() {
             destination: quote.destination,
             value: quote.value,
             created_by: user.id,
+            carreteiro_antt: anttTotal,
+            carreteiro_real: null,
           })
         )
         .select()

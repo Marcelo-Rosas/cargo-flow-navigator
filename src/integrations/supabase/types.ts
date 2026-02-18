@@ -458,6 +458,8 @@ export type Database = {
       orders: {
         Row: {
           assigned_to: string | null;
+          carreteiro_antt: number | null;
+          carreteiro_real: number | null;
           client_id: string | null;
           client_name: string;
           created_at: string;
@@ -491,6 +493,8 @@ export type Database = {
         };
         Insert: {
           assigned_to?: string | null;
+          carreteiro_antt?: number | null;
+          carreteiro_real?: number | null;
           client_id?: string | null;
           client_name: string;
           created_at?: string;
@@ -524,6 +528,8 @@ export type Database = {
         };
         Update: {
           assigned_to?: string | null;
+          carreteiro_antt?: number | null;
+          carreteiro_real?: number | null;
           client_id?: string | null;
           client_name?: string;
           created_at?: string;
