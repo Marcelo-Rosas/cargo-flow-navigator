@@ -59,7 +59,12 @@ export function useOrders() {
             destination_cep,
             freight_type,
             km_distance,
-            vehicle_type_id
+            vehicle_type_id,
+            vehicle_type:vehicle_types (
+              axes_count,
+              code,
+              name
+            )
           )
         `
         )
