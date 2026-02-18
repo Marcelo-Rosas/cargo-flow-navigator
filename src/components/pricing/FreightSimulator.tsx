@@ -484,7 +484,7 @@ export function FreightSimulator() {
                     />
                   )}
                   <BreakdownRow
-                    label={`DAS (${result.rates.das_percent}%)`}
+                    label={`Provisionamento DAS (${result.rates.das_percent}%)`}
                     value={result.totals.das}
                   />
                   <BreakdownRow

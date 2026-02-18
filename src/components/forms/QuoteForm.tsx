@@ -1437,7 +1437,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
+                    Provisionamento DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
                   </span>
                   <span className="text-foreground">
                     {formatCurrency(calculationResult.totals.das)}

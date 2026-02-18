@@ -748,82 +748,80 @@ export function QuoteDetailModal({
                           <span>{formatCurrency(breakdown.components.tear)}</span>
                         </div>
                       )}
-                      {breakdown.profitability?.custosDescarga != null &&
-                        breakdown.profitability.custosDescarga > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Carga e Descarga</span>
-                            <span>{formatCurrency(breakdown.profitability.custosDescarga)}</span>
-                          </div>
-                        )}
                     </>
                   )}
 
                   <Separator className="my-2" />
 
-                  {/* Totals */}
                   <div className="flex justify-between font-medium">
                     <span>Receita Bruta</span>
                     <span>{formatCurrency(breakdown.totals.receitaBruta || 0)}</span>
                   </div>
-
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)</span>
-                    <span>{formatCurrency(breakdown.totals.das || 0)}</span>
-                  </div>
-
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>
-                      ICMS (
-                      {isSimplesNacional
-                        ? '0.00'
-                        : (breakdown.rates?.icmsPercent?.toFixed(2) ?? '0.00')}
-                      %)
-                    </span>
-                    <span>
-                      {formatCurrency(isSimplesNacional ? 0 : breakdown.totals.icms || 0)}
-                    </span>
-                  </div>
-
-                  <Separator className="my-2" />
-
-                  <div className="flex justify-between font-semibold text-lg">
-                    <span>Total Cliente</span>
-                    <span className="text-primary">
-                      {formatCurrency(
-                        isSimplesNacional && breakdown?.totals
-                          ? (breakdown.totals.receitaBruta || 0) + (breakdown.totals.das || 0)
-                          : breakdown.totals?.totalCliente || 0
-                      )}
-                    </span>
-                  </div>
                 </div>
 
-                {/* Custos Diretos (ANTT + Carga e Descarga) — deduzidos para chegar na margem */}
-                {((breakdown?.meta?.antt?.total != null && breakdown.meta.antt.total > 0) ||
-                  (anttCalc?.total != null && anttCalc.total > 0) ||
-                  (breakdown?.profitability?.custosDescarga != null &&
-                    breakdown.profitability.custosDescarga > 0)) && (
+                {/* Custos Diretos (ANTT + Carga e Descarga) — deduzidos para chegar na Margem Bruta */}
+                {breakdown && (
                   <>
                     <Separator className="my-4" />
                     <h5 className="font-medium text-foreground mb-2">Custos Diretos</h5>
                     <div className="space-y-2 text-sm">
-                      {Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0) > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Piso ANTT (carreteiro)</span>
-                          <span>
-                            {formatCurrency(
-                              Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0)
-                            )}
-                          </span>
-                        </div>
-                      )}
-                      {breakdown?.profitability?.custosDescarga != null &&
-                        breakdown.profitability.custosDescarga > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Carga e Descarga</span>
-                            <span>{formatCurrency(breakdown.profitability.custosDescarga)}</span>
-                          </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Piso ANTT (carreteiro)</span>
+                        <span>
+                          {formatCurrency(
+                            Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0)
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Carga e Descarga</span>
+                        <span>{formatCurrency(breakdown?.profitability?.custosDescarga ?? 0)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Impostos — deduzidos para visão correta da Margem Bruta, Resultado Líquido e Margem */}
+                {breakdown?.totals && (
+                  <>
+                    <Separator className="my-4" />
+                    <h5 className="font-medium text-foreground mb-2">Impostos</h5>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>
+                          Provisionamento DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)
+                        </span>
+                        <span>{formatCurrency(breakdown.totals.das || 0)}</span>
+                      </div>
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>
+                          ICMS (
+                          {isSimplesNacional
+                            ? '0.00'
+                            : (breakdown.rates?.icmsPercent?.toFixed(2) ?? '0.00')}
+                          %)
+                        </span>
+                        <span>
+                          {formatCurrency(isSimplesNacional ? 0 : breakdown.totals.icms || 0)}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Total Cliente (continua somando impostos; apenas mudamos de lugar no quadro) */}
+                {breakdown?.totals && (
+                  <>
+                    <Separator className="my-4" />
+                    <div className="flex justify-between font-semibold text-lg">
+                      <span>Total Cliente</span>
+                      <span className="text-primary">
+                        {formatCurrency(
+                          isSimplesNacional && breakdown?.totals
+                            ? (breakdown.totals.receitaBruta || 0) + (breakdown.totals.das || 0)
+                            : breakdown.totals?.totalCliente || 0
                         )}
+                      </span>
                     </div>
                   </>
                 )}
