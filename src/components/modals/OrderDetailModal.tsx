@@ -53,6 +53,7 @@ interface OrderWithOccurrences extends Order {
         | 'freight_type'
         | 'km_distance'
         | 'vehicle_type_id'
+        | 'pricing_breakdown'
       > & {
         vehicle_type?: {
           axes_count: number | null;
@@ -148,8 +149,24 @@ export function OrderDetailModal({
   };
 
   // ANTT piso mínimo (Tabela A / Carga Geral / sem retorno vazio)
-  const axesCount = order?.quote?.vehicle_type?.axes_count ?? null;
-  const kmDistance = order?.quote?.km_distance ?? null;
+  const breakdown =
+    (order?.quote?.pricing_breakdown as unknown as {
+      meta?: {
+        antt?: {
+          total: number;
+          axesCount: number;
+          kmDistance: number;
+          ccd: number;
+          cc: number;
+          ida: number;
+        };
+      };
+    } | null) ?? null;
+  const savedAntt = breakdown?.meta?.antt;
+
+  const axesCount = savedAntt?.axesCount ?? order?.quote?.vehicle_type?.axes_count ?? null;
+  const kmDistance = savedAntt?.kmDistance ?? order?.quote?.km_distance ?? null;
+
   const { data: anttRate } = useAnttFloorRate({
     operationTable: 'A',
     cargoType: 'carga_geral',
@@ -157,13 +174,14 @@ export function OrderDetailModal({
   });
 
   const anttCalc =
-    anttRate && kmDistance
+    savedAntt ||
+    (anttRate && kmDistance
       ? calculateAnttMinimum({
           kmDistance: Number(kmDistance),
           ccd: Number(anttRate.ccd),
           cc: Number(anttRate.cc),
         })
-      : null;
+      : null);
 
   if (!order) return null;
 

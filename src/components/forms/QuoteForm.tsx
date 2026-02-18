@@ -46,6 +46,7 @@ import { usePriceTables } from '@/hooks/usePriceTables';
 import { useVehicleTypes, usePaymentTerms, usePricingParameter } from '@/hooks/usePricingRules';
 import { usePriceTableRowByKmRange, usePriceTableRows } from '@/hooks/usePriceTableRows';
 import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
+import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -184,6 +185,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedFreightModality = form.watch('freight_modality');
   const watchedPriceTableId = form.watch('price_table_id');
   const watchedKmDistance = form.watch('km_distance');
+  const watchedVehicleTypeId = form.watch('vehicle_type_id');
 
   // Filtrar tabelas pela modalidade (lotação → só lotação; fracionado → só fracionado)
   const priceTablesFiltered =
@@ -234,6 +236,17 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   // Regime tributário global (1 = Simples → ICMS 0%; 0 = Normal)
   const { data: taxRegimeParam } = usePricingParameter('tax_regime_simples');
   const taxRegimeSimples = taxRegimeParam?.value != null ? Number(taxRegimeParam.value) : 1;
+
+  // ANTT floor rate (Piso mínimo carreteiro) - Tabela A / Carga Geral
+  const selectedVehicle = vehicleTypes?.find((v) => v.id === watchedVehicleTypeId) ?? null;
+  const axesCountForAntt = selectedVehicle?.axes_count ?? null;
+  const kmDistanceForAntt = Number(watchedKmDistance || 0);
+
+  const { data: anttRate } = useAnttFloorRate({
+    operationTable: 'A',
+    cargoType: 'carga_geral',
+    axesCount: axesCountForAntt ?? undefined,
+  });
 
   // Normalize weight to kg; clamp to DECIMAL(10,2) max (99.999.999,99)
   const effectiveWeightKg = Math.min(unitToKg(watchedWeight || 0, weightUnit), 99_999_999.99);
@@ -510,7 +523,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
     try {
       // Build pricing breakdown for storage
-      const pricingBreakdown = buildStoredBreakdown(calculationResult, {
+      let pricingBreakdown = buildStoredBreakdown(calculationResult, {
         originCity: data.origin,
         destinationCity: data.destination,
         weightKg: effectiveWeightKg,
@@ -523,6 +536,34 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         tdeEnabled: data.tde_enabled || false,
         tearEnabled: data.tear_enabled || false,
       });
+
+      // Enriquecer breakdown com Piso ANTT (carreteiro), quando houver dados suficientes
+      if (anttRate && axesCountForAntt && data.km_distance && Number(data.km_distance) > 0) {
+        const anttCalcForSave = calculateAnttMinimum({
+          kmDistance: Number(data.km_distance),
+          ccd: Number(anttRate.ccd),
+          cc: Number(anttRate.cc),
+        });
+
+        pricingBreakdown = {
+          ...pricingBreakdown,
+          meta: {
+            ...pricingBreakdown.meta,
+            antt: {
+              operationTable: anttRate.operation_table,
+              cargoType: anttRate.cargo_type,
+              axesCount: axesCountForAntt,
+              kmDistance: Number(data.km_distance),
+              ccd: Number(anttRate.ccd),
+              cc: Number(anttRate.cc),
+              ida: anttCalcForSave.ida,
+              retornoVazio: 0,
+              total: anttCalcForSave.total,
+              calculatedAt: new Date().toISOString(),
+            },
+          },
+        };
+      }
 
       const quoteData = {
         client_id: data.client_id || null,

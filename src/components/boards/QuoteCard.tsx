@@ -79,6 +79,8 @@ export function QuoteCard({
   const routeUfLabel =
     breakdown?.meta?.routeUfLabel || formatRouteUf(quote.origin, quote.destination);
 
+  const anttTotal = breakdown?.meta?.antt?.total;
+
   // Get km band from pricing_breakdown
   const kmBandLabel = breakdown?.meta?.kmBandLabel || null;
   const kmStatus = breakdown?.meta?.kmStatus || 'OK';
@@ -281,9 +283,16 @@ export function QuoteCard({
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-border">
-        <span className="text-lg font-bold text-foreground">
-          {formatCurrency(Number(quote.value))}
-        </span>
+        <div className="flex flex-col">
+          <span className="text-lg font-bold text-foreground">
+            {formatCurrency(Number(quote.value))}
+          </span>
+          {anttTotal != null && (
+            <span className="text-[11px] text-muted-foreground">
+              Piso ANTT: {formatCurrency(Number(anttTotal))}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Calendar className="w-3 h-3" />
           {formatDate(quote.created_at)}
