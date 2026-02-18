@@ -39,6 +39,9 @@ const ownerSchema = z.object({
 
 type OwnerFormData = z.infer<typeof ownerSchema>;
 
+/** Form keys that hold string values (excludes `active`), for safeSet from CNPJ lookup. */
+type OwnerFormStringKey = Exclude<keyof OwnerFormData, 'active'>;
+
 interface OwnerFormProps {
   open: boolean;
   onClose: () => void;
@@ -105,11 +108,11 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
 
   const sanitizeCnpj = (v: string) => v.replace(/\D/g, '');
 
-  const safeSet = (key: keyof OwnerFormData, value?: unknown) => {
+  const safeSet = (key: OwnerFormStringKey, value?: unknown) => {
     const str = value != null ? String(value).trim() : '';
     if (!str) return;
     const current = form.getValues(key);
-    if (current && current.trim().length > 0) return;
+    if (typeof current === 'string' && current.trim().length > 0) return;
     form.setValue(key, str, { shouldValidate: true, shouldDirty: true });
   };
 
