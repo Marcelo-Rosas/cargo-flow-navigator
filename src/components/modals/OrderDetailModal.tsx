@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import {
   MapPin,
@@ -11,8 +11,10 @@ import {
   CheckCircle2,
   DollarSign,
   Pencil,
+  Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,6 +24,8 @@ import { DocumentList } from '@/components/documents/DocumentList';
 import { OccurrenceForm } from '@/components/forms/OccurrenceForm';
 import { OrderForm } from '@/components/forms/OrderForm';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
+import { useVehicleByPlate } from '@/hooks/useVehicles';
+import { useUpdateOrder } from '@/hooks/useOrders';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
@@ -102,6 +106,46 @@ export function OrderDetailModal({
   const resolveOccurrenceMutation = useResolveOccurrence();
   const [isOccurrenceFormOpen, setIsOccurrenceFormOpen] = useState(false);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  const [plateInput, setPlateInput] = useState('');
+  const [plateToSearch, setPlateToSearch] = useState<string | null>(null);
+
+  const isBuscaMotorista = order?.stage === 'busca_motorista';
+  const { data: vehicleByPlate, isLoading: vehicleByPlateLoading } = useVehicleByPlate(
+    isBuscaMotorista && plateToSearch ? plateToSearch : null
+  );
+  const updateOrderMutation = useUpdateOrder();
+
+  useEffect(() => {
+    if (order?.vehicle_plate != null) setPlateInput(order.vehicle_plate);
+    else setPlateInput('');
+    setPlateToSearch(null);
+  }, [order?.id, order?.vehicle_plate, open]);
+
+  const handleBuscarPorPlaca = () => {
+    const trimmed = plateInput.replace(/\s|-/g, '').toUpperCase().trim();
+    if (trimmed.length >= 7) setPlateToSearch(trimmed);
+    else toast.error('Informe uma placa válida (7 caracteres)');
+  };
+
+  const handleAplicarVeiculoNaOS = async () => {
+    if (!order?.id || !vehicleByPlate) return;
+    try {
+      await updateOrderMutation.mutateAsync({
+        id: order.id,
+        updates: {
+          vehicle_plate: vehicleByPlate.plate,
+          driver_name: vehicleByPlate.driver?.name ?? null,
+          driver_phone: vehicleByPlate.driver?.phone ?? null,
+          owner_name: vehicleByPlate.owner?.name ?? null,
+          owner_phone: vehicleByPlate.owner?.phone ?? null,
+        },
+      });
+      toast.success('Veículo, motorista e proprietário aplicados à OS');
+      setPlateToSearch(null);
+    } catch {
+      toast.error('Erro ao aplicar à OS');
+    }
+  };
 
   // ANTT piso mínimo (Tabela A / Carga Geral / sem retorno vazio)
   const axesCount = order?.quote?.vehicle_type?.axes_count ?? null;
@@ -247,28 +291,114 @@ export function OrderDetailModal({
                   </div>
                 </div>
 
-                {/* Driver Info - Visible from busca_motorista onwards */}
-                {showDriverSection && order.driver_name && (
-                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Truck className="w-6 h-6 text-primary" />
+                {/* Busca por placa (stage Busca Motorista) - preenche veículo, motorista e proprietário na OS */}
+                {isBuscaMotorista && canManage && (
+                  <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+                    <p className="text-sm font-medium text-foreground">
+                      Preencher veículo, motorista e proprietário pela placa
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        placeholder="Placa do veículo (ex: ABC1D23)"
+                        className="w-[180px] font-mono uppercase placeholder:normal-case"
+                        value={plateInput}
+                        onChange={(e) => setPlateInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => e.key === 'Enter' && handleBuscarPorPlaca()}
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleBuscarPorPlaca}
+                        disabled={vehicleByPlateLoading}
+                      >
+                        {vehicleByPlateLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Buscar e preencher'
+                        )}
+                      </Button>
+                    </div>
+                    {!vehicleByPlateLoading && plateToSearch && !vehicleByPlate && (
+                      <p className="text-sm text-muted-foreground">Placa não encontrada.</p>
+                    )}
+                    {vehicleByPlate && (
+                      <div className="rounded-md border border-border bg-background p-3 text-sm space-y-2">
+                        <p className="font-medium text-foreground">
+                          Veículo: <span className="font-mono">{vehicleByPlate.plate}</span>
+                          {vehicleByPlate.driver?.name && (
+                            <> · Motorista: {vehicleByPlate.driver.name}</>
+                          )}
+                          {vehicleByPlate.owner?.name && (
+                            <> · Proprietário: {vehicleByPlate.owner.name}</>
+                          )}
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleAplicarVeiculoNaOS}
+                          disabled={updateOrderMutation.isPending}
+                        >
+                          {updateOrderMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : null}
+                          Aplicar à OS
+                        </Button>
                       </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-foreground">{order.driver_name}</p>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          {order.driver_phone && (
-                            <span className="flex items-center gap-1">
-                              <Phone className="w-3.5 h-3.5" />
-                              {order.driver_phone}
-                            </span>
-                          )}
-                          {order.vehicle_plate && (
-                            <span className="font-mono">{order.vehicle_plate}</span>
-                          )}
+                    )}
+                  </div>
+                )}
+
+                {/* Motorista e Proprietário (via veículo) - visível a partir de Busca Motorista */}
+                {showDriverSection && (order.driver_name || order.owner_name) && (
+                  <div className="space-y-3">
+                    {order.driver_name && (
+                      <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Truck className="w-6 h-6 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Motorista
+                            </p>
+                            <p className="font-semibold text-foreground">{order.driver_name}</p>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                              {order.driver_phone && (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="w-3.5 h-3.5" />
+                                  {order.driver_phone}
+                                </span>
+                              )}
+                              {order.vehicle_plate && (
+                                <span className="font-mono">{order.vehicle_plate}</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
+                    {order.owner_name && (
+                      <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                            <Building2 className="w-6 h-6 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Proprietário
+                            </p>
+                            <p className="font-semibold text-foreground">{order.owner_name}</p>
+                            {order.owner_phone && (
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                                <Phone className="w-3.5 h-3.5" />
+                                {order.owner_phone}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

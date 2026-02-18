@@ -12,8 +12,6 @@ import {
   LogOut,
   Package,
   Ship,
-  Building2,
-  UserCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -30,8 +28,6 @@ const navItems = [
   // { path: '/relatorios', icon: BarChart3, label: 'Relatórios' }, // (a implementar)
   { path: '/clientes', icon: Users, label: 'Clientes' },
   { path: '/embarcadores', icon: Ship, label: 'Embarcadores' },
-  { path: '/proprietarios', icon: Building2, label: 'Proprietários' },
-  { path: '/motoristas', icon: UserCircle, label: 'Motoristas' },
   { path: '/veiculos', icon: Truck, label: 'Veículos' },
   {
     path: '/tabelas-preco',

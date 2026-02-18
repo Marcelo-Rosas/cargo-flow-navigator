@@ -11,14 +11,14 @@ export type Vehicle = VehicleRow;
 
 export interface VehicleWithRelations extends VehicleRow {
   owner?: { id: string; name: string; phone: string | null } | null;
-  driver?: { id: string; name: string } | null;
+  driver?: { id: string; name: string; phone: string | null } | null;
 }
 
 const selectWithRelations =
-  'id, plate, driver_id, owner_id, active, brand, model, owner:owners(id,name,phone), driver:drivers(id,name)';
+  'id, plate, driver_id, owner_id, active, brand, model, owner:owners(id,name,phone), driver:drivers(id,name,phone)';
 
 const selectBase = 'id, plate, driver_id, active, brand, model';
-const selectWithDriverOnly = `${selectBase}, driver:drivers(id,name)`;
+const selectWithDriverOnly = `${selectBase}, driver:drivers(id,name,phone)`;
 
 export function useVehicles(driverId?: string | null) {
   return useQuery({
@@ -58,13 +58,65 @@ export function useVehicles(driverId?: string | null) {
             ...row,
             owner_id: null,
             owner: null,
-            driver: (row as { driver?: { id: string; name: string } | null }).driver ?? null,
+            driver:
+              (row as { driver?: { id: string; name: string; phone: string | null } | null })
+                .driver ?? null,
           }));
         }
         throw error;
       }
       return filterSupabaseRows<VehicleWithRelations>(data);
     },
+  });
+}
+
+/** Normaliza placa para busca (maiúscula, sem espaços/hífen). */
+function normalizePlate(plate: string) {
+  return plate.replace(/\s|-/g, '').toUpperCase().trim();
+}
+
+/** Busca veículo por placa (motorista e proprietário vêm junto). Ativo apenas quando plate tem 7+ caracteres. */
+export function useVehicleByPlate(plate: string | null | undefined) {
+  const normalized = plate ? normalizePlate(plate) : '';
+  const enabled = normalized.length >= 7;
+
+  return useQuery({
+    queryKey: ['vehicles', 'byPlate', normalized],
+    queryFn: async () => {
+      if (normalized.length < 7) return null;
+      const query = supabase
+        .from('vehicles')
+        .select(selectWithRelations)
+        .ilike('plate', normalized)
+        .limit(1)
+        .maybeSingle();
+
+      const { data, error } = await query;
+
+      if (error) {
+        const msg = error.message || '';
+        if (
+          msg.includes('owner_id') ||
+          msg.includes('owners') ||
+          msg.includes('column') ||
+          msg.includes('relation')
+        ) {
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('vehicles')
+            .select(selectWithDriverOnly)
+            .ilike('plate', normalized)
+            .limit(1)
+            .maybeSingle();
+          if (fallbackError) throw fallbackError;
+          const row = filterSupabaseSingle<VehicleWithRelations>(fallbackData);
+          if (!row) return null;
+          return { ...row, owner_id: null, owner: null };
+        }
+        throw error;
+      }
+      return filterSupabaseSingle<VehicleWithRelations>(data);
+    },
+    enabled,
   });
 }
 

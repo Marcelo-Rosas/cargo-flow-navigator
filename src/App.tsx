@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/hooks/useAuth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 // Lazy routes (code-splitting)
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -15,8 +15,6 @@ const Operations = lazy(() => import('./pages/Operations'));
 const Documents = lazy(() => import('./pages/Documents'));
 const Clients = lazy(() => import('./pages/Clients'));
 const Shippers = lazy(() => import('./pages/Shippers'));
-const Owners = lazy(() => import('./pages/Owners'));
-const Drivers = lazy(() => import('./pages/Drivers'));
 const Vehicles = lazy(() => import('./pages/Vehicles'));
 const PriceTables = lazy(() => import('./pages/PriceTables'));
 const Auth = lazy(() => import('./pages/Auth'));
@@ -88,7 +86,7 @@ const App = () => (
                 path="/proprietarios"
                 element={
                   <ProtectedRoute>
-                    <Owners />
+                    <Navigate to="/veiculos?tab=proprietarios" replace />
                   </ProtectedRoute>
                 }
               />
@@ -96,7 +94,7 @@ const App = () => (
                 path="/motoristas"
                 element={
                   <ProtectedRoute>
-                    <Drivers />
+                    <Navigate to="/veiculos?tab=motoristas" replace />
                   </ProtectedRoute>
                 }
               />
