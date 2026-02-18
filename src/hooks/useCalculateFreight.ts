@@ -83,6 +83,7 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
       tear: response.components.tear,
       conditionalFeesTotal: response.components.conditional_fees_total,
       waitingTimeCost: response.components.waiting_time_cost,
+      dasProvision: response.components.das_provision,
     },
     rates: {
       dasPercent: response.rates.das_percent,

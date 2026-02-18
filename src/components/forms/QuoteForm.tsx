@@ -43,7 +43,7 @@ import { useCreateQuote, useUpdateQuote, useDeleteQuote } from '@/hooks/useQuote
 import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { usePriceTables } from '@/hooks/usePriceTables';
-import { useVehicleTypes, usePaymentTerms } from '@/hooks/usePricingRules';
+import { useVehicleTypes, usePaymentTerms, usePricingParameter } from '@/hooks/usePricingRules';
 import { usePriceTableRowByKmRange, usePriceTableRows } from '@/hooks/usePriceTableRows';
 import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
 import { useAuth } from '@/hooks/useAuth';
@@ -231,6 +231,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: icmsRateData } = useIcmsRateForPricing(originUf || '', destUf || '');
   const icmsRate = icmsRateData?.rate_percent ?? 12;
 
+  // Regime tributário global (1 = Simples → ICMS 0%; 0 = Normal)
+  const { data: taxRegimeParam } = usePricingParameter('tax_regime_simples');
+  const taxRegimeSimples = taxRegimeParam?.value != null ? Number(taxRegimeParam.value) : 1;
+
   // Normalize weight to kg; clamp to DECIMAL(10,2) max (99.999.999,99)
   const effectiveWeightKg = Math.min(unitToKg(watchedWeight || 0, weightUnit), 99_999_999.99);
 
@@ -249,6 +253,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       icmsRatePercent: icmsRate,
       tdeEnabled: watchedTdeEnabled || false,
       tearEnabled: watchedTearEnabled || false,
+      pricingParams: { taxRegimeSimples },
     });
   }, [
     watchedOrigin,
@@ -263,6 +268,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     icmsRate,
     watchedTdeEnabled,
     watchedTearEnabled,
+    taxRegimeSimples,
   ]);
 
   useEffect(() => {

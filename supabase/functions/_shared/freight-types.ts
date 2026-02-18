@@ -100,6 +100,8 @@ export interface FreightComponents {
   tear: number; // TODO: generalidades NTC; por ora 0
   conditional_fees_total: number;
   waiting_time_cost: number;
+  /** Provisão DAS por frete = max(receita × das_provision_percent/100, das_provision_min_value) */
+  das_provision: number;
 }
 
 export interface FreightRates {

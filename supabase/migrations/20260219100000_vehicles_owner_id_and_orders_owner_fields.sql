@@ -1,10 +1,26 @@
--- Add owner_id to vehicles (FK to owners)
-ALTER TABLE public.vehicles
-  ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES public.owners(id);
+-- Add owner_id to vehicles (FK to owners) and owner snapshot to orders.
+-- Run only if tables exist so db push does not fail on remotes that lack vehicles/orders.
 
--- Optional: snapshot of owner on order (like driver_name/driver_phone)
-ALTER TABLE public.orders
-  ADD COLUMN IF NOT EXISTS owner_name TEXT,
-  ADD COLUMN IF NOT EXISTS owner_phone TEXT;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'owners'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'vehicles'
+  ) THEN
+    ALTER TABLE public.vehicles
+      ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES public.owners(id);
+    CREATE INDEX IF NOT EXISTS idx_vehicles_owner_id ON public.vehicles(owner_id);
+  END IF;
 
-CREATE INDEX IF NOT EXISTS idx_vehicles_owner_id ON public.vehicles(owner_id);
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'orders'
+  ) THEN
+    ALTER TABLE public.orders
+      ADD COLUMN IF NOT EXISTS owner_name TEXT,
+      ADD COLUMN IF NOT EXISTS owner_phone TEXT;
+  END IF;
+END $$;

@@ -81,6 +81,9 @@ export interface FreightCalculationInput {
   pricingParams?: {
     cubageFactor?: number;
     dasPercent?: number;
+    dasProvisionMinValue?: number;
+    /** 1 = Simples Nacional (ICMS 0%), 0 = Normal. Default 1. */
+    taxRegimeSimples?: number;
     markupPercent?: number;
     overheadPercent?: number;
     targetMarginPercent?: number;
@@ -147,6 +150,7 @@ export interface FreightCalculationOutput {
     tear: number;
     conditionalFeesTotal: number;
     waitingTimeCost: number;
+    dasProvision: number;
   };
 
   rates: {
@@ -238,6 +242,7 @@ export interface StoredPricingBreakdown {
     tear: number;
     conditionalFeesTotal: number;
     waitingTimeCost: number;
+    dasProvision: number;
   };
 
   totals: {
@@ -322,6 +327,8 @@ function resolveParams(input: FreightCalculationInput) {
   return {
     cubageFactor: pp?.cubageFactor ?? FREIGHT_CONSTANTS.CUBAGE_FACTOR_KG_M3,
     dasPercent: pp?.dasPercent ?? input.dasPercent ?? FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT,
+    dasProvisionMinValue: pp?.dasProvisionMinValue ?? 0,
+    taxRegimeSimples: pp?.taxRegimeSimples ?? 1,
     markupPercent:
       pp?.markupPercent ?? input.markupPercent ?? FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT,
     overheadPercent:
@@ -349,7 +356,9 @@ function resolveDirectCosts(input: FreightCalculationInput, receitaBruta: number
 
 export function calculateFreight(input: FreightCalculationInput): FreightCalculationOutput {
   const params = resolveParams(input);
-  const icmsPercent = normalizeIcmsRate(input.icmsRatePercent);
+  let icmsPercent = normalizeIcmsRate(input.icmsRatePercent);
+  // Simples Nacional: ICMS não incide (linha visível 0% / R$ 0,00)
+  if (params.taxRegimeSimples === 1) icmsPercent = 0;
   const kmBandUsed = Math.round(Number(input.kmDistance || 0));
 
   // Empty result factory
@@ -382,6 +391,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       tear: 0,
       conditionalFeesTotal: 0,
       waitingTimeCost: 0,
+      dasProvision: 0,
     },
     rates: {
       dasPercent: params.dasPercent,
@@ -484,8 +494,11 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       waitingTimeCost
   );
 
-  // ---- STEP 8: IMPOSTOS POR FORA ----
-  const das = round2(receitaBruta * (params.dasPercent / 100));
+  // ---- STEP 8: IMPOSTOS POR FORA (provisão DAS com mínimo) ----
+  const dasProvision = round2(
+    Math.max(receitaBruta * (params.dasPercent / 100), params.dasProvisionMinValue)
+  );
+  const das = dasProvision;
   const icms = round2(receitaBruta * (icmsPercent / 100));
   const totalImpostos = round2(das + icms);
   const totalCliente = round2(receitaBruta + totalImpostos);
@@ -528,6 +541,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       tear,
       conditionalFeesTotal,
       waitingTimeCost,
+      dasProvision,
     },
     rates: {
       dasPercent: params.dasPercent,
@@ -599,6 +613,7 @@ export function buildStoredBreakdown(
       tear: output.components.tear,
       conditionalFeesTotal: output.components.conditionalFeesTotal,
       waitingTimeCost: output.components.waitingTimeCost,
+      dasProvision: output.components.dasProvision,
     },
 
     totals: { ...output.totals },

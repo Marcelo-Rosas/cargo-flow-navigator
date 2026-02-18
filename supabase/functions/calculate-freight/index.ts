@@ -158,6 +158,12 @@ Deno.serve(async (req) => {
 
     const correctionFactor = paramsMap.get('correction_factor_inctf') ?? 1.0;
 
+    // Regime tributário: 1 = Simples Nacional (ICMS 0%, DAS = provisão por frete)
+    const isSimples = (paramsMap.get('tax_regime_simples') ?? 1) === 1;
+    const dasProvisionPercent =
+      paramsMap.get('das_provision_percent') ?? FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT;
+    const dasProvisionMinValue = paramsMap.get('das_provision_min_value') ?? 0;
+
     if (!paramsMap.has('das_percent'))
       fallbacksApplied.push(
         `das_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT}%`
@@ -423,6 +429,9 @@ Deno.serve(async (req) => {
       icmsPercent = FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT;
     }
 
+    // Simples Nacional: ICMS não incide no cálculo (linha continua visível com 0% e R$ 0,00)
+    if (isSimples) icmsPercent = 0;
+
     // =====================================================
     // GET TAC RATE — NTC 2.6: Temporal formula
     // Para cada 5% de variação do diesel → 1,75% sobre frete peso
@@ -500,9 +509,12 @@ Deno.serve(async (req) => {
 
     // =====================================================
     // CALCULATE TAXES "POR FORA" (no gross-up)
+    // Provisão DAS = max(receita × das_provision_percent/100, das_provision_min_value).
+    // No Simples: totals.das = provisão por frete (colchão); ICMS = 0.
     // =====================================================
 
-    const das = receitaFinal * (dasPercent / 100);
+    const baseProvisao = receitaFinal;
+    const das = Math.max(baseProvisao * (dasProvisionPercent / 100), dasProvisionMinValue);
     const icms = receitaFinal * (icmsPercent / 100);
     const totalImpostos = das + icms;
 
@@ -559,10 +571,11 @@ Deno.serve(async (req) => {
       tear: roundCurrency(tear),
       conditional_fees_total: roundCurrency(conditionalFeesTotal),
       waiting_time_cost: roundCurrency(waitingTimeCost),
+      das_provision: roundCurrency(das),
     };
 
     const rates: FreightRates = {
-      das_percent: dasPercent,
+      das_percent: dasProvisionPercent,
       icms_percent: icmsPercent,
       gris_percent: grisPercent,
       tso_percent: tsoPercent,

@@ -176,6 +176,7 @@ export function QuoteDetailModal({
         tear: 0,
         conditionalFeesTotal: 0,
         waitingTimeCost: 0,
+        dasProvision: 0,
       };
 
       const defaultWeights = { cubageWeight: 0, billableWeight: 0, tonBillable: 0 };
@@ -619,6 +620,7 @@ export function QuoteDetailModal({
                                   tear: 0,
                                   conditionalFeesTotal: 0,
                                   waitingTimeCost: 0,
+                                  dasProvision: 0,
                                 },
                                 totals: current?.totals || {
                                   receitaBruta: 0,
@@ -740,6 +742,14 @@ export function QuoteDetailModal({
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">TEAR (NTC)</span>
                           <span>{formatCurrency(breakdown.components.tear)}</span>
+                        </div>
+                      )}
+                      {(breakdown.components.dasProvision ?? 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Provisão DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)
+                          </span>
+                          <span>{formatCurrency(breakdown.components.dasProvision ?? 0)}</span>
                         </div>
                       )}
                     </>
