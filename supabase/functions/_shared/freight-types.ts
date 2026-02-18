@@ -86,6 +86,8 @@ export interface FreightMeta {
   price_table_row_id?: string; // id da linha encontrada, para auditoria
   /** NTC Lotação Dez/25: frete_peso + frete_valor + gris + tso (sem correction/markup) */
   ntc_base?: number;
+  /** Piso ANTT carreteiro (km × CCD + CC) para custos diretos e rentabilidade */
+  antt_piso_carreteiro?: number;
 }
 
 export interface FreightComponents {

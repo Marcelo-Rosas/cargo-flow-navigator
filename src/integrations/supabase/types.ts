@@ -286,6 +286,7 @@ export type Database = {
       documents: {
         Row: {
           created_at: string;
+          fat_id: string | null;
           file_name: string;
           file_size: number | null;
           file_url: string;
@@ -300,6 +301,7 @@ export type Database = {
         };
         Insert: {
           created_at?: string;
+          fat_id?: string | null;
           file_name: string;
           file_size?: number | null;
           file_url: string;
@@ -314,6 +316,7 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          fat_id?: string | null;
           file_name?: string;
           file_size?: number | null;
           file_url?: string;
@@ -483,13 +486,13 @@ export type Database = {
           notes: string | null;
           origin: string;
           os_number: string;
+          owner_name: string | null;
+          owner_phone: string | null;
           quote_id: string | null;
           stage: Database['public']['Enums']['order_stage'];
           updated_at: string;
           value: number;
           vehicle_plate: string | null;
-          owner_name: string | null;
-          owner_phone: string | null;
           waiting_time_cost: number | null;
           waiting_time_hours: number | null;
         };
@@ -520,13 +523,13 @@ export type Database = {
           notes?: string | null;
           origin: string;
           os_number: string;
+          owner_name?: string | null;
+          owner_phone?: string | null;
           quote_id?: string | null;
           stage?: Database['public']['Enums']['order_stage'];
           updated_at?: string;
           value?: number;
           vehicle_plate?: string | null;
-          owner_name?: string | null;
-          owner_phone?: string | null;
           waiting_time_cost?: number | null;
           waiting_time_hours?: number | null;
         };
@@ -557,13 +560,13 @@ export type Database = {
           notes?: string | null;
           origin?: string;
           os_number?: string;
+          owner_name?: string | null;
+          owner_phone?: string | null;
           quote_id?: string | null;
           stage?: Database['public']['Enums']['order_stage'];
           updated_at?: string;
           value?: number;
           vehicle_plate?: string | null;
-          owner_name?: string | null;
-          owner_phone?: string | null;
           waiting_time_cost?: number | null;
           waiting_time_hours?: number | null;
         };
@@ -597,6 +600,60 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      owners: {
+        Row: {
+          active: boolean;
+          address: string | null;
+          city: string | null;
+          cpf_cnpj: string | null;
+          created_at: string;
+          email: string | null;
+          id: string;
+          name: string;
+          notes: string | null;
+          phone: string | null;
+          rg: string | null;
+          rg_emitter: string | null;
+          state: string | null;
+          updated_at: string;
+          zip_code: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          address?: string | null;
+          city?: string | null;
+          cpf_cnpj?: string | null;
+          created_at?: string;
+          email?: string | null;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          phone?: string | null;
+          rg?: string | null;
+          rg_emitter?: string | null;
+          state?: string | null;
+          updated_at?: string;
+          zip_code?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          address?: string | null;
+          city?: string | null;
+          cpf_cnpj?: string | null;
+          created_at?: string;
+          email?: string | null;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          phone?: string | null;
+          rg?: string | null;
+          rg_emitter?: string | null;
+          state?: string | null;
+          updated_at?: string;
+          zip_code?: string | null;
+        };
+        Relationships: [];
       };
       payment_terms: {
         Row: {
@@ -857,6 +914,7 @@ export type Database = {
           payment_term_id: string | null;
           price_table_id: string | null;
           pricing_breakdown: Json | null;
+          quote_code: string | null;
           shipper_email: string | null;
           shipper_id: string | null;
           shipper_name: string | null;
@@ -899,6 +957,7 @@ export type Database = {
           payment_term_id?: string | null;
           price_table_id?: string | null;
           pricing_breakdown?: Json | null;
+          quote_code?: string | null;
           shipper_email?: string | null;
           shipper_id?: string | null;
           shipper_name?: string | null;
@@ -941,6 +1000,7 @@ export type Database = {
           payment_term_id?: string | null;
           price_table_id?: string | null;
           pricing_breakdown?: Json | null;
+          quote_code?: string | null;
           shipper_email?: string | null;
           shipper_id?: string | null;
           shipper_name?: string | null;
@@ -1061,105 +1121,6 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: 'valid_users';
             referencedColumns: ['user_id'];
-          },
-        ];
-      };
-      owners: {
-        Row: {
-          id: string;
-          name: string;
-          cpf_cnpj: string | null;
-          rg: string | null;
-          rg_emitter: string | null;
-          phone: string | null;
-          email: string | null;
-          address: string | null;
-          city: string | null;
-          state: string | null;
-          zip_code: string | null;
-          notes: string | null;
-          active: boolean;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          name: string;
-          cpf_cnpj?: string | null;
-          rg?: string | null;
-          rg_emitter?: string | null;
-          phone?: string | null;
-          email?: string | null;
-          address?: string | null;
-          city?: string | null;
-          state?: string | null;
-          zip_code?: string | null;
-          notes?: string | null;
-          active?: boolean;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          name?: string;
-          cpf_cnpj?: string | null;
-          rg?: string | null;
-          rg_emitter?: string | null;
-          phone?: string | null;
-          email?: string | null;
-          address?: string | null;
-          city?: string | null;
-          state?: string | null;
-          zip_code?: string | null;
-          notes?: string | null;
-          active?: boolean;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
-      vehicles: {
-        Row: {
-          id: string;
-          plate: string;
-          driver_id: string | null;
-          owner_id: string | null;
-          active: boolean;
-          brand: string | null;
-          model: string | null;
-        };
-        Insert: {
-          id?: string;
-          plate: string;
-          driver_id?: string | null;
-          owner_id?: string | null;
-          active?: boolean;
-          brand?: string | null;
-          model?: string | null;
-        };
-        Update: {
-          id?: string;
-          plate?: string;
-          driver_id?: string | null;
-          owner_id?: string | null;
-          active?: boolean;
-          brand?: string | null;
-          model?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'vehicles_driver_id_fkey';
-            columns: ['driver_id'];
-            isOneToOne: false;
-            referencedRelation: 'drivers';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'vehicles_owner_id_fkey';
-            columns: ['owner_id'];
-            isOneToOne: false;
-            referencedRelation: 'owners';
-            referencedColumns: ['id'];
           },
         ];
       };
@@ -1410,11 +1371,30 @@ export type Database = {
       };
     };
     Functions: {
+      copy_quote_adiantamento_to_fat: {
+        Args: { p_fat_id: string; p_quote_id: string };
+        Returns: undefined;
+      };
       current_user_profile: {
         Args: never;
         Returns: Database['public']['Enums']['user_profile'];
       };
+      find_price_row_by_km: {
+        Args: {
+          p_km_numeric: number;
+          p_price_table_id: string;
+          p_rounding?: string;
+        };
+        Returns: {
+          cost_per_ton: number;
+          id: string;
+          km_from: number;
+          km_to: number;
+          matched_km: number;
+        }[];
+      };
       generate_os_number: { Args: never; Returns: string };
+      generate_quote_code: { Args: never; Returns: string };
       get_user_role: {
         Args: { _user_id: string };
         Returns: Database['public']['Enums']['app_role'];
@@ -1453,7 +1433,8 @@ export type Database = {
         | 'crlv'
         | 'comp_residencia'
         | 'antt_motorista'
-        | 'mdfe';
+        | 'mdfe'
+        | 'adiantamento';
       occurrence_severity: 'baixa' | 'media' | 'alta' | 'critica';
       order_stage:
         | 'ordem_criada'
@@ -1607,6 +1588,7 @@ export const Constants = {
         'comp_residencia',
         'antt_motorista',
         'mdfe',
+        'adiantamento',
       ],
       occurrence_severity: ['baixa', 'media', 'alta', 'critica'],
       order_stage: [

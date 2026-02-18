@@ -336,15 +336,17 @@ Deno.serve(async (req) => {
 
     let waitingTimeCost = 0;
     let vehicleTypeId: string | null = null;
+    let axesCount: number | null = null;
 
     if (input.vehicle_type_code) {
       const { data: vt } = await supabase
         .from('vehicle_types')
-        .select('id')
+        .select('id, axes_count')
         .eq('code', input.vehicle_type_code)
         .eq('active', true)
         .maybeSingle();
       vehicleTypeId = vt?.id ?? null;
+      axesCount = vt?.axes_count ?? null;
     }
 
     if (input.waiting_hours !== undefined && input.waiting_hours > 0) {
@@ -394,6 +396,31 @@ Deno.serve(async (req) => {
         const excessHours = Math.max(0, input.waiting_hours - 5);
         waitingTimeCost = excessHours * 146.44;
         fallbacksApplied.push('waiting_time_rules: usando fallback NTC 5h + R$146,44/h');
+      }
+    }
+
+    // =====================================================
+    // PISO ANTT (CARRETEIRO) — Tabela A, Carga Geral
+    // Fórmula: km × CCD + CC (ida, sem retorno vazio)
+    // =====================================================
+
+    let pisoAnttCarreteiro = 0;
+
+    if (axesCount != null && axesCount > 0 && input.km_distance != null && input.km_distance > 0) {
+      const kmBand = Math.ceil(Number(input.km_distance));
+
+      const { data: anttRate } = await supabase
+        .from('antt_floor_rates')
+        .select('ccd, cc')
+        .eq('operation_table', 'A')
+        .eq('cargo_type', 'carga_geral')
+        .eq('axes_count', axesCount)
+        .order('valid_from', { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (anttRate?.ccd != null && anttRate?.cc != null) {
+        pisoAnttCarreteiro = roundCurrency(kmBand * Number(anttRate.ccd) + Number(anttRate.cc));
       }
     }
 
@@ -527,17 +554,20 @@ Deno.serve(async (req) => {
 
     // =====================================================
     // CALCULATE PROFITABILITY
+    // Margem Bruta = Total Cliente - Piso ANTT - Carga/Descarga - Provisionamento DAS
+    // Resultado Líquido = Margem Bruta - Overhead
+    // Margem % = Resultado Líquido / Total Cliente
     // =====================================================
 
-    const custosCarreteiro = receitaFinal * (carreteiroPercent / 100);
+    const custosCarreteiro = pisoAnttCarreteiro; // Piso ANTT substitui % sobre receita
     const custosDescarga = descargaValue;
     const custosDiretos = custosCarreteiro + custosDescarga;
 
-    const margemBruta = receitaFinal - totalImpostos - custosDiretos;
+    const margemBruta = totalCliente - pisoAnttCarreteiro - custosDescarga - das;
     const overhead = margemBruta * (overheadPercent / 100);
     const resultadoLiquido = margemBruta - overhead;
 
-    const margemPercent = receitaFinal > 0 ? (resultadoLiquido / receitaFinal) * 100 : 0;
+    const margemPercent = totalCliente > 0 ? (resultadoLiquido / totalCliente) * 100 : 0;
 
     // =====================================================
     // BUILD RESPONSE
@@ -558,6 +588,7 @@ Deno.serve(async (req) => {
       ...(kmBandUsed !== undefined && { km_band_used: kmBandUsed }),
       ...(priceTableRowId && { price_table_row_id: priceTableRowId }),
       ...(priceTableRowId && { ntc_base: roundCurrency(ntc_base) }),
+      antt_piso_carreteiro: roundCurrency(pisoAnttCarreteiro),
     };
 
     const components: FreightComponents = {

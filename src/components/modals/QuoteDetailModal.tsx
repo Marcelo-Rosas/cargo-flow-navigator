@@ -269,11 +269,40 @@ export function QuoteDetailModal({
     breakdown?.meta?.routeUfLabel || formatRouteUf(quote.origin, quote.destination);
   const kmBandLabel = breakdown?.meta?.kmBandLabel;
   const kmStatus = breakdown?.meta?.kmStatus || 'OK';
-  const marginPercent = breakdown?.meta?.marginPercent ?? breakdown?.profitability?.margemPercent;
+
+  // Cálculo original de margem (meta) ainda usado para alertas gerais
+  const originalMarginPercent =
+    breakdown?.meta?.marginPercent ?? breakdown?.profitability?.margemPercent;
   const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
-  const isBelowTarget =
+  const isBelowTargetMeta =
     marginStatus === 'BELOW_TARGET' ||
-    (marginPercent !== undefined && marginPercent < TARGET_MARGIN_PERCENT);
+    (originalMarginPercent !== undefined && originalMarginPercent < TARGET_MARGIN_PERCENT);
+
+  // Visão contábil desejada:
+  // Margem Bruta = Total Cliente - Piso ANTT - Carga/Descarga - Provisionamento DAS
+  // Resultado Líquido = Margem Bruta - Overhead
+  // Margem % = Resultado Líquido / Total Cliente
+  const totalClienteView =
+    breakdown?.totals != null
+      ? isSimplesNacional
+        ? (breakdown.totals.receitaBruta || 0) + (breakdown.totals.das || 0)
+        : breakdown.totals.totalCliente || 0
+      : 0;
+
+  const pisoAnttView = Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0);
+  const cargaDescargaView = breakdown?.profitability?.custosDescarga ?? 0;
+  const provisaoDasView = breakdown?.totals?.das ?? 0;
+  const margemBrutaView = totalClienteView - pisoAnttView - cargaDescargaView - provisaoDasView;
+
+  const overheadView = breakdown?.profitability?.overhead ?? 0;
+  const resultadoLiquidoView = margemBrutaView - overheadView;
+  const margemPercentView =
+    totalClienteView > 0 ? (resultadoLiquidoView / totalClienteView) * 100 : 0;
+  const isBelowTargetView = margemPercentView < TARGET_MARGIN_PERCENT;
+
+  // Mantém compatibilidade com o alerta de margem existente
+  const marginPercent = originalMarginPercent;
+  const isBelowTarget = isBelowTargetMeta;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -837,36 +866,30 @@ export function QuoteDetailModal({
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Margem Bruta</span>
-                        <span>{formatCurrency(breakdown.profitability.margemBruta || 0)}</span>
+                        <span>{formatCurrency(margemBrutaView)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Overhead</span>
-                        <span>{formatCurrency(breakdown.profitability.overhead || 0)}</span>
+                        <span>{formatCurrency(overheadView)}</span>
                       </div>
                       <div className="flex justify-between font-medium items-center gap-2">
                         <span>Resultado Líquido</span>
                         <Badge
-                          variant={
-                            breakdown.profitability.resultadoLiquido >= 0
-                              ? 'default'
-                              : 'destructive'
-                          }
+                          variant={resultadoLiquidoView >= 0 ? 'default' : 'destructive'}
                           className={
-                            breakdown.profitability.resultadoLiquido >= 0
-                              ? 'bg-success text-success-foreground'
-                              : ''
+                            resultadoLiquidoView >= 0 ? 'bg-success text-success-foreground' : ''
                           }
                         >
-                          {formatCurrency(breakdown.profitability.resultadoLiquido || 0)}
+                          {formatCurrency(resultadoLiquidoView)}
                         </Badge>
                       </div>
                       <div className="flex justify-between font-semibold items-center gap-2">
                         <span>Margem %</span>
                         <Badge
-                          variant={isBelowTarget ? 'destructive' : 'default'}
-                          className={!isBelowTarget ? 'bg-success text-success-foreground' : ''}
+                          variant={isBelowTargetView ? 'destructive' : 'default'}
+                          className={!isBelowTargetView ? 'bg-success text-success-foreground' : ''}
                         >
-                          {(breakdown.profitability.margemPercent || 0).toFixed(1)}%
+                          {margemPercentView.toFixed(1)}%
                         </Badge>
                       </div>
                     </div>
@@ -874,57 +897,6 @@ export function QuoteDetailModal({
                 )}
               </div>
             )}
-
-            {/* Additional Fees Section */}
-            <Collapsible open={isAdditionalFeesOpen} onOpenChange={setIsAdditionalFeesOpen}>
-              <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-between p-0 h-auto hover:bg-transparent"
-                  >
-                    <h4 className="font-semibold text-foreground flex items-center gap-2">
-                      <Plus
-                        className={cn(
-                          'w-4 h-4 transition-transform',
-                          isAdditionalFeesOpen && 'rotate-45'
-                        )}
-                      />
-                      Taxas Adicionais
-                      {(additionalFeesSelection.conditionalFees.length > 0 ||
-                        additionalFeesSelection.waitingTimeEnabled) && (
-                        <Badge variant="secondary" className="ml-2">
-                          {additionalFeesSelection.conditionalFees.length +
-                            (additionalFeesSelection.waitingTimeEnabled ? 1 : 0)}
-                        </Badge>
-                      )}
-                    </h4>
-                  </Button>
-                </CollapsibleTrigger>
-
-                <CollapsibleContent className="pt-4">
-                  <AdditionalFeesSection
-                    selection={additionalFeesSelection}
-                    onChange={setAdditionalFeesSelection}
-                    baseFreight={breakdown?.components?.baseFreight || 0}
-                    cargoValue={quote.cargo_value || 0}
-                    vehicleTypeId={quote.vehicle_type_id || undefined}
-                  />
-
-                  {canManage && (
-                    <div className="flex justify-end mt-4">
-                      <Button
-                        size="sm"
-                        onClick={handleSaveAdditionalFees}
-                        disabled={saveAdditionalFeesMutation.isPending}
-                      >
-                        {saveAdditionalFeesMutation.isPending ? 'Salvando...' : 'Salvar Taxas'}
-                      </Button>
-                    </div>
-                  )}
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
 
             {/* Value (fallback if no breakdown) */}
             {!breakdown && (
