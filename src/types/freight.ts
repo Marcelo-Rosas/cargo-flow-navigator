@@ -31,6 +31,8 @@ export interface FreightMeta {
   billable_weight_kg: number;
   km_band_used?: number;
   price_table_row_id?: string;
+  /** NTC Lotação Dez/25: frete_peso + frete_valor + gris + tso */
+  ntc_base?: number;
 }
 
 export interface FreightComponents {

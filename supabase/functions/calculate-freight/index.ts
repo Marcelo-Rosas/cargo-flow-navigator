@@ -169,6 +169,9 @@ Deno.serve(async (req) => {
     if (!paramsMap.has('correction_factor_inctf'))
       fallbacksApplied.push('correction_factor_inctf: não encontrado, usando 1.0');
 
+    // NTC Lotação Dez/25: correctionFactor e markup não aplicados ao frete peso
+    fallbacksApplied.push('ntc_mode: correctionFactor/markup ignored');
+
     // =====================================================
     // CALCULATE WEIGHTS
     // =====================================================
@@ -200,7 +203,8 @@ Deno.serve(async (req) => {
       responseError = 'Tabela de preços não selecionada';
       fallbacksApplied.push('price_table: km_distance ausente');
     } else {
-      const kmBand = Math.round(Number(input.km_distance));
+      // Lotação: ceil para consistência de faixa (evitar cair em faixa errada por decimal)
+      const kmBand = Math.ceil(Number(input.km_distance));
       kmBandUsed = kmBand;
 
       const { data: allRows, error: rowsError } = await supabase
@@ -232,32 +236,27 @@ Deno.serve(async (req) => {
           costValuePercent = Number(priceRow.cost_value_percent) || 0;
 
           console.log(
-            `[calculate-freight] Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, baseCost: ${baseCost}`
+            `[calculate-freight] NTC Lotação Dez/25 | Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, frete_peso: ${baseCost}`
           );
         } else {
           kmStatus = 'OUT_OF_RANGE';
           responseStatus = 'OUT_OF_RANGE';
-          responseError = `Não existe faixa para ${kmBand} km nessa tabela`;
-          fallbacksApplied.push(`price_table_row: nenhuma faixa para ${kmBand} km`);
+          responseError = `Não existe faixa para ${kmBandUsed} km nessa tabela`;
+          fallbacksApplied.push(`price_table_row: nenhuma faixa para ${kmBandUsed} km`);
         }
       }
     }
 
     // =====================================================
-    // CALCULATE BASE FREIGHT (with INCTF correction + MARKUP)
+    // NTC LOTAÇÃO DEZ/25 — Variáveis explícitas (sem correction/markup)
     // =====================================================
 
-    const baseCostAdjusted = baseCost * correctionFactor;
-    const baseFreight = baseCostAdjusted * (1 + markupPercent / 100);
-
-    // =====================================================
-    // CALCULATE COMPONENTS ON CARGO VALUE
-    // =====================================================
-
+    const frete_peso = baseCost; // ton * cost_per_ton, sem correctionFactor
     const gris = input.cargo_value * (grisPercent / 100);
     const tso = input.cargo_value * (tsoPercent / 100);
-    const rctrc = input.cargo_value * (costValuePercent / 100);
+    const frete_valor = input.cargo_value * (costValuePercent / 100); // rctrc no response = frete valor NTC
     const adValorem = 0; // Sempre 0 (TSO substitui)
+    const ntc_base = frete_peso + frete_valor + gris + tso;
 
     // =====================================================
     // TOLL VALUE (manual)
@@ -266,11 +265,11 @@ Deno.serve(async (req) => {
     const toll = input.toll_value ?? 0;
 
     // =====================================================
-    // NTC FEES (TDE/TEAR - 20% sobre baseFreight)
+    // NTC FEES (TDE/TEAR) — TODO: generalidades NTC depois; por ora 0
     // =====================================================
 
-    const tde = input.tde_enabled ? baseFreight * (FREIGHT_CONSTANTS.NTC_TDE_PERCENT / 100) : 0;
-    const tear = input.tear_enabled ? baseFreight * (FREIGHT_CONSTANTS.NTC_TEAR_PERCENT / 100) : 0;
+    const tde = 0;
+    const tear = 0;
 
     // =====================================================
     // CONDITIONAL FEES
@@ -291,7 +290,7 @@ Deno.serve(async (req) => {
 
         if (fee) {
           let feeValue = 0;
-          const feeBase = fee.applies_to === 'cargo_value' ? input.cargo_value : baseFreight;
+          const feeBase = fee.applies_to === 'cargo_value' ? input.cargo_value : frete_peso;
 
           switch (fee.fee_type) {
             case 'percentage':
@@ -469,11 +468,11 @@ Deno.serve(async (req) => {
     // =====================================================
 
     const receitaBruta =
-      baseFreight +
+      frete_peso +
       toll +
       gris +
       tso +
-      rctrc +
+      frete_valor +
       adValorem +
       tde +
       tear +
@@ -481,10 +480,10 @@ Deno.serve(async (req) => {
       waitingTimeCost;
 
     // =====================================================
-    // APPLY TAC ADJUSTMENT (NTC: only on base freight, not full receita)
+    // APPLY TAC ADJUSTMENT (NTC 2.6: apenas sobre frete peso)
     // =====================================================
 
-    const tacAdjustment = baseFreight * (tacPercent / 100);
+    const tacAdjustment = frete_peso * (tacPercent / 100);
     const receitaComTac = receitaBruta + tacAdjustment;
 
     // =====================================================
@@ -540,15 +539,16 @@ Deno.serve(async (req) => {
       billable_weight_kg: roundCurrency(billableWeightKg),
       ...(kmBandUsed !== undefined && { km_band_used: kmBandUsed }),
       ...(priceTableRowId && { price_table_row_id: priceTableRowId }),
+      ntc_base: roundCurrency(ntc_base),
     };
 
     const components: FreightComponents = {
-      base_cost: roundCurrency(baseCostAdjusted),
-      base_freight: roundCurrency(baseFreight),
+      base_cost: roundCurrency(frete_peso),
+      base_freight: roundCurrency(frete_peso),
       toll: roundCurrency(toll),
       gris: roundCurrency(gris),
       tso: roundCurrency(tso),
-      rctrc: roundCurrency(rctrc),
+      rctrc: roundCurrency(frete_valor),
       ad_valorem: 0,
       tde: roundCurrency(tde),
       tear: roundCurrency(tear),

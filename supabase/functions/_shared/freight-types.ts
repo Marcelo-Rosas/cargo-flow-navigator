@@ -84,18 +84,20 @@ export interface FreightMeta {
   billable_weight_kg: number;
   km_band_used?: number; // inteiro usado na busca (ex.: 1719)
   price_table_row_id?: string; // id da linha encontrada, para auditoria
+  /** NTC Lotação Dez/25: frete_peso + frete_valor + gris + tso (sem correction/markup) */
+  ntc_base?: number;
 }
 
 export interface FreightComponents {
-  base_cost: number; // Antes do markup
-  base_freight: number; // Após markup (= base_cost * 1.30)
+  base_cost: number; // NTC: frete peso (sem correction/markup)
+  base_freight: number; // NTC: frete peso (sem correction/markup; UI evita duplicar gris/tso/rctrc)
   toll: number;
   gris: number;
   tso: number;
-  rctrc: number; // RCTR-C (seguro)
+  rctrc: number; // NTC: frete valor (= cargo_value * cost_value_percent); nome mantido compatibilidade UI
   ad_valorem: number; // Sempre 0 (legado)
-  tde: number;
-  tear: number;
+  tde: number; // TODO: generalidades NTC; por ora 0
+  tear: number; // TODO: generalidades NTC; por ora 0
   conditional_fees_total: number;
   waiting_time_cost: number;
 }
