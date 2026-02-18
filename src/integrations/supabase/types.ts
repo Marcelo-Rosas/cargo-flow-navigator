@@ -488,6 +488,8 @@ export type Database = {
           updated_at: string;
           value: number;
           vehicle_plate: string | null;
+          owner_name: string | null;
+          owner_phone: string | null;
           waiting_time_cost: number | null;
           waiting_time_hours: number | null;
         };
@@ -523,6 +525,8 @@ export type Database = {
           updated_at?: string;
           value?: number;
           vehicle_plate?: string | null;
+          owner_name?: string | null;
+          owner_phone?: string | null;
           waiting_time_cost?: number | null;
           waiting_time_hours?: number | null;
         };
@@ -558,6 +562,8 @@ export type Database = {
           updated_at?: string;
           value?: number;
           vehicle_plate?: string | null;
+          owner_name?: string | null;
+          owner_phone?: string | null;
           waiting_time_cost?: number | null;
           waiting_time_hours?: number | null;
         };
@@ -1055,6 +1061,105 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: 'valid_users';
             referencedColumns: ['user_id'];
+          },
+        ];
+      };
+      owners: {
+        Row: {
+          id: string;
+          name: string;
+          cpf_cnpj: string | null;
+          rg: string | null;
+          rg_emitter: string | null;
+          phone: string | null;
+          email: string | null;
+          address: string | null;
+          city: string | null;
+          state: string | null;
+          zip_code: string | null;
+          notes: string | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          cpf_cnpj?: string | null;
+          rg?: string | null;
+          rg_emitter?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          address?: string | null;
+          city?: string | null;
+          state?: string | null;
+          zip_code?: string | null;
+          notes?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          cpf_cnpj?: string | null;
+          rg?: string | null;
+          rg_emitter?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          address?: string | null;
+          city?: string | null;
+          state?: string | null;
+          zip_code?: string | null;
+          notes?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      vehicles: {
+        Row: {
+          id: string;
+          plate: string;
+          driver_id: string | null;
+          owner_id: string | null;
+          active: boolean;
+          brand: string | null;
+          model: string | null;
+        };
+        Insert: {
+          id?: string;
+          plate: string;
+          driver_id?: string | null;
+          owner_id?: string | null;
+          active?: boolean;
+          brand?: string | null;
+          model?: string | null;
+        };
+        Update: {
+          id?: string;
+          plate?: string;
+          driver_id?: string | null;
+          owner_id?: string | null;
+          active?: boolean;
+          brand?: string | null;
+          model?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'vehicles_driver_id_fkey';
+            columns: ['driver_id'];
+            isOneToOne: false;
+            referencedRelation: 'drivers';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'vehicles_owner_id_fkey';
+            columns: ['owner_id'];
+            isOneToOne: false;
+            referencedRelation: 'owners';
+            referencedColumns: ['id'];
           },
         ];
       };

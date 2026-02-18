@@ -15,6 +15,8 @@ const Operations = lazy(() => import('./pages/Operations'));
 const Documents = lazy(() => import('./pages/Documents'));
 const Clients = lazy(() => import('./pages/Clients'));
 const Shippers = lazy(() => import('./pages/Shippers'));
+const Owners = lazy(() => import('./pages/Owners'));
+const Vehicles = lazy(() => import('./pages/Vehicles'));
 const PriceTables = lazy(() => import('./pages/PriceTables'));
 const Auth = lazy(() => import('./pages/Auth'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -78,6 +80,22 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Shippers />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/proprietarios"
+                element={
+                  <ProtectedRoute>
+                    <Owners />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/veiculos"
+                element={
+                  <ProtectedRoute>
+                    <Vehicles />
                   </ProtectedRoute>
                 }
               />

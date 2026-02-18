@@ -40,6 +40,8 @@ const orderSchema = z.object({
   driver_name: z.string().optional(),
   driver_phone: z.string().optional(),
   vehicle_plate: z.string().optional(),
+  owner_name: z.string().optional(),
+  owner_phone: z.string().optional(),
   eta: z.string().optional(),
   notes: z.string().max(500, 'Observações muito longas').optional(),
 });
@@ -74,6 +76,8 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
       driver_name: '',
       driver_phone: '',
       vehicle_plate: '',
+      owner_name: '',
+      owner_phone: '',
       eta: '',
       notes: '',
     },
@@ -92,6 +96,8 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         driver_name: order.driver_name || '',
         driver_phone: order.driver_phone || '',
         vehicle_plate: order.vehicle_plate || '',
+        owner_name: order.owner_name || '',
+        owner_phone: order.owner_phone || '',
         eta: order.eta ? new Date(order.eta).toISOString().slice(0, 16) : '',
         notes: order.notes || '',
       });
@@ -107,6 +113,8 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         driver_name: '',
         driver_phone: '',
         vehicle_plate: '',
+        owner_name: '',
+        owner_phone: '',
         eta: '',
         notes: '',
       });
@@ -128,8 +136,9 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
       form.setValue('driver_id', driverId);
       form.setValue('driver_name', selectedDriver.name);
       form.setValue('driver_phone', selectedDriver.phone || '');
-      // Clear vehicle when driver changes
       form.setValue('vehicle_plate', '');
+      form.setValue('owner_name', '');
+      form.setValue('owner_phone', '');
     }
   };
 
@@ -137,6 +146,8 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
     const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
     if (selectedVehicle) {
       form.setValue('vehicle_plate', selectedVehicle.plate);
+      form.setValue('owner_name', selectedVehicle.owner?.name ?? '');
+      form.setValue('owner_phone', selectedVehicle.owner?.phone ?? '');
     }
   };
 
@@ -157,6 +168,8 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         driver_name: data.driver_name || null,
         driver_phone: data.driver_phone || null,
         vehicle_plate: data.vehicle_plate || null,
+        owner_name: data.owner_name || null,
+        owner_phone: data.owner_phone || null,
         eta: data.eta ? new Date(data.eta).toISOString() : null,
         notes: data.notes || null,
       };
@@ -404,6 +417,45 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                   </p>
                 )}
               </FormItem>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="owner_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Proprietário</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Selecione um veículo"
+                        {...field}
+                        readOnly
+                        className="bg-muted/50"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="owner_phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone do Proprietário</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="(11) 99999-9999"
+                        {...field}
+                        readOnly
+                        className="bg-muted/50"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <Separator />
