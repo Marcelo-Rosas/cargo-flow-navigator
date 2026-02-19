@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Loader2, ArrowRight, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,12 +23,10 @@ interface ConvertQuoteModalProps {
 export function ConvertQuoteModal({ open, onClose, quote }: ConvertQuoteModalProps) {
   const navigate = useNavigate();
   const convertMutation = useConvertQuoteToOrder();
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleConvert = async () => {
     if (!quote) return;
 
-    setIsLoading(true);
     try {
       await convertMutation.mutateAsync(quote.id);
       toast.success('Cotação convertida em Ordem de Serviço com sucesso!');
@@ -38,8 +35,6 @@ export function ConvertQuoteModal({ open, onClose, quote }: ConvertQuoteModalPro
       navigate('/operacional');
     } catch (error) {
       toast.error('Erro ao converter cotação');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -115,8 +110,8 @@ export function ConvertQuoteModal({ open, onClose, quote }: ConvertQuoteModalPro
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={handleConvert} disabled={isLoading} className="gap-2">
-            {isLoading ? (
+          <Button onClick={handleConvert} disabled={convertMutation.isPending} className="gap-2">
+            {convertMutation.isPending ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <ArrowRight className="w-4 h-4" />
