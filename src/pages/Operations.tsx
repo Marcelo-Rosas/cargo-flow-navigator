@@ -604,7 +604,16 @@ export default function Operations() {
             >
               Cancelar
             </Button>
-            <Button onClick={handleConfirmCarreteiroReal}>Confirmar e mover</Button>
+            <Button onClick={handleConfirmCarreteiroReal} disabled={updateOrderMutation.isPending}>
+              {updateOrderMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Salvando...
+                </>
+              ) : (
+                'Confirmar e mover'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

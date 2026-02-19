@@ -37,6 +37,7 @@ import type { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
 import { usePricingParameter } from '@/hooks/usePricingRules';
+import { useUpdateQuote } from '@/hooks/useQuotes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { supabase } from '@/integrations/supabase/client';
@@ -86,7 +87,9 @@ export function QuoteDetailModal({
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
   const [isAdditionalFeesOpen, setIsAdditionalFeesOpen] = useState(false);
   const [isConvertingToFat, setIsConvertingToFat] = useState(false);
+  const [selectedAdvancePercent, setSelectedAdvancePercent] = useState<string>('0');
   const queryClient = useQueryClient();
+  const updateQuoteMutation = useUpdateQuote();
 
   // Initialize additional fees selection from breakdown
   const getInitialFeesSelection = useCallback((): AdditionalFeesSelection => {
@@ -166,6 +169,13 @@ export function QuoteDetailModal({
     },
     enabled: !!quote?.payment_term_id,
   });
+
+  // Sync advance percent when paymentTerm loads (after paymentTerm declaration)
+  useEffect(() => {
+    if (!paymentTerm) return;
+    const p = paymentTerm.advance_percent;
+    setSelectedAdvancePercent(p === 70 ? '70' : p === 50 ? '50' : '0');
+  }, [paymentTerm]);
 
   // Mutation to save additional fees selection
   const saveAdditionalFeesMutation = useMutation({
@@ -344,6 +354,32 @@ export function QuoteDetailModal({
     }).format(new Date(date));
   };
 
+  const handleAdvancePercentChange = async (value: string) => {
+    if (!quote) return;
+    const prev = selectedAdvancePercent;
+    setSelectedAdvancePercent(value);
+    try {
+      const targetPercent = Number(value); // 0, 50, ou 70
+      const { data: term, error } = await supabase
+        .from('payment_terms')
+        .select('id')
+        .eq('advance_percent', targetPercent)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!term) {
+        toast.error('Condição de pagamento não encontrada');
+        setSelectedAdvancePercent(prev);
+        return;
+      }
+      await updateQuoteMutation.mutateAsync({ id: quote.id, updates: { payment_term_id: term.id } });
+      toast.success('Adiantamento atualizado');
+    } catch {
+      toast.error('Erro ao salvar adiantamento');
+      setSelectedAdvancePercent(prev);
+    }
+  };
+
   const handleConvertToFAT = async () => {
     if (!quote) return;
     setIsConvertingToFat(true);
@@ -367,7 +403,6 @@ export function QuoteDetailModal({
       const res = data as { data?: { id?: string; created?: boolean }; error?: string } | null;
       if (res?.error) throw new Error(res.error);
       toast.success(res?.data?.created ? 'FAT criado com sucesso' : 'FAT já existente');
-      queryClient.invalidateQueries({ queryKey: ['financial-board'] });
       queryClient.invalidateQueries({ queryKey: ['financial-documents'] });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao converter para FAT';
@@ -1077,13 +1112,9 @@ export function QuoteDetailModal({
                     Adiantamento
                   </label>
                   <Select
-                    defaultValue={
-                      paymentTerm?.advance_percent === 70
-                        ? '70'
-                        : paymentTerm?.advance_percent === 50
-                          ? '50'
-                          : '0'
-                    }
+                    value={selectedAdvancePercent}
+                    onValueChange={handleAdvancePercentChange}
+                    disabled={!canManage || updateQuoteMutation.isPending}
                   >
                     <SelectTrigger className="w-full max-w-[200px]">
                       <SelectValue placeholder="Selecionar..." />
