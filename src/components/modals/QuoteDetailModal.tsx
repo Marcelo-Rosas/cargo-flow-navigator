@@ -355,7 +355,15 @@ export function QuoteDetailModal({
           totalAmount: totalClienteView || Number(quote.value) || null,
         },
       });
-      if (error) throw error;
+      if (error) {
+        const res = error as { context?: Response };
+        let errMsg = error.message;
+        if (res?.context?.json) {
+          const body = await res.context.json().catch(() => null);
+          if (body?.error) errMsg = body.error;
+        }
+        throw new Error(errMsg);
+      }
       const res = data as { data?: { id?: string; created?: boolean }; error?: string } | null;
       if (res?.error) throw new Error(res.error);
       toast.success(res?.data?.created ? 'FAT criado com sucesso' : 'FAT já existente');
