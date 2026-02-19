@@ -28,7 +28,14 @@ import {
 } from '@/hooks/usePricingMutations';
 import { Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { PaymentTerm } from '@/types/pricing';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { type PaymentTerm, PAYMENT_STRUCTURE_OPTIONS, BALANCE_DAYS_OPTIONS } from '@/types/pricing';
 
 export function PaymentTermsSection() {
   const { data: terms, isLoading } = usePaymentTerms(false);
@@ -44,6 +51,7 @@ export function PaymentTermsSection() {
     name: string;
     days: number;
     adjustment_percent: number;
+    advance_percent?: number | null;
   }) => {
     try {
       await createMutation.mutateAsync(data);
@@ -99,6 +107,7 @@ export function PaymentTermsSection() {
           <TableRow>
             <TableHead>Código</TableHead>
             <TableHead>Nome</TableHead>
+            <TableHead>Condição</TableHead>
             <TableHead>Dias</TableHead>
             <TableHead>Ajuste (%)</TableHead>
             <TableHead>Status</TableHead>
@@ -110,7 +119,16 @@ export function PaymentTermsSection() {
             <TableRow key={term.id}>
               <TableCell className="font-mono text-sm">{term.code}</TableCell>
               <TableCell className="font-medium">{term.name}</TableCell>
-              <TableCell>{term.days === 0 ? 'À vista' : `${term.days} dias`}</TableCell>
+              <TableCell>
+                {term.advance_percent === 50
+                  ? '50/50'
+                  : term.advance_percent === 70
+                    ? '70/30'
+                    : term.days === 0
+                      ? 'À vista'
+                      : 'Prazo normal'}
+              </TableCell>
+              <TableCell>{term.days === 0 ? '—' : `${term.days} dias`}</TableCell>
               <TableCell>
                 <Badge
                   variant={
@@ -187,30 +205,50 @@ function PaymentTermForm({
   term?: PaymentTerm;
   onSubmit: (
     data:
-      | { code: string; name: string; days: number; adjustment_percent: number }
+      | {
+          code: string;
+          name: string;
+          days: number;
+          adjustment_percent: number;
+          advance_percent?: number | null;
+          active?: boolean;
+        }
       | Partial<PaymentTerm>
   ) => void;
   isLoading: boolean;
 }) {
-  const [code, setCode] = useState(term?.code || '');
-  const [name, setName] = useState(term?.name || '');
-  const [days, setDays] = useState(term?.days?.toString() || '');
+  const advance = term?.advance_percent ?? 0;
+  const [advancePercent, setAdvancePercent] = useState<number>(advance);
+  const [balanceDays, setBalanceDays] = useState(term?.days?.toString() || '30');
   const [adjustmentPercent, setAdjustmentPercent] = useState(
-    term?.adjustment_percent?.toString() || ''
+    term?.adjustment_percent?.toString() || '0'
   );
   const [active, setActive] = useState(term?.active ?? true);
 
+  const isAdvanceStructure = advancePercent === 50 || advancePercent === 70;
+  const parsedBalance = parseInt(balanceDays) || 30;
+  const days = isAdvanceStructure ? parsedBalance : term ? term.days : parsedBalance;
+
+  const deriveCodeAndName = () => {
+    if (advancePercent === 0 && days === 0) return { code: 'AVISTA', name: 'À Vista' };
+    if (advancePercent === 0) return { code: `D${days}`, name: `${days} dias` };
+    return {
+      code: `${advancePercent}_${100 - advancePercent}_D${days}`,
+      name: `${advancePercent}/${100 - advancePercent} em ${days} dias`,
+    };
+  };
+
+  const { code, name } = term ? { code: term.code, name: term.name } : deriveCodeAndName();
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim() || !name.trim()) {
-      toast.error('Código e nome são obrigatórios');
-      return;
-    }
+    const finalDays = advancePercent === 0 && !term ? days : days;
     onSubmit({
       code,
       name,
-      days: parseInt(days) || 0,
+      days: finalDays,
       adjustment_percent: parseFloat(adjustmentPercent) || 0,
+      advance_percent: advancePercent === 0 ? 0 : advancePercent,
       active,
     });
   };
@@ -220,46 +258,77 @@ function PaymentTermForm({
       <DialogHeader>
         <DialogTitle>{term ? 'Editar Prazo de Pagamento' : 'Novo Prazo de Pagamento'}</DialogTitle>
         <DialogDescription>
-          Configure prazos e seus ajustes percentuais sobre o frete
+          Configure condição (à vista, 50/50, 70/30) e dias para saldo (15, 25, 30)
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Código</Label>
-            <Input
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="D30"
-              disabled={!!term}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Nome</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="30 dias" />
-          </div>
+        <div className="space-y-2">
+          <Label>Condição de Pagamento</Label>
+          <Select
+            value={advancePercent.toString()}
+            onValueChange={(v) => setAdvancePercent(parseInt(v))}
+            disabled={!!term}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAYMENT_STRUCTURE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value.toString()}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+
+        {!term && (
           <div className="space-y-2">
-            <Label>Dias para Pagamento</Label>
-            <Input
-              type="number"
-              min="0"
-              value={days}
-              onChange={(e) => setDays(e.target.value)}
-              placeholder="0 = à vista"
-            />
+            <Label>{isAdvanceStructure ? 'Dias para Saldo' : 'Dias para Pagamento'}</Label>
+            {advancePercent === 0 ? (
+              <Input
+                type="number"
+                min="0"
+                value={balanceDays}
+                onChange={(e) => setBalanceDays(e.target.value)}
+                placeholder="0 = à vista"
+              />
+            ) : (
+              <Select value={balanceDays} onValueChange={setBalanceDays}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BALANCE_DAYS_OPTIONS.map((d) => (
+                    <SelectItem key={d} value={d.toString()}>
+                      {d} dias
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label>Ajuste (%)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={adjustmentPercent}
-              onChange={(e) => setAdjustmentPercent(e.target.value)}
-              placeholder="Negativo = desconto"
-            />
+        )}
+
+        {term && (
+          <div className="text-sm text-muted-foreground">
+            {advancePercent === 50 || advancePercent === 70
+              ? `${advancePercent}/${100 - advancePercent} em ${term.days} dias`
+              : term.days === 0
+                ? 'À vista'
+                : `${term.days} dias`}
           </div>
+        )}
+
+        <div className="space-y-2">
+          <Label>Ajuste (%)</Label>
+          <Input
+            type="number"
+            step="0.01"
+            value={adjustmentPercent}
+            onChange={(e) => setAdjustmentPercent(e.target.value)}
+            placeholder="Negativo = desconto"
+          />
         </div>
         <div className="flex items-center gap-2">
           <Switch checked={active} onCheckedChange={setActive} />

@@ -659,6 +659,7 @@ export type Database = {
         Row: {
           active: boolean;
           adjustment_percent: number;
+          advance_percent: number | null;
           code: string;
           created_at: string;
           created_by: string | null;
@@ -671,6 +672,7 @@ export type Database = {
         Insert: {
           active?: boolean;
           adjustment_percent?: number;
+          advance_percent?: number | null;
           code: string;
           created_at?: string;
           created_by?: string | null;
@@ -683,6 +685,7 @@ export type Database = {
         Update: {
           active?: boolean;
           adjustment_percent?: number;
+          advance_percent?: number | null;
           code?: string;
           created_at?: string;
           created_by?: string | null;

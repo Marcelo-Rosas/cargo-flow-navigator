@@ -437,6 +437,7 @@ export function useCreatePaymentTerm() {
       name: string;
       days: number;
       adjustment_percent: number;
+      advance_percent?: number | null;
       active?: boolean;
     }) => {
       const { data: result, error } = await supabase

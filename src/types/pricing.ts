@@ -109,11 +109,21 @@ export interface PaymentTerm {
   name: string;
   days: number;
   adjustment_percent: number;
+  advance_percent?: number | null; // 0 = à vista/prazo normal, 50 = 50/50, 70 = 70/30
   active: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/** Condição de pagamento: à vista, 50/50, 70/30 ou prazo normal */
+export const PAYMENT_STRUCTURE_OPTIONS = [
+  { value: 0, label: 'À vista / Prazo normal' },
+  { value: 50, label: '50/50 (adiantamento + saldo)' },
+  { value: 70, label: '70/30 (adiantamento + saldo)' },
+] as const;
+
+export const BALANCE_DAYS_OPTIONS = [15, 25, 30] as const;
 
 export type {
   CalculateFreightInput,
