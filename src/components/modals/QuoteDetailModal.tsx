@@ -18,6 +18,7 @@ import {
   Receipt,
   Plus,
   FileText,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -84,6 +85,7 @@ export function QuoteDetailModal({
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
   const [isAdditionalFeesOpen, setIsAdditionalFeesOpen] = useState(false);
+  const [isConvertingToFat, setIsConvertingToFat] = useState(false);
   const queryClient = useQueryClient();
 
   // Initialize additional fees selection from breakdown
@@ -342,6 +344,31 @@ export function QuoteDetailModal({
     }).format(new Date(date));
   };
 
+  const handleConvertToFAT = async () => {
+    if (!quote) return;
+    setIsConvertingToFat(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ensure-financial-document', {
+        body: {
+          docType: 'FAT',
+          sourceId: quote.id,
+          totalAmount: totalClienteView || Number(quote.value) || null,
+        },
+      });
+      if (error) throw error;
+      const res = data as { data?: { id?: string; created?: boolean }; error?: string } | null;
+      if (res?.error) throw new Error(res.error);
+      toast.success(res?.data?.created ? 'FAT criado com sucesso' : 'FAT já existente');
+      queryClient.invalidateQueries({ queryKey: ['financial-board'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-documents'] });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao converter para FAT';
+      toast.error(msg);
+    } finally {
+      setIsConvertingToFat(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
@@ -365,15 +392,31 @@ export function QuoteDetailModal({
               </DialogTitle>
               <div className="flex items-center gap-2">
                 {canManage && canConvert && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsConvertModalOpen(true)}
-                    className="gap-2"
-                  >
-                    <ArrowRightLeft className="w-4 h-4" />
-                    Converter para OS
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsConvertModalOpen(true)}
+                      className="gap-2"
+                    >
+                      <ArrowRightLeft className="w-4 h-4" />
+                      Converter para OS
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleConvertToFAT}
+                      disabled={isConvertingToFat}
+                      className="gap-2"
+                    >
+                      {isConvertingToFat ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Receipt className="w-4 h-4" />
+                      )}
+                      Converter para FAT
+                    </Button>
+                  </>
                 )}
                 {canManage && (
                   <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)}>
