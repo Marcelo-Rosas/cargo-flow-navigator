@@ -1,9 +1,9 @@
 import { ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
-import { AppRole, useUserRole } from '@/hooks/useUserRole';
+import { useUserRole, type UserProfile } from '@/hooks/useUserRole';
 
 interface RoleGuardProps {
-  allowedRoles: AppRole[];
+  allowedRoles: UserProfile[];
   children: ReactNode;
   fallback?: ReactNode;
   showLoadingState?: boolean;
@@ -15,7 +15,7 @@ export function RoleGuard({
   fallback = null,
   showLoadingState = false,
 }: RoleGuardProps) {
-  const { role, isLoading } = useUserRole();
+  const { perfil, isLoading } = useUserRole();
 
   if (isLoading) {
     if (!showLoadingState) return null;
@@ -27,7 +27,7 @@ export function RoleGuard({
     );
   }
 
-  if (!role || !allowedRoles.includes(role)) {
+  if (!perfil || !allowedRoles.includes(perfil)) {
     return <>{fallback}</>;
   }
 

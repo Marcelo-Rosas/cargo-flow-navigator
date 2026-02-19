@@ -12,13 +12,13 @@ import {
   LogOut,
   Package,
   Ship,
+  DollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { BrandLogo } from '@/components/BrandLogo';
-import { useUserRole } from '@/hooks/useUserRole';
-import { AppRole } from '@/hooks/useUserRole';
+import { useUserRole, type UserProfile } from '@/hooks/useUserRole';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -33,11 +33,17 @@ const navItems = [
     path: '/tabelas-preco',
     icon: Package,
     label: 'Tabelas de Preço',
-    roles: ['admin', 'comercial', 'fiscal'] as AppRole[],
+    roles: ['admin', 'operacional', 'financeiro'] as UserProfile[],
+  },
+  {
+    path: '/financeiro',
+    icon: DollarSign,
+    label: 'Financeiro',
+    roles: ['admin', 'operacional', 'financeiro'] as UserProfile[],
   },
 ];
 
-type NavItem = { path: string; icon: typeof LayoutDashboard; label: string; roles?: AppRole[] };
+type NavItem = { path: string; icon: typeof LayoutDashboard; label: string; roles?: UserProfile[] };
 const bottomNavItems: NavItem[] = [
   // { path: '/configuracoes', icon: Settings, label: 'Configurações' }, // (a implementar)
   // { path: '/integracoes', icon: Plug, label: 'Integrações' }, // (a implementar)
@@ -47,9 +53,9 @@ const bottomNavItems: NavItem[] = [
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
-  const { role } = useUserRole();
+  const { perfil } = useUserRole();
   const filteredNavItems = navItems.filter(
-    (item) => !item.roles || (role != null && item.roles?.includes(role))
+    (item) => !item.roles || (perfil != null && item.roles?.includes(perfil))
   );
 
   return (

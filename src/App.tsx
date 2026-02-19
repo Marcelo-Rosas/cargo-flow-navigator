@@ -17,6 +17,7 @@ const Clients = lazy(() => import('./pages/Clients'));
 const Shippers = lazy(() => import('./pages/Shippers'));
 const Vehicles = lazy(() => import('./pages/Vehicles'));
 const PriceTables = lazy(() => import('./pages/PriceTables'));
+const Financial = lazy(() => import('./pages/Financial'));
 const Auth = lazy(() => import('./pages/Auth'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -109,8 +110,16 @@ const App = () => (
               <Route
                 path="/tabelas-preco"
                 element={
-                  <ProtectedRoute requiredRoles={['admin', 'comercial', 'fiscal']}>
+                  <ProtectedRoute requiredRoles={['admin', 'operacional', 'financeiro']}>
                     <PriceTables />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/financeiro"
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'operacional', 'financeiro']}>
+                    <Financial />
                   </ProtectedRoute>
                 }
               />

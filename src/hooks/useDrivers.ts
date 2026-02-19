@@ -9,9 +9,13 @@ export interface Driver {
   active: boolean;
 }
 
-export function useDrivers(activeOnly = true) {
+type UseDriversOptions = { enabled?: boolean };
+
+export function useDrivers(activeOnly = true, options: UseDriversOptions = {}) {
+  const { enabled = true } = options;
   return useQuery({
     queryKey: ['drivers', activeOnly],
+    enabled,
     queryFn: async () => {
       let query = supabase
         .from('drivers')

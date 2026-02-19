@@ -1,19 +1,19 @@
 import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { AppRole, useUserRole } from '@/hooks/useUserRole';
+import { useUserRole, type UserProfile } from '@/hooks/useUserRole';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredRoles?: AppRole[];
+  requiredRoles?: UserProfile[];
   fallback?: ReactNode;
 }
 
 export function ProtectedRoute({ children, requiredRoles, fallback }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
-  const { role, isLoading: roleLoading } = useUserRole();
+  const { perfil, isLoading: roleLoading } = useUserRole();
   const location = useLocation();
 
   if (loading || (!!requiredRoles?.length && user && roleLoading)) {
@@ -32,7 +32,7 @@ export function ProtectedRoute({ children, requiredRoles, fallback }: ProtectedR
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  if (requiredRoles?.length && (!role || !requiredRoles.includes(role))) {
+  if (requiredRoles?.length && (!perfil || !requiredRoles.includes(perfil))) {
     if (fallback) return <>{fallback}</>;
 
     return (

@@ -236,7 +236,11 @@ export default function Vehicles() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="veiculos" className="mt-6 space-y-4">
+          <TabsContent
+            value="veiculos"
+            forceMount
+            className="mt-6 space-y-4 data-[state=inactive]:hidden"
+          >
             <div className="flex items-center gap-3">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -404,7 +408,11 @@ export default function Vehicles() {
             )}
           </TabsContent>
 
-          <TabsContent value="motoristas" className="mt-6 space-y-4">
+          <TabsContent
+            value="motoristas"
+            forceMount
+            className="mt-6 space-y-4 data-[state=inactive]:hidden"
+          >
             <div className="flex items-center gap-3">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -445,7 +453,7 @@ export default function Vehicles() {
                   Tentar novamente
                 </Button>
               </div>
-            ) : filteredDrivers?.length === 0 ? (
+            ) : (filteredDrivers ?? []).length === 0 ? (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -555,7 +563,11 @@ export default function Vehicles() {
             )}
           </TabsContent>
 
-          <TabsContent value="proprietarios" className="mt-6 space-y-4">
+          <TabsContent
+            value="proprietarios"
+            forceMount
+            className="mt-6 space-y-4 data-[state=inactive]:hidden"
+          >
             <div className="flex items-center gap-3">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

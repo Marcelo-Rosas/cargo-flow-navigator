@@ -49,8 +49,8 @@ interface VehicleFormProps {
 export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
   const createVehicleMutation = useCreateVehicle();
   const updateVehicleMutation = useUpdateVehicle();
-  const { data: drivers } = useDrivers();
-  const { data: owners } = useOwners(undefined, { enabled: open });
+  const { data: drivers, isLoading: driversLoading } = useDrivers(true, { enabled: open });
+  const { data: owners, isLoading: ownersLoading } = useOwners(undefined, { enabled: open });
   const isEditing = !!vehicle;
 
   const form = useForm<VehicleFormData>({
@@ -207,10 +207,18 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Motorista</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || ''}
+                      disabled={driversLoading}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecionar motorista..." />
+                          <SelectValue
+                            placeholder={
+                              driversLoading ? 'Carregando...' : 'Selecionar motorista...'
+                            }
+                          />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -242,10 +250,18 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Proprietário</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || ''}
+                      disabled={ownersLoading}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecionar proprietário..." />
+                          <SelectValue
+                            placeholder={
+                              ownersLoading ? 'Carregando...' : 'Selecionar proprietário...'
+                            }
+                          />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
