@@ -113,6 +113,9 @@ const quoteSchema = z.object({
   tde_enabled: z.boolean().optional().default(false),
   tear_enabled: z.boolean().optional().default(false),
   notes: z.string().max(500, 'Observações muito longas').optional(),
+  // Condição financeira: datas manuais (adiantamento, à vista, saldo)
+  advance_due_date: z.string().optional(),
+  balance_due_date: z.string().optional(),
 });
 
 type QuoteFormData = z.infer<typeof quoteSchema>;
@@ -181,6 +184,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       tde_enabled: false,
       tear_enabled: false,
       notes: '',
+      advance_due_date: '',
+      balance_due_date: '',
     },
   });
 
@@ -202,6 +207,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedDescarga = form.watch('descarga');
   const watchedTdeEnabled = form.watch('tde_enabled');
   const watchedTearEnabled = form.watch('tear_enabled');
+  const watchedPaymentTermId = form.watch('payment_term_id');
+  const selectedPaymentTerm = paymentTerms?.find((t) => t.id === watchedPaymentTermId);
 
   // Busca faixas via REST (price_table_rows) e seleciona a faixa do km via query (lte/gte)
   const kmForBand = Number(watchedKmDistance || 0);
@@ -325,6 +332,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         tde_enabled: false,
         tear_enabled: false,
         notes: quote.notes || '',
+        advance_due_date: (quote as { advance_due_date?: string | null })?.advance_due_date || '',
+        balance_due_date: (quote as { balance_due_date?: string | null })?.balance_due_date || '',
       });
     } else {
       form.reset({
@@ -353,6 +362,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         tde_enabled: false,
         tear_enabled: false,
         notes: '',
+        advance_due_date: '',
+        balance_due_date: '',
       });
     }
   }, [quote, form, weightUnit]);
@@ -619,6 +630,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         pricing_breakdown:
           pricingBreakdown as unknown as Database['public']['Tables']['quotes']['Row']['pricing_breakdown'],
         notes: data.notes || null,
+        advance_due_date: data.advance_due_date?.trim() || null,
+        balance_due_date: data.balance_due_date?.trim() || null,
       };
 
       if (isEditing && quote) {
@@ -1213,6 +1226,112 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     </FormItem>
                   )}
                 />
+
+                {/* Condição Financeira: datas manuais para adiantamento e saldo */}
+                {selectedPaymentTerm && (
+                  <div className="col-span-3 space-y-3 rounded-lg border border-dashed p-3">
+                    <h4 className="text-sm font-medium">Condição Financeira</h4>
+                    {(() => {
+                      const adv = selectedPaymentTerm.advance_percent ?? 0;
+                      const days = selectedPaymentTerm.days ?? 0;
+                      const total =
+                        calculationResult.status === 'OK'
+                          ? calculationResult.totals.totalCliente
+                          : 0;
+                      if (adv === 50 || adv === 70) {
+                        const advanceValue = (total * adv) / 100;
+                        const balanceValue = total - advanceValue;
+                        return (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                              <span className="text-xs text-muted-foreground">
+                                Adiantamento {adv}% = {formatCurrency(advanceValue)}
+                              </span>
+                              <FormField
+                                control={form.control}
+                                name="advance_due_date"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs">Data adiantamento</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="date"
+                                        value={field.value || ''}
+                                        onChange={(e) => field.onChange(e.target.value)}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <span className="text-xs text-muted-foreground">
+                                Saldo {100 - adv}% = {formatCurrency(balanceValue)}
+                              </span>
+                              <FormField
+                                control={form.control}
+                                name="balance_due_date"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs">Data saldo</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="date"
+                                        value={field.value || ''}
+                                        onChange={(e) => field.onChange(e.target.value)}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </div>
+                        );
+                      }
+                      if (adv === 0 && days === 0) {
+                        return (
+                          <FormField
+                            control={form.control}
+                            name="advance_due_date"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">
+                                  Data do pagamento (à vista)
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="date"
+                                    value={field.value || ''}
+                                    onChange={(e) => field.onChange(e.target.value)}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        );
+                      }
+                      // adv === 0 && days > 0: prazo normal (D15, D30, etc.)
+                      return (
+                        <FormField
+                          control={form.control}
+                          name="balance_due_date"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Data de vencimento</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="date"
+                                  value={field.value || ''}
+                                  onChange={(e) => field.onChange(e.target.value)}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      );
+                    })()}
+                  </div>
+                )}
 
                 <FormField
                   control={form.control}

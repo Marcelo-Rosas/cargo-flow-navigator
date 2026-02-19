@@ -4,9 +4,9 @@
 
 BEGIN;
 
--- Shipper-related (shipper_id matches shippers.id type: bigint or uuid)
+-- Shipper-related (shipper_id matches shippers.id type: uuid)
 ALTER TABLE public.quotes
-  ADD COLUMN IF NOT EXISTS shipper_id bigint REFERENCES public.shippers(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS shipper_id uuid REFERENCES public.shippers(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS shipper_name text,
   ADD COLUMN IF NOT EXISTS shipper_email text;
 

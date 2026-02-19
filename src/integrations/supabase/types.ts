@@ -891,7 +891,9 @@ export type Database = {
       };
       quotes: {
         Row: {
+          advance_due_date: string | null;
           assigned_to: string | null;
+          balance_due_date: string | null;
           billable_weight: number | null;
           cargo_type: string | null;
           cargo_value: number | null;
@@ -934,7 +936,9 @@ export type Database = {
           weight: number | null;
         };
         Insert: {
+          advance_due_date?: string | null;
           assigned_to?: string | null;
+          balance_due_date?: string | null;
           billable_weight?: number | null;
           cargo_type?: string | null;
           cargo_value?: number | null;
@@ -977,7 +981,9 @@ export type Database = {
           weight?: number | null;
         };
         Update: {
+          advance_due_date?: string | null;
           assigned_to?: string | null;
+          balance_due_date?: string | null;
           billable_weight?: number | null;
           cargo_type?: string | null;
           cargo_value?: number | null;
