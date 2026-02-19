@@ -88,6 +88,14 @@ export function QuoteDetailModal({
   const [isAdditionalFeesOpen, setIsAdditionalFeesOpen] = useState(false);
   const [isConvertingToFat, setIsConvertingToFat] = useState(false);
   const [selectedAdvancePercent, setSelectedAdvancePercent] = useState<string>('0');
+  const [activePaymentTermId, setActivePaymentTermId] = useState<string | null>(
+    quote?.payment_term_id ?? null
+  );
+
+  // Sync activePaymentTermId when quote prop changes (e.g. modal opens with different quote)
+  useEffect(() => {
+    setActivePaymentTermId(quote?.payment_term_id ?? null);
+  }, [quote?.id, quote?.payment_term_id]);
   const queryClient = useQueryClient();
   const updateQuoteMutation = useUpdateQuote();
 
@@ -151,13 +159,13 @@ export function QuoteDetailModal({
       : null;
 
   const { data: paymentTerm } = useQuery({
-    queryKey: ['payment-term', quote?.payment_term_id],
+    queryKey: ['payment-term', activePaymentTermId],
     queryFn: async () => {
-      if (!quote?.payment_term_id) return null;
+      if (!activePaymentTermId) return null;
       const { data } = await supabase
         .from('payment_terms')
         .select('name, code, adjustment_percent, advance_percent, days')
-        .eq('id', asDb(quote.payment_term_id))
+        .eq('id', asDb(activePaymentTermId))
         .maybeSingle();
       return filterSupabaseSingle<{
         name: string;
@@ -167,7 +175,7 @@ export function QuoteDetailModal({
         days?: number | null;
       }>(data);
     },
-    enabled: !!quote?.payment_term_id,
+    enabled: !!activePaymentTermId,
   });
 
   // Sync advance percent when paymentTerm loads (after paymentTerm declaration)
@@ -373,6 +381,9 @@ export function QuoteDetailModal({
         return;
       }
       await updateQuoteMutation.mutateAsync({ id: quote.id, updates: { payment_term_id: term.id } });
+      // Atualiza o ID local para que a query ['payment-term', activePaymentTermId]
+      // re-execute com o novo ID e os mini cards reflitam imediatamente
+      setActivePaymentTermId(term.id);
       toast.success('Adiantamento atualizado');
     } catch {
       toast.error('Erro ao salvar adiantamento');
