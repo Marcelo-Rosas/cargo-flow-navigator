@@ -108,10 +108,19 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
   const updateOrderMutation = useUpdateOrder();
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
 
-  // Pega os tipos disponíveis para o estágio atual
-  const availableTypes = orderStage
-    ? DOCUMENT_TYPES_BY_STAGE[orderStage]
-    : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
+  // Tipos de documento para cotações (adiantamento, etc.)
+  const QUOTE_DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
+    { value: 'adiantamento', label: 'Adiantamento' },
+    { value: 'outros', label: 'Outros' },
+  ];
+
+  // Pega os tipos disponíveis: ordem (por estágio) ou cotação
+  const availableTypes =
+    quoteId && !orderId
+      ? QUOTE_DOCUMENT_TYPES
+      : orderStage
+        ? DOCUMENT_TYPES_BY_STAGE[orderStage]
+        : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
 
   const [selectedType, setSelectedType] = useState<DocumentType>(availableTypes[0].value);
 

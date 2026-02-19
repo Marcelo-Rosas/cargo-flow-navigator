@@ -1,7 +1,7 @@
 import { FileText, Download, Trash2, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useDocumentsByOrder, useDeleteDocument } from '@/hooks/useDocuments';
+import { useDocumentsByOrder, useDocumentsByQuote, useDeleteDocument } from '@/hooks/useDocuments';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,8 @@ type Document = Database['public']['Tables']['documents']['Row'];
 type DocumentType = Database['public']['Enums']['document_type'];
 
 interface DocumentListProps {
-  orderId: string;
+  orderId?: string;
+  quoteId?: string;
 }
 
 const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
@@ -33,11 +34,14 @@ const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
   cte: { label: 'CT-e', color: 'bg-success/10 text-success' },
   mdfe: { label: 'MDF-e', color: 'bg-primary/10 text-primary' },
   pod: { label: 'POD', color: 'bg-warning/10 text-warning-foreground' },
+  adiantamento: { label: 'Adiantamento', color: 'bg-success/10 text-success' },
   outros: { label: 'Outros', color: 'bg-muted text-muted-foreground' },
 };
 
-export function DocumentList({ orderId }: DocumentListProps) {
-  const { data: documents, isLoading } = useDocumentsByOrder(orderId);
+export function DocumentList({ orderId, quoteId }: DocumentListProps) {
+  const byOrder = useDocumentsByOrder(orderId || '');
+  const byQuote = useDocumentsByQuote(quoteId || '');
+  const { data: documents, isLoading } = quoteId ? byQuote : byOrder;
   const deleteDocumentMutation = useDeleteDocument();
 
   const handleDelete = async (doc: Document) => {

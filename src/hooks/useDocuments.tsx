@@ -21,6 +21,23 @@ export function useDocuments() {
   });
 }
 
+export function useDocumentsByQuote(quoteId: string) {
+  return useQuery({
+    queryKey: ['documents', 'quote', quoteId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('quote_id', asDb(quoteId))
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return filterSupabaseRows<Document>(data);
+    },
+    enabled: !!quoteId,
+  });
+}
+
 export function useDocumentsByOrder(orderId: string) {
   return useQuery({
     queryKey: ['documents', 'order', orderId],
