@@ -26,6 +26,7 @@ import { OrderForm } from '@/components/forms/OrderForm';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
 import { useVehicleByPlate } from '@/hooks/useVehicles';
 import { useUpdateOrder } from '@/hooks/useOrders';
+import { useEnsureFinancialDocument } from '@/hooks/useEnsureFinancialDocument';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
@@ -111,10 +112,12 @@ export function OrderDetailModal({
   const [plateToSearch, setPlateToSearch] = useState<string | null>(null);
 
   const isBuscaMotorista = order?.stage === 'busca_motorista';
+  const canConvertToPAG = canManage && order?.stage === 'coleta_realizada';
   const { data: vehicleByPlate, isLoading: vehicleByPlateLoading } = useVehicleByPlate(
     isBuscaMotorista && plateToSearch ? plateToSearch : null
   );
   const updateOrderMutation = useUpdateOrder();
+  const ensureFinancialDocumentMutation = useEnsureFinancialDocument();
 
   useEffect(() => {
     if (order?.vehicle_plate != null) setPlateInput(order.vehicle_plate);
@@ -145,6 +148,26 @@ export function OrderDetailModal({
       setPlateToSearch(null);
     } catch {
       toast.error('Erro ao aplicar à OS');
+    }
+  };
+
+  const handleConverterParaPAG = async () => {
+    if (!order?.id) return;
+
+    try {
+      await ensureFinancialDocumentMutation.mutateAsync({
+        docType: 'PAG',
+        sourceId: order.id,
+      });
+      toast.success('PAG criado no Financeiro (status: INCLUIR)');
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : 'Erro ao converter para PAG';
+      toast.error(msg);
     }
   };
 
@@ -226,21 +249,42 @@ export function OrderDetailModal({
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <DialogTitle className="flex items-center gap-3">
                 <span className="text-2xl font-bold">{order.os_number}</span>
                 <Badge className={cn(stageInfo.color)}>{stageInfo.label}</Badge>
               </DialogTitle>
-              {canManage && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsEditFormOpen(true)}
-                  aria-label="Editar ordem de serviço"
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-              )}
+
+              <div className="flex items-center gap-2">
+                {canConvertToPAG && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleConverterParaPAG}
+                    disabled={ensureFinancialDocumentMutation.isPending}
+                    className="gap-2"
+                  >
+                    {ensureFinancialDocumentMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <DollarSign className="w-4 h-4" />
+                    )}
+                    Converter para PAG
+                  </Button>
+                )}
+
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsEditFormOpen(true)}
+                    aria-label="Editar ordem de serviço"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </DialogHeader>
 
