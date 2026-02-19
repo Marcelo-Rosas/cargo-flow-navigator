@@ -11,7 +11,7 @@ export function getCorsHeaders(req: Request): Record<string, string> {
           ?.env?.get === 'function'
       ) {
         return (
-          globalThis as { Deno: { env: { get: (k: string) => string | undefined } } }
+          globalThis as unknown as { Deno: { env: { get: (k: string) => string | undefined } } }
         ).Deno.env.get(key);
       }
       if (typeof process !== 'undefined' && process.env) {
@@ -22,7 +22,10 @@ export function getCorsHeaders(req: Request): Record<string, string> {
     }
     return undefined;
   };
-  const allowed = getEnv('ALLOWED_ORIGINS') || getEnv('ALLOWED_ORIGIN') || 'http://localhost:5173';
+  const allowed =
+    getEnv('ALLOWED_ORIGINS') ||
+    getEnv('ALLOWED_ORIGIN') ||
+    'http://localhost:5173,https://cargo-flow-navigator.vercel.app';
   const origins = allowed.split(',').map((o) => o.trim());
   const requestOrigin = req.headers.get('Origin');
 

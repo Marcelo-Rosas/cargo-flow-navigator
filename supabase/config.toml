@@ -17,3 +17,6 @@ verify_jwt = false  # utilitário público (distância CEP→CEP), sem dados sen
 
 [functions.price-row]
 verify_jwt = true
+
+[functions.ensure-financial-document]
+verify_jwt = true
