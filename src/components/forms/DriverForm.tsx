@@ -69,8 +69,8 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
       form.reset({
         name: driver.name,
         phone: driver.phone || '',
-        cnh: '',
-        cnh_category: '',
+        cnh: driver.cnh || '',
+        cnh_category: (driver.cnh_category as DriverFormData['cnh_category']) || '',
         active: driver.active,
       });
     } else {
@@ -83,13 +83,21 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
       if (isEditing && driver) {
         await updateDriverMutation.mutateAsync({
           id: driver.id,
-          updates: { name: data.name, phone: data.phone || null, active: data.active },
+          updates: {
+            name: data.name,
+            phone: data.phone || null,
+            cnh: data.cnh || null,
+            cnh_category: data.cnh_category || null,
+            active: data.active,
+          },
         });
         toast.success('Motorista atualizado com sucesso');
       } else {
         await createDriverMutation.mutateAsync({
           name: data.name,
           phone: data.phone || null,
+          cnh: data.cnh || null,
+          cnh_category: data.cnh_category || null,
           active: data.active,
         });
         toast.success('Motorista criado com sucesso');

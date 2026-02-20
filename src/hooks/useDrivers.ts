@@ -6,6 +6,8 @@ export interface Driver {
   id: string;
   name: string;
   phone: string | null;
+  cnh: string | null;
+  cnh_category: string | null;
   active: boolean;
 }
 
@@ -19,7 +21,7 @@ export function useDrivers(activeOnly = true, options: UseDriversOptions = {}) {
     queryFn: async () => {
       let query = supabase
         .from('drivers')
-        .select('id, name, phone, active')
+        .select('id, name, phone, cnh, cnh_category, active')
         .order('name', { ascending: true });
       if (activeOnly) {
         query = query.eq('active', asDb(true));
@@ -34,7 +36,13 @@ export function useDrivers(activeOnly = true, options: UseDriversOptions = {}) {
 export function useCreateDriver() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (driver: { name: string; phone?: string | null; active?: boolean }) => {
+    mutationFn: async (driver: {
+      name: string;
+      phone?: string | null;
+      cnh?: string | null;
+      cnh_category?: string | null;
+      active?: boolean;
+    }) => {
       const { data, error } = await supabase
         .from('drivers')
         .insert(asInsert(driver))
@@ -55,7 +63,13 @@ export function useUpdateDriver() {
       updates,
     }: {
       id: string;
-      updates: { name?: string; phone?: string | null; active?: boolean };
+      updates: {
+        name?: string;
+        phone?: string | null;
+        cnh?: string | null;
+        cnh_category?: string | null;
+        active?: boolean;
+      };
     }) => {
       const { data, error } = await supabase
         .from('drivers')
@@ -89,7 +103,7 @@ export function useDriver(id: string | null | undefined) {
 
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, name, phone, active')
+        .select('id, name, phone, cnh, cnh_category, active')
         .eq('id', asDb(id))
         .maybeSingle();
 

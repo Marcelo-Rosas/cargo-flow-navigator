@@ -157,6 +157,39 @@ export type Database = {
           },
         ];
       };
+      drivers: {
+        Row: {
+          id: string;
+          name: string;
+          phone: string | null;
+          cnh: string | null;
+          cnh_category: string | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          phone?: string | null;
+          cnh?: string | null;
+          cnh_category?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          phone?: string | null;
+          cnh?: string | null;
+          cnh_category?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       conditional_fees: {
         Row: {
           active: boolean;
@@ -1263,6 +1296,66 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: 'valid_users';
             referencedColumns: ['user_id'];
+          },
+        ];
+      };
+      vehicles: {
+        Row: {
+          id: string;
+          plate: string;
+          brand: string | null;
+          model: string | null;
+          year: number | null;
+          color: string | null;
+          renavam: string | null;
+          driver_id: string | null;
+          owner_id: string | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          plate: string;
+          brand?: string | null;
+          model?: string | null;
+          year?: number | null;
+          color?: string | null;
+          renavam?: string | null;
+          driver_id?: string | null;
+          owner_id?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          plate?: string;
+          brand?: string | null;
+          model?: string | null;
+          year?: number | null;
+          color?: string | null;
+          renavam?: string | null;
+          driver_id?: string | null;
+          owner_id?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'vehicles_driver_id_fkey';
+            columns: ['driver_id'];
+            isOneToOne: false;
+            referencedRelation: 'drivers';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'vehicles_owner_id_fkey';
+            columns: ['owner_id'];
+            isOneToOne: false;
+            referencedRelation: 'owners';
+            referencedColumns: ['id'];
           },
         ];
       };

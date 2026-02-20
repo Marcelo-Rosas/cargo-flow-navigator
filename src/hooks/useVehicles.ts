@@ -15,9 +15,9 @@ export interface VehicleWithRelations extends VehicleRow {
 }
 
 const selectWithRelations =
-  'id, plate, driver_id, owner_id, active, brand, model, owner:owners(id,name,phone), driver:drivers(id,name,phone)';
+  'id, plate, brand, model, year, color, renavam, driver_id, owner_id, active, created_at, updated_at, owner:owners(id,name,phone), driver:drivers(id,name,phone)';
 
-const selectBase = 'id, plate, driver_id, active, brand, model';
+const selectBase = 'id, plate, brand, model, year, color, renavam, driver_id, active';
 const selectWithDriverOnly = `${selectBase}, driver:drivers(id,name,phone)`;
 
 export function useVehicles(driverId?: string | null) {
