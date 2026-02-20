@@ -18,10 +18,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateDriver, useUpdateDriver } from '@/hooks/useDrivers';
 import { toast } from 'sonner';
 import type { Driver } from '@/hooks/useDrivers';
+import { zodPhone } from '@/lib/validators';
 
 const driverSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(200, 'Nome muito longo'),
-  phone: z.string().optional(),
+  phone: zodPhone,
   active: z.boolean(),
 });
 

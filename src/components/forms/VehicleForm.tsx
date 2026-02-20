@@ -28,9 +28,10 @@ import { useDrivers } from '@/hooks/useDrivers';
 import { useOwners } from '@/hooks/useOwners';
 import { toast } from 'sonner';
 import type { VehicleWithRelations } from '@/hooks/useVehicles';
+import { zodPlate } from '@/lib/validators';
 
 const vehicleSchema = z.object({
-  plate: z.string().min(2, 'Placa obrigatória').max(10, 'Placa muito longa'),
+  plate: zodPlate,
   brand: z.string().optional(),
   model: z.string().optional(),
   driver_id: z.string().optional(),

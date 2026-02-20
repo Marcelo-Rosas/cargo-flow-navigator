@@ -19,20 +19,25 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateOwner, useUpdateOwner } from '@/hooks/useOwners';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
+import { zodCpfOrCnpj, zodPhone, zodCep } from '@/lib/validators';
 
 type Owner = Database['public']['Tables']['owners']['Row'];
 
 const ownerSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(200, 'Nome muito longo'),
-  cpf_cnpj: z.string().optional(),
+  cpf_cnpj: zodCpfOrCnpj,
   rg: z.string().optional(),
   rg_emitter: z.string().optional(),
-  phone: z.string().optional(),
+  phone: zodPhone,
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   address: z.string().optional(),
   city: z.string().optional(),
-  state: z.string().max(2, 'Use a sigla do estado (ex: SP)').optional(),
-  zip_code: z.string().optional(),
+  state: z
+    .string()
+    .max(2, 'Use a sigla do estado (ex: SP)')
+    .optional()
+    .transform((v) => v?.toUpperCase()),
+  zip_code: zodCep,
   notes: z.string().max(500, 'Observações muito longas').optional(),
   active: z.boolean(),
 });

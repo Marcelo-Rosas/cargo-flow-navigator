@@ -58,6 +58,7 @@ import {
   formatRouteUf,
   extractUf,
 } from '@/lib/freightCalculator';
+import { zodPhone } from '@/lib/validators';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 
@@ -67,56 +68,72 @@ const idString = z
   .transform((v) => (v == null || v === '' ? undefined : String(v)))
   .optional();
 
-const quoteSchema = z.object({
-  client_id: idString,
-  client_name: z.string().min(2, 'Nome do cliente obrigatório'),
-  client_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
-  shipper_id: idString,
-  shipper_name: z.string().optional(),
-  shipper_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
-  freight_type: z.enum(['CIF', 'FOB']).default('FOB'),
-  freight_modality: z.enum(['lotacao', 'fracionado']).optional(),
-  // MaskedInput pode devolver number; coerce para string pra evitar erro do Zod.
-  origin_cep: z
-    .union([z.string(), z.number()])
-    .transform((v) => (v == null ? '' : String(v)))
-    .optional(),
-  destination_cep: z
-    .union([z.string(), z.number()])
-    .transform((v) => (v == null ? '' : String(v)))
-    .optional(),
-  origin: z.string().min(2, 'Origem obrigatória'),
-  destination: z.string().min(2, 'Destino obrigatório'),
-  cargo_type: z.string().optional(),
-  weight: z
-    .number()
-    .min(0, 'Peso inválido')
-    .max(99_999_999, 'Peso excede o limite (99.999.999)')
-    .optional()
-    .default(0),
-  volume: z
-    .number()
-    .min(0, 'Volume inválido')
-    .max(99_999_999, 'Volume excede o limite (99.999.999)')
-    .optional()
-    .default(0),
-  // Pricing selectors
-  price_table_id: idString,
-  vehicle_type_id: idString,
-  payment_term_id: idString,
-  km_distance: z.number().min(0, 'Distância inválida').optional(),
-  // Pricing components
-  cargo_value: z.number().min(0, 'Valor inválido').optional().default(0),
-  toll: z.number().min(0, 'Valor inválido').optional().default(0),
-  descarga: z.number().min(0, 'Valor inválido').optional().default(0),
-  // NTC flags
-  tde_enabled: z.boolean().optional().default(false),
-  tear_enabled: z.boolean().optional().default(false),
-  notes: z.string().max(500, 'Observações muito longas').optional(),
-  // Condição financeira: datas manuais (adiantamento, à vista, saldo)
-  advance_due_date: z.string().optional(),
-  balance_due_date: z.string().optional(),
-});
+const quoteSchema = z
+  .object({
+    client_id: idString,
+    client_name: z.string().min(2, 'Nome do cliente obrigatório'),
+    client_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+    shipper_id: idString,
+    shipper_name: z.string().optional(),
+    shipper_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+    freight_type: z.enum(['CIF', 'FOB']).default('FOB'),
+    freight_modality: z.enum(['lotacao', 'fracionado']).optional(),
+    // MaskedInput pode devolver number; coerce para string pra evitar erro do Zod.
+    origin_cep: z
+      .union([z.string(), z.number()])
+      .transform((v) => (v == null ? '' : String(v)))
+      .optional(),
+    destination_cep: z
+      .union([z.string(), z.number()])
+      .transform((v) => (v == null ? '' : String(v)))
+      .optional(),
+    origin: z.string().min(2, 'Origem obrigatória'),
+    destination: z.string().min(2, 'Destino obrigatório'),
+    cargo_type: z.string().optional(),
+    weight: z
+      .number()
+      .min(0, 'Peso inválido')
+      .max(99_999_999, 'Peso excede o limite (99.999.999)')
+      .optional()
+      .default(0),
+    volume: z
+      .number()
+      .min(0, 'Volume inválido')
+      .max(99_999_999, 'Volume excede o limite (99.999.999)')
+      .optional()
+      .default(0),
+    // Pricing selectors
+    price_table_id: idString,
+    vehicle_type_id: idString,
+    payment_term_id: idString,
+    km_distance: z.number().min(0, 'Distância inválida').optional(),
+    // Pricing components
+    cargo_value: z.number().min(0, 'Valor inválido').optional().default(0),
+    toll: z.number().min(0, 'Valor inválido').optional().default(0),
+    descarga: z.number().min(0, 'Valor inválido').optional().default(0),
+    // NTC flags
+    tde_enabled: z.boolean().optional().default(false),
+    tear_enabled: z.boolean().optional().default(false),
+    notes: z.string().max(500, 'Observações muito longas').optional(),
+    // Condição financeira: datas manuais (adiantamento, à vista, saldo)
+    advance_due_date: z.string().optional(),
+    balance_due_date: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Validação cross-field: se ambas as datas estiverem preenchidas,
+    // a data de saldo não pode ser anterior à data de adiantamento.
+    if (data.advance_due_date && data.balance_due_date) {
+      const adv = new Date(data.advance_due_date);
+      const bal = new Date(data.balance_due_date);
+      if (!isNaN(adv.getTime()) && !isNaN(bal.getTime()) && bal < adv) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Data do saldo não pode ser anterior à data do adiantamento',
+          path: ['balance_due_date'],
+        });
+      }
+    }
+  });
 
 type QuoteFormData = z.infer<typeof quoteSchema>;
 

@@ -19,18 +19,23 @@ import { useCreateClient, useUpdateClient } from '@/hooks/useClients';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
+import { zodCnpj, zodPhone, zodCep } from '@/lib/validators';
 
 type Client = Database['public']['Tables']['clients']['Row'];
 
 const clientSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(200, 'Nome muito longo'),
-  cnpj: z.string().optional(),
+  cnpj: zodCnpj,
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
-  phone: z.string().optional(),
+  phone: zodPhone,
   address: z.string().optional(),
   city: z.string().optional(),
-  state: z.string().max(2, 'Use a sigla do estado (ex: SP)').optional(),
-  zip_code: z.string().optional(),
+  state: z
+    .string()
+    .max(2, 'Use a sigla do estado (ex: SP)')
+    .optional()
+    .transform((v) => v?.toUpperCase()),
+  zip_code: zodCep,
   notes: z.string().max(500, 'Observações muito longas').optional(),
 });
 
