@@ -100,8 +100,16 @@ export default function Vehicles() {
   const deleteDriverMutation = useDeleteDriver();
   const deleteOwnerMutation = useDeleteOwner();
 
-  const filteredVehicles = debouncedVehicleSearch
-    ? vehicles?.filter((v) => v.plate.toLowerCase().includes(debouncedVehicleSearch.toLowerCase()))
+  const q = debouncedVehicleSearch.toLowerCase();
+  const filteredVehicles = q
+    ? vehicles?.filter(
+        (v) =>
+          v.plate.toLowerCase().includes(q) ||
+          (v.brand && v.brand.toLowerCase().includes(q)) ||
+          (v.model && v.model.toLowerCase().includes(q)) ||
+          (v.driver && v.driver.name.toLowerCase().includes(q)) ||
+          (v.owner && v.owner.name.toLowerCase().includes(q))
+      )
     : vehicles;
 
   const filteredDrivers = debouncedDriverSearch
@@ -225,14 +233,29 @@ export default function Vehicles() {
             <TabsTrigger value="veiculos" className="gap-2">
               <Truck className="w-4 h-4" />
               Veículos
+              {vehicles && vehicles.length > 0 && (
+                <span className="ml-1 text-xs bg-primary/15 text-primary rounded-full px-1.5 py-0.5 font-medium">
+                  {vehicles.length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="motoristas" className="gap-2">
               <User className="w-4 h-4" />
               Motoristas
+              {drivers && drivers.length > 0 && (
+                <span className="ml-1 text-xs bg-primary/15 text-primary rounded-full px-1.5 py-0.5 font-medium">
+                  {drivers.length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="proprietarios" className="gap-2">
               <Building2 className="w-4 h-4" />
               Proprietários
+              {owners && owners.length > 0 && (
+                <span className="ml-1 text-xs bg-primary/15 text-primary rounded-full px-1.5 py-0.5 font-medium">
+                  {owners.length}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -245,7 +268,7 @@ export default function Vehicles() {
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por placa (motorista e proprietário do veículo)"
+                  placeholder="Buscar por placa, marca, modelo, motorista ou proprietário..."
                   className="pl-10"
                   value={vehicleSearch}
                   onChange={(e) => setVehicleSearch(e.target.value)}
@@ -287,12 +310,16 @@ export default function Vehicles() {
               >
                 <Truck className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold text-foreground mb-2">
-                  Nenhum veículo cadastrado
+                  {debouncedVehicleSearch
+                    ? 'Nenhum veículo encontrado'
+                    : 'Nenhum veículo cadastrado'}
                 </h3>
                 <p className="text-muted-foreground mb-4">
-                  Cadastre veículos e associe motorista e proprietário
+                  {debouncedVehicleSearch
+                    ? `Nenhum resultado para "${debouncedVehicleSearch}"`
+                    : 'Cadastre veículos e associe motorista e proprietário'}
                 </p>
-                {canManage && (
+                {!debouncedVehicleSearch && canManage && (
                   <Button
                     onClick={() => {
                       setEditingVehicle(null);

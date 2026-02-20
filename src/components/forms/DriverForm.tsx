@@ -2,9 +2,10 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, User, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Form,
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateDriver, useUpdateDriver } from '@/hooks/useDrivers';
+import { useVehicles } from '@/hooks/useVehicles';
 import { toast } from 'sonner';
 import type { Driver } from '@/hooks/useDrivers';
 import { zodPhone } from '@/lib/validators';
@@ -23,6 +25,14 @@ import { zodPhone } from '@/lib/validators';
 const driverSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(200, 'Nome muito longo'),
   phone: zodPhone,
+  cnh: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || /^\d{11}$/.test(v.replace(/\D/g, '')),
+      'CNH inválida – informe 11 dígitos'
+    ),
+  cnh_category: z.enum(['A', 'AB', 'B', 'C', 'D', 'E', '']).optional(),
   active: z.boolean(),
 });
 
@@ -39,16 +49,32 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
   const updateDriverMutation = useUpdateDriver();
   const isEditing = !!driver;
 
+  // Busca veículo(s) vinculado ao motorista (apenas em modo edição)
+  const { data: allVehicles } = useVehicles(driver?.id ?? null);
+  const linkedVehicles = allVehicles?.filter((v) => v.driver_id === driver?.id) ?? [];
+
   const form = useForm<DriverFormData>({
     resolver: zodResolver(driverSchema),
-    defaultValues: { name: '', phone: '', active: true },
+    defaultValues: {
+      name: '',
+      phone: '',
+      cnh: '',
+      cnh_category: '',
+      active: true,
+    },
   });
 
   useEffect(() => {
     if (driver) {
-      form.reset({ name: driver.name, phone: driver.phone || '', active: driver.active });
+      form.reset({
+        name: driver.name,
+        phone: driver.phone || '',
+        cnh: '',
+        cnh_category: '',
+        active: driver.active,
+      });
     } else {
-      form.reset({ name: '', phone: '', active: true });
+      form.reset({ name: '', phone: '', cnh: '', cnh_category: '', active: true });
     }
   }, [driver, form]);
 
@@ -76,61 +102,152 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
 
   const isLoading = createDriverMutation.isPending || updateDriverMutation.isPending;
 
+  const cnhCategories = ['', 'A', 'AB', 'B', 'C', 'D', 'E'] as const;
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar Motorista' : 'Novo Motorista'}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <User className="w-5 h-5 text-primary" />
+            {isEditing ? 'Editar Motorista' : 'Novo Motorista'}
+          </DialogTitle>
         </DialogHeader>
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nome do motorista" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Telefone</FormLabel>
-                  <FormControl>
-                    <Input placeholder="(11) 99999-9999" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            {/* ── Dados pessoais ── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Dados pessoais
+              </p>
+
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome completo *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome do motorista" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone / WhatsApp</FormLabel>
+                    <FormControl>
+                      <Input placeholder="(11) 99999-9999" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* ── Habilitação ── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Habilitação (CNH)
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="cnh"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Número da CNH</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="11 dígitos"
+                          maxLength={11}
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cnh_category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoria</FormLabel>
+                      <FormControl>
+                        <select
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          {...field}
+                        >
+                          {cnhCategories.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat === '' ? 'Selecionar...' : `Categoria ${cat}`}
+                            </option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* ── Veículos vinculados (só em edição) ── */}
+            {isEditing && linkedVehicles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5" />
+                  Veículos vinculados
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {linkedVehicles.map((v) => (
+                    <Badge key={v.id} variant="secondary" className="font-mono text-sm gap-1.5">
+                      <Truck className="w-3 h-3" />
+                      {v.plate}
+                      {v.brand && v.model ? ` · ${v.brand} ${v.model}` : ''}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Status ── */}
             <FormField
               control={form.control}
               name="active"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-start gap-2 space-y-0">
+                <FormItem className="flex flex-row items-center gap-2 space-y-0 rounded-md border border-input p-3 bg-muted/30">
                   <FormControl>
                     <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                   </FormControl>
                   <div className="leading-none">
-                    <FormLabel>Ativo</FormLabel>
+                    <FormLabel className="font-normal cursor-pointer">Motorista ativo</FormLabel>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Motoristas inativos não aparecem nas seleções de cotação e OS
+                    </p>
                   </div>
                 </FormItem>
               )}
             />
-            <div className="flex justify-end gap-3 pt-4">
+
+            <div className="flex justify-end gap-3 pt-1">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {isEditing ? 'Salvar' : 'Criar Motorista'}
+                {isEditing ? 'Salvar alterações' : 'Criar Motorista'}
               </Button>
             </div>
           </form>

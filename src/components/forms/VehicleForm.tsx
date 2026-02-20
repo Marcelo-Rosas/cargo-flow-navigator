@@ -2,9 +2,10 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Truck, User, Building2 } from 'lucide-react';
+import { Loader2, Truck, User, Building2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Form,
@@ -34,6 +35,12 @@ const vehicleSchema = z.object({
   plate: zodPlate,
   brand: z.string().optional(),
   model: z.string().optional(),
+  year: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^\d{4}$/.test(v.trim()), 'Ano inválido – informe 4 dígitos (ex: 2020)'),
+  color: z.string().optional(),
+  renavam: z.string().optional(),
   driver_id: z.string().optional(),
   owner_id: z.string().optional(),
   active: z.boolean(),
@@ -60,6 +67,9 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
       plate: '',
       brand: '',
       model: '',
+      year: '',
+      color: '',
+      renavam: '',
       driver_id: '',
       owner_id: '',
       active: true,
@@ -72,6 +82,9 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
         plate: vehicle.plate,
         brand: vehicle.brand || '',
         model: vehicle.model || '',
+        year: '',
+        color: '',
+        renavam: '',
         driver_id: vehicle.driver_id || '',
         owner_id: vehicle.owner_id || '',
         active: vehicle.active,
@@ -81,6 +94,9 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
         plate: '',
         brand: '',
         model: '',
+        year: '',
+        color: '',
+        renavam: '',
         driver_id: '',
         owner_id: '',
         active: true,
@@ -90,11 +106,12 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
 
   const onSubmit = async (data: VehicleFormData) => {
     try {
+      const plate = data.plate.trim().toUpperCase().replace(/[-\s]/g, '');
       if (isEditing && vehicle) {
         await updateVehicleMutation.mutateAsync({
           id: vehicle.id,
           updates: {
-            plate: data.plate,
+            plate,
             brand: data.brand || null,
             model: data.model || null,
             driver_id: data.driver_id || null,
@@ -105,7 +122,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
         toast.success('Veículo atualizado com sucesso');
       } else {
         await createVehicleMutation.mutateAsync({
-          plate: data.plate,
+          plate,
           brand: data.brand || null,
           model: data.model || null,
           driver_id: data.driver_id || null,
@@ -124,20 +141,24 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar Veículo' : 'Novo Veículo'}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Truck className="w-5 h-5 text-primary" />
+            {isEditing ? 'Editar Veículo' : 'Novo Veículo'}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Seção Veículo */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Truck className="w-5 h-5 text-primary" />
-                <h4 className="font-medium text-foreground">Veículo</h4>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            {/* ── Identificação do Veículo ── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Identificação
+              </p>
+
+              {/* Placa + Ano */}
+              <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
                   name="plate"
@@ -145,12 +166,48 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                     <FormItem>
                       <FormLabel>Placa *</FormLabel>
                       <FormControl>
-                        <Input placeholder="ABC1D23" {...field} className="font-mono uppercase" />
+                        <Input
+                          placeholder="ABC1D23"
+                          {...field}
+                          className="font-mono uppercase tracking-widest"
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value
+                                .toUpperCase()
+                                .replace(/[^A-Z0-9]/g, '')
+                                .slice(0, 7)
+                            )
+                          }
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ano</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Ex: 2022"
+                          maxLength={4}
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(e.target.value.replace(/\D/g, '').slice(0, 4))
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Marca + Modelo */}
+              <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
                   name="brand"
@@ -164,31 +221,67 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="model"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Modelo</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Actros 2651" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <FormField
-                control={form.control}
-                name="model"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Modelo</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Actros" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
+              {/* Cor + RENAVAM */}
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="color"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cor</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Branco" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="renavam"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>RENAVAM</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="11 dígitos"
+                          maxLength={11}
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
                 name="active"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start gap-2 space-y-0">
+                  <FormItem className="flex flex-row items-center gap-2 space-y-0 pt-1">
                     <FormControl>
                       <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                     </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Ativo</FormLabel>
-                    </div>
+                    <FormLabel className="font-normal cursor-pointer">Veículo ativo</FormLabel>
                   </FormItem>
                 )}
               />
@@ -196,18 +289,18 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
 
             <Separator />
 
-            {/* Seção Motorista */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <User className="w-5 h-5 text-primary" />
-                <h4 className="font-medium text-foreground">Motorista</h4>
-              </div>
+            {/* ── Motorista ── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" />
+                Motorista
+              </p>
               <FormField
                 control={form.control}
                 name="driver_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Motorista</FormLabel>
+                    <FormLabel>Motorista vinculado</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value || ''}
@@ -223,10 +316,20 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Nenhum</SelectItem>
+                        <SelectItem value="">
+                          <span className="text-muted-foreground">Nenhum</span>
+                        </SelectItem>
                         {drivers?.map((driver) => (
                           <SelectItem key={driver.id} value={driver.id}>
-                            {driver.name}
+                            <div className="flex flex-col gap-0.5">
+                              <span>{driver.name}</span>
+                              {driver.phone && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Phone className="w-3 h-3" />
+                                  {driver.phone}
+                                </span>
+                              )}
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -239,18 +342,18 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
 
             <Separator />
 
-            {/* Seção Proprietário */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-primary" />
-                <h4 className="font-medium text-foreground">Proprietário</h4>
-              </div>
+            {/* ── Proprietário ── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5" />
+                Proprietário
+              </p>
               <FormField
                 control={form.control}
                 name="owner_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Proprietário</FormLabel>
+                    <FormLabel>Proprietário vinculado</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value || ''}
@@ -266,11 +369,26 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Nenhum</SelectItem>
+                        <SelectItem value="">
+                          <span className="text-muted-foreground">Nenhum</span>
+                        </SelectItem>
                         {owners?.map((owner) => (
                           <SelectItem key={owner.id} value={owner.id}>
-                            {owner.name}
-                            {owner.cpf_cnpj ? ` (${owner.cpf_cnpj})` : ''}
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-2">
+                                <span>{owner.name}</span>
+                                {!owner.active && (
+                                  <Badge variant="secondary" className="text-[10px] py-0 px-1">
+                                    Inativo
+                                  </Badge>
+                                )}
+                              </div>
+                              {owner.cpf_cnpj && (
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  {owner.cpf_cnpj}
+                                </span>
+                              )}
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -281,13 +399,13 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {isEditing ? 'Salvar' : 'Criar Veículo'}
+                {isEditing ? 'Salvar alterações' : 'Criar Veículo'}
               </Button>
             </div>
           </form>
