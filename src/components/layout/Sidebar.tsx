@@ -39,7 +39,7 @@ const navItems = [
     path: '/financeiro',
     icon: DollarSign,
     label: 'Financeiro',
-    roles: ['admin', 'financeiro'] as UserProfile[],
+    roles: ['admin', 'financeiro', 'operacional'] as UserProfile[],
   },
 ];
 

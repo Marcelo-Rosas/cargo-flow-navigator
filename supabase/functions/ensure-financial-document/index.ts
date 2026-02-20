@@ -3,8 +3,8 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 
 type Body = {
   docType: 'FAT' | 'PAG';
-  sourceId: string; // uuid
-  totalAmount?: number | null; // optional fallback
+  sourceId: string;
+  totalAmount?: number | null;
 };
 
 function isUuid(v: string) {
@@ -13,8 +13,9 @@ function isUuid(v: string) {
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
@@ -25,7 +26,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
         status: 401,
@@ -33,7 +34,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    const body = (await req.json()) as Body;
+    let body: Body;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'content-type': 'application/json' },
+      });
+    }
 
     if (!body?.docType || (body.docType !== 'FAT' && body.docType !== 'PAG')) {
       return new Response(JSON.stringify({ error: 'Invalid docType (expected FAT|PAG)' }), {
@@ -52,7 +61,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { authorization: authHeader } } }
     );
 
     const { data, error } = await supabase.rpc('ensure_financial_document', {
