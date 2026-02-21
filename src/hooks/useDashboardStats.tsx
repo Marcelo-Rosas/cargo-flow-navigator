@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { asDb, filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
+import { StoredPricingBreakdown, formatRouteUf } from '@/lib/freightCalculator';
 
 export interface TrendData {
   value: number;
@@ -259,6 +260,177 @@ export function useRevenueByClientData() {
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value)
         .slice(0, 5);
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// R$/KM — Custo por Rota
+// ─────────────────────────────────────────────────────────────
+
+export interface RouteRsKm {
+  route: string; // "SP→AM"
+  avgRsKmAntt: number; // média R$/km baseado no piso ANTT
+  avgRsKmReal: number; // média R$/km baseado no carreteiro_real pago
+  delta: number; // avgRsKmReal - avgRsKmAntt
+  deltaPercent: number; // delta / avgRsKmAntt * 100
+  count: number; // nº de OS com carreteiro_real nessa rota
+}
+
+/** Agrega R$/KM por rota para exibição no Dashboard e Relatórios. */
+export function useRsKmByRoute() {
+  return useQuery({
+    queryKey: ['rskm-by-route'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(
+          `
+          carreteiro_real,
+          carreteiro_antt,
+          origin,
+          destination,
+          quote:quotes(km_distance, pricing_breakdown)
+        `
+        )
+        .not('carreteiro_real', 'is', null);
+
+      if (error) throw error;
+
+      type RawRow = {
+        carreteiro_real: number | null;
+        carreteiro_antt: number | null;
+        origin: string;
+        destination: string;
+        quote: {
+          km_distance: number | null;
+          pricing_breakdown: unknown;
+        } | null;
+      };
+
+      const rows = filterSupabaseRows<RawRow>(data);
+
+      const grouped: Record<string, { sumAntt: number; sumReal: number; count: number }> = {};
+
+      for (const row of rows) {
+        const carrReal = Number(row.carreteiro_real ?? 0);
+        const carrAntt = Number(row.carreteiro_antt ?? 0);
+        const km = Number(row.quote?.km_distance ?? 0);
+        if (km <= 0 || carrReal <= 0) continue;
+
+        // Determinar rota: preferência ao routeUfLabel salvo no breakdown
+        const bd = row.quote?.pricing_breakdown as StoredPricingBreakdown | null;
+        const route =
+          bd?.meta?.routeUfLabel || formatRouteUf(row.origin, row.destination) || 'Outras';
+
+        if (!grouped[route]) grouped[route] = { sumAntt: 0, sumReal: 0, count: 0 };
+        grouped[route].sumReal += carrReal / km;
+        grouped[route].sumAntt += carrAntt > 0 ? carrAntt / km : 0;
+        grouped[route].count += 1;
+      }
+
+      return Object.entries(grouped)
+        .map(([route, { sumAntt, sumReal, count }]): RouteRsKm => {
+          const avgRsKmAntt = count > 0 ? sumAntt / count : 0;
+          const avgRsKmReal = count > 0 ? sumReal / count : 0;
+          const delta = avgRsKmReal - avgRsKmAntt;
+          const deltaPercent = avgRsKmAntt > 0 ? (delta / avgRsKmAntt) * 100 : 0;
+          return { route, avgRsKmAntt, avgRsKmReal, delta, deltaPercent, count };
+        })
+        .sort((a, b) => b.count - a.count);
+    },
+  });
+}
+
+export interface RouteRsKmDetailed extends RouteRsKm {
+  quoteCount: number; // nº de cotações com km_distance nessa rota
+}
+
+/** Versão estendida com contagem de cotações por rota — para a página de Relatórios. */
+export function useRsKmDetailedReport() {
+  return useQuery({
+    queryKey: ['rskm-detailed-report'],
+    queryFn: async () => {
+      // Cotações com km_distance — para calcular R$/KM da referência ANTT por rota
+      const { data: quotesData } = await supabase
+        .from('quotes')
+        .select('km_distance, pricing_breakdown, origin, destination')
+        .not('km_distance', 'is', null);
+
+      type QuoteRow = {
+        km_distance: number | null;
+        pricing_breakdown: unknown;
+        origin: string;
+        destination: string;
+      };
+      const quotes = filterSupabaseRows<QuoteRow>(quotesData);
+
+      // Contagem de cotações por rota
+      const quoteCountByRoute: Record<string, number> = {};
+      for (const q of quotes) {
+        const bd = q.pricing_breakdown as StoredPricingBreakdown | null;
+        const route = bd?.meta?.routeUfLabel || formatRouteUf(q.origin, q.destination) || 'Outras';
+        quoteCountByRoute[route] = (quoteCountByRoute[route] || 0) + 1;
+      }
+
+      // OS com carreteiro_real preenchido
+      const { data: ordersData, error } = await supabase
+        .from('orders')
+        .select(
+          `carreteiro_real, carreteiro_antt, origin, destination,
+           quote:quotes(km_distance, pricing_breakdown)`
+        )
+        .not('carreteiro_real', 'is', null);
+
+      if (error) throw error;
+
+      type OrderRow = {
+        carreteiro_real: number | null;
+        carreteiro_antt: number | null;
+        origin: string;
+        destination: string;
+        quote: { km_distance: number | null; pricing_breakdown: unknown } | null;
+      };
+      const orders = filterSupabaseRows<OrderRow>(ordersData);
+
+      const grouped: Record<string, { sumAntt: number; sumReal: number; count: number }> = {};
+      for (const row of orders) {
+        const carrReal = Number(row.carreteiro_real ?? 0);
+        const carrAntt = Number(row.carreteiro_antt ?? 0);
+        const km = Number(row.quote?.km_distance ?? 0);
+        if (km <= 0 || carrReal <= 0) continue;
+
+        const bd = row.quote?.pricing_breakdown as StoredPricingBreakdown | null;
+        const route =
+          bd?.meta?.routeUfLabel || formatRouteUf(row.origin, row.destination) || 'Outras';
+
+        if (!grouped[route]) grouped[route] = { sumAntt: 0, sumReal: 0, count: 0 };
+        grouped[route].sumReal += carrReal / km;
+        grouped[route].sumAntt += carrAntt > 0 ? carrAntt / km : 0;
+        grouped[route].count += 1;
+      }
+
+      // Merge todos as rotas (cotações + OS)
+      const allRoutes = new Set([...Object.keys(quoteCountByRoute), ...Object.keys(grouped)]);
+
+      return Array.from(allRoutes)
+        .map((route): RouteRsKmDetailed => {
+          const g = grouped[route] ?? { sumAntt: 0, sumReal: 0, count: 0 };
+          const avgRsKmAntt = g.count > 0 ? g.sumAntt / g.count : 0;
+          const avgRsKmReal = g.count > 0 ? g.sumReal / g.count : 0;
+          const delta = avgRsKmReal - avgRsKmAntt;
+          const deltaPercent = avgRsKmAntt > 0 ? (delta / avgRsKmAntt) * 100 : 0;
+          return {
+            route,
+            avgRsKmAntt,
+            avgRsKmReal,
+            delta,
+            deltaPercent,
+            count: g.count,
+            quoteCount: quoteCountByRoute[route] ?? 0,
+          };
+        })
+        .sort((a, b) => b.count - a.count || b.quoteCount - a.quoteCount);
     },
   });
 }

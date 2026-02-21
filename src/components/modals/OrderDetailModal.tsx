@@ -554,6 +554,45 @@ export function OrderDetailModal({
                           )}
                         </div>
                       </div>
+
+                      {/* R$/KM — comparativo ANTT vs Real */}
+                      {Number(kmDistance ?? 0) > 0 && (
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <p className="text-xs text-muted-foreground mb-2 font-semibold uppercase tracking-wide">
+                            Custo R$/km
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-xs text-muted-foreground">ANTT R$/km</p>
+                              <p className="font-semibold text-foreground">
+                                {order.carreteiro_antt != null
+                                  ? `R$ ${(Number(order.carreteiro_antt) / Number(kmDistance)).toFixed(2)}/km`
+                                  : '—'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Real R$/km</p>
+                              {order.carreteiro_real != null ? (
+                                <p
+                                  className={cn(
+                                    'font-semibold',
+                                    order.carreteiro_antt != null &&
+                                      Number(order.carreteiro_real) > Number(order.carreteiro_antt)
+                                      ? 'text-warning-foreground'
+                                      : 'text-success'
+                                  )}
+                                >
+                                  R${' '}
+                                  {(Number(order.carreteiro_real) / Number(kmDistance)).toFixed(2)}
+                                  /km
+                                </p>
+                              ) : (
+                                <p className="font-semibold text-foreground">—</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

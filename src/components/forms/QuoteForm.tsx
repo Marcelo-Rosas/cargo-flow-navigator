@@ -296,6 +296,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   // Normalize weight to kg; clamp to DECIMAL(10,2) max (99.999.999,99)
   const effectiveWeightKg = Math.min(unitToKg(watchedWeight || 0, weightUnit), 99_999_999.99);
 
+  // R$/KM — custo ANTT por km (referência ao vivo)
+  const anttRsKm = useMemo(() => {
+    const km = Number(watchedKmDistance || 0);
+    if (!anttRate || km <= 0) return null;
+    const anttTotal = km * Number(anttRate.ccd) + Number(anttRate.cc);
+    return anttTotal / km;
+  }, [anttRate, watchedKmDistance]);
+
   // Passo 1: calcular frete sem taxas condicionais para obter o baseFreight intermediário
   const baseCalculationResult = useMemo(() => {
     return calculateFreight({
@@ -1640,6 +1648,18 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
                   {/* ── Aba Memória ── */}
                   <TabsContent value="memoria" className="mt-2 space-y-1.5 text-sm">
+                    {/* Mini card R$/KM — referência ANTT */}
+                    {anttRsKm !== null && (
+                      <div className="flex items-center justify-between rounded bg-muted/60 border px-2 py-1.5 mb-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Custo ANTT/km
+                        </span>
+                        <span className="font-semibold text-foreground text-sm">
+                          R$ {anttRsKm.toFixed(2)}/km
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Frete Base</span>
                       <span className="text-foreground">

@@ -13,6 +13,7 @@ import {
   Package,
   Ship,
   DollarSign,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,7 +26,7 @@ const navItems = [
   { path: '/comercial', icon: TrendingUp, label: 'Comercial' },
   { path: '/operacional', icon: Truck, label: 'Operação' },
   { path: '/documentos', icon: FileText, label: 'Documentos' },
-  // { path: '/relatorios', icon: BarChart3, label: 'Relatórios' }, // (a implementar)
+  { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
   { path: '/clientes', icon: Users, label: 'Clientes' },
   { path: '/embarcadores', icon: Ship, label: 'Embarcadores' },
   { path: '/veiculos', icon: Truck, label: 'Veículos' },
