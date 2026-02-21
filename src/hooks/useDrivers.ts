@@ -27,7 +27,31 @@ export function useDrivers(activeOnly = true, options: UseDriversOptions = {}) {
         query = query.eq('active', asDb(true));
       }
       const { data, error } = await query;
-      if (error) throw error;
+
+      if (error) {
+        // Fallback gracioso: tenta select mínimo se colunas novas ainda não existem no banco
+        const msg = error.message || '';
+        if (
+          msg.includes('column') ||
+          msg.includes('cnh') ||
+          msg.includes('active') ||
+          msg.includes('relation')
+        ) {
+          const { data: fd, error: fe } = await supabase
+            .from('drivers')
+            .select('id, name, phone')
+            .order('name', { ascending: true });
+          if (fe) throw fe;
+          return (filterSupabaseRows<Driver>(fd) || []).map((d) => ({
+            ...d,
+            cnh: null,
+            cnh_category: null,
+            active: true, // assume ativo enquanto banco não tem a coluna
+          }));
+        }
+        throw error;
+      }
+
       return filterSupabaseRows<Driver>(data);
     },
   });
