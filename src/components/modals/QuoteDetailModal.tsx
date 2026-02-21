@@ -36,7 +36,7 @@ import {
 import type { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
-import { usePricingParameter } from '@/hooks/usePricingRules';
+import { usePricingParameter, useConditionalFees } from '@/hooks/usePricingRules';
 import { useUpdateQuote } from '@/hooks/useQuotes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
@@ -125,6 +125,7 @@ export function QuoteDetailModal({
   // All hooks MUST be called before any conditional returns
   const { data: priceTable } = usePriceTable(quote?.price_table_id || '');
   const { data: taxRegimeParam } = usePricingParameter('tax_regime_simples');
+  const { data: conditionalFeesData } = useConditionalFees(true);
   const isSimplesNacional =
     taxRegimeParam?.value != null ? Number(taxRegimeParam.value) === 1 : true;
 
@@ -380,7 +381,10 @@ export function QuoteDetailModal({
         setSelectedAdvancePercent(prev);
         return;
       }
-      await updateQuoteMutation.mutateAsync({ id: quote.id, updates: { payment_term_id: term.id } });
+      await updateQuoteMutation.mutateAsync({
+        id: quote.id,
+        updates: { payment_term_id: term.id },
+      });
       // Atualiza o ID local para que a query ['payment-term', activePaymentTermId]
       // re-execute com o novo ID e os mini cards reflitam imediatamente
       setActivePaymentTermId(term.id);
@@ -925,6 +929,35 @@ export function QuoteDetailModal({
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">TEAR (NTC)</span>
                             <span>{formatCurrency(breakdown.components.tear)}</span>
+                          </div>
+                        )}
+                        {/* Taxas Condicionais individuais */}
+                        {breakdown.conditionalFeesBreakdown &&
+                          Object.keys(breakdown.conditionalFeesBreakdown).length > 0 &&
+                          Object.entries(breakdown.conditionalFeesBreakdown).map(
+                            ([feeId, value]) => {
+                              const fee = conditionalFeesData?.find((f) => f.id === feeId);
+                              if (!value) return null;
+                              return (
+                                <div key={feeId} className="flex justify-between">
+                                  <span className="text-muted-foreground flex items-center gap-1">
+                                    {fee ? fee.name : 'Taxa adicional'}
+                                    {fee && (
+                                      <Badge variant="outline" className="text-[10px] py-0 ml-1">
+                                        {fee.code}
+                                      </Badge>
+                                    )}
+                                  </span>
+                                  <span>{formatCurrency(value as number)}</span>
+                                </div>
+                              );
+                            }
+                          )}
+                        {/* Estadia / Hora Parada */}
+                        {(breakdown.components?.waitingTimeCost ?? 0) > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Estadia / Hora Parada</span>
+                            <span>{formatCurrency(breakdown.components!.waitingTimeCost)}</span>
                           </div>
                         )}
                       </>

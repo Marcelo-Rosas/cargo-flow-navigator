@@ -43,8 +43,18 @@ import { useCreateQuote, useUpdateQuote, useDeleteQuote } from '@/hooks/useQuote
 import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { usePriceTables } from '@/hooks/usePriceTables';
-import { useVehicleTypes, usePaymentTerms, usePricingParameter } from '@/hooks/usePricingRules';
+import {
+  useVehicleTypes,
+  usePaymentTerms,
+  usePricingParameter,
+  useConditionalFees,
+} from '@/hooks/usePricingRules';
 import { usePriceTableRowByKmRange, usePriceTableRows } from '@/hooks/usePriceTableRows';
+import {
+  AdditionalFeesSection,
+  AdditionalFeesSelection,
+  defaultAdditionalFeesSelection,
+} from '@/components/quotes/AdditionalFeesSection';
 import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { useAuth } from '@/hooks/useAuth';
@@ -57,6 +67,7 @@ import {
   buildStoredBreakdown,
   formatRouteUf,
   extractUf,
+  StoredPricingBreakdown,
 } from '@/lib/freightCalculator';
 import { zodPhone } from '@/lib/validators';
 
@@ -156,6 +167,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: priceTables } = usePriceTables();
   const { data: vehicleTypes } = useVehicleTypes();
   const { data: paymentTerms } = usePaymentTerms();
+  const { data: conditionalFeesData } = useConditionalFees(true);
   const createQuoteMutation = useCreateQuote();
   const updateQuoteMutation = useUpdateQuote();
   const deleteQuoteMutation = useDeleteQuote();
@@ -172,6 +184,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   // Weight unit toggle: kg or ton
   const [weightUnit, setWeightUnit] = useState<'kg' | 'ton'>('ton');
+
+  // Taxas adicionais (conditional fees + estadia)
+  const [additionalFeesSelection, setAdditionalFeesSelection] = useState<AdditionalFeesSelection>(
+    defaultAdditionalFeesSelection
+  );
 
   const form = useForm<QuoteFormData>({
     resolver: zodResolver(quoteSchema),
@@ -278,8 +295,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   // Normalize weight to kg; clamp to DECIMAL(10,2) max (99.999.999,99)
   const effectiveWeightKg = Math.min(unitToKg(watchedWeight || 0, weightUnit), 99_999_999.99);
 
-  // Calculate freight using the pure function
-  const calculationResult = useMemo(() => {
+  // Passo 1: calcular frete sem taxas condicionais para obter o baseFreight intermediário
+  const baseCalculationResult = useMemo(() => {
     return calculateFreight({
       originCity: watchedOrigin || '',
       destinationCity: watchedDestination || '',
@@ -313,12 +330,111 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     taxRegimeSimples,
   ]);
 
+  // Passo 2: calcular o total das taxas condicionais usando o baseFreight intermediário
+  const computedConditionalFees = useMemo(() => {
+    const baseFreight = baseCalculationResult.components.baseFreight;
+    const cargoValue = watchedCargoValue || 0;
+    const selectedIds = additionalFeesSelection.conditionalFees;
+
+    if (!conditionalFeesData || selectedIds.length === 0) {
+      return {
+        ids: [] as string[],
+        total: additionalFeesSelection.waitingTimeCost,
+        breakdown: {} as Record<string, number>,
+      };
+    }
+
+    const breakdown: Record<string, number> = {};
+    let total = 0;
+    for (const feeId of selectedIds) {
+      const fee = conditionalFeesData.find((f) => f.id === feeId);
+      if (!fee) continue;
+      let val = 0;
+      if (fee.fee_type === 'percentage') {
+        if (fee.applies_to === 'freight') val = baseFreight * (fee.fee_value / 100);
+        else if (fee.applies_to === 'cargo_value') val = cargoValue * (fee.fee_value / 100);
+        else val = (baseFreight + cargoValue) * (fee.fee_value / 100);
+      } else if (fee.fee_type === 'fixed') {
+        val = fee.fee_value;
+      } else if (fee.fee_type === 'per_kg') {
+        val = fee.fee_value;
+      }
+      breakdown[feeId] = val;
+      total += val;
+    }
+    total += additionalFeesSelection.waitingTimeCost;
+    return { ids: selectedIds, total, breakdown };
+  }, [
+    conditionalFeesData,
+    additionalFeesSelection,
+    baseCalculationResult.components.baseFreight,
+    watchedCargoValue,
+  ]);
+
+  // Passo 3: calcular frete final com as taxas condicionais
+  const calculationResult = useMemo(() => {
+    return calculateFreight({
+      originCity: watchedOrigin || '',
+      destinationCity: watchedDestination || '',
+      weightKg: effectiveWeightKg,
+      volumeM3: watchedVolume || 0,
+      cargoValue: watchedCargoValue || 0,
+      tollValue: watchedToll || 0,
+      descargaValue: watchedDescarga ?? 0,
+      kmDistance: kmBand,
+      priceTableRow: priceTableRow || null,
+      priceTableId: watchedPriceTableId || undefined,
+      icmsRatePercent: icmsRate,
+      tdeEnabled: watchedTdeEnabled || false,
+      tearEnabled: watchedTearEnabled || false,
+      pricingParams: { taxRegimeSimples },
+      extras: {
+        conditionalFees: computedConditionalFees,
+        waitingTimeCost: additionalFeesSelection.waitingTimeCost,
+        waitingTimeHours: additionalFeesSelection.waitingTimeHours,
+        waitingTimeEnabled: additionalFeesSelection.waitingTimeEnabled,
+      },
+    });
+  }, [
+    watchedOrigin,
+    watchedDestination,
+    effectiveWeightKg,
+    watchedVolume,
+    watchedCargoValue,
+    watchedToll,
+    watchedDescarga,
+    watchedKmDistance,
+    watchedPriceTableId,
+    priceTableRow,
+    icmsRate,
+    watchedTdeEnabled,
+    watchedTearEnabled,
+    taxRegimeSimples,
+    computedConditionalFees,
+    additionalFeesSelection.waitingTimeCost,
+    additionalFeesSelection.waitingTimeHours,
+    additionalFeesSelection.waitingTimeEnabled,
+  ]);
+
   useEffect(() => {
     // Reset user edit flags when form opens/closes
     userEditedOrigin.current = false;
     userEditedDestination.current = false;
 
     if (quote) {
+      // Restaurar seleção de taxas condicionais do breakdown salvo
+      const bd = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+      if (bd?.meta) {
+        setAdditionalFeesSelection({
+          conditionalFees: bd.meta.selectedConditionalFeeIds ?? [],
+          waitingTimeEnabled: bd.meta.waitingTimeEnabled ?? false,
+          waitingTimeHours: bd.meta.waitingTimeHours ?? 0,
+          waitingTimeCost: bd.components?.waitingTimeCost ?? 0,
+        });
+      } else {
+        setAdditionalFeesSelection(defaultAdditionalFeesSelection);
+      }
+
       const quoteWeightKg = Number(quote.weight) || 0;
       const weightInUnit = kgToUnit(quoteWeightKg, weightUnit);
       form.reset({
@@ -353,6 +469,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         balance_due_date: (quote as { balance_due_date?: string | null })?.balance_due_date || '',
       });
     } else {
+      setAdditionalFeesSelection(defaultAdditionalFeesSelection);
       form.reset({
         client_id: '',
         client_name: '',
@@ -572,6 +689,12 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         icmsRatePercent: icmsRate,
         tdeEnabled: data.tde_enabled || false,
         tearEnabled: data.tear_enabled || false,
+        extras: {
+          conditionalFees: computedConditionalFees,
+          waitingTimeCost: additionalFeesSelection.waitingTimeCost,
+          waitingTimeHours: additionalFeesSelection.waitingTimeHours,
+          waitingTimeEnabled: additionalFeesSelection.waitingTimeEnabled,
+        },
       });
 
       // Enriquecer breakdown com Piso ANTT (carreteiro), quando houver dados suficientes
@@ -1564,6 +1687,34 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                     </span>
                   </div>
                 )}
+                {/* Taxas Condicionais no breakdown */}
+                {computedConditionalFees.ids.length > 0 &&
+                  computedConditionalFees.ids.map((feeId) => {
+                    const fee = conditionalFeesData?.find((f) => f.id === feeId);
+                    const val = computedConditionalFees.breakdown[feeId] ?? 0;
+                    if (val === 0) return null;
+                    return (
+                      <div key={feeId} className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          {fee ? fee.name : feeId}
+                          {fee && (
+                            <Badge variant="outline" className="ml-1 text-[10px] py-0">
+                              {fee.code}
+                            </Badge>
+                          )}
+                        </span>
+                        <span className="text-foreground">{formatCurrency(val)}</span>
+                      </div>
+                    );
+                  })}
+                {additionalFeesSelection.waitingTimeCost > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Estadia / Hora Parada</span>
+                    <span className="text-foreground">
+                      {formatCurrency(additionalFeesSelection.waitingTimeCost)}
+                    </span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between text-sm font-medium">
                   <span className="text-foreground">Receita Bruta</span>
@@ -1628,6 +1779,20 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   </span>
                 </div>
               </div>
+            </div>
+
+            <Separator />
+
+            {/* Taxas Adicionais */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-foreground">Taxas Adicionais</h3>
+              <AdditionalFeesSection
+                selection={additionalFeesSelection}
+                onChange={setAdditionalFeesSelection}
+                baseFreight={calculationResult.components.baseFreight}
+                cargoValue={watchedCargoValue ?? 0}
+                vehicleTypeId={watchedVehicleTypeId || undefined}
+              />
             </div>
 
             <Separator />
