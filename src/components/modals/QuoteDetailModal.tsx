@@ -874,216 +874,248 @@ export function QuoteDetailModal({
               )}
 
               {/* Pricing Breakdown */}
-              {breakdown && breakdown.totals && (
-                <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                  <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <Receipt className="w-4 h-4" />
-                    Breakdown do Cálculo
-                  </h4>
+              {breakdown &&
+                breakdown.totals &&
+                (() => {
+                  const hasFees =
+                    Object.keys(breakdown.conditionalFeesBreakdown ?? {}).filter(
+                      (k) => (breakdown.conditionalFeesBreakdown as Record<string, number>)[k] > 0
+                    ).length > 0 || (breakdown.components?.waitingTimeCost ?? 0) > 0;
 
-                  {/* Components */}
-                  <div className="space-y-2 text-sm">
-                    {breakdown.components && (
-                      <>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Frete Base</span>
-                          <span>{formatCurrency(breakdown.components.baseFreight || 0)}</span>
-                        </div>
-                        {breakdown.components.toll > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Pedágio</span>
-                            <span>{formatCurrency(breakdown.components.toll)}</span>
-                          </div>
-                        )}
-                        {breakdown.components.rctrc > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2)}%)
-                            </span>
-                            <span>{formatCurrency(breakdown.components.rctrc)}</span>
-                          </div>
-                        )}
-                        {breakdown.components.gris > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              GRIS ({breakdown.rates?.grisPercent?.toFixed(2)}%)
-                            </span>
-                            <span>{formatCurrency(breakdown.components.gris)}</span>
-                          </div>
-                        )}
-                        {breakdown.components.tso > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              TSO ({breakdown.rates?.tsoPercent?.toFixed(2)}%)
-                            </span>
-                            <span>{formatCurrency(breakdown.components.tso)}</span>
-                          </div>
-                        )}
-                        {breakdown.components.tde > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">TDE (NTC)</span>
-                            <span>{formatCurrency(breakdown.components.tde)}</span>
-                          </div>
-                        )}
-                        {breakdown.components.tear > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">TEAR (NTC)</span>
-                            <span>{formatCurrency(breakdown.components.tear)}</span>
-                          </div>
-                        )}
-                        {/* Taxas Condicionais individuais */}
-                        {breakdown.conditionalFeesBreakdown &&
-                          Object.keys(breakdown.conditionalFeesBreakdown).length > 0 &&
-                          Object.entries(breakdown.conditionalFeesBreakdown).map(
-                            ([feeId, value]) => {
-                              const fee = conditionalFeesData?.find((f) => f.id === feeId);
-                              if (!value) return null;
-                              return (
-                                <div key={feeId} className="flex justify-between">
-                                  <span className="text-muted-foreground flex items-center gap-1">
-                                    {fee ? fee.name : 'Taxa adicional'}
-                                    {fee && (
-                                      <Badge variant="outline" className="text-[10px] py-0 ml-1">
-                                        {fee.code}
-                                      </Badge>
-                                    )}
-                                  </span>
-                                  <span>{formatCurrency(value as number)}</span>
+                  return (
+                    <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-4">
+                      {/* Cabeçalho */}
+                      <h4 className="font-semibold text-foreground flex items-center gap-2">
+                        <Receipt className="w-4 h-4" />
+                        Breakdown do Cálculo
+                      </h4>
+
+                      {/* Tabs internas */}
+                      <Tabs defaultValue="memoria" className="w-full">
+                        <TabsList
+                          className={cn('grid w-full', hasFees ? 'grid-cols-3' : 'grid-cols-2')}
+                        >
+                          <TabsTrigger value="memoria">Memória</TabsTrigger>
+                          <TabsTrigger value="custos">Custos</TabsTrigger>
+                          {hasFees && <TabsTrigger value="taxas">Taxas</TabsTrigger>}
+                        </TabsList>
+
+                        {/* ── Aba Memória ── */}
+                        <TabsContent value="memoria" className="mt-3 space-y-2 text-sm">
+                          {breakdown.components && (
+                            <>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Frete Base</span>
+                                <span>{formatCurrency(breakdown.components.baseFreight || 0)}</span>
+                              </div>
+                              {breakdown.components.toll > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Pedágio</span>
+                                  <span>{formatCurrency(breakdown.components.toll)}</span>
                                 </div>
-                              );
-                            }
+                              )}
+                              {breakdown.components.rctrc > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">
+                                    RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2)}%)
+                                  </span>
+                                  <span>{formatCurrency(breakdown.components.rctrc)}</span>
+                                </div>
+                              )}
+                              {breakdown.components.gris > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">
+                                    GRIS ({breakdown.rates?.grisPercent?.toFixed(2)}%)
+                                  </span>
+                                  <span>{formatCurrency(breakdown.components.gris)}</span>
+                                </div>
+                              )}
+                              {breakdown.components.tso > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">
+                                    TSO ({breakdown.rates?.tsoPercent?.toFixed(2)}%)
+                                  </span>
+                                  <span>{formatCurrency(breakdown.components.tso)}</span>
+                                </div>
+                              )}
+                              {breakdown.components.tde > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">TDE (NTC)</span>
+                                  <span>{formatCurrency(breakdown.components.tde)}</span>
+                                </div>
+                              )}
+                              {breakdown.components.tear > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">TEAR (NTC)</span>
+                                  <span>{formatCurrency(breakdown.components.tear)}</span>
+                                </div>
+                              )}
+                            </>
                           )}
-                        {/* Estadia / Hora Parada */}
-                        {(breakdown.components?.waitingTimeCost ?? 0) > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Estadia / Hora Parada</span>
-                            <span>{formatCurrency(breakdown.components!.waitingTimeCost)}</span>
+
+                          <Separator className="my-2" />
+
+                          <div className="flex justify-between font-medium">
+                            <span>Receita Bruta</span>
+                            <span>{formatCurrency(breakdown.totals.receitaBruta || 0)}</span>
                           </div>
-                        )}
-                      </>
-                    )}
 
-                    <Separator className="my-2" />
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>
+                              Provisionamento DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)
+                            </span>
+                            <span>{formatCurrency(breakdown.totals.das || 0)}</span>
+                          </div>
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>
+                              ICMS (
+                              {isSimplesNacional
+                                ? '0.00'
+                                : (breakdown.rates?.icmsPercent?.toFixed(2) ?? '0.00')}
+                              %)
+                            </span>
+                            <span>
+                              {formatCurrency(isSimplesNacional ? 0 : breakdown.totals.icms || 0)}
+                            </span>
+                          </div>
 
-                    <div className="flex justify-between font-medium">
-                      <span>Receita Bruta</span>
-                      <span>{formatCurrency(breakdown.totals.receitaBruta || 0)}</span>
-                    </div>
-                  </div>
+                          <Separator className="my-2" />
 
-                  {/* Custos Diretos (ANTT + Carga e Descarga) — deduzidos para chegar na Margem Bruta */}
-                  {breakdown && (
-                    <>
-                      <Separator className="my-4" />
-                      <h5 className="font-medium text-foreground mb-2">Custos Diretos</h5>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Piso ANTT (carreteiro)</span>
-                          <span>
-                            {formatCurrency(
-                              Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0)
+                          <div className="flex justify-between font-semibold text-base">
+                            <span>Total Cliente</span>
+                            <span className="text-primary">
+                              {formatCurrency(
+                                isSimplesNacional && breakdown?.totals
+                                  ? (breakdown.totals.receitaBruta || 0) +
+                                      (breakdown.totals.das || 0)
+                                  : breakdown.totals?.totalCliente || 0
+                              )}
+                            </span>
+                          </div>
+                        </TabsContent>
+
+                        {/* ── Aba Custos ── */}
+                        <TabsContent value="custos" className="mt-3 space-y-2 text-sm">
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Custos deduzidos da Receita Bruta para apurar a Margem Bruta.
+                          </p>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Piso ANTT (carreteiro)</span>
+                            <span>
+                              {formatCurrency(
+                                Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0)
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Carga e Descarga</span>
+                            <span>
+                              {formatCurrency(breakdown?.profitability?.custosDescarga ?? 0)}
+                            </span>
+                          </div>
+                        </TabsContent>
+
+                        {/* ── Aba Taxas (só quando hasFees) ── */}
+                        {hasFees && (
+                          <TabsContent value="taxas" className="mt-3 space-y-2 text-sm">
+                            {breakdown.conditionalFeesBreakdown &&
+                              Object.entries(breakdown.conditionalFeesBreakdown).map(
+                                ([feeId, value]) => {
+                                  const fee = conditionalFeesData?.find((f) => f.id === feeId);
+                                  if (!value) return null;
+                                  return (
+                                    <div key={feeId} className="flex justify-between">
+                                      <span className="text-muted-foreground flex items-center gap-1">
+                                        {fee ? fee.name : 'Taxa adicional'}
+                                        {fee && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[10px] py-0 ml-1"
+                                          >
+                                            {fee.code}
+                                          </Badge>
+                                        )}
+                                      </span>
+                                      <span>{formatCurrency(value as number)}</span>
+                                    </div>
+                                  );
+                                }
+                              )}
+                            {(breakdown.components?.waitingTimeCost ?? 0) > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Estadia / Hora Parada</span>
+                                <span>{formatCurrency(breakdown.components!.waitingTimeCost)}</span>
+                              </div>
                             )}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Carga e Descarga</span>
-                          <span>
-                            {formatCurrency(breakdown?.profitability?.custosDescarga ?? 0)}
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                            <Separator className="my-2" />
+                            <div className="flex justify-between font-medium">
+                              <span>Total Taxas</span>
+                              <span>
+                                {formatCurrency(
+                                  Object.values(breakdown.conditionalFeesBreakdown ?? {}).reduce(
+                                    (s, v) => s + (v as number),
+                                    0
+                                  ) + (breakdown.components?.waitingTimeCost ?? 0)
+                                )}
+                              </span>
+                            </div>
+                          </TabsContent>
+                        )}
+                      </Tabs>
 
-                  {/* Impostos — deduzidos para visão correta da Margem Bruta, Resultado Líquido e Margem */}
-                  {breakdown?.totals && (
-                    <>
-                      <Separator className="my-4" />
-                      <h5 className="font-medium text-foreground mb-2">Impostos</h5>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>
-                            Provisionamento DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)
-                          </span>
-                          <span>{formatCurrency(breakdown.totals.das || 0)}</span>
-                        </div>
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>
-                            ICMS (
-                            {isSimplesNacional
-                              ? '0.00'
-                              : (breakdown.rates?.icmsPercent?.toFixed(2) ?? '0.00')}
-                            %)
-                          </span>
-                          <span>
-                            {formatCurrency(isSimplesNacional ? 0 : breakdown.totals.icms || 0)}
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Total Cliente (continua somando impostos; apenas mudamos de lugar no quadro) */}
-                  {breakdown?.totals && (
-                    <>
-                      <Separator className="my-4" />
-                      <div className="flex justify-between font-semibold text-lg">
-                        <span>Total Cliente</span>
-                        <span className="text-primary">
-                          {formatCurrency(
-                            isSimplesNacional && breakdown?.totals
-                              ? (breakdown.totals.receitaBruta || 0) + (breakdown.totals.das || 0)
-                              : breakdown.totals?.totalCliente || 0
+                      {/* ── Rentabilidade — sempre visível, fora das tabs ── */}
+                      {breakdown.profitability && (
+                        <div
+                          className={cn(
+                            'rounded-lg p-3 border',
+                            isBelowTargetView
+                              ? 'bg-destructive/5 border-destructive/20'
+                              : 'bg-success/5 border-success/20'
                           )}
-                        </span>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Profitability */}
-                  {breakdown.profitability && (
-                    <>
-                      <Separator className="my-4" />
-                      <h5 className="font-medium text-foreground mb-2 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4" />
-                        Rentabilidade
-                      </h5>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Margem Bruta</span>
-                          <span>{formatCurrency(margemBrutaView)}</span>
+                        >
+                          <h5 className="font-medium text-foreground mb-2 flex items-center gap-2 text-sm">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            Rentabilidade
+                          </h5>
+                          <div className="space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Margem Bruta</span>
+                              <span>{formatCurrency(margemBrutaView)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Overhead</span>
+                              <span>{formatCurrency(overheadView)}</span>
+                            </div>
+                            <div className="flex justify-between font-medium items-center gap-2">
+                              <span>Resultado Líquido</span>
+                              <Badge
+                                variant={resultadoLiquidoView >= 0 ? 'default' : 'destructive'}
+                                className={
+                                  resultadoLiquidoView >= 0
+                                    ? 'bg-success text-success-foreground'
+                                    : ''
+                                }
+                              >
+                                {formatCurrency(resultadoLiquidoView)}
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between font-semibold items-center gap-2">
+                              <span>Margem %</span>
+                              <Badge
+                                variant={isBelowTargetView ? 'destructive' : 'default'}
+                                className={
+                                  !isBelowTargetView ? 'bg-success text-success-foreground' : ''
+                                }
+                              >
+                                {margemPercentView.toFixed(1)}%
+                              </Badge>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Overhead</span>
-                          <span>{formatCurrency(overheadView)}</span>
-                        </div>
-                        <div className="flex justify-between font-medium items-center gap-2">
-                          <span>Resultado Líquido</span>
-                          <Badge
-                            variant={resultadoLiquidoView >= 0 ? 'default' : 'destructive'}
-                            className={
-                              resultadoLiquidoView >= 0 ? 'bg-success text-success-foreground' : ''
-                            }
-                          >
-                            {formatCurrency(resultadoLiquidoView)}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between font-semibold items-center gap-2">
-                          <span>Margem %</span>
-                          <Badge
-                            variant={isBelowTargetView ? 'destructive' : 'default'}
-                            className={
-                              !isBelowTargetView ? 'bg-success text-success-foreground' : ''
-                            }
-                          >
-                            {margemPercentView.toFixed(1)}%
-                          </Badge>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+                      )}
+                    </div>
+                  );
+                })()}
 
               {/* Value (fallback if no breakdown) */}
               {!breakdown && (

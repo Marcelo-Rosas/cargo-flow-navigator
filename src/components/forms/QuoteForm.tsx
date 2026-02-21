@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MaskedInput } from '@/components/ui/masked-input';
@@ -1626,158 +1627,210 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               </div>
 
               {/* Calculated Values */}
-              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Frete Base</span>
-                  <span className="text-foreground">
-                    {formatCurrency(calculationResult.components.baseFreight)}
-                  </span>
-                </div>
-                {calculationResult.components.toll > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Pedágio</span>
-                    <span className="text-foreground">
-                      {formatCurrency(calculationResult.components.toll)}
-                    </span>
-                  </div>
-                )}
-                {calculationResult.components.gris > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      GRIS ({calculationResult.rates.grisPercent.toFixed(2)}%)
-                    </span>
-                    <span className="text-foreground">
-                      {formatCurrency(calculationResult.components.gris)}
-                    </span>
-                  </div>
-                )}
-                {calculationResult.components.tso > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      TSO ({calculationResult.rates.tsoPercent.toFixed(2)}%)
-                    </span>
-                    <span className="text-foreground">
-                      {formatCurrency(calculationResult.components.tso)}
-                    </span>
-                  </div>
-                )}
-                {calculationResult.components.rctrc > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      RCTR-C ({calculationResult.rates.costValuePercent.toFixed(2)}%)
-                    </span>
-                    <span className="text-foreground">
-                      {formatCurrency(calculationResult.components.rctrc)}
-                    </span>
-                  </div>
-                )}
-                {calculationResult.components.tde > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">TDE (NTC)</span>
-                    <span className="text-foreground">
-                      {formatCurrency(calculationResult.components.tde)}
-                    </span>
-                  </div>
-                )}
-                {calculationResult.components.tear > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">TEAR (NTC)</span>
-                    <span className="text-foreground">
-                      {formatCurrency(calculationResult.components.tear)}
-                    </span>
-                  </div>
-                )}
-                {/* Taxas Condicionais no breakdown */}
-                {computedConditionalFees.ids.length > 0 &&
-                  computedConditionalFees.ids.map((feeId) => {
-                    const fee = conditionalFeesData?.find((f) => f.id === feeId);
-                    const val = computedConditionalFees.breakdown[feeId] ?? 0;
-                    if (val === 0) return null;
-                    return (
-                      <div key={feeId} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          {fee ? fee.name : feeId}
-                          {fee && (
-                            <Badge variant="outline" className="ml-1 text-[10px] py-0">
-                              {fee.code}
-                            </Badge>
-                          )}
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <Tabs defaultValue="memoria" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 h-8">
+                    <TabsTrigger value="memoria" className="text-xs">
+                      Memória
+                    </TabsTrigger>
+                    <TabsTrigger value="rentabilidade" className="text-xs">
+                      Rentabilidade
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* ── Aba Memória ── */}
+                  <TabsContent value="memoria" className="mt-2 space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Frete Base</span>
+                      <span className="text-foreground">
+                        {formatCurrency(calculationResult.components.baseFreight)}
+                      </span>
+                    </div>
+                    {calculationResult.components.toll > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Pedágio</span>
+                        <span className="text-foreground">
+                          {formatCurrency(calculationResult.components.toll)}
                         </span>
-                        <span className="text-foreground">{formatCurrency(val)}</span>
                       </div>
-                    );
-                  })}
-                {additionalFeesSelection.waitingTimeCost > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Estadia / Hora Parada</span>
-                    <span className="text-foreground">
-                      {formatCurrency(additionalFeesSelection.waitingTimeCost)}
-                    </span>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex justify-between text-sm font-medium">
-                  <span className="text-foreground">Receita Bruta</span>
-                  <span className="text-foreground">
-                    {formatCurrency(calculationResult.totals.receitaBruta)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Provisionamento DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
-                  </span>
-                  <span className="text-foreground">
-                    {formatCurrency(calculationResult.totals.das)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    ICMS (
-                    {taxRegimeSimples === 1
-                      ? '0.00'
-                      : calculationResult.rates.icmsPercent.toFixed(2)}
-                    %)
-                  </span>
-                  <span className="text-foreground">
-                    {formatCurrency(taxRegimeSimples === 1 ? 0 : calculationResult.totals.icms)}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex justify-between font-semibold">
-                  <span className="text-foreground">Total Cliente</span>
-                  <span className="text-primary text-lg">
-                    {formatCurrency(
-                      taxRegimeSimples === 1
-                        ? calculationResult.totals.receitaBruta + calculationResult.totals.das
-                        : calculationResult.totals.totalCliente
                     )}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Resultado Líquido</span>
-                  <span
-                    className={cn(
-                      calculationResult.profitability.resultadoLiquido >= 0
-                        ? 'text-success'
-                        : 'text-destructive'
+                    {calculationResult.components.gris > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          GRIS ({calculationResult.rates.grisPercent.toFixed(2)}%)
+                        </span>
+                        <span className="text-foreground">
+                          {formatCurrency(calculationResult.components.gris)}
+                        </span>
+                      </div>
                     )}
-                  >
-                    {formatCurrency(calculationResult.profitability.resultadoLiquido)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm font-medium">
-                  <span className="text-foreground">Margem</span>
-                  <span
-                    className={cn(
-                      calculationResult.meta.marginStatus === 'BELOW_TARGET'
-                        ? 'text-warning-foreground'
-                        : 'text-success'
+                    {calculationResult.components.tso > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          TSO ({calculationResult.rates.tsoPercent.toFixed(2)}%)
+                        </span>
+                        <span className="text-foreground">
+                          {formatCurrency(calculationResult.components.tso)}
+                        </span>
+                      </div>
                     )}
-                  >
-                    {calculationResult.profitability.margemPercent.toFixed(1)}%
-                  </span>
-                </div>
+                    {calculationResult.components.rctrc > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          RCTR-C ({calculationResult.rates.costValuePercent.toFixed(2)}%)
+                        </span>
+                        <span className="text-foreground">
+                          {formatCurrency(calculationResult.components.rctrc)}
+                        </span>
+                      </div>
+                    )}
+                    {calculationResult.components.tde > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">TDE (NTC)</span>
+                        <span className="text-foreground">
+                          {formatCurrency(calculationResult.components.tde)}
+                        </span>
+                      </div>
+                    )}
+                    {calculationResult.components.tear > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">TEAR (NTC)</span>
+                        <span className="text-foreground">
+                          {formatCurrency(calculationResult.components.tear)}
+                        </span>
+                      </div>
+                    )}
+                    {/* Taxas Condicionais */}
+                    {computedConditionalFees.ids.length > 0 &&
+                      computedConditionalFees.ids.map((feeId) => {
+                        const fee = conditionalFeesData?.find((f) => f.id === feeId);
+                        const val = computedConditionalFees.breakdown[feeId] ?? 0;
+                        if (val === 0) return null;
+                        return (
+                          <div key={feeId} className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              {fee ? fee.name : feeId}
+                              {fee && (
+                                <Badge variant="outline" className="ml-1 text-[10px] py-0">
+                                  {fee.code}
+                                </Badge>
+                              )}
+                            </span>
+                            <span className="text-foreground">{formatCurrency(val)}</span>
+                          </div>
+                        );
+                      })}
+                    {additionalFeesSelection.waitingTimeCost > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Estadia / Hora Parada</span>
+                        <span className="text-foreground">
+                          {formatCurrency(additionalFeesSelection.waitingTimeCost)}
+                        </span>
+                      </div>
+                    )}
+
+                    <Separator className="my-1" />
+
+                    <div className="flex justify-between font-medium">
+                      <span className="text-foreground">Receita Bruta</span>
+                      <span className="text-foreground">
+                        {formatCurrency(calculationResult.totals.receitaBruta)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
+                      </span>
+                      <span className="text-foreground">
+                        {formatCurrency(calculationResult.totals.das)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        ICMS (
+                        {taxRegimeSimples === 1
+                          ? '0.00'
+                          : calculationResult.rates.icmsPercent.toFixed(2)}
+                        %)
+                      </span>
+                      <span className="text-foreground">
+                        {formatCurrency(taxRegimeSimples === 1 ? 0 : calculationResult.totals.icms)}
+                      </span>
+                    </div>
+
+                    <Separator className="my-1" />
+
+                    <div className="flex justify-between font-semibold">
+                      <span className="text-foreground">Total Cliente</span>
+                      <span className="text-primary text-base">
+                        {formatCurrency(
+                          taxRegimeSimples === 1
+                            ? calculationResult.totals.receitaBruta + calculationResult.totals.das
+                            : calculationResult.totals.totalCliente
+                        )}
+                      </span>
+                    </div>
+                  </TabsContent>
+
+                  {/* ── Aba Rentabilidade ── */}
+                  <TabsContent value="rentabilidade" className="mt-2">
+                    <div
+                      className={cn(
+                        'rounded-lg p-3 border space-y-2 text-sm',
+                        calculationResult.meta.marginStatus === 'BELOW_TARGET'
+                          ? 'bg-destructive/5 border-destructive/20'
+                          : 'bg-success/5 border-success/20'
+                      )}
+                    >
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Margem Bruta</span>
+                        <span className="text-foreground">
+                          {formatCurrency(calculationResult.profitability.margemBruta)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Overhead</span>
+                        <span className="text-foreground">
+                          {formatCurrency(calculationResult.profitability.overhead)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-medium items-center gap-2">
+                        <span className="text-foreground">Resultado Líquido</span>
+                        <Badge
+                          variant={
+                            calculationResult.profitability.resultadoLiquido >= 0
+                              ? 'default'
+                              : 'destructive'
+                          }
+                          className={
+                            calculationResult.profitability.resultadoLiquido >= 0
+                              ? 'bg-success text-success-foreground'
+                              : ''
+                          }
+                        >
+                          {formatCurrency(calculationResult.profitability.resultadoLiquido)}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between font-semibold items-center gap-2">
+                        <span className="text-foreground">Margem %</span>
+                        <Badge
+                          variant={
+                            calculationResult.meta.marginStatus === 'BELOW_TARGET'
+                              ? 'destructive'
+                              : 'default'
+                          }
+                          className={
+                            calculationResult.meta.marginStatus !== 'BELOW_TARGET'
+                              ? 'bg-success text-success-foreground'
+                              : ''
+                          }
+                        >
+                          {calculationResult.profitability.margemPercent.toFixed(1)}%
+                        </Badge>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
 
