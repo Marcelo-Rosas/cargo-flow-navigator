@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -50,6 +50,15 @@ export default function Commercial() {
   const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const canManageCommercial = canWrite;
+
+  // Sincroniza selectedQuote com o cache quando quotes atualiza (após save/edit)
+  useEffect(() => {
+    if (!selectedQuote) return;
+    const freshQuote = quotes?.find((q) => q.id === selectedQuote.id);
+    if (freshQuote && freshQuote.updated_at !== selectedQuote.updated_at) {
+      setSelectedQuote(freshQuote);
+    }
+  }, [quotes, selectedQuote]);
 
   // Enable realtime updates
   useRealtimeSubscription(['quotes']);
