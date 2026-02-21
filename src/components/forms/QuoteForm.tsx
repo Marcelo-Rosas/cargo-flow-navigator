@@ -462,8 +462,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         descarga:
           (quote.pricing_breakdown as { profitability?: { custosDescarga?: number } } | null)
             ?.profitability?.custosDescarga ?? 0,
-        tde_enabled: false,
-        tear_enabled: false,
+        tde_enabled: (bd?.components?.tde ?? 0) > 0,
+        tear_enabled: (bd?.components?.tear ?? 0) > 0,
         notes: quote.notes || '',
         advance_due_date: (quote as { advance_due_date?: string | null })?.advance_due_date || '',
         balance_due_date: (quote as { balance_due_date?: string | null })?.balance_due_date || '',
@@ -500,7 +500,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         balance_due_date: '',
       });
     }
-  }, [quote, form, weightUnit]);
+  }, [quote, form, weightUnit, open]);
 
   const handleClientSelect = (clientId: string) => {
     const selectedClient = clients?.find((c) => c.id === clientId);
