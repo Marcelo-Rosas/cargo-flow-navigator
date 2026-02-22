@@ -123,7 +123,7 @@ export default function Clients() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nome, CNPJ, e-mail..."
+              placeholder="Buscar por nome, CPF, CNPJ, e-mail..."
               className="pl-10 w-80"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -183,7 +183,7 @@ export default function Clients() {
                     Cliente
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                    CNPJ
+                    CPF / CNPJ
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                     Contato
@@ -215,7 +215,7 @@ export default function Clients() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-foreground font-mono text-sm">
-                      {client.cnpj || '-'}
+                      {client.cpf ? String(client.cpf) : client.cnpj || '-'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="space-y-1">
@@ -279,11 +279,7 @@ export default function Clients() {
       )}
 
       {/* Client Form */}
-      <ClientForm
-        open={isFormOpen && canManageClients}
-        onClose={handleFormClose}
-        client={editingClient}
-      />
+      <ClientForm open={isFormOpen} onClose={handleFormClose} client={editingClient} />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog

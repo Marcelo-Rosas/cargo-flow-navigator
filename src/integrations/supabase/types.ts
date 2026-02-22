@@ -96,6 +96,7 @@ export type Database = {
           address: string | null;
           city: string | null;
           cnpj: string | null;
+          cpf: number | null;
           created_at: string;
           created_by: string | null;
           email: string | null;
@@ -112,6 +113,7 @@ export type Database = {
           address?: string | null;
           city?: string | null;
           cnpj?: string | null;
+          cpf?: number | null;
           created_at?: string;
           created_by?: string | null;
           email?: string | null;
@@ -128,6 +130,7 @@ export type Database = {
           address?: string | null;
           city?: string | null;
           cnpj?: string | null;
+          cpf?: number | null;
           created_at?: string;
           created_by?: string | null;
           email?: string | null;

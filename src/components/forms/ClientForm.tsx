@@ -19,12 +19,18 @@ import { useCreateClient, useUpdateClient } from '@/hooks/useClients';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
-import { zodCnpj, zodPhone, zodCep } from '@/lib/validators';
+import { zodCnpj, zodPhone, zodCep, validateCpf } from '@/lib/validators';
 
 type Client = Database['public']['Tables']['clients']['Row'];
 
+const digits = (v: string) => v.replace(/\D/g, '');
+
 const clientSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(200, 'Nome muito longo'),
+  cpf: z
+    .string()
+    .optional()
+    .refine((v) => !v || digits(v).length === 0 || validateCpf(v), 'CPF inválido'),
   cnpj: zodCnpj,
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   phone: zodPhone,
@@ -58,6 +64,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
     resolver: zodResolver(clientSchema),
     defaultValues: {
       name: '',
+      cpf: '',
       cnpj: '',
       email: '',
       phone: '',
@@ -73,6 +80,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
     if (client) {
       form.reset({
         name: client.name,
+        cpf: client.cpf ? String(client.cpf) : '',
         cnpj: client.cnpj || '',
         email: client.email || '',
         phone: client.phone || '',
@@ -85,6 +93,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
     } else {
       form.reset({
         name: '',
+        cpf: '',
         cnpj: '',
         email: '',
         phone: '',
@@ -157,10 +166,12 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
 
     try {
       if (isEditing && client) {
+        const cpfNum = data.cpf ? Number(digits(data.cpf)) : null;
         await updateClientMutation.mutateAsync({
           id: client.id,
           updates: {
             name: data.name,
+            cpf: cpfNum,
             cnpj: data.cnpj || null,
             email: data.email || null,
             phone: data.phone || null,
@@ -173,8 +184,10 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
         });
         toast.success('Cliente atualizado com sucesso');
       } else {
+        const cpfNum = data.cpf ? Number(digits(data.cpf)) : null;
         await createClientMutation.mutateAsync({
           name: data.name,
+          cpf: cpfNum,
           cnpj: data.cnpj || null,
           email: data.email || null,
           phone: data.phone || null,
@@ -218,39 +231,55 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="cnpj"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>CNPJ</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        placeholder="00.000.000/0000-00"
-                        {...field}
-                        onBlur={async (e) => {
-                          field.onBlur();
-                          await handleCnpjLookup();
-                        }}
-                        className="pr-10"
-                      />
-                      {isLookingUp && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                        </div>
-                      )}
-                      {!isLookingUp && field.value && sanitizeCnpj(field.value).length === 14 && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <Search className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF</FormLabel>
+                    <FormControl>
+                      <Input placeholder="000.000.000-00" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="cnpj"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CNPJ</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          placeholder="00.000.000/0000-00"
+                          {...field}
+                          onBlur={async (e) => {
+                            field.onBlur();
+                            await handleCnpjLookup();
+                          }}
+                          className="pr-10"
+                        />
+                        {isLookingUp && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
+                        {!isLookingUp && field.value && sanitizeCnpj(field.value).length === 14 && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <Search className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
