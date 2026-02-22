@@ -435,7 +435,7 @@ export function QuoteDetailModal({
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-3">
-                <span className="text-xl font-bold">Cotação</span>
+                <span className="text-xl font-bold">{quote.quote_code ?? 'Cotação'}</span>
                 <Badge className={cn(stageInfo.color)}>{stageInfo.label}</Badge>
                 {routeUfLabel && (
                   <Badge variant="outline" className="text-xs">
