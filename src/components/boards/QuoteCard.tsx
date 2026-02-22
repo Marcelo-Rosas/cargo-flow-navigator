@@ -119,14 +119,10 @@ export function QuoteCard({
             </button>
           )}
           <div className="flex flex-col min-w-0">
-            {quote.quote_code && (
-              <span className="text-[10px] font-medium text-muted-foreground leading-none mb-0.5">
-                {quote.quote_code}
-              </span>
-            )}
-            <h4 className="font-semibold text-foreground truncate max-w-[160px]">
+            <h4 className="font-semibold text-foreground">{quote.quote_code ?? '—'}</h4>
+            <p className="text-sm text-muted-foreground truncate max-w-[160px]">
               {quote.client_name}
-            </h4>
+            </p>
           </div>
         </div>
 
