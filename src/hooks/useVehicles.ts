@@ -38,33 +38,24 @@ export function useVehicles(driverId?: string | null) {
       const { data, error } = await query;
 
       if (error) {
-        const msg = error.message || '';
-        const fallback =
-          msg.includes('owner_id') ||
-          msg.includes('owners') ||
-          msg.includes('column') ||
-          msg.includes('relation');
-        if (fallback) {
-          let fallbackQuery = supabase
-            .from('vehicles')
-            .select(selectWithDriverOnly)
-            .eq('active', asDb(true))
-            .order('plate', { ascending: true });
-          if (driverId) {
-            fallbackQuery = fallbackQuery.eq('driver_id', asDb(driverId));
-          }
-          const { data: fallbackData, error: fallbackError } = await fallbackQuery;
-          if (fallbackError) throw fallbackError;
-          return (filterSupabaseRows<VehicleWithRelations>(fallbackData) || []).map((row) => ({
-            ...row,
-            owner_id: null,
-            owner: null,
-            driver:
-              (row as { driver?: { id: string; name: string; phone: string | null } | null })
-                .driver ?? null,
-          }));
+        // Fallback universal: qualquer erro na query principal tenta sem join de owner
+        let fallbackQuery = supabase
+          .from('vehicles')
+          .select(selectWithDriverOnly)
+          .eq('active', asDb(true))
+          .order('plate', { ascending: true });
+        if (driverId) {
+          fallbackQuery = fallbackQuery.eq('driver_id', asDb(driverId));
         }
-        throw error;
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+        if (fallbackError) throw fallbackError;
+        return (filterSupabaseRows<VehicleWithRelations>(fallbackData) || []).map((row) => ({
+          ...row,
+          owner: null,
+          driver:
+            (row as { driver?: { id: string; name: string; phone: string | null } | null })
+              .driver ?? null,
+        }));
       }
       return filterSupabaseRows<VehicleWithRelations>(data);
     },
@@ -95,25 +86,17 @@ export function useVehicleByPlate(plate: string | null | undefined) {
       const { data, error } = await query;
 
       if (error) {
-        const msg = error.message || '';
-        if (
-          msg.includes('owner_id') ||
-          msg.includes('owners') ||
-          msg.includes('column') ||
-          msg.includes('relation')
-        ) {
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('vehicles')
-            .select(selectWithDriverOnly)
-            .ilike('plate', normalized)
-            .limit(1)
-            .maybeSingle();
-          if (fallbackError) throw fallbackError;
-          const row = filterSupabaseSingle<VehicleWithRelations>(fallbackData);
-          if (!row) return null;
-          return { ...row, owner_id: null, owner: null };
-        }
-        throw error;
+        // Fallback universal: qualquer erro tenta sem join de owner
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('vehicles')
+          .select(selectWithDriverOnly)
+          .ilike('plate', normalized)
+          .limit(1)
+          .maybeSingle();
+        if (fallbackError) throw fallbackError;
+        const row = filterSupabaseSingle<VehicleWithRelations>(fallbackData);
+        if (!row) return null;
+        return { ...row, owner: null };
       }
       return filterSupabaseSingle<VehicleWithRelations>(data);
     },
@@ -134,24 +117,16 @@ export function useVehicle(id: string | null | undefined) {
         .maybeSingle();
 
       if (error) {
-        const msg = error.message || '';
-        if (
-          msg.includes('owner_id') ||
-          msg.includes('owners') ||
-          msg.includes('column') ||
-          msg.includes('relation')
-        ) {
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('vehicles')
-            .select(selectWithDriverOnly)
-            .eq('id', asDb(id))
-            .maybeSingle();
-          if (fallbackError) throw fallbackError;
-          const row = filterSupabaseSingle<VehicleWithRelations>(fallbackData);
-          if (!row) return null;
-          return { ...row, owner_id: null, owner: null };
-        }
-        throw error;
+        // Fallback universal: qualquer erro tenta sem join de owner
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('vehicles')
+          .select(selectWithDriverOnly)
+          .eq('id', asDb(id))
+          .maybeSingle();
+        if (fallbackError) throw fallbackError;
+        const row = filterSupabaseSingle<VehicleWithRelations>(fallbackData);
+        if (!row) return null;
+        return { ...row, owner: null };
       }
       return filterSupabaseSingle<VehicleWithRelations>(data);
     },
