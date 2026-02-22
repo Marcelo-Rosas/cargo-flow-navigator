@@ -781,7 +781,7 @@ export default function Vehicles() {
       </div>
 
       <VehicleForm
-        open={isVehicleFormOpen && canManage}
+        open={isVehicleFormOpen}
         onClose={() => {
           setIsVehicleFormOpen(false);
           setEditingVehicle(null);
@@ -789,7 +789,7 @@ export default function Vehicles() {
         vehicle={editingVehicle}
       />
       <DriverForm
-        open={isDriverFormOpen && canManage}
+        open={isDriverFormOpen}
         onClose={() => {
           setIsDriverFormOpen(false);
           setEditingDriver(null);
@@ -797,7 +797,7 @@ export default function Vehicles() {
         driver={editingDriver}
       />
       <OwnerForm
-        open={isOwnerFormOpen && canManage}
+        open={isOwnerFormOpen}
         onClose={() => {
           setIsOwnerFormOpen(false);
           setEditingOwner(null);
