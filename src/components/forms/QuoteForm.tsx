@@ -1517,6 +1517,21 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 </Badge>
               )}
 
+              {/* Mini card R$/KM — Custo ANTT por km */}
+              {anttRsKm !== null && (
+                <div className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/20 px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-primary">Custo ANTT/km</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      (referência carreteiro)
+                    </span>
+                  </div>
+                  <span className="font-bold text-primary text-sm">
+                    R$ {anttRsKm.toFixed(2)}/km
+                  </span>
+                </div>
+              )}
+
               <Separator className="my-2" />
 
               <div className="grid grid-cols-2 gap-4">
@@ -1648,18 +1663,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
                   {/* ── Aba Memória ── */}
                   <TabsContent value="memoria" className="mt-2 space-y-1.5 text-sm">
-                    {/* Mini card R$/KM — referência ANTT */}
-                    {anttRsKm !== null && (
-                      <div className="flex items-center justify-between rounded bg-muted/60 border px-2 py-1.5 mb-1">
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Custo ANTT/km
-                        </span>
-                        <span className="font-semibold text-foreground text-sm">
-                          R$ {anttRsKm.toFixed(2)}/km
-                        </span>
-                      </div>
-                    )}
-
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Frete Base</span>
                       <span className="text-foreground">
