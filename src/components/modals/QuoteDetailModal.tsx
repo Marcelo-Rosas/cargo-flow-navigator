@@ -729,6 +729,25 @@ export function QuoteDetailModal({
                       </div>
                     )}
 
+                    {/* Mini card R$/KM — referência ANTT */}
+                    {anttCalc && Number(kmDistance ?? 0) > 0 && (
+                      <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 col-span-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-semibold text-primary">
+                              Custo ANTT/km
+                            </span>
+                            <span className="text-[10px] text-muted-foreground ml-1.5">
+                              (referência carreteiro)
+                            </span>
+                          </div>
+                          <span className="font-bold text-primary text-base">
+                            R$ {(anttCalc.total / Number(kmDistance)).toFixed(2)}/km
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Piso mínimo ANTT (carreteiro) - Tabela A / Carga Geral */}
                     <div className="p-3 rounded-lg bg-muted/30 border border-border">
                       <div className="flex items-center justify-between gap-2">
