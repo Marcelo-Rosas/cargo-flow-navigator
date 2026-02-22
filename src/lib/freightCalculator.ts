@@ -452,8 +452,13 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const billableWeightKg = Math.max(input.weightKg, cubageWeightKg);
 
   // ---- STEP 2: BASE COST ----
+  // Prioridade: cost_per_ton → cost_per_kg (fallback para tabelas de lotação importadas em kg)
   const costPerTon = Number(row.cost_per_ton) || 0;
-  const baseCost = round2((billableWeightKg / 1000) * costPerTon);
+  const costPerKg = Number(row.cost_per_kg) || 0;
+  const baseCost =
+    costPerTon > 0
+      ? round2((billableWeightKg / 1000) * costPerTon)
+      : round2(billableWeightKg * costPerKg);
 
   // ---- STEP 3: COMPONENTES PERCENTUAIS SOBRE VALOR DA CARGA ----
   const grisPercent = Number(row.gris_percent) || 0;
