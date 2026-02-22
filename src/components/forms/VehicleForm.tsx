@@ -308,8 +308,8 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                   <FormItem>
                     <FormLabel>Motorista vinculado</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
-                      value={field.value || ''}
+                      onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+                      value={field.value || '__none__'}
                       disabled={driversLoading}
                     >
                       <FormControl>
@@ -322,7 +322,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">
+                        <SelectItem value="__none__">
                           <span className="text-muted-foreground">Nenhum</span>
                         </SelectItem>
                         {drivers?.map((driver) => (
@@ -361,8 +361,8 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                   <FormItem>
                     <FormLabel>Proprietário vinculado</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
-                      value={field.value || ''}
+                      onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+                      value={field.value || '__none__'}
                       disabled={ownersLoading}
                     >
                       <FormControl>
@@ -375,7 +375,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">
+                        <SelectItem value="__none__">
                           <span className="text-muted-foreground">Nenhum</span>
                         </SelectItem>
                         {owners?.map((owner) => (

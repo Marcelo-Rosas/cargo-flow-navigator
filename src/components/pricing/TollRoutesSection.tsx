@@ -368,12 +368,15 @@ function TollRouteForm({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Tipo de Veículo</Label>
-            <Select value={vehicleTypeId} onValueChange={setVehicleTypeId}>
+            <Select
+              value={vehicleTypeId || '__none__'}
+              onValueChange={(v) => setVehicleTypeId(v === '__none__' ? '' : v)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="__none__">Todos</SelectItem>
                 {vehicleTypes?.map((v) => (
                   <SelectItem key={v.id} value={v.id}>
                     {v.code} - {v.name}

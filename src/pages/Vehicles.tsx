@@ -346,13 +346,22 @@ export default function Vehicles() {
                           Placa
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Marca / Modelo
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Ano
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Cor
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          RENAVAM
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                           Motorista
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                           Proprietário
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                          Marca / Modelo
                         </th>
                         <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
                           Ações
@@ -377,6 +386,18 @@ export default function Vehicles() {
                               </div>
                             </div>
                           </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {[vehicle.brand, vehicle.model].filter(Boolean).join(' / ') || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {vehicle.year || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {vehicle.color || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
+                            {vehicle.renavam || '—'}
+                          </td>
                           <td className="px-4 py-3">
                             {vehicle.driver ? (
                               <div className="flex items-center gap-2 text-sm text-foreground">
@@ -396,9 +417,6 @@ export default function Vehicles() {
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-muted-foreground">
-                            {[vehicle.brand, vehicle.model].filter(Boolean).join(' / ') || '—'}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-2">

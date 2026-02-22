@@ -229,12 +229,15 @@ export function FreightSimulator() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Tabela de Preço</Label>
-                <Select value={priceTableId} onValueChange={setPriceTableId}>
+                <Select
+                  value={priceTableId || '__none__'}
+                  onValueChange={(v) => setPriceTableId(v === '__none__' ? '' : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhuma</SelectItem>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
                     {activeTables.map((table) => (
                       <SelectItem key={table.id} value={table.id}>
                         {table.name}
@@ -245,12 +248,15 @@ export function FreightSimulator() {
               </div>
               <div className="space-y-2">
                 <Label>Tipo de Veículo</Label>
-                <Select value={vehicleTypeCode} onValueChange={setVehicleTypeCode}>
+                <Select
+                  value={vehicleTypeCode || '__none__'}
+                  onValueChange={(v) => setVehicleTypeCode(v === '__none__' ? '' : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Padrão" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Padrão</SelectItem>
+                    <SelectItem value="__none__">Padrão</SelectItem>
                     {vehicleTypes?.map((v) => (
                       <SelectItem key={v.id} value={v.code}>
                         {v.code} - {v.name}
@@ -262,12 +268,15 @@ export function FreightSimulator() {
             </div>
             <div className="space-y-2">
               <Label>Prazo de Pagamento</Label>
-              <Select value={paymentTermCode} onValueChange={setPaymentTermCode}>
+              <Select
+                value={paymentTermCode || '__none__'}
+                onValueChange={(v) => setPaymentTermCode(v === '__none__' ? '' : v)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Padrão" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Padrão (D30)</SelectItem>
+                  <SelectItem value="__none__">Padrão (D30)</SelectItem>
                   {paymentTerms?.map((t) => (
                     <SelectItem key={t.id} value={t.code}>
                       {t.name} ({t.adjustment_percent > 0 ? '+' : ''}
