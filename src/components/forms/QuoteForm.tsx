@@ -122,6 +122,7 @@ const quoteSchema = z
     // Pricing components
     cargo_value: z.number().min(0, 'Valor inválido').optional().default(0),
     toll: z.number().min(0, 'Valor inválido').optional().default(0),
+    aluguel_maquinas: z.number().min(0, 'Valor inválido').optional().default(0),
     descarga: z.number().min(0, 'Valor inválido').optional().default(0),
     // NTC flags
     tde_enabled: z.boolean().optional().default(false),
@@ -215,6 +216,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       km_distance: undefined,
       cargo_value: 0,
       toll: 0,
+      aluguel_maquinas: 0,
       descarga: 0,
       tde_enabled: false,
       tear_enabled: false,
@@ -239,6 +241,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedVolume = form.watch('volume');
   const watchedCargoValue = form.watch('cargo_value');
   const watchedToll = form.watch('toll');
+  const watchedAluguelMaquinas = form.watch('aluguel_maquinas');
   const watchedDescarga = form.watch('descarga');
   const watchedTdeEnabled = form.watch('tde_enabled');
   const watchedTearEnabled = form.watch('tear_enabled');
@@ -328,6 +331,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       volumeM3: watchedVolume || 0,
       cargoValue: watchedCargoValue || 0,
       tollValue: watchedToll || 0,
+      aluguelMaquinasValue: watchedAluguelMaquinas || 0,
       descargaValue: watchedDescarga ?? 0,
       kmDistance: kmBand,
       priceTableRow: priceTableRow || null,
@@ -344,6 +348,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     watchedVolume,
     watchedCargoValue,
     watchedToll,
+    watchedAluguelMaquinas,
     watchedDescarga,
     watchedKmDistance,
     watchedPriceTableId,
@@ -404,6 +409,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       volumeM3: watchedVolume || 0,
       cargoValue: watchedCargoValue || 0,
       tollValue: watchedToll || 0,
+      aluguelMaquinasValue: watchedAluguelMaquinas || 0,
       descargaValue: watchedDescarga ?? 0,
       kmDistance: kmBand,
       priceTableRow: priceTableRow || null,
@@ -426,6 +432,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     watchedVolume,
     watchedCargoValue,
     watchedToll,
+    watchedAluguelMaquinas,
     watchedDescarga,
     watchedKmDistance,
     watchedPriceTableId,
@@ -483,6 +490,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         km_distance: quote.km_distance ? Number(quote.km_distance) : undefined,
         cargo_value: Number(quote.cargo_value) || 0,
         toll: Number(quote.toll_value) || 0,
+        aluguel_maquinas: Number(bd?.components?.aluguelMaquinas ?? 0),
         descarga:
           (quote.pricing_breakdown as { profitability?: { custosDescarga?: number } } | null)
             ?.profitability?.custosDescarga ?? 0,
@@ -516,6 +524,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         km_distance: undefined,
         cargo_value: 0,
         toll: 0,
+        aluguel_maquinas: 0,
         descarga: 0,
         tde_enabled: false,
         tear_enabled: false,
@@ -708,6 +717,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         volumeM3: data.volume || 0,
         cargoValue: data.cargo_value || 0,
         tollValue: data.toll || 0,
+        aluguelMaquinasValue: data.aluguel_maquinas || 0,
         kmDistance: data.km_distance || 0,
         priceTableRow: priceTableRow || null,
         icmsRatePercent: icmsRate,
@@ -1608,6 +1618,34 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
                 <FormField
                   control={form.control}
+                  name="aluguel_maquinas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Aluguel de Máquinas</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            R$
+                          </span>
+                          <MaskedInput
+                            mask="currency"
+                            placeholder="0,00"
+                            className="pl-10"
+                            value={String(Math.round((field.value || 0) * 100))}
+                            onValueChange={(rawValue) =>
+                              field.onChange(parseInt(rawValue || '0', 10) / 100)
+                            }
+                            onBlur={field.onBlur}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="descarga"
                   render={({ field }) => (
                     <FormItem>
@@ -1689,6 +1727,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                         <span className="text-muted-foreground">Pedágio</span>
                         <span className="text-foreground">
                           {formatCurrency(calculationResult.components.toll)}
+                        </span>
+                      </div>
+                    )}
+                    {calculationResult.components.aluguelMaquinas > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Aluguel de Máquinas</span>
+                        <span className="text-foreground">
+                          {formatCurrency(calculationResult.components.aluguelMaquinas)}
                         </span>
                       </div>
                     )}

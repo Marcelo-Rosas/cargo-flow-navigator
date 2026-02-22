@@ -206,6 +206,7 @@ export function QuoteDetailModal({
         baseCost: 0,
         baseFreight: 0,
         toll: 0,
+        aluguelMaquinas: 0,
         gris: 0,
         tso: 0,
         rctrc: 0,
@@ -931,6 +932,14 @@ export function QuoteDetailModal({
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Pedágio</span>
                                   <span>{formatCurrency(breakdown.components.toll)}</span>
+                                </div>
+                              )}
+                              {(breakdown.components.aluguelMaquinas ?? 0) > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Aluguel de Máquinas</span>
+                                  <span>
+                                    {formatCurrency(breakdown.components.aluguelMaquinas ?? 0)}
+                                  </span>
                                 </div>
                               )}
                               {breakdown.components.rctrc > 0 && (

@@ -66,6 +66,9 @@ export interface FreightCalculationInput {
   // Pedágio manual
   tollValue: number;
 
+  // Aluguel de máquinas (valor fixo cobrado ao cliente)
+  aluguelMaquinasValue?: number;
+
   // Linha da tabela de preços (já selecionada, pode ser null)
   priceTableRow: PriceTableRow | null;
   priceTableId?: string;
@@ -142,6 +145,7 @@ export interface FreightCalculationOutput {
     baseCost: number;
     baseFreight: number;
     toll: number;
+    aluguelMaquinas: number;
     gris: number;
     tso: number;
     rctrc: number;
@@ -234,6 +238,7 @@ export interface StoredPricingBreakdown {
     baseCost: number;
     baseFreight: number;
     toll: number;
+    aluguelMaquinas: number;
     gris: number;
     tso: number;
     rctrc: number;
@@ -481,9 +486,11 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const waitingTimeCost = round2(input.extras?.waitingTimeCost ?? 0);
 
   // ---- STEP 7: RECEITA BRUTA ----
+  const aluguelMaquinas = round2(input.aluguelMaquinasValue ?? 0);
   const receitaBruta = round2(
     baseFreight +
       input.tollValue +
+      aluguelMaquinas +
       gris +
       tso +
       rctrc +
@@ -533,6 +540,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       baseCost,
       baseFreight,
       toll: round2(input.tollValue),
+      aluguelMaquinas,
       gris,
       tso,
       rctrc,
@@ -605,6 +613,7 @@ export function buildStoredBreakdown(
       baseCost: output.components.baseCost,
       baseFreight: output.components.baseFreight,
       toll: output.components.toll,
+      aluguelMaquinas: output.components.aluguelMaquinas,
       gris: output.components.gris,
       tso: output.components.tso,
       rctrc: output.components.rctrc,
