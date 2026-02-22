@@ -284,7 +284,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   // ANTT floor rate (Piso mínimo carreteiro) - Tabela A / Carga Geral
   const selectedVehicle = vehicleTypes?.find((v) => v.id === watchedVehicleTypeId) ?? null;
-  const axesCountForAntt = selectedVehicle?.axes_count ?? null;
+  // Fallback: quando vehicleTypes ainda está carregando, usa o axesCount salvo no breakdown
+  const savedAxesCount =
+    (quote?.pricing_breakdown as unknown as StoredPricingBreakdown | null)?.meta?.antt?.axesCount ??
+    null;
+  const axesCountForAntt = selectedVehicle?.axes_count ?? savedAxesCount;
   const kmDistanceForAntt = Number(watchedKmDistance || 0);
 
   const { data: anttRate } = useAnttFloorRate({
@@ -297,12 +301,23 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const effectiveWeightKg = Math.min(unitToKg(watchedWeight || 0, weightUnit), 99_999_999.99);
 
   // R$/KM — custo ANTT por km (referência ao vivo)
+  // Prioridade: 1) rate do banco (mais atualizado) 2) coeficientes salvos no breakdown
+  const savedAnttMeta =
+    (quote?.pricing_breakdown as unknown as StoredPricingBreakdown | null)?.meta?.antt ?? null;
   const anttRsKm = useMemo(() => {
     const km = Number(watchedKmDistance || 0);
-    if (!anttRate || km <= 0) return null;
-    const anttTotal = km * Number(anttRate.ccd) + Number(anttRate.cc);
-    return anttTotal / km;
-  }, [anttRate, watchedKmDistance]);
+    if (km <= 0) return null;
+    if (anttRate) {
+      const anttTotal = km * Number(anttRate.ccd) + Number(anttRate.cc);
+      return anttTotal / km;
+    }
+    // Fallback: usar ccd/cc do breakdown salvo quando anttRate ainda não carregou
+    if (savedAnttMeta?.ccd != null && savedAnttMeta?.cc != null) {
+      const anttTotal = km * Number(savedAnttMeta.ccd) + Number(savedAnttMeta.cc);
+      return anttTotal / km;
+    }
+    return null;
+  }, [anttRate, watchedKmDistance, savedAnttMeta]);
 
   // Passo 1: calcular frete sem taxas condicionais para obter o baseFreight intermediário
   const baseCalculationResult = useMemo(() => {
