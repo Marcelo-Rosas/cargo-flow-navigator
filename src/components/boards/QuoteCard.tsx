@@ -219,27 +219,33 @@ export function QuoteCard({
       {/* Route UF Badge + Km Band Badge */}
       <div className="flex flex-wrap gap-1.5 mb-2">
         {routeUfLabel && (
-          <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
+          <Badge variant="secondary" className="text-xs uppercase bg-primary/10 text-primary">
             <Route className="w-3 h-3 mr-1" />
             {routeUfLabel}
           </Badge>
         )}
 
         {kmBandLabel && kmStatus === 'OK' && (
-          <Badge variant="secondary" className="text-xs bg-muted">
+          <Badge variant="secondary" className="text-xs uppercase bg-muted">
             {kmBandLabel} km
           </Badge>
         )}
 
         {kmStatus === 'OUT_OF_RANGE' && (
-          <Badge variant="secondary" className="text-xs bg-destructive/10 text-destructive">
+          <Badge
+            variant="secondary"
+            className="text-xs uppercase bg-destructive/10 text-destructive"
+          >
             <AlertTriangle className="w-3 h-3 mr-1" />
             Fora da faixa
           </Badge>
         )}
 
         {marginStatus === 'BELOW_TARGET' && marginPercent !== undefined && (
-          <Badge variant="secondary" className="text-xs bg-warning/10 text-warning-foreground">
+          <Badge
+            variant="secondary"
+            className="text-xs uppercase bg-warning/10 text-warning-foreground"
+          >
             <AlertTriangle className="w-3 h-3 mr-1" />
             {marginPercent.toFixed(1)}%
           </Badge>
@@ -256,12 +262,12 @@ export function QuoteCard({
             </div>
           )}
           {quote.freight_type && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+            <Badge variant="outline" className="text-[10px] uppercase px-1.5 py-0">
               {quote.freight_type}
             </Badge>
           )}
           {quote.freight_modality && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+            <Badge variant="outline" className="text-[10px] uppercase px-1.5 py-0">
               {quote.freight_modality === 'lotacao' ? 'Lot' : 'Frac'}
             </Badge>
           )}
@@ -276,7 +282,7 @@ export function QuoteCard({
               key={tag}
               variant="secondary"
               className={cn(
-                'text-xs',
+                'text-xs uppercase',
                 tag === 'urgente' && 'bg-destructive/10 text-destructive',
                 tag === 'contrato' && 'bg-primary/10 text-primary',
                 tag === 'refrigerado' && 'bg-accent text-accent-foreground'

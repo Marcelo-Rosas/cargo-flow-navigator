@@ -131,7 +131,7 @@ export function OrderCard({
                 <Badge
                   variant="outline"
                   className={cn(
-                    'text-[10px] px-2 py-0.5',
+                    'text-[10px] uppercase px-2 py-0.5',
                     order.stage === 'em_transito'
                       ? 'border-amber-500/40 text-amber-700 bg-amber-500/10'
                       : 'border-amber-500/40 text-amber-700 bg-amber-500/10'
@@ -233,7 +233,7 @@ export function OrderCard({
         <div className="flex flex-wrap gap-1 mb-3">
           <Badge
             variant="secondary"
-            className="text-xs bg-warning/10 text-warning-foreground gap-1"
+            className="text-xs uppercase bg-warning/10 text-warning-foreground gap-1"
           >
             <AlertTriangle className="w-3 h-3" />
             {occurrences.length} ocorrência{occurrences.length !== 1 ? 's' : ''}
@@ -254,7 +254,7 @@ export function OrderCard({
                       key={doc.key}
                       variant={hasDoc ? 'default' : 'outline'}
                       className={cn(
-                        'text-xs font-medium transition-all',
+                        'text-xs uppercase font-medium transition-all',
                         hasDoc
                           ? 'bg-success/15 text-success border-success/40 hover:bg-success/20'
                           : 'border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 bg-background'
