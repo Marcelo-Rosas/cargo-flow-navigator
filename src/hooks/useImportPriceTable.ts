@@ -44,6 +44,16 @@ export function useImportPriceTable() {
           gris_percent: row.gris_percent,
           tso_percent: row.tso_percent,
           toll_percent: row.toll_percent,
+          // LTL weight range columns
+          weight_rate_10: row.weight_rate_10,
+          weight_rate_20: row.weight_rate_20,
+          weight_rate_30: row.weight_rate_30,
+          weight_rate_50: row.weight_rate_50,
+          weight_rate_70: row.weight_rate_70,
+          weight_rate_100: row.weight_rate_100,
+          weight_rate_150: row.weight_rate_150,
+          weight_rate_200: row.weight_rate_200,
+          weight_rate_above_200: row.weight_rate_above_200,
         }));
 
       if (validRows.length === 0) {

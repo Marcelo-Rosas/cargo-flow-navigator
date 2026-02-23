@@ -766,6 +766,15 @@ export type Database = {
           toll_percent: number | null;
           tso_percent: number | null;
           user_id: string | null;
+          weight_rate_10: number | null;
+          weight_rate_20: number | null;
+          weight_rate_30: number | null;
+          weight_rate_50: number | null;
+          weight_rate_70: number | null;
+          weight_rate_100: number | null;
+          weight_rate_150: number | null;
+          weight_rate_200: number | null;
+          weight_rate_above_200: number | null;
         };
         Insert: {
           ad_valorem_percent?: number | null;
@@ -781,6 +790,15 @@ export type Database = {
           toll_percent?: number | null;
           tso_percent?: number | null;
           user_id?: string | null;
+          weight_rate_10?: number | null;
+          weight_rate_20?: number | null;
+          weight_rate_30?: number | null;
+          weight_rate_50?: number | null;
+          weight_rate_70?: number | null;
+          weight_rate_100?: number | null;
+          weight_rate_150?: number | null;
+          weight_rate_200?: number | null;
+          weight_rate_above_200?: number | null;
         };
         Update: {
           ad_valorem_percent?: number | null;
@@ -796,6 +814,15 @@ export type Database = {
           toll_percent?: number | null;
           tso_percent?: number | null;
           user_id?: string | null;
+          weight_rate_10?: number | null;
+          weight_rate_20?: number | null;
+          weight_rate_30?: number | null;
+          weight_rate_50?: number | null;
+          weight_rate_70?: number | null;
+          weight_rate_100?: number | null;
+          weight_rate_150?: number | null;
+          weight_rate_200?: number | null;
+          weight_rate_above_200?: number | null;
         };
         Relationships: [
           {

@@ -45,6 +45,7 @@ export interface FreightComponents {
   ad_valorem: number;
   tde: number;
   tear: number;
+  dispatch_fee: number;
   conditional_fees_total: number;
   waiting_time_cost: number;
   /** Provisão DAS por frete (colchão) */

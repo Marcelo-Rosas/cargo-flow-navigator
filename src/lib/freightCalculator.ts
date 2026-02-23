@@ -73,6 +73,20 @@ export interface FreightCalculationInput {
   priceTableRow: PriceTableRow | null;
   priceTableId?: string;
 
+  // Modalidade da tabela (lotacao | fracionado)
+  modality?: 'lotacao' | 'fracionado';
+
+  // Parâmetros LTL (fracionado) — mínimos NTC
+  ltlParams?: {
+    minFreight: number;
+    minFreightCargoLimit: number;
+    minTso: number;
+    grisPercent: number;
+    grisMin: number;
+    grisMinCargoLimit: number;
+    dispatchFee: number;
+  };
+
   // Alíquota ICMS (já normalizada em %)
   icmsRatePercent: number;
 
@@ -152,6 +166,7 @@ export interface FreightCalculationOutput {
     adValorem: number;
     tde: number;
     tear: number;
+    dispatchFee: number;
     conditionalFeesTotal: number;
     waitingTimeCost: number;
     dasProvision: number;
@@ -245,6 +260,7 @@ export interface StoredPricingBreakdown {
     adValorem: number;
     tde: number;
     tear: number;
+    dispatchFee: number;
     conditionalFeesTotal: number;
     waitingTimeCost: number;
     dasProvision: number;
@@ -356,6 +372,22 @@ function resolveDirectCosts(input: FreightCalculationInput, receitaBruta: number
 }
 
 // ============================================
+// LTL WEIGHT COLUMN HELPER
+// ============================================
+
+function getLtlWeightColumn(weightKg: number): string | null {
+  if (weightKg <= 10) return 'weight_rate_10';
+  if (weightKg <= 20) return 'weight_rate_20';
+  if (weightKg <= 30) return 'weight_rate_30';
+  if (weightKg <= 50) return 'weight_rate_50';
+  if (weightKg <= 70) return 'weight_rate_70';
+  if (weightKg <= 100) return 'weight_rate_100';
+  if (weightKg <= 150) return 'weight_rate_150';
+  if (weightKg <= 200) return 'weight_rate_200';
+  return null; // acima de 200 kg → usa weight_rate_above_200 × kg
+}
+
+// ============================================
 // MAIN CALCULATION FUNCTION
 // ============================================
 
@@ -394,6 +426,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       adValorem: 0,
       tde: 0,
       tear: 0,
+      dispatchFee: 0,
       conditionalFeesTotal: 0,
       waitingTimeCost: 0,
       dasProvision: 0,
@@ -451,23 +484,58 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const cubageWeightKg = round2(input.volumeM3 * params.cubageFactor);
   const billableWeightKg = Math.max(input.weightKg, cubageWeightKg);
 
-  // ---- STEP 2: BASE COST ----
-  // Prioridade: cost_per_ton → cost_per_kg (fallback para tabelas de lotação importadas em kg)
-  const costPerTon = Number(row.cost_per_ton) || 0;
-  const costPerKg = Number(row.cost_per_kg) || 0;
-  const baseCost =
-    costPerTon > 0
-      ? round2((billableWeightKg / 1000) * costPerTon)
-      : round2(billableWeightKg * costPerKg);
+  // ---- STEP 2: BASE COST (branch por modalidade) ----
+  const isLtl = input.modality === 'fracionado';
+  let baseCost: number;
+  let dispatchFee = 0;
+
+  if (isLtl) {
+    // NTC Fracionado (LTL): faixas de peso por CTe
+    const weightCol = getLtlWeightColumn(billableWeightKg);
+    if (weightCol) {
+      // ≤ 200 kg: valor fixo por CTe
+      baseCost = round2(Number((row as Record<string, unknown>)[weightCol]) || 0);
+    } else {
+      // > 200 kg: R$/kg × peso faturável
+      const ratePerKg = Number((row as Record<string, unknown>).weight_rate_above_200) || 0;
+      baseCost = round2(billableWeightKg * ratePerKg);
+    }
+    dispatchFee = input.ltlParams?.dispatchFee ?? 102.90;
+  } else {
+    // Lotação (FTL): cost_per_ton → cost_per_kg fallback
+    const costPerTon = Number(row.cost_per_ton) || 0;
+    const costPerKg = Number(row.cost_per_kg) || 0;
+    baseCost =
+      costPerTon > 0
+        ? round2((billableWeightKg / 1000) * costPerTon)
+        : round2(billableWeightKg * costPerKg);
+  }
 
   // ---- STEP 3: COMPONENTES PERCENTUAIS SOBRE VALOR DA CARGA ----
-  const grisPercent = Number(row.gris_percent) || 0;
+  let grisPercent: number;
   const tsoPercent = Number(row.tso_percent) || 0;
-  const costValuePercent = Number(row.cost_value_percent) || 0;
+  const costValuePercent = isLtl ? (Number(row.cost_value_percent) || 0) : 0; // Lotação: RCTR-C = 0
 
-  const gris = round2(input.cargoValue * (grisPercent / 100));
-  const tso = round2(input.cargoValue * (tsoPercent / 100));
+  if (isLtl && input.ltlParams) {
+    // Fracionado: GRIS vem de ltl_parameters
+    grisPercent = input.ltlParams.grisPercent;
+  } else {
+    grisPercent = Number(row.gris_percent) || 0;
+  }
+
+  let gris = round2(input.cargoValue * (grisPercent / 100));
+  let tso = round2(input.cargoValue * (tsoPercent / 100));
   const rctrc = round2(input.cargoValue * (costValuePercent / 100));
+
+  // Fracionado: aplicar mínimos NTC
+  if (isLtl && input.ltlParams) {
+    if (input.cargoValue <= input.ltlParams.grisMinCargoLimit && gris < input.ltlParams.grisMin) {
+      gris = input.ltlParams.grisMin;
+    }
+    if (tso < input.ltlParams.minTso) {
+      tso = input.ltlParams.minTso;
+    }
+  }
 
   // ---- STEP 4: MARKUP (com escopo configurável) ----
   let markupBase = baseCost;
@@ -476,7 +544,9 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   } else if (params.markupScope === 'ALL_PERCENT_COMPONENTS') {
     markupBase = baseCost + gris + tso + rctrc;
   }
-  const baseFreight = round2(markupBase * (1 + params.markupPercent / 100));
+  const baseFreight = isLtl
+    ? baseCost // Fracionado: sem markup sobre frete peso (NTC referência)
+    : round2(markupBase * (1 + params.markupPercent / 100));
 
   // ---- STEP 5: TAXAS NTC (20% sobre baseFreight) ----
   const tde = input.tdeEnabled
@@ -502,6 +572,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       0 + // adValorem always 0
       tde +
       tear +
+      dispatchFee +
       conditionalFeesTotal +
       waitingTimeCost
   );
@@ -552,6 +623,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       adValorem: 0,
       tde,
       tear,
+      dispatchFee,
       conditionalFeesTotal,
       waitingTimeCost,
       dasProvision,
@@ -625,6 +697,7 @@ export function buildStoredBreakdown(
       adValorem: output.components.adValorem,
       tde: output.components.tde,
       tear: output.components.tear,
+      dispatchFee: output.components.dispatchFee,
       conditionalFeesTotal: output.components.conditionalFeesTotal,
       waitingTimeCost: output.components.waitingTimeCost,
       dasProvision: output.components.dasProvision,

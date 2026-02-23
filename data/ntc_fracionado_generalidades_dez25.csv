@@ -1,0 +1,20 @@
+codigo;nome;forma_cobranca;valor;unidade;valor_minimo;limite_cargo;observacao
+PERM;Taxa de Permanência da Carga;por ton/dia ou fração;47.73;R$/ton/dia;;;"seguro 0,20% sobre valor mercadoria"
+CUBA;Cubagem;kg por m3;300;kg/m3;;;
+DEVO;Devolução;% frete original;100;%;;;
+RENT;Reentrega;% frete original;50;%;89.05;178.10;"até frete R$ 178,10 cobrar R$ 89,05"
+ESTA_TOCO;Estadia Toco (3/4);por veículo/dia;1389.20;R$/dia;;;
+ESTA_TRUCK;Estadia Truck;por veículo/dia;1496.06;R$/dia;;;
+ESTA_CONJ;Estadia Conjunto (Cav+Carreta);por veículo/dia;2545.71;R$/dia;;;
+ESTA_CARR;Estadia Carreta (3 eixos);por veículo/dia;569.93;R$/dia;;;
+PEDA;Pedágio;por 100 kg ou fração;9.09;R$/100kg;;;
+TAS;TAS - Taxa Adm. SEFAZ;por conhecimento;6.77;R$/CTe;;;
+TDE;TDE - Taxa Dificuldade Entrega;% frete original;40;%;226.86;567.15;"até frete R$ 567,15 cobrar R$ 226,86"
+TRT_SP_RJ;TRT - Restrição Trânsito (SP/RJ metro);% frete original;20;%;96.02;480.11;"até frete R$ 480,11 cobrar R$ 96,02"
+TRT_OUTROS;TRT - Restrição Trânsito (outras metros);% frete original;15;%;49.55;330.34;"até frete R$ 330,34 cobrar R$ 49,55"
+TFD;TFD - Fiel Depositário;% valor mercadoria/dia;0.50;%/dia;136.24;27248.11;"até mercadoria R$ 27.248,11 cobrar R$ 136,24/dia"
+ESCOLTA;Taxa de Escolta Armada;por veículo/hora;502.28;R$/veículo/hora;;;"mínimo 2 horas"
+EMEX;EMEX - Emergência Excepcional;por 100 kg ou fração;18.79;R$/100kg;;;"0,3% a 1,0% sobre valor mercadoria - RJ metro"
+TDA;TDA - Dificuldade de Acesso;% frete original;30;%;250.18;833.93;"até frete R$ 833,93 cobrar R$ 250,18"
+TPD;TPD - Pagamento de Descargas;por unidade/volume;0;;consultar;;;"consultar texto descritivo"
+GAC;GAC - Gatilho Combustível;% frete peso líquido;35;%;;;"35% sobre variação diesel quando >= 5%"

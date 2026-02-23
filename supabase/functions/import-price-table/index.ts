@@ -20,6 +20,16 @@ interface PriceTableRowInput {
   tso_percent?: number | null;
   toll_percent?: number | null;
   ad_valorem_percent?: number | null;
+  // LTL weight range columns
+  weight_rate_10?: number | null;
+  weight_rate_20?: number | null;
+  weight_rate_30?: number | null;
+  weight_rate_50?: number | null;
+  weight_rate_70?: number | null;
+  weight_rate_100?: number | null;
+  weight_rate_150?: number | null;
+  weight_rate_200?: number | null;
+  weight_rate_above_200?: number | null;
 }
 
 interface ImportRequest {
@@ -449,6 +459,16 @@ Deno.serve(async (req) => {
         tso_percent: row.tso_percent ?? null,
         toll_percent: row.toll_percent ?? null,
         ad_valorem_percent: row.ad_valorem_percent ?? null,
+        // LTL weight range columns
+        weight_rate_10: row.weight_rate_10 ?? null,
+        weight_rate_20: row.weight_rate_20 ?? null,
+        weight_rate_30: row.weight_rate_30 ?? null,
+        weight_rate_50: row.weight_rate_50 ?? null,
+        weight_rate_70: row.weight_rate_70 ?? null,
+        weight_rate_100: row.weight_rate_100 ?? null,
+        weight_rate_150: row.weight_rate_150 ?? null,
+        weight_rate_200: row.weight_rate_200 ?? null,
+        weight_rate_above_200: row.weight_rate_above_200 ?? null,
       }));
 
       const { error: insertRowsError } = await supabase
@@ -521,6 +541,16 @@ Deno.serve(async (req) => {
         tso_percent: row.tso_percent ?? null,
         toll_percent: row.toll_percent ?? null,
         ad_valorem_percent: row.ad_valorem_percent ?? null,
+        // LTL weight range columns
+        weight_rate_10: row.weight_rate_10 ?? null,
+        weight_rate_20: row.weight_rate_20 ?? null,
+        weight_rate_30: row.weight_rate_30 ?? null,
+        weight_rate_50: row.weight_rate_50 ?? null,
+        weight_rate_70: row.weight_rate_70 ?? null,
+        weight_rate_100: row.weight_rate_100 ?? null,
+        weight_rate_150: row.weight_rate_150 ?? null,
+        weight_rate_200: row.weight_rate_200 ?? null,
+        weight_rate_above_200: row.weight_rate_above_200 ?? null,
       }));
 
       const { error: upsertError } = await supabase.from('price_table_rows').upsert(rowsToUpsert, {

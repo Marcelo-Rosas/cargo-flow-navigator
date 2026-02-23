@@ -100,6 +100,7 @@ export interface FreightComponents {
   ad_valorem: number; // Sempre 0 (legado)
   tde: number; // TODO: generalidades NTC; por ora 0
   tear: number; // TODO: generalidades NTC; por ora 0
+  dispatch_fee: number; // Taxa de Despacho (fracionado NTC: R$ por CTe)
   conditional_fees_total: number;
   waiting_time_cost: number;
   /** Provisão DAS por frete = max(receita × das_provision_percent/100, das_provision_min_value) */

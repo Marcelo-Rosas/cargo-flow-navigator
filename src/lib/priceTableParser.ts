@@ -7,6 +7,16 @@ export interface ParsedPriceRow {
   gris_percent?: number | null;
   tso_percent?: number | null; // TSO (Seguro Obrigatório) - novo nome para ad_valorem
   toll_percent?: number | null;
+  // LTL (Fracionado) weight range columns
+  weight_rate_10?: number | null;
+  weight_rate_20?: number | null;
+  weight_rate_30?: number | null;
+  weight_rate_50?: number | null;
+  weight_rate_70?: number | null;
+  weight_rate_100?: number | null;
+  weight_rate_150?: number | null;
+  weight_rate_200?: number | null;
+  weight_rate_above_200?: number | null;
   isValid: boolean;
   errors: string[];
 }
@@ -155,6 +165,16 @@ const COLUMN_MAPPINGS: Record<string, string[]> = {
     '%ad_valorem',
   ],
   toll_percent: ['toll_percent', 'pedagio', 'pedagio%', 'toll', '%pedagio'],
+  // LTL (Fracionado) weight range columns
+  weight_rate_10: ['weight_rate_10', '10', 'de_1_a_10', '1_a_10_kg', 'ate_10kg', 'ate_10'],
+  weight_rate_20: ['weight_rate_20', '20', 'de_11_a_20', '11_a_20_kg', 'ate_20kg', 'ate_20'],
+  weight_rate_30: ['weight_rate_30', '30', 'de_21_a_30', '21_a_30_kg', 'ate_30kg', 'ate_30'],
+  weight_rate_50: ['weight_rate_50', '50', 'de_31_a_50', '31_a_50_kg', 'ate_50kg', 'ate_50'],
+  weight_rate_70: ['weight_rate_70', '70', 'de_51_a_70', '51_a_70_kg', 'ate_70kg', 'ate_70'],
+  weight_rate_100: ['weight_rate_100', '100', 'de_71_a_100', '71_a_100_kg', 'ate_100kg', 'ate_100'],
+  weight_rate_150: ['weight_rate_150', '150', 'de_101_a_150', '101_a_150_kg', 'ate_150kg', 'ate_150'],
+  weight_rate_200: ['weight_rate_200', '200', 'de_151_a_200', '151_a_200_kg', 'ate_200kg', 'ate_200'],
+  weight_rate_above_200: ['weight_rate_above_200', 'acima_200', 'acima_de_200', 'acima_200_kg', 'r$/kg', 'r$porkg'],
 };
 
 function findColumnIndex(headers: string[], fieldName: string): number {
@@ -244,6 +264,17 @@ export function parseCSVPriceTable(
   const tsoIdx = findColumnIndex(headers, 'tso_percent'); // Também encontra ad_valorem_percent por alias
   const tollIdx = findColumnIndex(headers, 'toll_percent');
 
+  // LTL weight range columns
+  const wr10Idx = findColumnIndex(headers, 'weight_rate_10');
+  const wr20Idx = findColumnIndex(headers, 'weight_rate_20');
+  const wr30Idx = findColumnIndex(headers, 'weight_rate_30');
+  const wr50Idx = findColumnIndex(headers, 'weight_rate_50');
+  const wr70Idx = findColumnIndex(headers, 'weight_rate_70');
+  const wr100Idx = findColumnIndex(headers, 'weight_rate_100');
+  const wr150Idx = findColumnIndex(headers, 'weight_rate_150');
+  const wr200Idx = findColumnIndex(headers, 'weight_rate_200');
+  const wrAbove200Idx = findColumnIndex(headers, 'weight_rate_above_200');
+
   const hasKmRange = kmRangeIdx !== -1;
   const hasKmSeparate = kmFromIdx !== -1 && kmToIdx !== -1;
 
@@ -290,6 +321,16 @@ export function parseCSVPriceTable(
       gris_percent: grisIdx !== -1 ? normalizeBrazilianNumber(values[grisIdx]) : null,
       tso_percent: tsoIdx !== -1 ? normalizeBrazilianNumber(values[tsoIdx]) : null,
       toll_percent: tollIdx !== -1 ? normalizeBrazilianNumber(values[tollIdx]) : null,
+      // LTL weight rates
+      weight_rate_10: wr10Idx !== -1 ? normalizeBrazilianNumber(values[wr10Idx]) : null,
+      weight_rate_20: wr20Idx !== -1 ? normalizeBrazilianNumber(values[wr20Idx]) : null,
+      weight_rate_30: wr30Idx !== -1 ? normalizeBrazilianNumber(values[wr30Idx]) : null,
+      weight_rate_50: wr50Idx !== -1 ? normalizeBrazilianNumber(values[wr50Idx]) : null,
+      weight_rate_70: wr70Idx !== -1 ? normalizeBrazilianNumber(values[wr70Idx]) : null,
+      weight_rate_100: wr100Idx !== -1 ? normalizeBrazilianNumber(values[wr100Idx]) : null,
+      weight_rate_150: wr150Idx !== -1 ? normalizeBrazilianNumber(values[wr150Idx]) : null,
+      weight_rate_200: wr200Idx !== -1 ? normalizeBrazilianNumber(values[wr200Idx]) : null,
+      weight_rate_above_200: wrAbove200Idx !== -1 ? normalizeBrazilianNumber(values[wrAbove200Idx]) : null,
     };
 
     const validation = validatePriceRow(row, rows.length);
@@ -407,6 +448,17 @@ export async function parseXLSXPriceTable(file: File): Promise<ParseResult<Parse
     const tsoIdx = findColumnIndex(headers, 'tso_percent'); // Também encontra ad_valorem_percent por alias
     const tollIdx = findColumnIndex(headers, 'toll_percent');
 
+    // LTL weight range columns
+    const wr10Idx = findColumnIndex(headers, 'weight_rate_10');
+    const wr20Idx = findColumnIndex(headers, 'weight_rate_20');
+    const wr30Idx = findColumnIndex(headers, 'weight_rate_30');
+    const wr50Idx = findColumnIndex(headers, 'weight_rate_50');
+    const wr70Idx = findColumnIndex(headers, 'weight_rate_70');
+    const wr100Idx = findColumnIndex(headers, 'weight_rate_100');
+    const wr150Idx = findColumnIndex(headers, 'weight_rate_150');
+    const wr200Idx = findColumnIndex(headers, 'weight_rate_200');
+    const wrAbove200Idx = findColumnIndex(headers, 'weight_rate_above_200');
+
     const hasKmRange = kmRangeIdx !== -1;
     const hasKmSeparate = kmFromIdx !== -1 && kmToIdx !== -1;
 
@@ -458,6 +510,16 @@ export async function parseXLSXPriceTable(file: File): Promise<ParseResult<Parse
         gris_percent: grisIdx !== -1 ? normalizeBrazilianNumber(values[grisIdx]) : null,
         tso_percent: tsoIdx !== -1 ? normalizeBrazilianNumber(values[tsoIdx]) : null,
         toll_percent: tollIdx !== -1 ? normalizeBrazilianNumber(values[tollIdx]) : null,
+        // LTL weight rates
+        weight_rate_10: wr10Idx !== -1 ? normalizeBrazilianNumber(values[wr10Idx]) : null,
+        weight_rate_20: wr20Idx !== -1 ? normalizeBrazilianNumber(values[wr20Idx]) : null,
+        weight_rate_30: wr30Idx !== -1 ? normalizeBrazilianNumber(values[wr30Idx]) : null,
+        weight_rate_50: wr50Idx !== -1 ? normalizeBrazilianNumber(values[wr50Idx]) : null,
+        weight_rate_70: wr70Idx !== -1 ? normalizeBrazilianNumber(values[wr70Idx]) : null,
+        weight_rate_100: wr100Idx !== -1 ? normalizeBrazilianNumber(values[wr100Idx]) : null,
+        weight_rate_150: wr150Idx !== -1 ? normalizeBrazilianNumber(values[wr150Idx]) : null,
+        weight_rate_200: wr200Idx !== -1 ? normalizeBrazilianNumber(values[wr200Idx]) : null,
+        weight_rate_above_200: wrAbove200Idx !== -1 ? normalizeBrazilianNumber(values[wrAbove200Idx]) : null,
       };
 
       const validation = validatePriceRow(row, rows.length);
