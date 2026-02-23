@@ -655,7 +655,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       }
 
       form.setValue('km_distance', km, { shouldDirty: true, shouldValidate: true });
-      toast.success(`Distância calculada: ${km.toLocaleString('pt-BR')} km`);
+
+      const toll = Number(data.data?.toll) || 0;
+      if (toll > 0) {
+        form.setValue('toll', toll, { shouldDirty: true, shouldValidate: true });
+        toast.success(`Distância: ${km.toLocaleString('pt-BR')} km | Pedágio: R$ ${toll.toFixed(2)}`);
+      } else {
+        toast.success(`Distância calculada: ${km.toLocaleString('pt-BR')} km`);
+      }
     } catch (e) {
       const msg = (e as Error)?.message || '';
       const isFetchError = /failed to send|fetch error|network/i.test(msg);
