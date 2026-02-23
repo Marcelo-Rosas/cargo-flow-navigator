@@ -11,11 +11,21 @@ export type Vehicle = VehicleRow;
 
 export interface VehicleWithRelations extends VehicleRow {
   owner?: { id: string; name: string; phone: string | null } | null;
-  driver?: { id: string; name: string; phone: string | null } | null;
+  driver?: {
+    id: string;
+    name: string;
+    phone: string | null;
+    cnh?: string | null;
+    antt?: string | null;
+  } | null;
+  vehicle_type?: { id: string; code: string; name: string } | null;
 }
 
 const selectWithRelations =
-  'id, plate, brand, model, year, color, renavam, driver_id, owner_id, active, created_at, updated_at, owner:owners(id,name,phone), driver:drivers(id,name,phone)';
+  'id, plate, brand, model, year, color, renavam, vehicle_type_id, driver_id, owner_id, active, created_at, updated_at, ' +
+  'owner:owners(id,name,phone), ' +
+  'driver:drivers(id,name,phone,cnh,antt), ' +
+  'vehicle_type:vehicle_types(id,code,name)';
 
 // selectBase usa apenas colunas originais — seguro mesmo antes do SQL de migration ser rodado no Supabase
 const selectBase = 'id, plate, brand, model, driver_id, active';

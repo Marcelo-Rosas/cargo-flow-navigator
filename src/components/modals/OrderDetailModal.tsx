@@ -138,8 +138,13 @@ export function OrderDetailModal({
         id: order.id,
         updates: {
           vehicle_plate: vehicleByPlate.plate,
+          vehicle_brand: vehicleByPlate.brand ?? null,
+          vehicle_model: vehicleByPlate.model ?? null,
+          vehicle_type_name: vehicleByPlate.vehicle_type?.name ?? null,
           driver_name: vehicleByPlate.driver?.name ?? null,
           driver_phone: vehicleByPlate.driver?.phone ?? null,
+          driver_cnh: vehicleByPlate.driver?.cnh ?? null,
+          driver_antt: vehicleByPlate.driver?.antt ?? null,
           owner_name: vehicleByPlate.owner?.name ?? null,
           owner_phone: vehicleByPlate.owner?.phone ?? null,
         },
@@ -386,15 +391,44 @@ export function OrderDetailModal({
                     )}
                     {vehicleByPlate && (
                       <div className="rounded-md border border-border bg-background p-3 text-sm space-y-2">
-                        <p className="font-medium text-foreground">
-                          Veículo: <span className="font-mono">{vehicleByPlate.plate}</span>
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">
+                            Placa: <span className="font-mono">{vehicleByPlate.plate}</span>
+                            {vehicleByPlate.brand && vehicleByPlate.model && (
+                              <span className="text-muted-foreground">
+                                {' '}
+                                · {vehicleByPlate.brand} {vehicleByPlate.model}
+                              </span>
+                            )}
+                          </p>
+                          {vehicleByPlate.vehicle_type?.name && (
+                            <p className="text-muted-foreground">
+                              Tipo: {vehicleByPlate.vehicle_type.name}
+                            </p>
+                          )}
                           {vehicleByPlate.driver?.name && (
-                            <> · Motorista: {vehicleByPlate.driver.name}</>
+                            <p className="text-foreground">
+                              Motorista: {vehicleByPlate.driver.name}
+                              {vehicleByPlate.driver.cnh && (
+                                <span className="text-muted-foreground">
+                                  {' '}
+                                  · CNH: {vehicleByPlate.driver.cnh}
+                                </span>
+                              )}
+                              {vehicleByPlate.driver.antt && (
+                                <span className="text-muted-foreground">
+                                  {' '}
+                                  · ANTT: {vehicleByPlate.driver.antt}
+                                </span>
+                              )}
+                            </p>
                           )}
                           {vehicleByPlate.owner?.name && (
-                            <> · Proprietário: {vehicleByPlate.owner.name}</>
+                            <p className="text-foreground">
+                              Proprietário: {vehicleByPlate.owner.name}
+                            </p>
                           )}
-                        </p>
+                        </div>
                         <Button
                           type="button"
                           size="sm"
@@ -425,15 +459,27 @@ export function OrderDetailModal({
                               Motorista
                             </p>
                             <p className="font-semibold text-foreground">{order.driver_name}</p>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-1">
                               {order.driver_phone && (
                                 <span className="flex items-center gap-1">
                                   <Phone className="w-3.5 h-3.5" />
                                   {order.driver_phone}
                                 </span>
                               )}
+                              {order.driver_cnh && <span>CNH: {order.driver_cnh}</span>}
+                              {order.driver_antt && <span>ANTT: {order.driver_antt}</span>}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-1">
                               {order.vehicle_plate && (
                                 <span className="font-mono">{order.vehicle_plate}</span>
+                              )}
+                              {order.vehicle_brand && order.vehicle_model && (
+                                <span>
+                                  {order.vehicle_brand} {order.vehicle_model}
+                                </span>
+                              )}
+                              {order.vehicle_type_name && (
+                                <span>Tipo: {order.vehicle_type_name}</span>
                               )}
                             </div>
                           </div>

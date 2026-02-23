@@ -8,6 +8,7 @@ export interface Driver {
   phone: string | null;
   cnh: string | null;
   cnh_category: string | null;
+  antt: string | null;
   active: boolean;
 }
 
@@ -21,7 +22,7 @@ export function useDrivers(activeOnly = true, options: UseDriversOptions = {}) {
     queryFn: async () => {
       let query = supabase
         .from('drivers')
-        .select('id, name, phone, cnh, cnh_category, active')
+        .select('id, name, phone, cnh, cnh_category, antt, active')
         .order('name', { ascending: true });
       if (activeOnly) {
         query = query.eq('active', asDb(true));
@@ -46,6 +47,7 @@ export function useDrivers(activeOnly = true, options: UseDriversOptions = {}) {
             ...d,
             cnh: null,
             cnh_category: null,
+            antt: null,
             active: true, // assume ativo enquanto banco não tem a coluna
           }));
         }
@@ -65,6 +67,7 @@ export function useCreateDriver() {
       phone?: string | null;
       cnh?: string | null;
       cnh_category?: string | null;
+      antt?: string | null;
       active?: boolean;
     }) => {
       const { data, error } = await supabase
@@ -92,6 +95,7 @@ export function useUpdateDriver() {
         phone?: string | null;
         cnh?: string | null;
         cnh_category?: string | null;
+        antt?: string | null;
         active?: boolean;
       };
     }) => {
@@ -127,7 +131,7 @@ export function useDriver(id: string | null | undefined) {
 
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, name, phone, cnh, cnh_category, active')
+        .select('id, name, phone, cnh, cnh_category, antt, active')
         .eq('id', asDb(id))
         .maybeSingle();
 

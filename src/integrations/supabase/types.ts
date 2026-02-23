@@ -167,6 +167,7 @@ export type Database = {
           phone: string | null;
           cnh: string | null;
           cnh_category: string | null;
+          antt: string | null;
           active: boolean;
           created_at: string;
           updated_at: string;
@@ -177,6 +178,7 @@ export type Database = {
           phone?: string | null;
           cnh?: string | null;
           cnh_category?: string | null;
+          antt?: string | null;
           active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -187,6 +189,7 @@ export type Database = {
           phone?: string | null;
           cnh?: string | null;
           cnh_category?: string | null;
+          antt?: string | null;
           active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -504,6 +507,8 @@ export type Database = {
           created_at: string;
           created_by: string;
           destination: string;
+          driver_antt: string | null;
+          driver_cnh: string | null;
           driver_name: string | null;
           driver_phone: string | null;
           eta: string | null;
@@ -528,7 +533,10 @@ export type Database = {
           stage: Database['public']['Enums']['order_stage'];
           updated_at: string;
           value: number;
+          vehicle_brand: string | null;
+          vehicle_model: string | null;
           vehicle_plate: string | null;
+          vehicle_type_name: string | null;
           waiting_time_cost: number | null;
           waiting_time_hours: number | null;
         };
@@ -541,6 +549,8 @@ export type Database = {
           created_at?: string;
           created_by: string;
           destination: string;
+          driver_antt?: string | null;
+          driver_cnh?: string | null;
           driver_name?: string | null;
           driver_phone?: string | null;
           eta?: string | null;
@@ -565,7 +575,10 @@ export type Database = {
           stage?: Database['public']['Enums']['order_stage'];
           updated_at?: string;
           value?: number;
+          vehicle_brand?: string | null;
+          vehicle_model?: string | null;
           vehicle_plate?: string | null;
+          vehicle_type_name?: string | null;
           waiting_time_cost?: number | null;
           waiting_time_hours?: number | null;
         };
@@ -578,6 +591,8 @@ export type Database = {
           created_at?: string;
           created_by?: string;
           destination?: string;
+          driver_antt?: string | null;
+          driver_cnh?: string | null;
           driver_name?: string | null;
           driver_phone?: string | null;
           eta?: string | null;
@@ -602,7 +617,10 @@ export type Database = {
           stage?: Database['public']['Enums']['order_stage'];
           updated_at?: string;
           value?: number;
+          vehicle_brand?: string | null;
+          vehicle_model?: string | null;
           vehicle_plate?: string | null;
+          vehicle_type_name?: string | null;
           waiting_time_cost?: number | null;
           waiting_time_hours?: number | null;
         };
@@ -1311,6 +1329,7 @@ export type Database = {
           year: number | null;
           color: string | null;
           renavam: string | null;
+          vehicle_type_id: string | null;
           driver_id: string | null;
           owner_id: string | null;
           active: boolean;
@@ -1325,6 +1344,7 @@ export type Database = {
           year?: number | null;
           color?: string | null;
           renavam?: string | null;
+          vehicle_type_id?: string | null;
           driver_id?: string | null;
           owner_id?: string | null;
           active?: boolean;
@@ -1339,6 +1359,7 @@ export type Database = {
           year?: number | null;
           color?: string | null;
           renavam?: string | null;
+          vehicle_type_id?: string | null;
           driver_id?: string | null;
           owner_id?: string | null;
           active?: boolean;

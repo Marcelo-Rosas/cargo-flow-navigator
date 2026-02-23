@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, User, Truck } from 'lucide-react';
+import { Loader2, User, Truck, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,9 @@ import {
 } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateDriver, useUpdateDriver } from '@/hooks/useDrivers';
+import { useCreateOwner } from '@/hooks/useOwners';
 import { useVehicles } from '@/hooks/useVehicles';
+import { useUpdateVehicle } from '@/hooks/useVehicles';
 import { toast } from 'sonner';
 import type { Driver } from '@/hooks/useDrivers';
 import { zodPhone } from '@/lib/validators';
@@ -33,6 +35,8 @@ const driverSchema = z.object({
       'CNH inválida – informe 11 dígitos'
     ),
   cnh_category: z.enum(['A', 'AB', 'B', 'C', 'D', 'E', '']).optional(),
+  antt: z.string().optional(),
+  is_owner: z.boolean(),
   active: z.boolean(),
 });
 
@@ -47,11 +51,22 @@ interface DriverFormProps {
 export function DriverForm({ open, onClose, driver }: DriverFormProps) {
   const createDriverMutation = useCreateDriver();
   const updateDriverMutation = useUpdateDriver();
+  const createOwnerMutation = useCreateOwner();
+  const updateVehicleMutation = useUpdateVehicle();
   const isEditing = !!driver;
 
   // Busca veículo(s) vinculado ao motorista (apenas em modo edição)
   const { data: allVehicles } = useVehicles(driver?.id ?? null);
   const linkedVehicles = allVehicles?.filter((v) => v.driver_id === driver?.id) ?? [];
+
+  // Verifica se o motorista já é proprietário de algum veículo vinculado
+  const [initialIsOwner, setInitialIsOwner] = useState(false);
+  useEffect(() => {
+    if (isEditing && linkedVehicles.length > 0) {
+      const hasOwnership = linkedVehicles.some((v) => v.owner?.name === driver?.name);
+      setInitialIsOwner(hasOwnership);
+    }
+  }, [isEditing, linkedVehicles, driver?.name]);
 
   const form = useForm<DriverFormData>({
     resolver: zodResolver(driverSchema),
@@ -60,6 +75,8 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
       phone: '',
       cnh: '',
       cnh_category: '',
+      antt: '',
+      is_owner: false,
       active: true,
     },
   });
@@ -71,12 +88,22 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
         phone: driver.phone || '',
         cnh: driver.cnh || '',
         cnh_category: (driver.cnh_category as DriverFormData['cnh_category']) || '',
+        antt: driver.antt || '',
+        is_owner: initialIsOwner,
         active: driver.active,
       });
     } else {
-      form.reset({ name: '', phone: '', cnh: '', cnh_category: '', active: true });
+      form.reset({
+        name: '',
+        phone: '',
+        cnh: '',
+        cnh_category: '',
+        antt: '',
+        is_owner: false,
+        active: true,
+      });
     }
-  }, [driver, form]);
+  }, [driver, form, initialIsOwner]);
 
   const onSubmit = async (data: DriverFormData) => {
     try {
@@ -88,9 +115,32 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
             phone: data.phone || null,
             cnh: data.cnh || null,
             cnh_category: data.cnh_category || null,
+            antt: data.antt || null,
             active: data.active,
           },
         });
+
+        // Se marcou "é proprietário" e tem veículos vinculados, criar/vincular owner
+        if (data.is_owner && linkedVehicles.length > 0) {
+          try {
+            const ownerData = await createOwnerMutation.mutateAsync({
+              name: data.name,
+              phone: data.phone || null,
+            });
+            // Vincular o owner aos veículos do motorista
+            for (const v of linkedVehicles) {
+              if (!v.owner_id) {
+                await updateVehicleMutation.mutateAsync({
+                  id: v.id,
+                  updates: { owner_id: ownerData.id },
+                });
+              }
+            }
+          } catch {
+            // Owner pode já existir com mesmo nome — não é erro crítico
+          }
+        }
+
         toast.success('Motorista atualizado com sucesso');
       } else {
         await createDriverMutation.mutateAsync({
@@ -98,6 +148,7 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
           phone: data.phone || null,
           cnh: data.cnh || null,
           cnh_category: data.cnh_category || null,
+          antt: data.antt || null,
           active: data.active,
         });
         toast.success('Motorista criado com sucesso');
@@ -114,7 +165,7 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[460px]">
+      <DialogContent className="sm:max-w-[460px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="w-5 h-5 text-primary" />
@@ -159,10 +210,10 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
               />
             </div>
 
-            {/* ── Habilitação ── */}
+            {/* ── Habilitação + ANTT ── */}
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Habilitação (CNH)
+                Habilitação (CNH) e ANTT
               </p>
 
               <div className="grid grid-cols-2 gap-3">
@@ -209,7 +260,51 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="antt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Registro ANTT (RNTRC)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Número do RNTRC" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
+
+            {/* ── Proprietário ── */}
+            {isEditing && linkedVehicles.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5" />
+                  Proprietário
+                </p>
+                <FormField
+                  control={form.control}
+                  name="is_owner"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-2 space-y-0 rounded-md border border-input p-3 bg-muted/30">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <div className="leading-none">
+                        <FormLabel className="font-normal cursor-pointer">
+                          Motorista é proprietário do veículo
+                        </FormLabel>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Ao salvar, cria um registro de proprietário com os dados do motorista e
+                          vincula aos veículos
+                        </p>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
 
             {/* ── Veículos vinculados (só em edição) ── */}
             {isEditing && linkedVehicles.length > 0 && (

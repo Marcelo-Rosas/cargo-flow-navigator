@@ -27,6 +27,7 @@ import { Separator } from '@/components/ui/separator';
 import { useCreateVehicle, useUpdateVehicle } from '@/hooks/useVehicles';
 import { useDrivers } from '@/hooks/useDrivers';
 import { useOwners } from '@/hooks/useOwners';
+import { useVehicleTypes } from '@/hooks/useVehicleTypes';
 import { toast } from 'sonner';
 import type { VehicleWithRelations } from '@/hooks/useVehicles';
 import { zodPlate } from '@/lib/validators';
@@ -41,6 +42,7 @@ const vehicleSchema = z.object({
     .refine((v) => !v || /^\d{4}$/.test(v.trim()), 'Ano inválido – informe 4 dígitos (ex: 2020)'),
   color: z.string().optional(),
   renavam: z.string().optional(),
+  vehicle_type_id: z.string().optional(),
   driver_id: z.string().optional(),
   owner_id: z.string().optional(),
   active: z.boolean(),
@@ -59,6 +61,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
   const updateVehicleMutation = useUpdateVehicle();
   const { data: drivers, isLoading: driversLoading } = useDrivers(true, { enabled: open });
   const { data: owners, isLoading: ownersLoading } = useOwners(undefined, { enabled: open });
+  const { data: vehicleTypes, isLoading: vehicleTypesLoading } = useVehicleTypes();
   const isEditing = !!vehicle;
 
   const form = useForm<VehicleFormData>({
@@ -70,6 +73,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
       year: '',
       color: '',
       renavam: '',
+      vehicle_type_id: '',
       driver_id: '',
       owner_id: '',
       active: true,
@@ -85,6 +89,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
         year: vehicle.year ? String(vehicle.year) : '',
         color: vehicle.color || '',
         renavam: vehicle.renavam || '',
+        vehicle_type_id: vehicle.vehicle_type_id || '',
         driver_id: vehicle.driver_id || '',
         owner_id: vehicle.owner_id || '',
         active: vehicle.active,
@@ -97,6 +102,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
         year: '',
         color: '',
         renavam: '',
+        vehicle_type_id: '',
         driver_id: '',
         owner_id: '',
         active: true,
@@ -117,6 +123,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
             year: data.year ? parseInt(data.year, 10) : null,
             color: data.color || null,
             renavam: data.renavam || null,
+            vehicle_type_id: data.vehicle_type_id || null,
             driver_id: data.driver_id || null,
             owner_id: data.owner_id || null,
             active: data.active,
@@ -131,6 +138,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
           year: data.year ? parseInt(data.year, 10) : null,
           color: data.color || null,
           renavam: data.renavam || null,
+          vehicle_type_id: data.vehicle_type_id || null,
           driver_id: data.driver_id || null,
           owner_id: data.owner_id || null,
           active: data.active,
@@ -288,6 +296,51 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                       <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                     </FormControl>
                     <FormLabel className="font-normal cursor-pointer">Veículo ativo</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <Separator />
+
+            {/* ── Tipo de Veículo ── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Truck className="w-3.5 h-3.5" />
+                Tipo de Veículo
+              </p>
+              <FormField
+                control={form.control}
+                name="vehicle_type_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo</FormLabel>
+                    <Select
+                      onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+                      value={field.value || '__none__'}
+                      disabled={vehicleTypesLoading}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              vehicleTypesLoading ? 'Carregando...' : 'Selecionar tipo...'
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">Nenhum</span>
+                        </SelectItem>
+                        {vehicleTypes?.map((vt) => (
+                          <SelectItem key={vt.id} value={vt.id}>
+                            {vt.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
