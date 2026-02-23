@@ -367,7 +367,7 @@ export function PriceTableImportModal({
                     <TableHead>KM Até</TableHead>
                     {modality === 'fracionado' ? (
                       <>
-                        <TableHead className="text-xs">R$/Ton</TableHead>
+                        <TableHead className="text-xs">R$/t</TableHead>
                         <TableHead className="text-xs">≤10kg</TableHead>
                         <TableHead className="text-xs">11-20</TableHead>
                         <TableHead className="text-xs">21-30</TableHead>
@@ -379,6 +379,7 @@ export function PriceTableImportModal({
                         <TableHead className="text-xs">&gt;200 R$/kg</TableHead>
                         <TableHead className="text-xs">Custo Valor%</TableHead>
                         <TableHead className="text-xs">TSO %</TableHead>
+                        <TableHead className="text-xs">GRIS %</TableHead>
                       </>
                     ) : (
                       <>
@@ -412,6 +413,7 @@ export function PriceTableImportModal({
                           <TableCell className="text-xs">{row.weight_rate_above_200?.toFixed(4) ?? '-'}</TableCell>
                           <TableCell className="text-xs">{row.cost_value_percent?.toFixed(2) ?? '-'}</TableCell>
                           <TableCell className="text-xs">{row.tso_percent?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.gris_percent?.toFixed(2) ?? '-'}</TableCell>
                         </>
                       ) : (
                         <>
