@@ -1,7 +1,10 @@
 -- =============================================================================
 -- Sessão 9 — Migration: ANTT, vehicle_type_id, snapshot columns
--- Rodar no Supabase SQL Editor
+-- Rodar no Supabase SQL Editor (Dashboard → SQL Editor → New query)
 -- =============================================================================
+
+-- Garantir execução como owner das tabelas
+SET ROLE postgres;
 
 -- 1. Adicionar ANTT (RNTRC) na tabela drivers
 ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS antt text NULL;
@@ -25,3 +28,13 @@ COMMENT ON COLUMN public.orders.driver_antt IS 'Snapshot: ANTT/RNTRC do motorist
 COMMENT ON COLUMN public.orders.vehicle_brand IS 'Snapshot: Marca do veículo no momento da atribuição';
 COMMENT ON COLUMN public.orders.vehicle_model IS 'Snapshot: Modelo do veículo no momento da atribuição';
 COMMENT ON COLUMN public.orders.vehicle_type_name IS 'Snapshot: Tipo de veículo no momento da atribuição';
+
+-- 4. Garantir que o role authenticated tem acesso às colunas novas
+-- (As policies de RLS já existem nas tabelas — só precisamos garantir GRANT nos novos campos)
+GRANT SELECT, INSERT, UPDATE ON public.drivers TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.vehicles TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.orders TO authenticated;
+GRANT SELECT ON public.vehicle_types TO authenticated;
+
+-- Restaurar role padrão
+RESET ROLE;

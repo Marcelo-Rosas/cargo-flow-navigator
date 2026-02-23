@@ -26,3 +26,14 @@ dist-ssr
 
 # Supabase CLI temp
 supabase/.temp/
+
+# Sensitive / local-only
+APIs/
+*.env
+*.env.*
+*_keys.txt
+debug-*.mjs
+tmp/
+data/ngrok/
+CON
+~$*
