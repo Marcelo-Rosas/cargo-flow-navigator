@@ -5,13 +5,15 @@ import { toast } from 'sonner';
 interface SendQuoteEmailParams {
   quoteId: string;
   recipientEmail: string;
+  cc?: string;
+  bcc?: string;
 }
 
 export function useSendQuoteEmail() {
   return useMutation({
-    mutationFn: async ({ quoteId, recipientEmail }: SendQuoteEmailParams) => {
+    mutationFn: async ({ quoteId, recipientEmail, cc, bcc }: SendQuoteEmailParams) => {
       const { data, error } = await supabase.functions.invoke('send-quote-email', {
-        body: { quoteId, recipientEmail },
+        body: { quoteId, recipientEmail, cc, bcc },
       });
 
       if (error) throw error;

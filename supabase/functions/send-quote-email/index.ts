@@ -4,6 +4,8 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 interface RequestBody {
   quoteId: string;
   recipientEmail: string;
+  cc?: string;
+  bcc?: string;
 }
 
 interface PaymentTerm {
@@ -312,6 +314,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: 'Vectra Cargo <cotacao@vectracargo.com.br>',
         to: [body.recipientEmail],
+        ...(body.cc ? { cc: [body.cc] } : {}),
+        ...(body.bcc ? { bcc: [body.bcc] } : {}),
         subject: `Cotação ${quoteCode} — Vectra Cargo`,
         html,
       }),

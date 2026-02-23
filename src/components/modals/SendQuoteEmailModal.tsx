@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Loader2, MapPin } from 'lucide-react';
+import { Mail, Loader2, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,9 @@ interface SendQuoteEmailModalProps {
 
 export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModalProps) {
   const [recipientEmail, setRecipientEmail] = useState('');
+  const [cc, setCc] = useState('');
+  const [bcc, setBcc] = useState('');
+  const [showCcBcc, setShowCcBcc] = useState(false);
   const sendMutation = useSendQuoteEmail();
 
   useEffect(() => {
@@ -30,6 +33,9 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
       setRecipientEmail(
         (quote.client_email as string) || (quote.shipper_email as string) || ''
       );
+      setCc('');
+      setBcc('');
+      setShowCcBcc(false);
     }
   }, [quote, open]);
 
@@ -37,7 +43,12 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
     if (!quote || !recipientEmail) return;
 
     await sendMutation.mutateAsync(
-      { quoteId: quote.id, recipientEmail },
+      {
+        quoteId: quote.id,
+        recipientEmail,
+        cc: cc.trim() || undefined,
+        bcc: bcc.trim() || undefined,
+      },
       { onSuccess: () => onClose() }
     );
   };
@@ -81,7 +92,17 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
 
         {/* Recipient */}
         <div className="space-y-2">
-          <Label htmlFor="recipient-email">Destinatário</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="recipient-email">Destinatário</Label>
+            <button
+              type="button"
+              onClick={() => setShowCcBcc(!showCcBcc)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showCcBcc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              CC / CCO
+            </button>
+          </div>
           <Input
             id="recipient-email"
             type="email"
@@ -90,6 +111,32 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
             onChange={(e) => setRecipientEmail(e.target.value)}
           />
         </div>
+
+        {/* CC / BCC */}
+        {showCcBcc && (
+          <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="space-y-2">
+              <Label htmlFor="cc-email">CC (Cópia)</Label>
+              <Input
+                id="cc-email"
+                type="email"
+                placeholder="copia@exemplo.com"
+                value={cc}
+                onChange={(e) => setCc(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bcc-email">CCO (Cópia Oculta)</Label>
+              <Input
+                id="bcc-email"
+                type="email"
+                placeholder="oculta@exemplo.com"
+                value={bcc}
+                onChange={(e) => setBcc(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-2">
