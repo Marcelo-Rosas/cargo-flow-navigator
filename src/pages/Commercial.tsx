@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
 import { QuoteDetailModal } from '@/components/modals/QuoteDetailModal';
+import { SendQuoteEmailModal } from '@/components/modals/SendQuoteEmailModal';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -48,6 +49,7 @@ export default function Commercial() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
+  const [emailingQuote, setEmailingQuote] = useState<Quote | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const canManageCommercial = canWrite;
 
@@ -277,6 +279,7 @@ export default function Commercial() {
                     key={quote.id}
                     quote={quote}
                     onEdit={() => setSelectedQuote(quote)}
+                    onSendEmail={() => setEmailingQuote(quote)}
                     canManageActions={canManageCommercial}
                   />
                 ))}
@@ -301,6 +304,13 @@ export default function Commercial() {
         onClose={() => setSelectedQuote(null)}
         quote={selectedQuote}
         canManage={canManageCommercial}
+      />
+
+      {/* Send Quote Email Modal */}
+      <SendQuoteEmailModal
+        open={!!emailingQuote}
+        onClose={() => setEmailingQuote(null)}
+        quote={emailingQuote}
       />
 
       {/* Convert Quote Modal */}

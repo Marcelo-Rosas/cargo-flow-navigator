@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * Brand logo helper.
- * Expects an image at /brand/vectra-logo.png (put it in /public/brand/vectra-logo.png).
+ * Expects an image at /brand/logo_vectra.jpg (put it in /public/brand/logo_vectra.jpg).
  * Falls back to the Package icon if the image is missing.
  */
 export function BrandLogo({
@@ -53,7 +53,7 @@ export function BrandLogo({
       <div className={cn(sizeStyles.wrap, 'flex items-center justify-center', iconWrapClassName)}>
         {!imgError ? (
           <img
-            src="/brand/vectra-logo.png"
+            src="/brand/logo_vectra.jpg"
             alt="Vectra Hub Cargo"
             className={cn(sizeStyles.img, 'object-contain', imgClassName)}
             onError={() => setImgError(true)}
