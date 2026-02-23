@@ -16,6 +16,7 @@ import { ExportReports } from '@/components/dashboard/ExportReports';
 import { OverviewTab } from '@/components/dashboard/tabs/OverviewTab';
 import { CommercialTab } from '@/components/dashboard/tabs/CommercialTab';
 import { OperationsTab } from '@/components/dashboard/tabs/OperationsTab';
+import { NtcInsightsTab } from '@/components/dashboard/tabs/NtcInsightsTab';
 import {
   useDashboardStats,
   useRecentOrders,
@@ -98,6 +99,9 @@ export default function Dashboard() {
     queryClient.invalidateQueries({ queryKey: ['performance-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['quote-stage-distribution'] });
     queryClient.invalidateQueries({ queryKey: ['order-stage-distribution'] });
+    queryClient.invalidateQueries({ queryKey: ['ntc-inctl-series'] });
+    queryClient.invalidateQueries({ queryKey: ['ntc-inctf-series'] });
+    queryClient.invalidateQueries({ queryKey: ['ntc-fuel-reference'] });
   };
 
   const hasError = statsIsError || ordersIsError || conversionIsError || revenueIsError;
@@ -324,6 +328,7 @@ export default function Dashboard() {
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="commercial">Comercial</TabsTrigger>
           <TabsTrigger value="operations">Operacional</TabsTrigger>
+          <TabsTrigger value="ntc-insights">Inteligência NTC</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -352,6 +357,10 @@ export default function Dashboard() {
             onViewAllOrders={() => navigate('/operacional')}
             onViewOrder={(order) => navigate(`/operacional?orderId=${order.id}`)}
           />
+        </TabsContent>
+
+        <TabsContent value="ntc-insights" className="space-y-6">
+          <NtcInsightsTab />
         </TabsContent>
       </Tabs>
     </MainLayout>

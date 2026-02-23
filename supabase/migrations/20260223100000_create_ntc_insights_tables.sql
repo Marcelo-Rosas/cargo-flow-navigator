@@ -1,0 +1,378 @@
+-- =====================================================
+-- NTC INSIGHTS — Tabelas para índices de custo NTC e combustível
+-- Objetivo: armazenar séries INCTL / INCTF e referência de diesel
+-- para seção de Insights no Dashboard.
+-- =====================================================
+
+-- ── ntc_cost_indices ─────────────────────────────────────────────────────
+-- Armazena séries históricas dos índices NTC:
+--   INCTL (Lotação)   — R$/Ton por faixa de distância
+--   INCTL_INDEX        — Número Índice INCTL (base)
+--   INCTF              — Índice geral do Fracionado
+--   INCTF_DETAIL       — Índice detalhado por distância × coleta/entrega
+
+CREATE TABLE IF NOT EXISTS public.ntc_cost_indices (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  index_type text NOT NULL CHECK (index_type IN ('INCTL', 'INCTL_INDEX', 'INCTF', 'INCTF_DETAIL')),
+  period date NOT NULL,                          -- 1º dia do mês (e.g. 2026-01-01)
+  distance_km integer,                           -- faixa de distância (50, 400, 800, 2400, 6000)
+  pickup_km integer,                             -- coleta/entrega km (10, 40, 90) — só INCTF_DETAIL
+  index_value numeric NOT NULL,                  -- valor do índice ou R$/Ton
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Índice para consultas rápidas
+CREATE INDEX IF NOT EXISTS idx_ntc_cost_indices_lookup
+  ON public.ntc_cost_indices (index_type, distance_km, period DESC);
+
+-- Unicidade: cada combinação de tipo+período+distância+coleta é única
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ntc_cost_indices_unique
+  ON public.ntc_cost_indices (index_type, period, COALESCE(distance_km, 0), COALESCE(pickup_km, 0));
+
+ALTER TABLE public.ntc_cost_indices ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Authenticated users can view ntc_cost_indices" ON public.ntc_cost_indices;
+CREATE POLICY "Authenticated users can view ntc_cost_indices" ON public.ntc_cost_indices
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "Admin and Operacao can insert ntc_cost_indices" ON public.ntc_cost_indices;
+CREATE POLICY "Admin and Operacao can insert ntc_cost_indices" ON public.ntc_cost_indices
+  FOR INSERT WITH CHECK (has_any_role(auth.uid(), ARRAY['admin'::app_role, 'operacao'::app_role]));
+
+DROP POLICY IF EXISTS "Admin and Operacao can update ntc_cost_indices" ON public.ntc_cost_indices;
+CREATE POLICY "Admin and Operacao can update ntc_cost_indices" ON public.ntc_cost_indices
+  FOR UPDATE USING (has_any_role(auth.uid(), ARRAY['admin'::app_role, 'operacao'::app_role]))
+  WITH CHECK (has_any_role(auth.uid(), ARRAY['admin'::app_role, 'operacao'::app_role]));
+
+DROP POLICY IF EXISTS "Admin can delete ntc_cost_indices" ON public.ntc_cost_indices;
+CREATE POLICY "Admin can delete ntc_cost_indices" ON public.ntc_cost_indices
+  FOR DELETE USING (has_role(auth.uid(), 'admin'::app_role));
+
+DROP TRIGGER IF EXISTS update_ntc_cost_indices_updated_at ON public.ntc_cost_indices;
+CREATE TRIGGER update_ntc_cost_indices_updated_at
+  BEFORE UPDATE ON public.ntc_cost_indices
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+-- ── ntc_fuel_reference ───────────────────────────────────────────────────
+-- Referência mensal de preço do diesel (Simulador NTC / ANP)
+
+CREATE TABLE IF NOT EXISTS public.ntc_fuel_reference (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  reference_month date NOT NULL UNIQUE,          -- 1º dia do mês
+  diesel_price_liter numeric NOT NULL,           -- R$/L preço médio Brasil
+  diesel_price_sp numeric,                       -- R$/L São Paulo
+  diesel_price_rj numeric,                       -- R$/L Rio de Janeiro
+  diesel_price_mg numeric,                       -- R$/L Minas Gerais
+  diesel_price_pr numeric,                       -- R$/L Paraná
+  monthly_variation_pct numeric,                 -- variação mensal (%)
+  annual_variation_pct numeric,                  -- variação anual (%)
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.ntc_fuel_reference ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Authenticated users can view ntc_fuel_reference" ON public.ntc_fuel_reference;
+CREATE POLICY "Authenticated users can view ntc_fuel_reference" ON public.ntc_fuel_reference
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "Admin and Operacao can insert ntc_fuel_reference" ON public.ntc_fuel_reference;
+CREATE POLICY "Admin and Operacao can insert ntc_fuel_reference" ON public.ntc_fuel_reference
+  FOR INSERT WITH CHECK (has_any_role(auth.uid(), ARRAY['admin'::app_role, 'operacao'::app_role]));
+
+DROP POLICY IF EXISTS "Admin and Operacao can update ntc_fuel_reference" ON public.ntc_fuel_reference;
+CREATE POLICY "Admin and Operacao can update ntc_fuel_reference" ON public.ntc_fuel_reference
+  FOR UPDATE USING (has_any_role(auth.uid(), ARRAY['admin'::app_role, 'operacao'::app_role]))
+  WITH CHECK (has_any_role(auth.uid(), ARRAY['admin'::app_role, 'operacao'::app_role]));
+
+DROP POLICY IF EXISTS "Admin can delete ntc_fuel_reference" ON public.ntc_fuel_reference;
+CREATE POLICY "Admin can delete ntc_fuel_reference" ON public.ntc_fuel_reference
+  FOR DELETE USING (has_role(auth.uid(), 'admin'::app_role));
+
+DROP TRIGGER IF EXISTS update_ntc_fuel_reference_updated_at ON public.ntc_fuel_reference;
+CREATE TRIGGER update_ntc_fuel_reference_updated_at
+  BEFORE UPDATE ON public.ntc_fuel_reference
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+-- ── Populate ANTT Floor Rates (All Tables × All Cargo Types) ─────────
+-- Source: Calc_Piso_Minimo_TRC-4.xlsx (Resolução ANTT nº 6.076/2026)
+
+DELETE FROM public.antt_floor_rates;
+
+INSERT INTO public.antt_floor_rates (operation_table, cargo_type, axes_count, ccd, cc) VALUES
+  ('A', 'granel_solido', 2, 3.7123, 444.84),
+  ('A', 'granel_solido', 3, 4.7427, 533.36),
+  ('A', 'granel_solido', 4, 5.3672, 576.59),
+  ('A', 'granel_solido', 5, 6.1859, 642.1),
+  ('A', 'granel_solido', 6, 6.8058, 656.76),
+  ('A', 'granel_solido', 7, 7.4505, 792.3),
+  ('A', 'granel_solido', 9, 8.53, 877.83),
+  ('A', 'granel_liquido', 2, 3.7837, 455.84),
+  ('A', 'granel_liquido', 3, 4.835, 550.1),
+  ('A', 'granel_liquido', 4, 5.5162, 600.27),
+  ('A', 'granel_liquido', 5, 6.348, 669.38),
+  ('A', 'granel_liquido', 6, 6.973, 685.45),
+  ('A', 'granel_liquido', 7, 7.5842, 811.76),
+  ('A', 'granel_liquido', 9, 8.6837, 902.8),
+  ('A', 'frigorificada', 2, 4.3423, 502.29),
+  ('A', 'frigorificada', 3, 5.5387, 601.96),
+  ('A', 'frigorificada', 4, 6.3226, 663.16),
+  ('A', 'frigorificada', 5, 7.2435, 732.07),
+  ('A', 'frigorificada', 6, 7.9625, 745.94),
+  ('A', 'frigorificada', 7, 8.8534, 949.16),
+  ('A', 'frigorificada', 9, 10.0426, 1030.58),
+  ('A', 'conteinerizada', 3, 4.7164, 526.13),
+  ('A', 'conteinerizada', 4, 5.2975, 557.42),
+  ('A', 'conteinerizada', 5, 6.1243, 625.16),
+  ('A', 'conteinerizada', 6, 6.7426, 639.38),
+  ('A', 'conteinerizada', 7, 7.4482, 791.67),
+  ('A', 'conteinerizada', 9, 8.4497, 855.76),
+  ('A', 'carga_geral', 2, 3.6815, 436.39),
+  ('A', 'carga_geral', 3, 4.7062, 523.33),
+  ('A', 'carga_geral', 4, 5.3386, 568.72),
+  ('A', 'carga_geral', 5, 6.1604, 635.08),
+  ('A', 'carga_geral', 6, 6.7774, 648.95),
+  ('A', 'carga_geral', 7, 7.4902, 803.22),
+  ('A', 'carga_geral', 9, 8.5104, 872.44),
+  ('A', 'neogranel', 2, 3.3488, 436.39),
+  ('A', 'neogranel', 3, 4.7048, 522.93),
+  ('A', 'neogranel', 4, 5.3649, 575.96),
+  ('A', 'neogranel', 5, 6.1604, 635.08),
+  ('A', 'neogranel', 6, 6.7774, 648.95),
+  ('A', 'neogranel', 7, 7.4902, 803.22),
+  ('A', 'neogranel', 9, 8.5104, 872.44),
+  ('A', 'perigosa_granel_solido', 2, 4.456, 587.98),
+  ('A', 'perigosa_granel_solido', 3, 5.496, 679.12),
+  ('A', 'perigosa_granel_solido', 4, 6.156, 727.28),
+  ('A', 'perigosa_granel_solido', 5, 6.9747, 792.8),
+  ('A', 'perigosa_granel_solido', 6, 7.5946, 807.45),
+  ('A', 'perigosa_granel_solido', 7, 8.2569, 947.84),
+  ('A', 'perigosa_granel_solido', 9, 9.3441, 1035.49),
+  ('A', 'perigosa_granel_liquido', 2, 4.5395, 610.96),
+  ('A', 'perigosa_granel_liquido', 3, 5.6004, 707.85),
+  ('A', 'perigosa_granel_liquido', 4, 6.2857, 762.95),
+  ('A', 'perigosa_granel_liquido', 5, 7.1175, 832.06),
+  ('A', 'perigosa_granel_liquido', 6, 7.7425, 848.13),
+  ('A', 'perigosa_granel_liquido', 7, 8.3713, 979.29),
+  ('A', 'perigosa_granel_liquido', 9, 9.4785, 1072.44),
+  ('A', 'perigosa_frigorificada', 2, 4.9296, 609.31),
+  ('A', 'perigosa_frigorificada', 3, 6.1385, 712.41),
+  ('A', 'perigosa_frigorificada', 4, 6.9381, 780.02),
+  ('A', 'perigosa_frigorificada', 5, 7.859, 848.93),
+  ('A', 'perigosa_frigorificada', 6, 8.578, 862.8),
+  ('A', 'perigosa_frigorificada', 7, 9.4918, 1072.32),
+  ('A', 'perigosa_frigorificada', 9, 10.691, 1156.49),
+  ('A', 'perigosa_conteinerizada', 3, 5.0876, 623.38),
+  ('A', 'perigosa_conteinerizada', 4, 5.7042, 659.6),
+  ('A', 'perigosa_conteinerizada', 5, 6.5311, 727.35),
+  ('A', 'perigosa_conteinerizada', 6, 7.1493, 741.56),
+  ('A', 'perigosa_conteinerizada', 7, 7.8726, 898.7),
+  ('A', 'perigosa_conteinerizada', 9, 8.8818, 964.9),
+  ('A', 'perigosa_carga_geral', 2, 4.0432, 531.01),
+  ('A', 'perigosa_carga_geral', 3, 5.0774, 620.58),
+  ('A', 'perigosa_carga_geral', 4, 5.7453, 670.91),
+  ('A', 'perigosa_carga_geral', 5, 6.5671, 737.27),
+  ('A', 'perigosa_carga_geral', 6, 7.1841, 751.14),
+  ('A', 'perigosa_carga_geral', 7, 7.9146, 910.26),
+  ('A', 'perigosa_carga_geral', 9, 8.9424, 981.58),
+  ('A', 'pressurizada', 5, 6.5125, 731.9),
+  ('A', 'pressurizada', 6, 7.1739, 757.99),
+  ('A', 'pressurizada', 9, 9.0335, 1016.29),
+  ('B', 'granel_solido', 4, 4.7937, 515.17),
+  ('B', 'granel_solido', 5, 5.4473, 574.29),
+  ('B', 'granel_solido', 6, 6.0546, 588.17),
+  ('B', 'granel_solido', 7, 6.4716, 695.68),
+  ('B', 'granel_solido', 9, 7.1838, 746.78),
+  ('B', 'granel_liquido', 4, 4.8566, 515.17),
+  ('B', 'granel_liquido', 5, 5.5102, 574.29),
+  ('B', 'granel_liquido', 6, 6.1175, 588.17),
+  ('B', 'granel_liquido', 7, 6.5345, 695.68),
+  ('B', 'granel_liquido', 9, 7.2467, 746.78),
+  ('B', 'frigorificada', 4, 5.6121, 564.07),
+  ('B', 'frigorificada', 5, 6.3555, 623.2),
+  ('B', 'frigorificada', 6, 7.0649, 637.07),
+  ('B', 'frigorificada', 7, 7.4995, 749.43),
+  ('B', 'frigorificada', 9, 8.3441, 802.65),
+  ('B', 'conteinerizada', 4, 4.7937, 515.17),
+  ('B', 'conteinerizada', 5, 5.4473, 574.29),
+  ('B', 'conteinerizada', 6, 6.0546, 588.17),
+  ('B', 'conteinerizada', 7, 6.4716, 695.68),
+  ('B', 'conteinerizada', 9, 7.1838, 746.78),
+  ('B', 'carga_geral', 4, 4.7937, 515.17),
+  ('B', 'carga_geral', 5, 5.4473, 574.29),
+  ('B', 'carga_geral', 6, 6.0546, 588.17),
+  ('B', 'carga_geral', 7, 6.4716, 695.68),
+  ('B', 'carga_geral', 9, 7.1838, 746.78),
+  ('B', 'neogranel', 4, 4.7937, 515.17),
+  ('B', 'neogranel', 5, 5.4473, 574.29),
+  ('B', 'neogranel', 6, 6.0546, 588.17),
+  ('B', 'neogranel', 7, 6.4716, 695.68),
+  ('B', 'neogranel', 9, 7.1838, 746.78),
+  ('B', 'perigosa_granel_solido', 4, 5.5825, 665.87),
+  ('B', 'perigosa_granel_solido', 5, 6.236, 724.99),
+  ('B', 'perigosa_granel_solido', 6, 6.8434, 738.86),
+  ('B', 'perigosa_granel_solido', 7, 7.278, 851.22),
+  ('B', 'perigosa_granel_solido', 9, 7.9979, 904.44),
+  ('B', 'perigosa_granel_liquido', 4, 5.626, 677.85),
+  ('B', 'perigosa_granel_liquido', 5, 6.2796, 736.97),
+  ('B', 'perigosa_granel_liquido', 6, 6.887, 750.84),
+  ('B', 'perigosa_granel_liquido', 7, 7.3216, 863.2),
+  ('B', 'perigosa_granel_liquido', 9, 8.0415, 916.42),
+  ('B', 'perigosa_frigorificada', 4, 6.2276, 680.93),
+  ('B', 'perigosa_frigorificada', 5, 6.971, 740.05),
+  ('B', 'perigosa_frigorificada', 6, 7.6804, 753.93),
+  ('B', 'perigosa_frigorificada', 7, 8.138, 872.59),
+  ('B', 'perigosa_frigorificada', 9, 8.9925, 928.56),
+  ('B', 'perigosa_conteinerizada', 4, 5.2004, 617.35),
+  ('B', 'perigosa_conteinerizada', 5, 5.854, 676.48),
+  ('B', 'perigosa_conteinerizada', 6, 6.4613, 690.35),
+  ('B', 'perigosa_conteinerizada', 7, 6.896, 802.71),
+  ('B', 'perigosa_conteinerizada', 9, 7.6158, 855.93),
+  ('B', 'perigosa_carga_geral', 4, 5.2004, 617.35),
+  ('B', 'perigosa_carga_geral', 5, 5.854, 676.48),
+  ('B', 'perigosa_carga_geral', 6, 6.4613, 690.35),
+  ('B', 'perigosa_carga_geral', 7, 6.896, 802.71),
+  ('B', 'perigosa_carga_geral', 9, 7.6158, 855.93),
+  ('B', 'pressurizada', 5, 5.4473, 574.29),
+  ('B', 'pressurizada', 6, 6.0546, 588.17),
+  ('B', 'pressurizada', 9, 7.1838, 746.78),
+  ('C', 'granel_solido', 2, 3.1154, 168.42),
+  ('C', 'granel_solido', 3, 3.9624, 191.28),
+  ('C', 'granel_solido', 4, 4.5292, 207.68),
+  ('C', 'granel_solido', 5, 5.1952, 221.79),
+  ('C', 'granel_solido', 6, 5.7809, 224.95),
+  ('C', 'granel_solido', 7, 6.152, 261.12),
+  ('C', 'granel_solido', 9, 7.0505, 282.59),
+  ('C', 'granel_liquido', 2, 3.1612, 170.79),
+  ('C', 'granel_liquido', 3, 4.0158, 194.88),
+  ('C', 'granel_liquido', 4, 4.623, 212.78),
+  ('C', 'granel_liquido', 5, 5.2937, 227.67),
+  ('C', 'granel_liquido', 6, 5.8813, 231.13),
+  ('C', 'granel_liquido', 7, 6.2403, 265.31),
+  ('C', 'granel_liquido', 9, 7.146, 287.97),
+  ('C', 'frigorificada', 2, 3.7196, 198.62),
+  ('C', 'frigorificada', 3, 4.7135, 225.01),
+  ('C', 'frigorificada', 4, 5.4105, 247.41),
+  ('C', 'frigorificada', 5, 6.1709, 262.25),
+  ('C', 'frigorificada', 6, 6.8575, 265.24),
+  ('C', 'frigorificada', 7, 7.3296, 318.08),
+  ('C', 'frigorificada', 9, 8.3531, 339.58),
+  ('C', 'conteinerizada', 3, 3.953, 189.72),
+  ('C', 'conteinerizada', 4, 4.5041, 203.55),
+  ('C', 'conteinerizada', 5, 5.1731, 218.14),
+  ('C', 'conteinerizada', 6, 5.7582, 221.21),
+  ('C', 'conteinerizada', 7, 6.1511, 260.98),
+  ('C', 'conteinerizada', 9, 7.0217, 277.83),
+  ('C', 'carga_geral', 2, 3.1044, 166.6),
+  ('C', 'carga_geral', 3, 3.9493, 189.11),
+  ('C', 'carga_geral', 4, 4.5189, 205.98),
+  ('C', 'carga_geral', 5, 5.186, 220.28),
+  ('C', 'carga_geral', 6, 5.7707, 223.27),
+  ('C', 'carga_geral', 7, 6.1662, 263.47),
+  ('C', 'carga_geral', 9, 7.0435, 281.43),
+  ('C', 'neogranel', 2, 2.7717, 166.6),
+  ('C', 'neogranel', 3, 3.9488, 189.03),
+  ('C', 'neogranel', 4, 4.5283, 207.54),
+  ('C', 'neogranel', 5, 5.186, 220.28),
+  ('C', 'neogranel', 6, 5.7707, 223.27),
+  ('C', 'neogranel', 7, 6.1662, 263.47),
+  ('C', 'neogranel', 9, 7.0435, 281.43),
+  ('C', 'perigosa_granel_solido', 2, 3.6335, 217.08),
+  ('C', 'perigosa_granel_solido', 3, 4.4909, 241.63),
+  ('C', 'perigosa_granel_solido', 4, 5.0945, 261.22),
+  ('C', 'perigosa_granel_solido', 5, 5.7605, 275.34),
+  ('C', 'perigosa_granel_solido', 6, 6.3462, 278.5),
+  ('C', 'perigosa_granel_solido', 7, 6.7363, 317.8),
+  ('C', 'perigosa_granel_solido', 9, 7.6431, 340.64),
+  ('C', 'perigosa_granel_liquido', 2, 3.6635, 222.03),
+  ('C', 'perigosa_granel_liquido', 3, 4.5284, 247.82),
+  ('C', 'perigosa_granel_liquido', 4, 5.1411, 268.91),
+  ('C', 'perigosa_granel_liquido', 5, 5.8118, 283.8),
+  ('C', 'perigosa_granel_liquido', 6, 6.3993, 287.26),
+  ('C', 'perigosa_granel_liquido', 7, 6.7773, 324.57),
+  ('C', 'perigosa_granel_liquido', 9, 7.6914, 348.6),
+  ('C', 'perigosa_frigorificada', 2, 4.1978, 244.84),
+  ('C', 'perigosa_frigorificada', 3, 5.2051, 273.44),
+  ('C', 'perigosa_frigorificada', 4, 5.9198, 299.98),
+  ('C', 'perigosa_frigorificada', 5, 6.6801, 314.83),
+  ('C', 'perigosa_frigorificada', 6, 7.3668, 317.82),
+  ('C', 'perigosa_frigorificada', 7, 7.8636, 374.73),
+  ('C', 'perigosa_frigorificada', 9, 8.8978, 398.01),
+  ('C', 'perigosa_conteinerizada', 3, 4.2124, 229.62),
+  ('C', 'perigosa_conteinerizada', 4, 4.8005, 246.64),
+  ('C', 'perigosa_conteinerizada', 5, 5.4694, 261.24),
+  ('C', 'perigosa_conteinerizada', 6, 6.0545, 264.3),
+  ('C', 'perigosa_conteinerizada', 7, 6.4664, 307.21),
+  ('C', 'perigosa_conteinerizada', 9, 7.3453, 325.43),
+  ('C', 'perigosa_carga_geral', 2, 3.3535, 204.81),
+  ('C', 'perigosa_carga_geral', 3, 4.2088, 229.02),
+  ('C', 'perigosa_carga_geral', 4, 4.8152, 249.08),
+  ('C', 'perigosa_carga_geral', 5, 5.4824, 263.37),
+  ('C', 'perigosa_carga_geral', 6, 6.067, 266.36),
+  ('C', 'perigosa_carga_geral', 7, 6.4815, 309.7),
+  ('C', 'perigosa_carga_geral', 9, 7.3671, 329.02),
+  ('C', 'pressurizada', 5, 5.3125, 241.14),
+  ('C', 'pressurizada', 6, 5.9131, 246.76),
+  ('C', 'pressurizada', 9, 7.2313, 312.42),
+  ('D', 'granel_solido', 4, 4.0988, 194.44),
+  ('D', 'granel_solido', 5, 4.6146, 207.18),
+  ('D', 'granel_solido', 6, 5.1896, 210.17),
+  ('D', 'granel_solido', 7, 5.3982, 240.3),
+  ('D', 'granel_solido', 9, 6.0097, 254.35),
+  ('D', 'granel_liquido', 4, 4.1617, 194.44),
+  ('D', 'granel_liquido', 5, 4.6775, 207.18),
+  ('D', 'granel_liquido', 6, 5.2525, 210.17),
+  ('D', 'granel_liquido', 7, 5.4611, 240.3),
+  ('D', 'granel_liquido', 9, 6.0726, 254.35),
+  ('D', 'frigorificada', 4, 4.9309, 226.06),
+  ('D', 'frigorificada', 5, 5.5366, 238.8),
+  ('D', 'frigorificada', 6, 6.2136, 241.78),
+  ('D', 'frigorificada', 7, 6.4413, 275.04),
+  ('D', 'frigorificada', 9, 7.1858, 290.47),
+  ('D', 'conteinerizada', 4, 4.0988, 194.44),
+  ('D', 'conteinerizada', 5, 4.6146, 207.18),
+  ('D', 'conteinerizada', 6, 5.1896, 210.17),
+  ('D', 'conteinerizada', 7, 5.3982, 240.3),
+  ('D', 'conteinerizada', 9, 6.0097, 254.35),
+  ('D', 'carga_geral', 4, 4.0988, 194.44),
+  ('D', 'carga_geral', 5, 4.6146, 207.18),
+  ('D', 'carga_geral', 6, 5.1896, 210.17),
+  ('D', 'carga_geral', 7, 5.3982, 240.3),
+  ('D', 'carga_geral', 9, 6.0097, 254.35),
+  ('D', 'neogranel', 4, 4.0988, 194.44),
+  ('D', 'neogranel', 5, 4.6146, 207.18),
+  ('D', 'neogranel', 6, 5.1896, 210.17),
+  ('D', 'neogranel', 7, 5.3982, 240.3),
+  ('D', 'neogranel', 9, 6.0097, 254.35),
+  ('D', 'perigosa_granel_solido', 4, 4.6641, 247.99),
+  ('D', 'perigosa_granel_solido', 5, 5.1799, 260.73),
+  ('D', 'perigosa_granel_solido', 6, 5.7549, 263.72),
+  ('D', 'perigosa_granel_solido', 7, 5.9826, 296.98),
+  ('D', 'perigosa_granel_solido', 9, 6.6023, 312.4),
+  ('D', 'perigosa_granel_liquido', 4, 4.6797, 250.57),
+  ('D', 'perigosa_granel_liquido', 5, 5.1955, 263.31),
+  ('D', 'perigosa_granel_liquido', 6, 5.7706, 266.3),
+  ('D', 'perigosa_granel_liquido', 7, 5.9982, 299.56),
+  ('D', 'perigosa_granel_liquido', 9, 6.618, 314.98),
+  ('D', 'perigosa_frigorificada', 4, 5.4402, 278.63),
+  ('D', 'perigosa_frigorificada', 5, 6.0458, 291.37),
+  ('D', 'perigosa_frigorificada', 6, 6.7229, 294.36),
+  ('D', 'perigosa_frigorificada', 7, 6.9752, 331.7),
+  ('D', 'perigosa_frigorificada', 9, 7.7305, 348.9),
+  ('D', 'perigosa_conteinerizada', 4, 4.3951, 237.54),
+  ('D', 'perigosa_conteinerizada', 5, 4.9109, 250.28),
+  ('D', 'perigosa_conteinerizada', 6, 5.4859, 253.27),
+  ('D', 'perigosa_conteinerizada', 7, 5.7136, 286.53),
+  ('D', 'perigosa_conteinerizada', 9, 6.3333, 301.95),
+  ('D', 'perigosa_carga_geral', 4, 4.3951, 237.54),
+  ('D', 'perigosa_carga_geral', 5, 4.9109, 250.28),
+  ('D', 'perigosa_carga_geral', 6, 5.4859, 253.27),
+  ('D', 'perigosa_carga_geral', 7, 5.7136, 286.53),
+  ('D', 'perigosa_carga_geral', 9, 6.3333, 301.95),
+  ('D', 'pressurizada', 5, 4.6146, 207.18),
+  ('D', 'pressurizada', 6, 5.1896, 210.17),
+  ('D', 'pressurizada', 9, 6.0097, 254.35);
