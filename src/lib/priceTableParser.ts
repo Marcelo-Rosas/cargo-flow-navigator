@@ -151,7 +151,7 @@ const COLUMN_MAPPINGS: Record<string, string[]> = {
     'preço_kg',
     'frete_kg',
   ],
-  cost_value_percent: ['cost_value_percent', 'percent_valor', 'valor%', '%valor', 'valor_percent'],
+  cost_value_percent: ['cost_value_percent', 'custo_valor', 'percent_valor', 'valor%', '%valor', 'valor_percent'],
   gris_percent: ['gris_percent', 'gris', 'gris%', '%gris'],
   // TSO aceita ambos: tso_percent (novo) e ad_valorem_percent (legado)
   tso_percent: [
