@@ -76,6 +76,18 @@ export function useImportPriceTable() {
       });
 
       if (error) {
+        // Try to extract detailed error from Edge Function response
+        const ctx = (error as { context?: Response }).context;
+        if (ctx && typeof ctx.json === 'function') {
+          try {
+            const body = await ctx.json();
+            if (body?.errors?.length) {
+              throw new Error(body.errors.join('; '));
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
         throw new Error(error.message || 'Erro ao chamar função de importação');
       }
 
