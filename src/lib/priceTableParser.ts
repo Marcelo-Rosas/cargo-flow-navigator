@@ -127,6 +127,7 @@ const COLUMN_MAPPINGS: Record<string, string[]> = {
     'cost_per_ton',
     'custo_ton',
     'custo_tonelada',
+    'custo_peso',
     'r$/ton',
     'valor_ton',
     'ton',

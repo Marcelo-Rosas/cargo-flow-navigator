@@ -503,6 +503,11 @@ interface ActiveTableCardProps {
 
 function ActiveTableCard({ title, table, variant }: ActiveTableCardProps) {
   const { data: rows, isLoading } = usePriceTableRows(table?.id || '');
+  const isLtl = table?.modality === 'fracionado';
+
+  // Check if first row has weight_rate data (fracionado with data)
+  const firstRow = rows?.[0];
+  const hasWeightRates = firstRow && (firstRow as Record<string, unknown>).weight_rate_10 != null;
 
   return (
     <Card>
@@ -546,6 +551,20 @@ function ActiveTableCard({ title, table, variant }: ActiveTableCardProps) {
                 </p>
               </div>
             </div>
+            {isLtl && !isLoading && rows && rows.length > 0 && (
+              <div className="pt-2 border-t">
+                <p className="text-sm text-muted-foreground mb-1">Estrutura</p>
+                {hasWeightRates ? (
+                  <p className="text-sm font-medium text-success">
+                    9 faixas de peso (≤10kg a &gt;200kg) por faixa de KM
+                  </p>
+                ) : (
+                  <p className="text-sm font-medium text-warning">
+                    Sem dados de faixas de peso — reimporte o CSV fracionado
+                  </p>
+                )}
+              </div>
+            )}
             {table.valid_from && (
               <div className="pt-2 border-t">
                 <p className="text-sm text-muted-foreground">Vigência</p>

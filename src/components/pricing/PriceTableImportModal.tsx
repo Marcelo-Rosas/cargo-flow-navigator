@@ -181,7 +181,7 @@ export function PriceTableImportModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className={cn('max-h-[90vh] overflow-hidden flex flex-col', modality === 'fracionado' ? 'max-w-6xl' : 'max-w-4xl')}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5" />
@@ -289,10 +289,18 @@ export function PriceTableImportModal({
 
             <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
               <p className="font-medium mb-1">Colunas esperadas:</p>
-              <p>
-                km_from, km_to (ou faixa), cost_per_ton, cost_per_kg, gris_percent, tso_percent (ou
-                ad_valorem_percent), toll_percent
-              </p>
+              {modality === 'fracionado' ? (
+                <p>
+                  km_from, km_to, custo_peso, weight_rate_10, weight_rate_20, weight_rate_30,
+                  weight_rate_50, weight_rate_70, weight_rate_100, weight_rate_150, weight_rate_200,
+                  weight_rate_above_200, cost_value_percent, tso_percent
+                </p>
+              ) : (
+                <p>
+                  km_from, km_to (ou faixa), cost_per_ton, cost_per_kg, gris_percent, tso_percent
+                  (ou ad_valorem_percent), toll_percent
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -357,11 +365,30 @@ export function PriceTableImportModal({
                     <TableHead className="w-10">#</TableHead>
                     <TableHead>KM De</TableHead>
                     <TableHead>KM Até</TableHead>
-                    <TableHead>R$/Ton</TableHead>
-                    <TableHead>R$/Kg</TableHead>
-                    <TableHead>GRIS %</TableHead>
-                    <TableHead>TSO %</TableHead>
-                    <TableHead>Pedágio %</TableHead>
+                    {modality === 'fracionado' ? (
+                      <>
+                        <TableHead className="text-xs">R$/Ton</TableHead>
+                        <TableHead className="text-xs">≤10kg</TableHead>
+                        <TableHead className="text-xs">11-20</TableHead>
+                        <TableHead className="text-xs">21-30</TableHead>
+                        <TableHead className="text-xs">31-50</TableHead>
+                        <TableHead className="text-xs">51-70</TableHead>
+                        <TableHead className="text-xs">71-100</TableHead>
+                        <TableHead className="text-xs">101-150</TableHead>
+                        <TableHead className="text-xs">151-200</TableHead>
+                        <TableHead className="text-xs">&gt;200 R$/kg</TableHead>
+                        <TableHead className="text-xs">Custo Valor%</TableHead>
+                        <TableHead className="text-xs">TSO %</TableHead>
+                      </>
+                    ) : (
+                      <>
+                        <TableHead>R$/Ton</TableHead>
+                        <TableHead>R$/Kg</TableHead>
+                        <TableHead>GRIS %</TableHead>
+                        <TableHead>TSO %</TableHead>
+                        <TableHead>Pedágio %</TableHead>
+                      </>
+                    )}
                     <TableHead className="w-20">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -371,11 +398,30 @@ export function PriceTableImportModal({
                       <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                       <TableCell>{row.km_from}</TableCell>
                       <TableCell>{row.km_to}</TableCell>
-                      <TableCell>{row.cost_per_ton?.toFixed(2) ?? '-'}</TableCell>
-                      <TableCell>{row.cost_per_kg?.toFixed(4) ?? '-'}</TableCell>
-                      <TableCell>{row.gris_percent?.toFixed(2) ?? '-'}</TableCell>
-                      <TableCell>{row.tso_percent?.toFixed(2) ?? '-'}</TableCell>
-                      <TableCell>{row.toll_percent?.toFixed(2) ?? '-'}</TableCell>
+                      {modality === 'fracionado' ? (
+                        <>
+                          <TableCell className="text-xs">{row.cost_per_ton?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.weight_rate_10?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.weight_rate_20?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.weight_rate_30?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.weight_rate_50?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.weight_rate_70?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.weight_rate_100?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.weight_rate_150?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.weight_rate_200?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.weight_rate_above_200?.toFixed(4) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.cost_value_percent?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">{row.tso_percent?.toFixed(2) ?? '-'}</TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell>{row.cost_per_ton?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell>{row.cost_per_kg?.toFixed(4) ?? '-'}</TableCell>
+                          <TableCell>{row.gris_percent?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell>{row.tso_percent?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell>{row.toll_percent?.toFixed(2) ?? '-'}</TableCell>
+                        </>
+                      )}
                       <TableCell>
                         {row.isValid ? (
                           <CheckCircle2 className="h-4 w-4 text-success" />
