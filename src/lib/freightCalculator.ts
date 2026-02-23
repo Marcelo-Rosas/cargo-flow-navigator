@@ -209,6 +209,15 @@ export interface FreightCalculationOutput {
 // STORED BREAKDOWN (para salvar em JSONB)
 // ============================================
 
+export interface TollPlaza {
+  nome: string;
+  cidade: string;
+  uf: string;
+  valor: number;
+  valorTag: number;
+  ordemPassagem: number;
+}
+
 export interface StoredPricingBreakdown {
   calculatedAt: string;
   version: string;
@@ -227,6 +236,9 @@ export interface StoredPricingBreakdown {
     waitingTimeEnabled?: boolean;
     waitingTimeHours?: number;
     markupScope?: MarkupScope;
+
+    // Praças de pedágio retornadas pelo WebRouter
+    tollPlazas?: TollPlaza[];
 
     // ANTT piso mínimo (memória de cálculo) - opcional
     antt?: {

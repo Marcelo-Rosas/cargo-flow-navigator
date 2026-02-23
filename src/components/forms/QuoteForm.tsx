@@ -69,6 +69,7 @@ import {
   formatRouteUf,
   extractUf,
   StoredPricingBreakdown,
+  TollPlaza,
 } from '@/lib/freightCalculator';
 import { zodPhone } from '@/lib/validators';
 
@@ -183,6 +184,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const [isLoadingOriginCep, setIsLoadingOriginCep] = useState(false);
   const [isLoadingDestinationCep, setIsLoadingDestinationCep] = useState(false);
   const [isCalculatingKm, setIsCalculatingKm] = useState(false);
+
+  // Toll plazas from WebRouter
+  const [tollPlazas, setTollPlazas] = useState<TollPlaza[]>([]);
 
   // Weight unit toggle: kg or ton
   const [weightUnit, setWeightUnit] = useState<'kg' | 'ton'>('ton');
@@ -462,8 +466,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
           waitingTimeHours: bd.meta.waitingTimeHours ?? 0,
           waitingTimeCost: bd.components?.waitingTimeCost ?? 0,
         });
+        // Restore toll plazas from saved breakdown
+        setTollPlazas(bd.meta.tollPlazas ?? []);
       } else {
         setAdditionalFeesSelection(defaultAdditionalFeesSelection);
+        setTollPlazas([]);
       }
 
       const quoteWeightKg = Number(quote.weight) || 0;
@@ -502,6 +509,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       });
     } else {
       setAdditionalFeesSelection(defaultAdditionalFeesSelection);
+      setTollPlazas([]);
       form.reset({
         client_id: '',
         client_name: '',
@@ -634,7 +642,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     setIsCalculatingKm(true);
     try {
       const { data, error } = await supabase.functions.invoke('calculate-distance-webrouter', {
-        body: { origin_cep: originCep, destination_cep: destinationCep },
+        body: {
+          origin_cep: originCep,
+          destination_cep: destinationCep,
+          axes_count: selectedVehicle?.axes_count ?? undefined,
+        },
       });
 
       if (error || !data?.success) {
@@ -659,7 +671,19 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       const toll = Number(data.data?.toll) || 0;
       if (toll > 0) {
         form.setValue('toll', toll, { shouldDirty: true, shouldValidate: true });
-        toast.success(`Distância: ${km.toLocaleString('pt-BR')} km | Pedágio: R$ ${toll.toFixed(2)}`);
+      }
+
+      // Store toll plazas for persistence in breakdown
+      const plazas: TollPlaza[] = Array.isArray(data.data?.toll_plazas)
+        ? data.data.toll_plazas
+        : [];
+      setTollPlazas(plazas);
+
+      const plazaCount = plazas.length;
+      if (toll > 0) {
+        toast.success(
+          `Distância: ${km.toLocaleString('pt-BR')} km | Pedágio: R$ ${toll.toFixed(2)} (${plazaCount} praças)`
+        );
       } else {
         toast.success(`Distância calculada: ${km.toLocaleString('pt-BR')} km`);
       }
@@ -762,6 +786,17 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               total: anttCalcForSave.total,
               calculatedAt: new Date().toISOString(),
             },
+          },
+        };
+      }
+
+      // Persist toll plazas from WebRouter in breakdown
+      if (tollPlazas.length > 0) {
+        pricingBreakdown = {
+          ...pricingBreakdown,
+          meta: {
+            ...pricingBreakdown.meta,
+            tollPlazas,
           },
         };
       }

@@ -19,6 +19,7 @@ import {
   Plus,
   FileText,
   Loader2,
+  Landmark,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,7 +43,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { supabase } from '@/integrations/supabase/client';
 import { asDb, asInsert, filterSupabaseSingle } from '@/lib/supabase-utils';
-import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
+import { formatRouteUf, StoredPricingBreakdown, TollPlaza } from '@/lib/freightCalculator';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -300,6 +310,7 @@ export function QuoteDetailModal({
 
   // Parse pricing breakdown - using new StoredPricingBreakdown type
   const breakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+  const tollPlazas: TollPlaza[] = breakdown?.meta?.tollPlazas ?? [];
   const routeUfLabel =
     breakdown?.meta?.routeUfLabel || formatRouteUf(quote.origin, quote.destination);
   const kmBandLabel = breakdown?.meta?.kmBandLabel;
@@ -518,8 +529,17 @@ export function QuoteDetailModal({
             )}
 
           <Tabs defaultValue="resumo" className="mt-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="resumo">Resumo</TabsTrigger>
+              <TabsTrigger value="pedagios" className="gap-2">
+                <Landmark className="w-4 h-4" />
+                Pedágios
+                {tollPlazas.length > 0 && (
+                  <Badge variant="secondary" className="text-xs ml-1">
+                    {tollPlazas.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="documentos" className="gap-2">
                 <FileText className="w-4 h-4" />
                 Documento em Edição
@@ -1207,6 +1227,83 @@ export function QuoteDetailModal({
                 <span>Criado em: {formatDateTime(quote.created_at)}</span>
                 <span>Atualizado em: {formatDateTime(quote.updated_at)}</span>
               </div>
+            </TabsContent>
+
+            <TabsContent value="pedagios" className="space-y-4 mt-4 m-0">
+              {tollPlazas.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <Landmark className="h-4 w-4" />
+                      Praças de Pedágio da Rota
+                    </h4>
+                    <Badge variant="outline" className="text-xs">
+                      {tollPlazas.length} praça{tollPlazas.length !== 1 ? 's' : ''}
+                    </Badge>
+                  </div>
+                  <div className="rounded-md border overflow-auto max-h-[400px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-10 text-center">#</TableHead>
+                          <TableHead>Praça</TableHead>
+                          <TableHead>Cidade/UF</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
+                          <TableHead className="text-right">TAG</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tollPlazas.map((plaza, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="text-center text-muted-foreground text-xs">
+                              {plaza.ordemPassagem || idx + 1}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium">
+                              {plaza.nome}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {plaza.cidade}{plaza.uf ? ` - ${plaza.uf}` : ''}
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              {plaza.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </TableCell>
+                            <TableCell className="text-right text-sm text-muted-foreground">
+                              {plaza.valorTag.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <TableFooter>
+                        <TableRow className="font-semibold">
+                          <TableCell colSpan={3} className="text-right">
+                            Total ({tollPlazas.length} praça{tollPlazas.length !== 1 ? 's' : ''})
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {tollPlazas
+                              .reduce((sum, p) => sum + p.valor, 0)
+                              .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {tollPlazas
+                              .reduce((sum, p) => sum + p.valorTag, 0)
+                              .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Landmark className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    Nenhuma praça de pedágio registrada.
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    Edite a cotação e clique &quot;Calcular KM&quot; para carregar as praças da rota.
+                  </p>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="documentos" className="space-y-6 mt-4 m-0">

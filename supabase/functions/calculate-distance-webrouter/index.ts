@@ -3,7 +3,17 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 type Input = {
   origin_cep: string;
   destination_cep: string;
+  axes_count?: number;
 };
+
+interface TollPlaza {
+  nome: string;
+  cidade: string;
+  uf: string;
+  valor: number;
+  valorTag: number;
+  ordemPassagem: number;
+}
 
 function sanitizeCep(v: string) {
   return (v || '').toString().replace(/\D/g, '').slice(0, 8);
@@ -23,6 +33,30 @@ function getEnv(key: string): string | undefined {
     // ignore
   }
   return undefined;
+}
+
+/**
+ * Map axes_count (number of axles) to WebRouter categoriaVeiculo code.
+ * See WebRouter API docs — Tabela de Categorias:
+ *   "2" = Comercial 2 eixos, "4" = Comercial 3 eixos,
+ *   "6" = Comercial 4 eixos, "7" = Comercial 5 eixos,
+ *   "8" = Comercial 6 eixos, "10" = Comercial 7 eixos,
+ *   "11" = Comercial 8 eixos, "12" = Comercial 9 eixos.
+ * Default: "6" (4 eixos — caminhão trucado, perfil mais comum).
+ */
+function axesToCategoria(axes?: number): string {
+  if (!axes || axes < 2) return '6'; // default: trucado 4 eixos
+  const map: Record<number, string> = {
+    2: '2',
+    3: '4',
+    4: '6',
+    5: '7',
+    6: '8',
+    7: '10',
+    8: '11',
+    9: '12',
+  };
+  return map[axes] ?? '8'; // 6+ eixos fallback to comercial 6 eixos
 }
 
 const WEBROUTER_URL = 'https://way.webrouter.com.br/RouterService/router/api/calcular';
@@ -45,6 +79,34 @@ const ERROR_MAP: Record<string, { status: number; message: string }> = {
   LIMITE_CONSUMO_ATINGIDO: { status: 429, message: 'Limite de consumo atingido' },
   ERRO_CALCULO_ROTEIRO: { status: 422, message: 'Erro ao calcular rota' },
 };
+
+/**
+ * Extract toll plazas from WebRouter response.
+ * WebRouter returns: rotas[0].informacaoPedagios.result.pedagios[]
+ * Each plaza has: nome, cidade { uf, cidade }, valor, valorTag, ordemPassagem
+ */
+function extractTollPlazas(rota: Record<string, unknown>): TollPlaza[] {
+  try {
+    const info = rota?.informacaoPedagios as Record<string, unknown> | undefined;
+    const result = info?.result as Record<string, unknown> | undefined;
+    const pedagios = result?.pedagios;
+    if (!Array.isArray(pedagios)) return [];
+
+    return pedagios.map((p: Record<string, unknown>) => {
+      const cidade = p.cidade as Record<string, unknown> | undefined;
+      return {
+        nome: String(p.nome || ''),
+        cidade: String(cidade?.cidade || ''),
+        uf: String(cidade?.uf || ''),
+        valor: Number(p.valor) || 0,
+        valorTag: Number(p.valorTag) || 0,
+        ordemPassagem: Number(p.ordemPassagem) || 0,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -72,11 +134,17 @@ Deno.serve(async (req) => {
       );
     }
 
+    const axesCount = body.axes_count;
+    const categoria = axesToCategoria(axesCount);
+
     const webRouterBody = {
       autenticacao: { chaveAcesso: apiKey },
       rota: {
         enderecos: [buildAddress(originCep, 0), buildAddress(destinationCep, 1)],
         params: {
+          categoriaVeiculo: categoria,
+          perfilVeiculo: 'CAMINHAO',
+          tipoCombustivel: 'DIESEL',
           tipoVeiculo: 'CAMINHAO',
           tipoRota: 'RAPIDA',
           priorizarRodovias: true,
@@ -84,6 +152,10 @@ Deno.serve(async (req) => {
       },
       salvarRota: false,
     };
+
+    console.log(
+      `[webrouter] CEPs: ${originCep} → ${destinationCep}, eixos: ${axesCount ?? 'default'}, categoria: ${categoria}`
+    );
 
     const res = await fetch(WEBROUTER_URL, {
       method: 'POST',
@@ -138,6 +210,12 @@ Deno.serve(async (req) => {
     }
 
     const custos = rota?.custos ?? {};
+    const tollPlazas = rota ? extractTollPlazas(rota as Record<string, unknown>) : [];
+
+    console.log(
+      `[webrouter] Resultado: ${km} km, pedágio: ${custos.pedagio}, tag: ${custos.pedagioTag}, praças: ${tollPlazas.length}`
+    );
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -145,6 +223,7 @@ Deno.serve(async (req) => {
           km_distance: Math.round(km * 10) / 10,
           toll: custos.pedagio ?? undefined,
           toll_tag: custos.pedagioTag ?? undefined,
+          toll_plazas: tollPlazas,
           source: 'webrouter',
         },
       }),
