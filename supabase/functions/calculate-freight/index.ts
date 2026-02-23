@@ -240,7 +240,10 @@ Deno.serve(async (req) => {
 
           grisPercent = Number(priceRow.gris_percent) || 0;
           tsoPercent = Number(priceRow.tso_percent) || 0;
-          costValuePercent = Number(priceRow.cost_value_percent) || 0;
+          // NTC Lotação Dez/25: RCTR-C não compõe base de cálculo.
+          // GRIS e TSO já cobrem seguro sobre valor da mercadoria.
+          // cost_value_percent permanece na tabela para compatibilidade futura.
+          costValuePercent = 0;
 
           console.log(
             `[calculate-freight] NTC Lotação Dez/25 | Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, frete_peso: ${baseCost}`
