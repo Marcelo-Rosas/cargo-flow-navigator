@@ -2,6 +2,7 @@ import { MapPin, DollarSign } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import type { FinancialKanbanRow } from '@/types/financial';
+import { FinancialAiAnalysis } from '@/components/financial/FinancialAiAnalysis';
 
 interface FinancialDetailModalProps {
   open: boolean;
@@ -35,7 +36,7 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="font-mono">{doc.code ?? doc.id?.slice(0, 8)}</span>
@@ -74,6 +75,9 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
               <p className="font-medium">{formatDate(dueDate)}</p>
             </div>
           )}
+
+          {/* AI Analysis Section */}
+          <FinancialAiAnalysis entityId={doc.id} entityType="financial_document" />
         </div>
       </DialogContent>
     </Dialog>

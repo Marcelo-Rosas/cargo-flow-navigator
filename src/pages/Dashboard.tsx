@@ -40,6 +40,11 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency } from '@/lib/utils';
+import { ApprovalBanner } from '@/components/approvals/ApprovalBanner';
+import { AiInsightsWidget } from '@/components/dashboard/AiInsightsWidget';
+import { AutomationActivityFeed } from '@/components/dashboard/AutomationActivityFeed';
+import { AiUsageDashboard } from '@/components/dashboard/AiUsageDashboard';
+import { useUserRole } from '@/hooks/useUserRole';
 
 // Fallback data for empty states
 const emptyConversionData = [
@@ -53,6 +58,7 @@ const emptyRevenueData = [{ name: 'Sem dados', value: 0 }];
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isAdmin, isFinanceiro } = useUserRole();
   const queryClient = useQueryClient();
   const {
     data: stats,
@@ -102,6 +108,7 @@ export default function Dashboard() {
     queryClient.invalidateQueries({ queryKey: ['ntc-inctl-series'] });
     queryClient.invalidateQueries({ queryKey: ['ntc-inctf-series'] });
     queryClient.invalidateQueries({ queryKey: ['ntc-fuel-reference'] });
+    queryClient.invalidateQueries({ queryKey: ['ai-usage-stats'] });
   };
 
   const hasError = statsIsError || ordersIsError || conversionIsError || revenueIsError;
@@ -189,6 +196,9 @@ export default function Dashboard() {
           <ExportReports />
         </motion.div>
       </div>
+
+      {/* Approval Banner */}
+      <ApprovalBanner />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8 auto-rows-fr">
@@ -321,6 +331,13 @@ export default function Dashboard() {
           </Table>
         )}
       </motion.div>
+
+      {/* AI Insights + Activity Feed + Usage */}
+      <div className={`grid grid-cols-1 ${(isAdmin || isFinanceiro) ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6 mb-8`}>
+        <AiInsightsWidget />
+        <AutomationActivityFeed />
+        {(isAdmin || isFinanceiro) && <AiUsageDashboard />}
+      </div>
 
       {/* Tabs for different views */}
       <Tabs defaultValue="overview" className="space-y-6">
