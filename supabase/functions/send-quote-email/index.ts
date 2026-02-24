@@ -312,7 +312,7 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Vectra Cargo <cotacao@vectracargo.com.br>',
+        from: 'Vectra Cargo <cotacao@cotacao.vectracargo.com.br>',
         to: [body.recipientEmail],
         ...(body.cc ? { cc: [body.cc] } : {}),
         ...(body.bcc ? { bcc: [body.bcc] } : {}),
