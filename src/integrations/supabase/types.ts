@@ -1255,6 +1255,8 @@ export type Database = {
           destination: string
           destination_cep: string | null
           discharge_checklist_selected: Json | null
+          email_sent: boolean
+          email_sent_at: string | null
           freight_modality: string | null
           freight_type: string | null
           id: string
@@ -1300,6 +1302,8 @@ export type Database = {
           destination: string
           destination_cep?: string | null
           discharge_checklist_selected?: Json | null
+          email_sent?: boolean
+          email_sent_at?: string | null
           freight_modality?: string | null
           freight_type?: string | null
           id?: string
@@ -1345,6 +1349,8 @@ export type Database = {
           destination?: string
           destination_cep?: string | null
           discharge_checklist_selected?: Json | null
+          email_sent?: boolean
+          email_sent_at?: string | null
           freight_modality?: string | null
           freight_type?: string | null
           id?: string

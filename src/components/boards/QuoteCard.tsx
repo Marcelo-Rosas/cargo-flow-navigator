@@ -227,6 +227,13 @@ export function QuoteCard({
           </Badge>
         )}
 
+        {quote.email_sent && (
+          <Badge variant="secondary" className="text-xs uppercase bg-emerald-100 text-emerald-700 border-emerald-300">
+            <Mail className="w-3 h-3 mr-1" />
+            E-mail
+          </Badge>
+        )}
+
         {kmStatus === 'OUT_OF_RANGE' && (
           <Badge
             variant="secondary"

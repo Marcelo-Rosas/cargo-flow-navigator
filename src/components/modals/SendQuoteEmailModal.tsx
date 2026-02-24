@@ -67,7 +67,7 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
             Enviar Cotação por E-mail
           </DialogTitle>
           <DialogDescription>
-            A cotação será enviada com o resumo de valores e condições.
+            A cotação será enviada e movida automaticamente para Negociação.
           </DialogDescription>
         </DialogHeader>
 
