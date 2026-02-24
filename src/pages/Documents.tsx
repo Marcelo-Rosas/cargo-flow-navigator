@@ -197,7 +197,7 @@ export default function Documents() {
           />
           <p className="text-foreground font-medium">Arraste e solte arquivos aqui</p>
           <p className="text-sm text-muted-foreground mt-1">
-            ou clique para selecionar (PDF, XML, JPG, PNG até 10MB)
+            ou clique para selecionar (PDF, XML, imagens ou vídeos • até 500MB)
           </p>
         </motion.div>
       )}

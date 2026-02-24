@@ -227,8 +227,12 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
       'image/webp': ['.webp'],
       'application/xml': ['.xml'],
       'text/xml': ['.xml'],
+      'video/mp4': ['.mp4'],
+      'video/quicktime': ['.mov'],
+      'video/x-msvideo': ['.avi'],
+      'video/webm': ['.webm'],
     },
-    maxSize: 52428800, // 50MB
+    maxSize: 524288000, // 500MB
   });
 
   const removeFile = (file: File) => {
@@ -281,7 +285,7 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
           {isDragActive ? 'Solte os arquivos aqui' : 'Arraste arquivos ou clique para selecionar'}
         </p>
         <p className="text-sm text-muted-foreground">
-          PDF, imagens (JPG, PNG, WebP) ou XML • Máximo 50MB
+          PDF, imagens, XML ou vídeos (MP4, MOV, AVI, WebM) • Máximo 500MB
         </p>
       </div>
 
