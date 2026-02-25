@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { DollarSign, Save, Loader2, Send } from 'lucide-react';
+import { DollarSign, Save, Loader2, Send, TrendingDown, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { MaskedInput } from '@/components/ui/masked-input';
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { DocumentList } from '@/components/documents/DocumentList';
@@ -29,19 +30,12 @@ interface CarreteiroTabProps {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-const formatDate = (date: string) =>
-  new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(new Date(date));
-
 export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
   const updateOrderMutation = useUpdateOrder();
   const ensureFinancialDocMutation = useEnsureFinancialDocument();
   const { data: paymentTermsList } = usePaymentTerms(true);
 
-  // --- Seção 1: Valor Negociado ---
+  // ---------- Valor Negociado ----------
   const initialCents =
     order.carreteiro_real != null ? String(Math.round(Number(order.carreteiro_real) * 100)) : '';
   const [carreteiroRealCents, setCarreteiroRealCents] = useState(initialCents);
@@ -77,7 +71,7 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
     }
   };
 
-  // --- Seção 2: Condição de Pagamento do Carreteiro ---
+  // ---------- Condição de Pagamento ----------
   const [selectedPaymentTermId, setSelectedPaymentTermId] = useState(
     order.carrier_payment_term_id ?? ''
   );
@@ -104,13 +98,13 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
         id: order.id,
         updates: { carrier_payment_term_id: ptId || null },
       });
-      toast.success('Condição de pagamento do carreteiro salva');
+      toast.success('Condição de pagamento salva');
     } catch {
       toast.error('Erro ao salvar condição de pagamento');
     }
   };
 
-  // --- Seção 3: Datas de Adiantamento / Saldo ---
+  // ---------- Datas ----------
   const [advanceDate, setAdvanceDate] = useState(order.carrier_advance_date ?? '');
   const [balanceDate, setBalanceDate] = useState(order.carrier_balance_date ?? '');
 
@@ -134,7 +128,7 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
     }
   };
 
-  // --- Seção 4: Enviar para Financeiro PAG ---
+  // ---------- Enviar para PAG ----------
   const handleEnviarParaPAG = async () => {
     if (!order.id) return;
     if (carreteiroRealValue == null || carreteiroRealValue <= 0) {
@@ -143,14 +137,12 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
     }
 
     try {
-      // 1. Ensure PAG document exists
-      const result = await ensureFinancialDocMutation.mutateAsync({
+      await ensureFinancialDocMutation.mutateAsync({
         docType: 'PAG',
         sourceId: order.id,
         totalAmount: carreteiroRealValue,
       });
 
-      // 2. Try to get the financial_document to insert installments
       const { data: finDoc } = await supabase
         .from('financial_documents')
         .select('id')
@@ -159,7 +151,6 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
         .maybeSingle();
 
       if (finDoc?.id) {
-        // Check if installments already exist
         const { data: existingInstallments } = await supabase
           .from('financial_installments')
           .select('id')
@@ -167,7 +158,6 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
 
         if (!existingInstallments || existingInstallments.length === 0) {
           if (advancePercent > 0) {
-            // Insert 2 installments: advance + balance
             const installments = [
               {
                 financial_document_id: finDoc.id,
@@ -195,7 +185,6 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
               return;
             }
           } else {
-            // Insert 1 single installment
             const { error: insError } = await supabase.from('financial_installments').insert(
               asInsert({
                 financial_document_id: finDoc.id,
@@ -228,105 +217,126 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
   };
 
   return (
-    <div className="space-y-6 p-1">
-      {/* Seção 1: Valor Negociado */}
+    <div className="space-y-5 py-1">
+      {/* ── Piso ANTT (read-only, exatamente como na aba Detalhes) ── */}
       <div className="p-4 rounded-lg bg-muted/30 border border-border">
-        <div className="flex items-center gap-2 text-muted-foreground mb-3">
-          <DollarSign className="w-4 h-4" />
-          <span className="text-sm font-medium">Valor Negociado (Carreteiro)</span>
+        <div className="flex items-center gap-2 mb-3">
+          <DollarSign className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-semibold text-foreground">Piso ANTT (base)</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-3">
+        <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Valor Real (R$)</label>
-            <MaskedInput
-              mask="currency"
-              value={carreteiroRealCents}
-              onValueChange={(rawValue) => setCarreteiroRealCents(rawValue)}
-              placeholder="0,00"
-              disabled={!canManage}
-              className="h-9"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">ANTT (base)</label>
-            <p className="font-semibold text-foreground text-sm mt-1.5">
+            <p className="text-xs text-muted-foreground mb-0.5">Valor ANTT</p>
+            <p className="text-lg font-bold text-foreground">
               {anttValue != null ? formatCurrency(anttValue) : '—'}
             </p>
           </div>
-        </div>
-
-        {/* Comparativo */}
-        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
           <div>
-            <p className="text-xs text-muted-foreground">Diferença</p>
+            <p className="text-xs text-muted-foreground mb-0.5">Real (fechado)</p>
+            <p className="text-lg font-bold text-foreground">
+              {order.carreteiro_real != null ? formatCurrency(Number(order.carreteiro_real)) : '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-0.5">Diferença</p>
             {diff != null ? (
-              <p
-                className={cn(
-                  'font-semibold text-sm',
-                  diff > 0 ? 'text-warning-foreground' : 'text-success'
+              <div className="flex items-center gap-1">
+                {diff > 0 ? (
+                  <TrendingUp className="w-4 h-4 text-warning-foreground" />
+                ) : (
+                  <TrendingDown className="w-4 h-4 text-success" />
                 )}
-              >
-                {formatCurrency(diff)}
-              </p>
+                <p
+                  className={cn(
+                    'text-lg font-bold',
+                    diff > 0 ? 'text-warning-foreground' : 'text-success'
+                  )}
+                >
+                  {formatCurrency(Math.abs(diff))}
+                </p>
+              </div>
             ) : (
-              <p className="font-semibold text-foreground text-sm">—</p>
+              <p className="text-lg font-bold text-foreground">—</p>
             )}
           </div>
-          {kmDistance > 0 && (
-            <>
+        </div>
+
+        {kmDistance > 0 && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <p className="text-xs text-muted-foreground mb-2 font-semibold uppercase tracking-wide">
+              Custo R$/km
+            </p>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-muted-foreground">R$/km ANTT</p>
-                <p className="font-semibold text-foreground text-sm">
-                  {anttValue != null ? `R$ ${(anttValue / kmDistance).toFixed(2)}` : '—'}
+                <p className="text-xs text-muted-foreground">ANTT R$/km</p>
+                <p className="font-semibold text-foreground">
+                  {anttValue != null ? `R$ ${(anttValue / kmDistance).toFixed(2)}/km` : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">R$/km Real</p>
-                {carreteiroRealValue != null ? (
+                <p className="text-xs text-muted-foreground">Real R$/km</p>
+                {order.carreteiro_real != null ? (
                   <p
                     className={cn(
-                      'font-semibold text-sm',
-                      anttValue != null && carreteiroRealValue > anttValue
+                      'font-semibold',
+                      anttValue != null && Number(order.carreteiro_real) > anttValue
                         ? 'text-warning-foreground'
                         : 'text-success'
                     )}
                   >
-                    R$ {(carreteiroRealValue / kmDistance).toFixed(2)}
+                    R$ {(Number(order.carreteiro_real) / kmDistance).toFixed(2)}/km
                   </p>
                 ) : (
-                  <p className="font-semibold text-foreground text-sm">—</p>
+                  <p className="font-semibold text-foreground">—</p>
                 )}
               </div>
-            </>
-          )}
-        </div>
-
-        {canManage && (
-          <div className="mt-3 flex justify-end">
-            <Button
-              size="sm"
-              onClick={handleSaveCarreteiroReal}
-              disabled={updateOrderMutation.isPending}
-              className="gap-2"
-            >
-              {updateOrderMutation.isPending ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Save className="w-3.5 h-3.5" />
-              )}
-              Salvar Valor
-            </Button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Seção 2: Condição de Pagamento */}
-      <div className="p-4 rounded-lg bg-muted/30 border border-border">
-        <div className="flex items-center gap-2 text-muted-foreground mb-3">
-          <span className="text-sm font-medium">Condição de Pagamento (Carreteiro)</span>
+      {/* ── Valor Negociado (editável) ── */}
+      {canManage && (
+        <div className="p-4 rounded-lg border border-primary/20 bg-primary/5">
+          <p className="text-sm font-semibold text-foreground mb-3">Editar Valor Negociado</p>
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <label className="text-xs text-muted-foreground block mb-1">
+                Valor Carreteiro Real (R$)
+              </label>
+              <MaskedInput
+                mask="currency"
+                value={carreteiroRealCents}
+                onValueChange={(rawValue) => setCarreteiroRealCents(rawValue)}
+                placeholder="0,00"
+                className="h-10"
+              />
+            </div>
+            <Button
+              size="default"
+              onClick={handleSaveCarreteiroReal}
+              disabled={updateOrderMutation.isPending}
+              className="gap-2 h-10"
+            >
+              {updateOrderMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              Salvar
+            </Button>
+          </div>
         </div>
+      )}
 
+      <Separator />
+
+      {/* ── Condição de Pagamento do Carreteiro ── */}
+      <div>
+        <p className="text-sm font-semibold text-foreground mb-2">
+          Condição de Pagamento (Carreteiro)
+        </p>
         <Select
           value={selectedPaymentTermId}
           onValueChange={handleSavePaymentTerm}
@@ -345,93 +355,108 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
         </Select>
 
         {selectedPaymentTerm && (
-          <div className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-1.5 text-xs text-muted-foreground">
             {selectedPaymentTerm.advance_percent != null && selectedPaymentTerm.advance_percent > 0
               ? `${selectedPaymentTerm.advance_percent}% Adiantamento / ${100 - selectedPaymentTerm.advance_percent}% Saldo em ${selectedPaymentTerm.days ?? 0} dias`
               : `Pagamento à vista em ${selectedPaymentTerm.days ?? 0} dias`}
-          </div>
+          </p>
         )}
       </div>
 
-      {/* Seção 3: Mini-cards Adiantamento / Saldo (visível quando advance > 0) */}
+      {/* ── Mini-cards Adiantamento / Saldo ── */}
       {selectedPaymentTerm && advancePercent > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          {/* Card Adiantamento */}
-          <div className="p-3 rounded-lg border bg-primary/5 border-primary/20">
-            <p className="text-xs text-muted-foreground mb-0.5">Adiantamento {advancePercent}%</p>
-            <p className="font-semibold text-foreground">{formatCurrency(advanceAmount)}</p>
-            <div className="mt-2">
-              <label className="text-xs text-muted-foreground block mb-1">Data Adiantamento</label>
-              <Input
-                type="date"
-                value={advanceDate}
-                onChange={(e) => setAdvanceDate(e.target.value)}
-                onBlur={() => handleSaveDate('carrier_advance_date', advanceDate)}
-                disabled={!canManage}
-                className="h-8 text-xs"
-              />
-            </div>
+        <div className="grid grid-cols-2 gap-4">
+          {/* Adiantamento */}
+          <div className="p-4 rounded-lg border bg-primary/5 border-primary/20">
+            <p className="text-xs text-muted-foreground font-medium mb-1">
+              Adiantamento {advancePercent}%
+            </p>
+            <p className="text-xl font-bold text-foreground mb-3">
+              {formatCurrency(advanceAmount)}
+            </p>
+            <label className="text-xs text-muted-foreground block mb-1">Data</label>
+            <Input
+              type="date"
+              value={advanceDate}
+              onChange={(e) => setAdvanceDate(e.target.value)}
+              onBlur={() => handleSaveDate('carrier_advance_date', advanceDate)}
+              disabled={!canManage}
+              className="h-9"
+            />
           </div>
 
-          {/* Card Saldo */}
-          <div className="p-3 rounded-lg border bg-muted/30 border-border">
-            <p className="text-xs text-muted-foreground mb-0.5">Saldo {balancePercent}%</p>
-            <p className="font-semibold text-foreground">{formatCurrency(balanceAmount)}</p>
-            <div className="mt-2">
-              <label className="text-xs text-muted-foreground block mb-1">Data Saldo</label>
-              <Input
-                type="date"
-                value={balanceDate}
-                onChange={(e) => setBalanceDate(e.target.value)}
-                onBlur={() => handleSaveDate('carrier_balance_date', balanceDate)}
-                disabled={!canManage}
-                className="h-8 text-xs"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pagamento único (sem split) */}
-      {selectedPaymentTerm && advancePercent === 0 && (
-        <div className="p-3 rounded-lg border bg-muted/30 border-border">
-          <p className="text-xs text-muted-foreground mb-0.5">Pagamento Único (100%)</p>
-          <p className="font-semibold text-foreground">{formatCurrency(baseValue)}</p>
-          <div className="mt-2">
-            <label className="text-xs text-muted-foreground block mb-1">Data de Pagamento</label>
+          {/* Saldo */}
+          <div className="p-4 rounded-lg border bg-muted/30 border-border">
+            <p className="text-xs text-muted-foreground font-medium mb-1">
+              Saldo {balancePercent}%
+            </p>
+            <p className="text-xl font-bold text-foreground mb-3">
+              {formatCurrency(balanceAmount)}
+            </p>
+            <label className="text-xs text-muted-foreground block mb-1">Data</label>
             <Input
               type="date"
               value={balanceDate}
               onChange={(e) => setBalanceDate(e.target.value)}
               onBlur={() => handleSaveDate('carrier_balance_date', balanceDate)}
               disabled={!canManage}
-              className="h-8 text-xs"
+              className="h-9"
             />
           </div>
         </div>
       )}
 
-      {/* Seção 4: Enviar para Financeiro PAG */}
-      {canManage && (
-        <div className="flex justify-center">
-          <Button
-            onClick={handleEnviarParaPAG}
-            disabled={ensureFinancialDocMutation.isPending || carreteiroRealValue == null}
-            className="gap-2"
-          >
-            {ensureFinancialDocMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-            Enviar para Contas a Pagar
-          </Button>
+      {/* Pagamento único (sem split) */}
+      {selectedPaymentTerm && advancePercent === 0 && (
+        <div className="p-4 rounded-lg border bg-muted/30 border-border">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-xs text-muted-foreground font-medium mb-1">
+                Pagamento Único (100%)
+              </p>
+              <p className="text-xl font-bold text-foreground">{formatCurrency(baseValue)}</p>
+            </div>
+            <div className="w-48">
+              <label className="text-xs text-muted-foreground block mb-1">Data de Pagamento</label>
+              <Input
+                type="date"
+                value={balanceDate}
+                onChange={(e) => setBalanceDate(e.target.value)}
+                onBlur={() => handleSaveDate('carrier_balance_date', balanceDate)}
+                disabled={!canManage}
+                className="h-9"
+              />
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Seção 5: Upload de Comprovantes */}
-      <div className="p-4 rounded-lg bg-muted/30 border border-border">
-        <p className="text-sm font-medium text-muted-foreground mb-3">Comprovantes de Pagamento</p>
+      {/* ── Enviar para Contas a Pagar ── */}
+      {canManage && (
+        <>
+          <Separator />
+          <div className="flex justify-center">
+            <Button
+              size="lg"
+              onClick={handleEnviarParaPAG}
+              disabled={ensureFinancialDocMutation.isPending || carreteiroRealValue == null}
+              className="gap-2"
+            >
+              {ensureFinancialDocMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              Enviar para Contas a Pagar
+            </Button>
+          </div>
+        </>
+      )}
+
+      {/* ── Comprovantes de Pagamento ── */}
+      <Separator />
+      <div>
+        <p className="text-sm font-semibold text-foreground mb-3">Comprovantes de Pagamento</p>
         <DocumentUpload
           orderId={order.id}
           orderStage={order.stage}

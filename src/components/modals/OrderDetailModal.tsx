@@ -291,7 +291,7 @@ export function OrderDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-[780px] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <div className="flex items-center justify-between gap-3">
               <DialogTitle className="flex items-center gap-3">
@@ -333,40 +333,40 @@ export function OrderDetailModal({
           </DialogHeader>
 
           <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="flex-shrink-0">
+            <TabsList className="flex-shrink-0 w-full overflow-x-auto justify-start">
               <TabsTrigger value="details">Detalhes</TabsTrigger>
-              <TabsTrigger value="pedagios" className="gap-2">
-                <Landmark className="w-4 h-4" />
+              <TabsTrigger value="pedagios" className="gap-1.5">
+                <Landmark className="w-3.5 h-3.5" />
                 Pedágios
                 {tollPlazas.length > 0 && (
-                  <Badge variant="secondary" className="text-xs ml-1">
+                  <Badge variant="secondary" className="text-xs ml-0.5">
                     {tollPlazas.length}
                   </Badge>
                 )}
               </TabsTrigger>
               {showDriverSection && (
-                <TabsTrigger value="carreteiro" className="gap-2">
-                  <DollarSign className="w-4 h-4" />
-                  Vl. Carreteiro
+                <TabsTrigger value="carreteiro" className="gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5" />
+                  Carreteiro
                 </TabsTrigger>
               )}
               {showDocsTab && (
-                <TabsTrigger value="documents" className="gap-2">
-                  <FileText className="w-4 h-4" />
-                  Documentos
+                <TabsTrigger value="documents" className="gap-1.5">
+                  <FileText className="w-3.5 h-3.5" />
+                  Docs
                 </TabsTrigger>
               )}
-              <TabsTrigger value="occurrences" className="gap-2">
-                <AlertTriangle className="w-4 h-4" />
+              <TabsTrigger value="occurrences" className="gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
                 Ocorrências
                 {(occurrences?.length || 0) > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-warning text-warning-foreground">
+                  <span className="ml-0.5 px-1.5 py-0.5 text-xs rounded-full bg-warning text-warning-foreground">
                     {occurrences?.length}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="timeline" className="gap-2">
-                <Clock className="w-4 h-4" />
+              <TabsTrigger value="timeline" className="gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
                 Timeline
               </TabsTrigger>
             </TabsList>
