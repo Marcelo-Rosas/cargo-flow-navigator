@@ -1,26 +1,24 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, User } from 'lucide-react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { BrandLogo } from '@/components/BrandLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-// Validation schemas
 const loginSchema = z.object({
-  email: z.string().email('E-mail inválido'),
-  password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
-});
-
-const signupSchema = z.object({
-  firstName: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
-  lastName: z.string().min(2, 'Sobrenome deve ter no mínimo 2 caracteres'),
   email: z.string().email('E-mail inválido'),
   password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
 });
@@ -28,7 +26,8 @@ const signupSchema = z.object({
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading, signIn, signUp } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { user, loading, signIn, resetPassword, updatePassword } = useAuth();
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,31 +37,36 @@ export default function Auth() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginErrors, setLoginErrors] = useState<{ email?: string; password?: string }>({});
 
-  // Signup form state
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  const [signupErrors, setSignupErrors] = useState<{
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-    password?: string;
-  }>({});
+  // Password reset dialog state
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
-  // Redirect if already logged in
+  // New password form (shown after recovery link click)
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Detect recovery mode from URL params
   useEffect(() => {
-    if (!loading && user) {
+    const type = searchParams.get('type');
+    if (type === 'recovery') {
+      setIsRecoveryMode(true);
+    }
+  }, [searchParams]);
+
+  // Redirect if already logged in (and not in recovery mode)
+  useEffect(() => {
+    if (!loading && user && !isRecoveryMode) {
       const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
       navigate(from, { replace: true });
     }
-  }, [user, loading, navigate, location]);
+  }, [user, loading, navigate, location, isRecoveryMode]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginErrors({});
 
-    // Validate
     const result = loginSchema.safeParse({ email: loginEmail, password: loginPassword });
     if (!result.success) {
       const errors: { email?: string; password?: string } = {};
@@ -92,51 +96,52 @@ export default function Auth() {
     toast.success('Login realizado com sucesso!');
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSignupErrors({});
-
-    // Validate
-    const result = signupSchema.safeParse({
-      firstName,
-      lastName,
-      email: signupEmail,
-      password: signupPassword,
-    });
-
-    if (!result.success) {
-      const errors: { firstName?: string; lastName?: string; email?: string; password?: string } =
-        {};
-      result.error.errors.forEach((err) => {
-        if (err.path[0] === 'firstName') errors.firstName = err.message;
-        if (err.path[0] === 'lastName') errors.lastName = err.message;
-        if (err.path[0] === 'email') errors.email = err.message;
-        if (err.path[0] === 'password') errors.password = err.message;
-      });
-      setSignupErrors(errors);
+  const handleResetPassword = async () => {
+    if (!resetEmail || !resetEmail.includes('@')) {
+      toast.error('Informe um e-mail válido');
       return;
     }
 
     setIsLoading(true);
-    const fullName = `${firstName} ${lastName}`;
-    const { error } = await signUp(signupEmail, signupPassword, fullName);
+    const { error } = await resetPassword(resetEmail);
     setIsLoading(false);
 
     if (error) {
-      if (error.message.includes('User already registered')) {
-        toast.error('Este e-mail já está cadastrado. Tente fazer login.');
-      } else if (error.message.includes('Password')) {
-        toast.error('Senha muito fraca. Use letras, números e caracteres especiais.');
-      } else {
-        toast.error('Erro ao criar conta. Tente novamente.');
-      }
+      toast.error('Erro ao enviar link de recuperação. Tente novamente.');
       return;
     }
 
-    toast.success('Conta criada com sucesso! Você já está logado.');
+    setResetSent(true);
+    toast.success('Link de recuperação enviado! Verifique seu e-mail.');
   };
 
-  // Show loading while checking auth
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (newPassword.length < 6) {
+      toast.error('A senha deve ter no mínimo 6 caracteres');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('As senhas não coincidem');
+      return;
+    }
+
+    setIsLoading(true);
+    const { error } = await updatePassword(newPassword);
+    setIsLoading(false);
+
+    if (error) {
+      toast.error('Erro ao atualizar senha. Tente novamente.');
+      return;
+    }
+
+    toast.success('Senha atualizada com sucesso!');
+    setIsRecoveryMode(false);
+    navigate('/', { replace: true });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -154,7 +159,6 @@ export default function Auth() {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-full h-full">
             {[...Array(20)].map((_, i) => (
@@ -173,14 +177,11 @@ export default function Auth() {
           </div>
         </div>
 
-        {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          {/* Logo */}
           <div className="flex items-center gap-3">
             <BrandLogo size="lg" iconWrapClassName="bg-sidebar-primary" />
           </div>
 
-          {/* Hero Text */}
           <div className="max-w-md">
             <motion.h1
               className="text-4xl font-bold text-sidebar-foreground leading-tight"
@@ -200,7 +201,6 @@ export default function Auth() {
               automação inteligente.
             </motion.p>
 
-            {/* Features List */}
             <motion.ul
               className="mt-8 space-y-3"
               initial={{ opacity: 0, y: 20 }}
@@ -221,9 +221,8 @@ export default function Auth() {
             </motion.ul>
           </div>
 
-          {/* Footer */}
           <p className="text-sm text-sidebar-muted">
-            © 2024 Vectra Cargo. Todos os direitos reservados.
+            &copy; 2024 Vectra Cargo. Todos os direitos reservados.
           </p>
         </div>
       </motion.div>
@@ -246,210 +245,196 @@ export default function Auth() {
             />
           </div>
 
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="signup">Cadastrar</TabsTrigger>
-            </TabsList>
+          {isRecoveryMode ? (
+            /* ============ New Password Form ============ */
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+              <h2 className="text-2xl font-bold text-foreground mb-2">Definir Nova Senha</h2>
+              <p className="text-muted-foreground mb-8">
+                Escolha uma nova senha para sua conta
+              </p>
 
-            {/* Login Tab */}
-            <TabsContent value="login">
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <h2 className="text-2xl font-bold text-foreground mb-2">Bem-vindo de volta</h2>
-                <p className="text-muted-foreground mb-8">
-                  Entre com suas credenciais para acessar o sistema
-                </p>
-
-                <form onSubmit={handleLogin} className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">E-mail</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="seu@email.com.br"
-                        className={`pl-10 ${loginErrors.email ? 'border-destructive' : ''}`}
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                    {loginErrors.email && (
-                      <p className="text-sm text-destructive">{loginErrors.email}</p>
-                    )}
+              <form onSubmit={handleUpdatePassword} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">Nova Senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="newPassword"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Mínimo 6 caracteres"
+                      className="pl-10 pr-10"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="password">Senha</Label>
-                      <Button variant="link" className="p-0 h-auto text-sm" type="button">
-                        Esqueceu a senha?
-                      </Button>
-                    </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="••••••••"
-                        className={`pl-10 pr-10 ${loginErrors.password ? 'border-destructive' : ''}`}
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </div>
-                    {loginErrors.password && (
-                      <p className="text-sm text-destructive">{loginErrors.password}</p>
-                    )}
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirmar Senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="confirmPassword"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Repita a senha"
+                      className="pl-10"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
                   </div>
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <Checkbox id="remember" />
-                    <Label htmlFor="remember" className="text-sm font-normal">
-                      Manter conectado
-                    </Label>
+                <Button type="submit" className="w-full gap-2" disabled={isLoading}>
+                  {isLoading ? 'Atualizando...' : 'Atualizar Senha'}
+                  {!isLoading && <ArrowRight className="w-4 h-4" />}
+                </Button>
+              </form>
+            </motion.div>
+          ) : (
+            /* ============ Login Form ============ */
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+              <h2 className="text-2xl font-bold text-foreground mb-2">Bem-vindo de volta</h2>
+              <p className="text-muted-foreground mb-8">
+                Entre com suas credenciais para acessar o sistema
+              </p>
+
+              <form onSubmit={handleLogin} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-mail</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="seu@vectracargo.com.br"
+                      className={`pl-10 ${loginErrors.email ? 'border-destructive' : ''}`}
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      required
+                    />
                   </div>
+                  {loginErrors.email && (
+                    <p className="text-sm text-destructive">{loginErrors.email}</p>
+                  )}
+                </div>
 
-                  <Button type="submit" className="w-full gap-2" disabled={isLoading}>
-                    {isLoading ? 'Entrando...' : 'Entrar'}
-                    {!isLoading && <ArrowRight className="w-4 h-4" />}
-                  </Button>
-                </form>
-              </motion.div>
-            </TabsContent>
-
-            {/* Signup Tab */}
-            <TabsContent value="signup">
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <h2 className="text-2xl font-bold text-foreground mb-2">Crie sua conta</h2>
-                <p className="text-muted-foreground mb-8">
-                  Preencha os dados para começar a usar o sistema
-                </p>
-
-                <form onSubmit={handleSignup} className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">Nome</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="firstName"
-                          placeholder="João"
-                          className={`pl-10 ${signupErrors.firstName ? 'border-destructive' : ''}`}
-                          value={firstName}
-                          onChange={(e) => setFirstName(e.target.value)}
-                          required
-                        />
-                      </div>
-                      {signupErrors.firstName && (
-                        <p className="text-sm text-destructive">{signupErrors.firstName}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Sobrenome</Label>
-                      <Input
-                        id="lastName"
-                        placeholder="Silva"
-                        className={signupErrors.lastName ? 'border-destructive' : ''}
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        required
-                      />
-                      {signupErrors.lastName && (
-                        <p className="text-sm text-destructive">{signupErrors.lastName}</p>
-                      )}
-                    </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Senha</Label>
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto text-sm"
+                      type="button"
+                      onClick={() => {
+                        setResetDialogOpen(true);
+                        setResetSent(false);
+                        setResetEmail(loginEmail);
+                      }}
+                    >
+                      Esqueceu a senha?
+                    </Button>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signupEmail">E-mail</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="signupEmail"
-                        type="email"
-                        placeholder="seu@email.com.br"
-                        className={`pl-10 ${signupErrors.email ? 'border-destructive' : ''}`}
-                        value={signupEmail}
-                        onChange={(e) => setSignupEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                    {signupErrors.email && (
-                      <p className="text-sm text-destructive">{signupErrors.email}</p>
-                    )}
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      className={`pl-10 pr-10 ${loginErrors.password ? 'border-destructive' : ''}`}
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
                   </div>
+                  {loginErrors.password && (
+                    <p className="text-sm text-destructive">{loginErrors.password}</p>
+                  )}
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signupPassword">Senha</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="signupPassword"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Mínimo 6 caracteres"
-                        className={`pl-10 pr-10 ${signupErrors.password ? 'border-destructive' : ''}`}
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </div>
-                    {signupErrors.password && (
-                      <p className="text-sm text-destructive">{signupErrors.password}</p>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="remember" />
+                  <Label htmlFor="remember" className="text-sm font-normal">
+                    Manter conectado
+                  </Label>
+                </div>
 
-                  <div className="flex items-start gap-2">
-                    <Checkbox id="terms" className="mt-0.5" required />
-                    <Label htmlFor="terms" className="text-sm font-normal">
-                      Concordo com os{' '}
-                      <Button variant="link" className="p-0 h-auto text-sm" type="button">
-                        Termos de Uso
-                      </Button>{' '}
-                      e{' '}
-                      <Button variant="link" className="p-0 h-auto text-sm" type="button">
-                        Política de Privacidade
-                      </Button>
-                    </Label>
-                  </div>
+                <Button type="submit" className="w-full gap-2" disabled={isLoading}>
+                  {isLoading ? 'Entrando...' : 'Entrar'}
+                  {!isLoading && <ArrowRight className="w-4 h-4" />}
+                </Button>
+              </form>
 
-                  <Button type="submit" className="w-full gap-2" disabled={isLoading}>
-                    {isLoading ? 'Criando conta...' : 'Criar conta'}
-                    {!isLoading && <ArrowRight className="w-4 h-4" />}
-                  </Button>
-                </form>
-              </motion.div>
-            </TabsContent>
-          </Tabs>
+              <p className="text-center text-sm text-muted-foreground mt-6">
+                Acesso restrito a colaboradores Vectra Cargo.
+                <br />
+                Solicite seu acesso ao administrador do sistema.
+              </p>
+            </motion.div>
+          )}
         </div>
       </motion.div>
+
+      {/* Password Reset Dialog */}
+      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Recuperar Senha</DialogTitle>
+            <DialogDescription>
+              {resetSent
+                ? 'Verifique sua caixa de entrada para o link de recuperação.'
+                : 'Informe seu e-mail para receber o link de recuperação.'}
+            </DialogDescription>
+          </DialogHeader>
+          {!resetSent ? (
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">E-mail</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="seu@vectracargo.com.br"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setResetDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleResetPassword} disabled={isLoading}>
+                  {isLoading ? 'Enviando...' : 'Enviar Link'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <Button className="w-full" onClick={() => setResetDialogOpen(false)}>
+                Fechar
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

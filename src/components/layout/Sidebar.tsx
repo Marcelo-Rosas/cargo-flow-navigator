@@ -7,6 +7,7 @@ import {
   Truck,
   FileText,
   Users,
+  UserCog,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -48,6 +49,12 @@ const navItems = [
     icon: ShieldCheck,
     label: 'Aprovações',
     roles: ['admin', 'financeiro'] as UserProfile[],
+  },
+  {
+    path: '/usuarios',
+    icon: UserCog,
+    label: 'Usuários',
+    roles: ['admin'] as UserProfile[],
   },
 ];
 

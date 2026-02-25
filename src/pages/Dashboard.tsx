@@ -58,7 +58,7 @@ const emptyRevenueData = [{ name: 'Sem dados', value: 0 }];
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isAdmin, isFinanceiro } = useUserRole();
+  const { isAdmin, isFinanceiro, isOperacional } = useUserRole();
   const queryClient = useQueryClient();
   const {
     data: stats,
@@ -227,38 +227,42 @@ export default function Dashboard() {
               variant="success"
               delay={0.05}
             />
-            <KPICard
-              title="OS Ativas"
-              value={stats?.activeOrders || 0}
-              subtitle="Em operação"
-              icon={Truck}
-              variant="default"
-              delay={0.1}
-            />
-            <KPICard
-              title="Entregas Hoje"
-              value={stats?.deliveriesToday || 0}
-              subtitle="Previstas"
-              icon={TrendingUp}
-              variant="default"
-              delay={0.15}
-            />
-            <KPICard
-              title="Docs Pendentes"
-              value={stats?.pendingDocuments || 0}
-              subtitle="Aguardando"
-              icon={FileText}
-              variant="warning"
-              delay={0.2}
-            />
-            <KPICard
-              title="Alertas Críticos"
-              value={stats?.criticalAlerts || 0}
-              subtitle="Requer ação"
-              icon={AlertTriangle}
-              variant="destructive"
-              delay={0.25}
-            />
+            {!isOperacional && (
+              <>
+                <KPICard
+                  title="OS Ativas"
+                  value={stats?.activeOrders || 0}
+                  subtitle="Em operação"
+                  icon={Truck}
+                  variant="default"
+                  delay={0.1}
+                />
+                <KPICard
+                  title="Entregas Hoje"
+                  value={stats?.deliveriesToday || 0}
+                  subtitle="Previstas"
+                  icon={TrendingUp}
+                  variant="default"
+                  delay={0.15}
+                />
+                <KPICard
+                  title="Docs Pendentes"
+                  value={stats?.pendingDocuments || 0}
+                  subtitle="Aguardando"
+                  icon={FileText}
+                  variant="warning"
+                  delay={0.2}
+                />
+                <KPICard
+                  title="Alertas Críticos"
+                  value={stats?.criticalAlerts || 0}
+                  subtitle="Requer ação"
+                  icon={AlertTriangle}
+                  variant="destructive"
+                  delay={0.25}
+                />
+              </>
+            )}
           </>
         )}
       </div>

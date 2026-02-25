@@ -20,6 +20,7 @@ const PriceTables = lazy(() => import('./pages/PriceTables'));
 const Financial = lazy(() => import('./pages/Financial'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Approvals = lazy(() => import('./pages/Approvals'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
 const Auth = lazy(() => import('./pages/Auth'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -139,6 +140,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRoles={['admin', 'financeiro']}>
                     <Approvals />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/usuarios"
+                element={
+                  <ProtectedRoute requiredRoles={['admin']}>
+                    <UserManagement />
                   </ProtectedRoute>
                 }
               />
