@@ -1,10 +1,10 @@
 project_id = "epgedaiukjippepujuzc"
 
 [functions.import-price-table]
-verify_jwt = true
+verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente
 
 [functions.calculate-freight]
-verify_jwt = true
+verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente
 
 [functions.lookup-cep]
 verify_jwt = false  # utilitário público (consulta ViaCEP/BrasilAPI/OpenCEP), sem dados sensíveis

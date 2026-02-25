@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 // ─────────────────────────────────────────────────────
 // Types
@@ -83,11 +84,10 @@ export function useRequestAiAnalysis() {
       entityId: string;
       entityType: string;
     }) => {
-      const { data, error } = await supabase.functions.invoke('ai-financial-agent', {
+      const data = await invokeEdgeFunction<{ error?: string }>('ai-financial-agent', {
         body: { analysisType, entityId, entityType },
       });
 
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
     },

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import type { Database } from '@/integrations/supabase/types';
 
 export type UserProfile = Database['public']['Enums']['user_profile'];
@@ -24,10 +24,7 @@ export function useProfiles() {
   return useQuery({
     queryKey: ['profiles-list'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('full_name');
+      const { data, error } = await supabase.from('profiles').select('*').order('full_name');
       if (error) throw error;
       return (data ?? []) as ProfileRow[];
     },
@@ -39,14 +36,17 @@ export function useProfiles() {
  */
 export function useInviteUser() {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
 
   return useMutation({
     mutationFn: async (payload: { email: string; fullName: string; perfil: UserProfile }) => {
-      const { data, error } = await supabase.functions.invoke('invite-user', {
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        userId: string;
+        message: string;
+        error?: string;
+      }>('invite-user', {
         body: payload,
       });
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data as { success: boolean; userId: string; message: string };
     },

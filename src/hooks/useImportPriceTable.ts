@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { ParsedPriceRow } from '@/lib/priceTableParser';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 export interface PriceTableImportInput {
   id?: string | 'new';
@@ -67,15 +67,15 @@ export function useImportPriceTable() {
         };
       }
 
-      const { data, error } = await supabase.functions.invoke('import-price-table', {
-        body: {
-          priceTable: params.priceTable,
-          rows: validRows,
-          importMode: params.importMode,
-        },
-      });
-
-      if (error) {
+      try {
+        return await invokeEdgeFunction<ImportPriceTableResult>('import-price-table', {
+          body: {
+            priceTable: params.priceTable,
+            rows: validRows,
+            importMode: params.importMode,
+          },
+        });
+      } catch (error) {
         // Try to extract detailed error from Edge Function response
         const ctx = (error as { context?: Response }).context;
         if (ctx && typeof ctx.json === 'function') {
@@ -88,10 +88,10 @@ export function useImportPriceTable() {
             // ignore parse errors
           }
         }
-        throw new Error(error.message || 'Erro ao chamar função de importação');
+        throw new Error(
+          (error as { message?: string })?.message || 'Erro ao chamar função de importação'
+        );
       }
-
-      return data as ImportPriceTableResult;
     },
     onSuccess: () => {
       // Invalidate all price table related queries

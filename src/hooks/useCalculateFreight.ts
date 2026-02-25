@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import type { CalculateFreightInput, CalculateFreightResponse } from '@/types/freight';
 export type { CalculateFreightInput, CalculateFreightResponse } from '@/types/freight';
 
@@ -10,13 +10,9 @@ export type { CalculateFreightInput, CalculateFreightResponse } from '@/types/fr
 export function useCalculateFreight() {
   return useMutation({
     mutationFn: async (input: CalculateFreightInput): Promise<CalculateFreightResponse> => {
-      const { data, error } = await supabase.functions.invoke('calculate-freight', {
+      const data = await invokeEdgeFunction<CalculateFreightResponse>('calculate-freight', {
         body: input,
       });
-
-      if (error) {
-        throw new Error(error.message || 'Erro ao calcular frete');
-      }
 
       if (!data.success) {
         throw new Error(data.errors?.join(', ') || data.error || 'Erro no cálculo do frete');
