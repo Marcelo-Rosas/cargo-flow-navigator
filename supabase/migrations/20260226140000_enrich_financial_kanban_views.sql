@@ -1,10 +1,13 @@
 -- Enrich financial kanban views with pricing, cargo, toll and payment term data
--- so the financial cards and AI analysis can perform compliance checks.
+-- DROP+CREATE needed because column order changed (PG doesn't allow reorder with CREATE OR REPLACE)
 
 begin;
 
+drop view if exists public.financial_receivable_kanban;
+drop view if exists public.financial_payable_kanban;
+
 -- FAT view: enriched with quote pricing, cargo, toll and payment term
-create or replace view public.financial_receivable_kanban as
+create view public.financial_receivable_kanban as
 select
   k.*,
   q.client_name,
@@ -36,8 +39,8 @@ left join public.vehicle_types vt on vt.id = q.vehicle_type_id
 left join public.payment_terms pt on pt.id = q.payment_term_id
 where k.type = 'FAT';
 
--- PAG view: enriched with order pricing, cargo, toll and payment term (cloned from quote)
-create or replace view public.financial_payable_kanban as
+-- PAG view: enriched with order pricing, cargo, toll and payment term
+create view public.financial_payable_kanban as
 select
   k.*,
   o.client_name,
