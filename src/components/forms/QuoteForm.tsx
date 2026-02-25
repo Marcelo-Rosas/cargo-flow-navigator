@@ -1454,7 +1454,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                         calculationResult.status === 'OK'
                           ? calculationResult.totals.totalCliente
                           : 0;
-                      if (adv === 50 || adv === 70) {
+                      if (adv > 0) {
                         const advanceValue = (total * adv) / 100;
                         const balanceValue = total - advanceValue;
                         return (

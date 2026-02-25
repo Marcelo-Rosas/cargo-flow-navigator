@@ -193,7 +193,7 @@ export function QuoteDetailModal({
   useEffect(() => {
     if (!paymentTerm) return;
     const p = paymentTerm.advance_percent;
-    setSelectedAdvancePercent(p === 70 ? '70' : p === 50 ? '50' : '0');
+    setSelectedAdvancePercent(String(p ?? 0));
   }, [paymentTerm]);
 
   // Mutation to save additional fees selection
@@ -497,9 +497,9 @@ export function QuoteDetailModal({
             </div>
           </DialogHeader>
 
-          {/* Mini cards: Adiantamento e Saldo (70/30 ou 50/50) */}
+          {/* Mini cards: Adiantamento e Saldo (qualquer split %) */}
           {paymentTerm &&
-            (paymentTerm.advance_percent === 50 || paymentTerm.advance_percent === 70) && (
+            (paymentTerm.advance_percent ?? 0) > 0 && (
               <div className="grid grid-cols-2 gap-3 -mt-2">
                 <div className="p-3 rounded-lg border bg-primary/5 border-primary/20">
                   <p className="text-xs text-muted-foreground mb-0.5">

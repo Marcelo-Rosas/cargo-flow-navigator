@@ -28,14 +28,15 @@ import {
 } from '@/hooks/usePricingMutations';
 import { Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { type PaymentTerm, PAYMENT_STRUCTURE_OPTIONS, BALANCE_DAYS_OPTIONS } from '@/types/pricing';
+import { type PaymentTerm, ADVANCE_PRESETS, DAYS_PRESETS } from '@/types/pricing';
+
+/** Retorna label legível para a coluna "Condição" na tabela */
+function formatConditionLabel(advancePercent: number | null | undefined, days: number): string {
+  const adv = advancePercent ?? 0;
+  if (adv > 0) return `${adv}/${100 - adv}`;
+  if (days === 0) return 'À vista';
+  return 'Prazo normal';
+}
 
 export function PaymentTermsSection() {
   const { data: terms, isLoading } = usePaymentTerms(false);
@@ -120,13 +121,7 @@ export function PaymentTermsSection() {
               <TableCell className="font-mono text-sm">{term.code}</TableCell>
               <TableCell className="font-medium">{term.name}</TableCell>
               <TableCell>
-                {term.advance_percent === 50
-                  ? '50/50'
-                  : term.advance_percent === 70
-                    ? '70/30'
-                    : term.days === 0
-                      ? 'À vista'
-                      : 'Prazo normal'}
+                {formatConditionLabel(term.advance_percent, term.days)}
               </TableCell>
               <TableCell>{term.days === 0 ? '—' : `${term.days} dias`}</TableCell>
               <TableCell>
@@ -197,6 +192,45 @@ export function PaymentTermsSection() {
   );
 }
 
+/* ────────────────────────────────────────────────────────────── */
+/*  Preset chip buttons                                          */
+/* ────────────────────────────────────────────────────────────── */
+
+function PresetChips({
+  presets,
+  current,
+  onSelect,
+  suffix,
+}: {
+  presets: readonly number[];
+  current: number;
+  onSelect: (v: number) => void;
+  suffix?: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {presets.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onSelect(p)}
+          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+            current === p
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+          }`}
+        >
+          {p === 0 ? 'À vista' : `${p}${suffix ?? ''}`}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*  Form (criação + edição 100% livre)                           */
+/* ────────────────────────────────────────────────────────────── */
+
 function PaymentTermForm({
   term,
   onSubmit,
@@ -217,36 +251,34 @@ function PaymentTermForm({
   ) => void;
   isLoading: boolean;
 }) {
-  const advance = term?.advance_percent ?? 0;
-  const [advancePercent, setAdvancePercent] = useState<number>(advance);
+  const [advancePercent, setAdvancePercent] = useState<number>(term?.advance_percent ?? 0);
   const [balanceDays, setBalanceDays] = useState(term?.days?.toString() || '30');
   const [adjustmentPercent, setAdjustmentPercent] = useState(
     term?.adjustment_percent?.toString() || '0'
   );
   const [active, setActive] = useState(term?.active ?? true);
 
-  const isAdvanceStructure = advancePercent === 50 || advancePercent === 70;
-  const parsedBalance = parseInt(balanceDays) || 30;
-  const days = isAdvanceStructure ? parsedBalance : term ? term.days : parsedBalance;
+  const isAdvanceStructure = advancePercent > 0;
+  const parsedDays = parseInt(balanceDays) || 0;
 
   const deriveCodeAndName = () => {
-    if (advancePercent === 0 && days === 0) return { code: 'AVISTA', name: 'À Vista' };
-    if (advancePercent === 0) return { code: `D${days}`, name: `${days} dias` };
+    if (advancePercent === 0 && parsedDays === 0) return { code: 'AVISTA', name: 'À Vista' };
+    if (advancePercent === 0) return { code: `D${parsedDays}`, name: `${parsedDays} dias` };
     return {
-      code: `${advancePercent}_${100 - advancePercent}_D${days}`,
-      name: `${advancePercent}/${100 - advancePercent} em ${days} dias`,
+      code: `${advancePercent}_${100 - advancePercent}_D${parsedDays}`,
+      name: `${advancePercent}/${100 - advancePercent} em ${parsedDays} dias`,
     };
   };
 
-  const { code, name } = term ? { code: term.code, name: term.name } : deriveCodeAndName();
+  // Sempre recalcula code/name baseado nos valores atuais (tanto criação quanto edição)
+  const { code, name } = deriveCodeAndName();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalDays = advancePercent === 0 && !term ? days : days;
     onSubmit({
       code,
       name,
-      days: finalDays,
+      days: parsedDays,
       adjustment_percent: parseFloat(adjustmentPercent) || 0,
       advance_percent: advancePercent === 0 ? 0 : advancePercent,
       active,
@@ -258,68 +290,60 @@ function PaymentTermForm({
       <DialogHeader>
         <DialogTitle>{term ? 'Editar Prazo de Pagamento' : 'Novo Prazo de Pagamento'}</DialogTitle>
         <DialogDescription>
-          Configure condição (à vista, 50/50, 70/30) e dias para saldo (15, 25, 30)
+          Configure livremente a condição e os dias. Use os atalhos ou digite valores customizados.
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
+        {/* % Adiantamento — input livre + presets */}
         <div className="space-y-2">
-          <Label>Condição de Pagamento</Label>
-          <Select
-            value={advancePercent.toString()}
-            onValueChange={(v) => setAdvancePercent(parseInt(v))}
-            disabled={!!term}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAYMENT_STRUCTURE_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value.toString()}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>% Adiantamento</Label>
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            value={advancePercent}
+            onChange={(e) => setAdvancePercent(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+            placeholder="0 = à vista / prazo normal"
+          />
+          <PresetChips
+            presets={ADVANCE_PRESETS}
+            current={advancePercent}
+            onSelect={setAdvancePercent}
+            suffix="%"
+          />
+          {isAdvanceStructure && (
+            <p className="text-xs text-muted-foreground">
+              {advancePercent}% adiantamento + {100 - advancePercent}% saldo
+            </p>
+          )}
         </div>
 
-        {!term && (
-          <div className="space-y-2">
-            <Label>{isAdvanceStructure ? 'Dias para Saldo' : 'Dias para Pagamento'}</Label>
-            {advancePercent === 0 ? (
-              <Input
-                type="number"
-                min="0"
-                value={balanceDays}
-                onChange={(e) => setBalanceDays(e.target.value)}
-                placeholder="0 = à vista"
-              />
-            ) : (
-              <Select value={balanceDays} onValueChange={setBalanceDays}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BALANCE_DAYS_OPTIONS.map((d) => (
-                    <SelectItem key={d} value={d.toString()}>
-                      {d} dias
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        )}
+        {/* Dias — input livre + presets */}
+        <div className="space-y-2">
+          <Label>{isAdvanceStructure ? 'Dias para Saldo' : 'Dias para Pagamento'}</Label>
+          <Input
+            type="number"
+            min="0"
+            value={balanceDays}
+            onChange={(e) => setBalanceDays(e.target.value)}
+            placeholder="0 = à vista"
+          />
+          <PresetChips
+            presets={DAYS_PRESETS}
+            current={parsedDays}
+            onSelect={(v) => setBalanceDays(v.toString())}
+            suffix="d"
+          />
+        </div>
 
-        {term && (
-          <div className="text-sm text-muted-foreground">
-            {advancePercent === 50 || advancePercent === 70
-              ? `${advancePercent}/${100 - advancePercent} em ${term.days} dias`
-              : term.days === 0
-                ? 'À vista'
-                : `${term.days} dias`}
-          </div>
-        )}
+        {/* Preview do código e nome */}
+        <div className="rounded-md border border-dashed p-3 bg-muted/30">
+          <p className="text-xs text-muted-foreground mb-1">Preview</p>
+          <p className="text-sm font-medium">{name}</p>
+          <p className="text-xs font-mono text-muted-foreground">{code}</p>
+        </div>
 
+        {/* Ajuste % */}
         <div className="space-y-2">
           <Label>Ajuste (%)</Label>
           <Input
@@ -330,6 +354,8 @@ function PaymentTermForm({
             placeholder="Negativo = desconto"
           />
         </div>
+
+        {/* Ativo toggle */}
         <div className="flex items-center gap-2">
           <Switch checked={active} onCheckedChange={setActive} />
           <Label>Ativo</Label>

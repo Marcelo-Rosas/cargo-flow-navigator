@@ -116,14 +116,27 @@ export interface PaymentTerm {
   updated_at: string;
 }
 
-/** Condição de pagamento: à vista, 50/50, 70/30 ou prazo normal */
+/** Presets comuns para % adiantamento — o usuário pode digitar qualquer valor de 0 a 100 */
+export const ADVANCE_PRESETS = [0, 50, 60, 70, 80] as const;
+
+/** Presets comuns para dias de saldo — o usuário pode digitar qualquer valor */
+export const DAYS_PRESETS = [15, 25, 30, 45, 60] as const;
+
+/**
+ * @deprecated Use ADVANCE_PRESETS. Mantido para compatibilidade.
+ */
 export const PAYMENT_STRUCTURE_OPTIONS = [
   { value: 0, label: 'À vista / Prazo normal' },
   { value: 50, label: '50/50 (adiantamento + saldo)' },
+  { value: 60, label: '60/40 (adiantamento + saldo)' },
   { value: 70, label: '70/30 (adiantamento + saldo)' },
+  { value: 80, label: '80/20 (adiantamento + saldo)' },
 ] as const;
 
-export const BALANCE_DAYS_OPTIONS = [15, 25, 30] as const;
+/**
+ * @deprecated Use DAYS_PRESETS. Mantido para compatibilidade.
+ */
+export const BALANCE_DAYS_OPTIONS = [15, 25, 30, 45, 60] as const;
 
 export type {
   CalculateFreightInput,
