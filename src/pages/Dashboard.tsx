@@ -201,68 +201,70 @@ export default function Dashboard() {
       <ApprovalBanner />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8 auto-rows-fr">
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${isOperacional ? 'lg:grid-cols-4' : 'lg:grid-cols-3 xl:grid-cols-6'} gap-4 mb-8 auto-rows-fr`}>
         {statsLoading ? (
           <div className="col-span-full flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : (
           <>
-            <KPICard
-              title="Pipeline Total"
-              value={formatCurrency(stats?.pipelineValue || 0, {
-                notation: 'compact',
-                maximumFractionDigits: 1,
-              })}
-              icon={DollarSign}
-              trend={stats?.pipelineTrend || undefined}
-              variant="primary"
-              delay={0}
-            />
-            <KPICard
-              title="Taxa de Conversão"
-              value={`${stats?.conversionRate || 0}%`}
-              icon={Target}
-              trend={stats?.conversionTrend || undefined}
-              variant="success"
-              delay={0.05}
-            />
+            {/* Cards comerciais — ocultos para operacional */}
             {!isOperacional && (
               <>
                 <KPICard
-                  title="OS Ativas"
-                  value={stats?.activeOrders || 0}
-                  subtitle="Em operação"
-                  icon={Truck}
-                  variant="default"
-                  delay={0.1}
+                  title="Pipeline Total"
+                  value={formatCurrency(stats?.pipelineValue || 0, {
+                    notation: 'compact',
+                    maximumFractionDigits: 1,
+                  })}
+                  icon={DollarSign}
+                  trend={stats?.pipelineTrend || undefined}
+                  variant="primary"
+                  delay={0}
                 />
                 <KPICard
-                  title="Entregas Hoje"
-                  value={stats?.deliveriesToday || 0}
-                  subtitle="Previstas"
-                  icon={TrendingUp}
-                  variant="default"
-                  delay={0.15}
-                />
-                <KPICard
-                  title="Docs Pendentes"
-                  value={stats?.pendingDocuments || 0}
-                  subtitle="Aguardando"
-                  icon={FileText}
-                  variant="warning"
-                  delay={0.2}
-                />
-                <KPICard
-                  title="Alertas Críticos"
-                  value={stats?.criticalAlerts || 0}
-                  subtitle="Requer ação"
-                  icon={AlertTriangle}
-                  variant="destructive"
-                  delay={0.25}
+                  title="Taxa de Conversão"
+                  value={`${stats?.conversionRate || 0}%`}
+                  icon={Target}
+                  trend={stats?.conversionTrend || undefined}
+                  variant="success"
+                  delay={0.05}
                 />
               </>
             )}
+            {/* Cards operacionais — visíveis para todos */}
+            <KPICard
+              title="OS Ativas"
+              value={stats?.activeOrders || 0}
+              subtitle="Em operação"
+              icon={Truck}
+              variant="default"
+              delay={isOperacional ? 0 : 0.1}
+            />
+            <KPICard
+              title="Entregas Hoje"
+              value={stats?.deliveriesToday || 0}
+              subtitle="Previstas"
+              icon={TrendingUp}
+              variant="default"
+              delay={isOperacional ? 0.05 : 0.15}
+            />
+            <KPICard
+              title="Docs Pendentes"
+              value={stats?.pendingDocuments || 0}
+              subtitle="Aguardando"
+              icon={FileText}
+              variant="warning"
+              delay={isOperacional ? 0.1 : 0.2}
+            />
+            <KPICard
+              title="Alertas Críticos"
+              value={stats?.criticalAlerts || 0}
+              subtitle="Requer ação"
+              icon={AlertTriangle}
+              variant="destructive"
+              delay={isOperacional ? 0.15 : 0.25}
+            />
           </>
         )}
       </div>
