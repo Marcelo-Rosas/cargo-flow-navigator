@@ -43,8 +43,17 @@ export function useInviteUser() {
 
   return useMutation({
     mutationFn: async (payload: { email: string; fullName: string; perfil: UserProfile }) => {
+      // Get a fresh session to avoid stale/expired JWTs
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token ?? session?.access_token;
+
+      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: payload,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
