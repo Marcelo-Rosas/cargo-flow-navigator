@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   MapPin,
   Calendar,
@@ -37,7 +37,7 @@ import {
 import type { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
-import { usePricingParameter, useConditionalFees } from '@/hooks/usePricingRules';
+import { usePricingParameter, useConditionalFees, usePaymentTerms } from '@/hooks/usePricingRules';
 import { useUpdateQuote } from '@/hooks/useQuotes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
@@ -136,6 +136,28 @@ export function QuoteDetailModal({
   const { data: priceTable } = usePriceTable(quote?.price_table_id || '');
   const { data: taxRegimeParam } = usePricingParameter('tax_regime_simples');
   const { data: conditionalFeesData } = useConditionalFees(true);
+  const { data: paymentTermsList } = usePaymentTerms(true);
+
+  /** Opções dinâmicas de adiantamento baseadas nos prazos de pagamento cadastrados */
+  const advanceOptions = useMemo(() => {
+    if (!paymentTermsList || paymentTermsList.length === 0)
+      return [{ value: '0', label: 'À vista' }];
+    const seen = new Set<number>();
+    const opts: { value: string; label: string }[] = [];
+    for (const t of paymentTermsList) {
+      const adv = t.advance_percent ?? 0;
+      if (seen.has(adv)) continue;
+      seen.add(adv);
+      opts.push({
+        value: String(adv),
+        label:
+          adv === 0
+            ? 'À vista'
+            : `${adv}% Adiantamento / ${100 - adv}% Saldo`,
+      });
+    }
+    return opts.sort((a, b) => Number(a.value) - Number(b.value));
+  }, [paymentTermsList]);
   const isSimplesNacional =
     taxRegimeParam?.value != null ? Number(taxRegimeParam.value) === 1 : true;
 
@@ -1321,9 +1343,11 @@ export function QuoteDetailModal({
                       <SelectValue placeholder="Selecionar..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">À vista</SelectItem>
-                      <SelectItem value="50">50% Adiantamento / 50% Saldo</SelectItem>
-                      <SelectItem value="70">70% Adiantamento / 30% Saldo</SelectItem>
+                      {advanceOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
