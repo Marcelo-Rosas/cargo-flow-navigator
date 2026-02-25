@@ -1,6 +1,18 @@
-import { MapPin, DollarSign } from 'lucide-react';
+import {
+  MapPin,
+  DollarSign,
+  Package,
+  Scale,
+  Box,
+  Truck,
+  CreditCard,
+  Route,
+  Landmark,
+  Building2,
+} from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import type { FinancialKanbanRow } from '@/types/financial';
 import { FinancialAiAnalysis } from '@/components/financial/FinancialAiAnalysis';
 
@@ -34,9 +46,25 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
   const name = (doc.client_name ?? doc.supplier_name ?? '—') as string;
   const dueDate = (doc.next_due_date ?? doc.due_date) as string | null | undefined;
 
+  const hasCargo = doc.cargo_type || doc.weight != null || doc.volume != null;
+  const hasPricing = doc.vehicle_type_name || doc.payment_term_name || doc.km_distance != null;
+  const tollValue = doc.toll_value != null ? Number(doc.toll_value) : 0;
+
+  const breakdown = doc.pricing_breakdown as Record<string, unknown> | null;
+  const breakdownTotals = (breakdown?.totals ?? null) as {
+    receitaBruta?: number;
+    das?: number;
+    totalCliente?: number;
+  } | null;
+  const breakdownProfitability = (breakdown?.profitability ?? null) as {
+    margemPercent?: number;
+    resultadoLiquido?: number;
+    margemBruta?: number;
+  } | null;
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="font-mono">{doc.code ?? doc.id?.slice(0, 8)}</span>
@@ -46,32 +74,221 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
             </Badge>
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 pt-2">
-          <div>
-            <p className="text-sm text-muted-foreground">Cliente</p>
-            <p className="font-medium">{name}</p>
-          </div>
-          {doc.origin && doc.destination && (
-            <div className="flex items-start gap-2">
-              <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+        <div className="space-y-5 pt-2">
+          {/* Client + Shipper */}
+          <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-2">
+            <div className="flex items-center gap-3">
+              <Building2 className="w-5 h-5 text-primary shrink-0" />
               <div>
-                <p className="text-sm text-muted-foreground">Rota</p>
-                <p className="font-medium">
-                  {doc.origin} → {doc.destination}
+                <p className="text-xs text-muted-foreground">Cliente</p>
+                <p className="font-semibold">{name}</p>
+              </div>
+            </div>
+            {doc.shipper_name && (
+              <div className="pl-8">
+                <p className="text-xs text-muted-foreground">Embarcador</p>
+                <p className="text-sm font-medium">{doc.shipper_name as string}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Route */}
+          {doc.origin && doc.destination && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                  <MapPin className="w-4 h-4" />
+                  <span className="text-xs">Origem</span>
+                </div>
+                <p className="font-medium text-sm">{doc.origin as string}</p>
+                {doc.origin_cep && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    CEP: {doc.origin_cep as string}
+                  </p>
+                )}
+              </div>
+              <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                  <MapPin className="w-4 h-4" />
+                  <span className="text-xs">Destino</span>
+                </div>
+                <p className="font-medium text-sm">{doc.destination as string}</p>
+                {doc.destination_cep && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    CEP: {doc.destination_cep as string}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Cargo Data */}
+          {hasCargo && (
+            <div>
+              <h4 className="font-semibold text-foreground text-sm mb-2">Dados da Carga</h4>
+              <div className="grid grid-cols-3 gap-2">
+                {doc.cargo_type && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                      <Package className="w-3.5 h-3.5" />
+                      <span className="text-[10px]">Tipo</span>
+                    </div>
+                    <p className="font-medium text-xs">{doc.cargo_type as string}</p>
+                  </div>
+                )}
+                {doc.weight != null && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                      <Scale className="w-3.5 h-3.5" />
+                      <span className="text-[10px]">Peso</span>
+                    </div>
+                    <p className="font-medium text-xs">
+                      {Number(doc.weight) >= 1000
+                        ? `${(Number(doc.weight) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} t`
+                        : `${Number(doc.weight).toLocaleString('pt-BR')} kg`}
+                    </p>
+                  </div>
+                )}
+                {doc.volume != null && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                      <Box className="w-3.5 h-3.5" />
+                      <span className="text-[10px]">Volume</span>
+                    </div>
+                    <p className="font-medium text-xs">
+                      {Number(doc.volume).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Pricing Details */}
+          {hasPricing && (
+            <div>
+              <h4 className="font-semibold text-foreground text-sm mb-2">
+                Detalhes de Precificação
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                {doc.vehicle_type_name && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                      <Truck className="w-3.5 h-3.5" />
+                      <span className="text-[10px]">Veículo</span>
+                    </div>
+                    <p className="font-medium text-xs">
+                      {doc.vehicle_type_name as string}
+                      {doc.vehicle_type_code && (
+                        <span className="text-muted-foreground">
+                          {' '}
+                          ({doc.vehicle_type_code as string})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+                {doc.payment_term_name && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span className="text-[10px]">Prazo Pagamento</span>
+                    </div>
+                    <p className="font-medium text-xs">{doc.payment_term_name as string}</p>
+                  </div>
+                )}
+                {doc.km_distance != null && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                      <Route className="w-3.5 h-3.5" />
+                      <span className="text-[10px]">Distância</span>
+                    </div>
+                    <p className="font-medium text-xs">
+                      {Number(doc.km_distance).toLocaleString('pt-BR')} km
+                    </p>
+                  </div>
+                )}
+                {tollValue > 0 && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                      <Landmark className="w-3.5 h-3.5" />
+                      <span className="text-[10px]">Pedágio</span>
+                    </div>
+                    <p className="font-medium text-xs">{formatCurrency(tollValue)}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Financial Values */}
+          <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-primary">
+                <DollarSign className="w-5 h-5" />
+                <span className="font-medium">Valor do Documento</span>
+              </div>
+              <p className="text-2xl font-bold text-primary">{formatCurrency(amount)}</p>
+            </div>
+
+            {/* Breakdown summary if available */}
+            {breakdownTotals && (
+              <div className="mt-3 pt-3 border-t border-primary/10 grid grid-cols-2 gap-2 text-sm">
+                {breakdownTotals.receitaBruta != null && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Receita Bruta</p>
+                    <p className="font-medium">{formatCurrency(breakdownTotals.receitaBruta)}</p>
+                  </div>
+                )}
+                {breakdownTotals.das != null && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">DAS</p>
+                    <p className="font-medium">{formatCurrency(breakdownTotals.das)}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {breakdownProfitability && breakdownProfitability.margemPercent != null && (
+              <div className="mt-2 pt-2 border-t border-primary/10 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Margem</span>
+                <Badge
+                  variant={breakdownProfitability.margemPercent < 15 ? 'destructive' : 'default'}
+                  className={
+                    breakdownProfitability.margemPercent >= 15
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      : ''
+                  }
+                >
+                  {breakdownProfitability.margemPercent.toFixed(1)}%
+                </Badge>
+              </div>
+            )}
+          </div>
+
+          {/* PAG-specific: carreteiro */}
+          {(doc.carreteiro_antt != null || doc.carreteiro_real != null) && (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                <p className="text-[10px] text-muted-foreground">Carreteiro ANTT</p>
+                <p className="font-semibold text-sm">
+                  {doc.carreteiro_antt != null ? formatCurrency(Number(doc.carreteiro_antt)) : '—'}
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                <p className="text-[10px] text-muted-foreground">Carreteiro Real</p>
+                <p className="font-semibold text-sm">
+                  {doc.carreteiro_real != null ? formatCurrency(Number(doc.carreteiro_real)) : '—'}
                 </p>
               </div>
             </div>
           )}
-          <div className="flex items-start gap-2">
-            <DollarSign className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm text-muted-foreground">Valor</p>
-              <p className="text-xl font-bold">{formatCurrency(amount)}</p>
-            </div>
-          </div>
+
           {dueDate && (
-            <div>
-              <p className="text-sm text-muted-foreground">Próximo vencimento</p>
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground">Próximo vencimento</p>
               <p className="font-medium">{formatDate(dueDate)}</p>
             </div>
           )}

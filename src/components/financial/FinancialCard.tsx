@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, CreditCard, Package, Route, Landmark } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { FinancialKanbanRow } from '@/types/financial';
@@ -87,6 +87,35 @@ export function FinancialCard({ row, onEdit, canManageActions = true }: Financia
               </p>
             )}
             <p className="text-lg font-semibold text-foreground">{formatCurrency(amount)}</p>
+
+            {/* Enriched info chips */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              {row.payment_term_name && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
+                  <CreditCard className="w-3 h-3" />
+                  {row.payment_term_name}
+                </span>
+              )}
+              {row.cargo_type && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
+                  <Package className="w-3 h-3" />
+                  {row.cargo_type}
+                </span>
+              )}
+              {row.km_distance != null && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
+                  <Route className="w-3 h-3" />
+                  {Number(row.km_distance).toLocaleString('pt-BR')} km
+                </span>
+              )}
+              {row.toll_value != null && Number(row.toll_value) > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
+                  <Landmark className="w-3 h-3" />
+                  {formatCurrency(Number(row.toll_value))}
+                </span>
+              )}
+            </div>
+
             {dueDate && (
               <p className="text-xs text-muted-foreground">Venc: {formatDate(dueDate)}</p>
             )}
