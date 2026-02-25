@@ -30,6 +30,7 @@ import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { DocumentList } from '@/components/documents/DocumentList';
 import { OccurrenceForm } from '@/components/forms/OccurrenceForm';
 import { OrderForm } from '@/components/forms/OrderForm';
+import { CarreteiroTab } from '@/components/modals/CarreteiroTab';
 import { DriverQualificationPanel } from '@/components/operational/DriverQualificationPanel';
 import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
@@ -343,6 +344,12 @@ export function OrderDetailModal({
                   </Badge>
                 )}
               </TabsTrigger>
+              {showDriverSection && (
+                <TabsTrigger value="carreteiro" className="gap-2">
+                  <DollarSign className="w-4 h-4" />
+                  Vl. Carreteiro
+                </TabsTrigger>
+              )}
               {showDocsTab && (
                 <TabsTrigger value="documents" className="gap-2">
                   <FileText className="w-4 h-4" />
@@ -910,6 +917,12 @@ export function OrderDetailModal({
                   </div>
                 )}
               </TabsContent>
+
+              {showDriverSection && (
+                <TabsContent value="carreteiro" className="m-0">
+                  <CarreteiroTab order={order} canManage={canManage} />
+                </TabsContent>
+              )}
 
               {showDocsTab && (
                 <TabsContent value="documents" className="m-0 space-y-6">

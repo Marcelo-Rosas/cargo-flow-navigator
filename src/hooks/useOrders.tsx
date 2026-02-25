@@ -21,6 +21,14 @@ export interface OrderWithOccurrences extends Order {
     advance_percent: number | null;
     days: number | null;
   } | null;
+  carrier_payment_term?: {
+    id: string;
+    name: string;
+    code: string;
+    adjustment_percent: number;
+    advance_percent: number | null;
+    days: number | null;
+  } | null;
   quote?:
     | (Pick<
         Quote,
@@ -59,6 +67,7 @@ export function useOrders() {
           price_table:price_tables!orders_price_table_id_fkey (name),
           vehicle_type:vehicle_types!orders_vehicle_type_id_fkey (name, code, axes_count),
           payment_term:payment_terms!orders_payment_term_id_fkey (name, code, adjustment_percent, advance_percent, days),
+          carrier_payment_term:payment_terms!orders_carrier_payment_term_id_fkey (id, name, code, adjustment_percent, advance_percent, days),
           quote:quotes (
             id,
             shipper_name,
@@ -101,6 +110,7 @@ export function useOrder(id: string) {
           price_table:price_tables!orders_price_table_id_fkey (name),
           vehicle_type:vehicle_types!orders_vehicle_type_id_fkey (name, code, axes_count),
           payment_term:payment_terms!orders_payment_term_id_fkey (name, code, adjustment_percent, advance_percent, days),
+          carrier_payment_term:payment_terms!orders_carrier_payment_term_id_fkey (id, name, code, adjustment_percent, advance_percent, days),
           quote:quotes (
             id,
             shipper_name,

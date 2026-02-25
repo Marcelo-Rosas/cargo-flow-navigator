@@ -26,6 +26,7 @@ interface DocumentUploadProps {
   orderId?: string;
   quoteId?: string;
   orderStage?: OrderStage;
+  financialContext?: 'carrier_payment';
   onSuccess?: () => void;
 }
 
@@ -101,6 +102,13 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
   ],
 };
 
+// Tipos de documento para pagamento do carreteiro
+const CARRIER_PAYMENT_DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
+  { value: 'adiantamento_carreteiro', label: 'Adiantamento (Carreteiro)' },
+  { value: 'saldo_carreteiro', label: 'Saldo (Carreteiro)' },
+  { value: 'outros', label: 'Outros' },
+];
+
 // Mapeamento de tipo de documento para campo booleano da ordem
 const DOCUMENT_TYPE_TO_ORDER_FIELD: Record<string, keyof Order | null> = {
   cnh: 'has_cnh',
@@ -117,7 +125,13 @@ const DOCUMENT_TYPE_TO_ORDER_FIELD: Record<string, keyof Order | null> = {
   outros: null,
 };
 
-export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: DocumentUploadProps) {
+export function DocumentUpload({
+  orderId,
+  quoteId,
+  orderStage,
+  financialContext,
+  onSuccess,
+}: DocumentUploadProps) {
   const { user } = useAuth();
   const createDocumentMutation = useCreateDocument();
   const updateOrderMutation = useUpdateOrder();
@@ -129,13 +143,15 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
     { value: 'outros', label: 'Outros' },
   ];
 
-  // Pega os tipos disponíveis: ordem (por estágio) ou cotação
+  // Pega os tipos disponíveis: carrier payment, cotação ou ordem (por estágio)
   const availableTypes =
-    quoteId && !orderId
-      ? QUOTE_DOCUMENT_TYPES
-      : orderStage
-        ? DOCUMENT_TYPES_BY_STAGE[orderStage]
-        : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
+    financialContext === 'carrier_payment'
+      ? CARRIER_PAYMENT_DOCUMENT_TYPES
+      : quoteId && !orderId
+        ? QUOTE_DOCUMENT_TYPES
+        : orderStage
+          ? DOCUMENT_TYPES_BY_STAGE[orderStage]
+          : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
 
   const [selectedType, setSelectedType] = useState<DocumentType>(availableTypes[0].value);
 

@@ -754,6 +754,9 @@ export type Database = {
         Row: {
           assigned_to: string | null;
           cargo_type: string | null;
+          carrier_advance_date: string | null;
+          carrier_balance_date: string | null;
+          carrier_payment_term_id: string | null;
           carreteiro_antt: number | null;
           carreteiro_real: number | null;
           client_id: string | null;
@@ -814,6 +817,9 @@ export type Database = {
         Insert: {
           assigned_to?: string | null;
           cargo_type?: string | null;
+          carrier_advance_date?: string | null;
+          carrier_balance_date?: string | null;
+          carrier_payment_term_id?: string | null;
           carreteiro_antt?: number | null;
           carreteiro_real?: number | null;
           client_id?: string | null;
@@ -874,6 +880,9 @@ export type Database = {
         Update: {
           assigned_to?: string | null;
           cargo_type?: string | null;
+          carrier_advance_date?: string | null;
+          carrier_balance_date?: string | null;
+          carrier_payment_term_id?: string | null;
           carreteiro_antt?: number | null;
           carreteiro_real?: number | null;
           client_id?: string | null;
@@ -2082,7 +2091,9 @@ export type Database = {
         | 'adiantamento'
         | 'analise_gr'
         | 'doc_rota'
-        | 'comprovante_vpo';
+        | 'comprovante_vpo'
+        | 'adiantamento_carreteiro'
+        | 'saldo_carreteiro';
       financial_doc_type: 'FAT' | 'PAG';
       financial_installment_status: 'pendente' | 'baixado';
       financial_source_type: 'quote' | 'order';
@@ -2243,6 +2254,8 @@ export const Constants = {
         'analise_gr',
         'doc_rota',
         'comprovante_vpo',
+        'adiantamento_carreteiro',
+        'saldo_carreteiro',
       ],
       financial_doc_type: ['FAT', 'PAG'],
       financial_installment_status: ['pendente', 'baixado'],
