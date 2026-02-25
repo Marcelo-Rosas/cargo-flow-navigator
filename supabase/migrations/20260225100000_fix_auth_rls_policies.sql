@@ -520,6 +520,11 @@ CREATE POLICY "approval_requests_update" ON public.approval_requests FOR UPDATE 
 -- =============================================================
 -- 4. BACKFILL: Sync user_id for existing profiles
 -- =============================================================
-UPDATE public.profiles
-SET user_id = id
-WHERE user_id IS NULL AND id IS NOT NULL;
+UPDATE public.profiles p
+SET user_id = p.id
+WHERE p.user_id IS NULL
+  AND p.id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM public.profiles p2
+    WHERE p2.user_id = p.id AND p2.id <> p.id
+  );

@@ -38,7 +38,7 @@ export function useEntityInsights(entityType: string, entityId: string) {
         if (error.code === '42P01') return [];
         throw error;
       }
-      return (data ?? []) as AiInsight[];
+      return (data ?? []) as unknown as AiInsight[];
     },
     enabled: !!entityType && !!entityId,
   });
@@ -60,7 +60,7 @@ export function useDashboardInsights() {
         if (error.code === '42P01') return null;
         throw error;
       }
-      return (data?.[0] ?? null) as AiInsight | null;
+      return (data?.[0] ?? null) as unknown as AiInsight | null;
     },
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
   });
