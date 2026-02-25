@@ -7,13 +7,18 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "lint": "eslint .",
+    "lint": "npm run lint:types && npm run lint:eslint",
     "format": "prettier --write src/",
     "preview": "vite preview",
-    "prepare": "husky"
+    "prepare": "husky",
+    "lint:types": "tsc --noEmit",
+    "lint:eslint": "eslint ."
   },
   "lint-staged": {
     "*.{ts,tsx}": [
+      "prettier --write"
+    ],
+    "*.{js,cjs,mjs}": [
       "prettier --write",
       "eslint --fix"
     ]
@@ -85,7 +90,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^4.2.3",
     "autoprefixer": "^10.4.21",
-    "eslint": "^10.0.1",
+    "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
