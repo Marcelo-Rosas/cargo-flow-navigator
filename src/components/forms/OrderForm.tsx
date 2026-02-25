@@ -164,7 +164,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         origin: data.origin,
         destination: data.destination,
         value: data.value,
-        driver_id: data.driver_id || null,
+        // driver_id não existe na tabela orders — o motorista é identificado pelos campos snapshot
         driver_name: data.driver_name || null,
         driver_phone: data.driver_phone || null,
         vehicle_plate: data.vehicle_plate || null,

@@ -63,8 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
+    // URL fixa de produção para garantir que o link de recovery sempre aponte corretamente
+    const prodOrigin = 'https://cargo-flow-navigator.vercel.app';
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${prodOrigin}/reset-password`,
     });
     return { error: error as Error | null };
   };
