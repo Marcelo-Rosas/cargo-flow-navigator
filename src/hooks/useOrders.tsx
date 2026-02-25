@@ -12,6 +12,15 @@ type Quote = Database['public']['Tables']['quotes']['Row'];
 
 export interface OrderWithOccurrences extends Order {
   occurrences: Occurrence[];
+  price_table?: { name: string } | null;
+  vehicle_type?: { name: string; code: string; axes_count: number | null } | null;
+  payment_term?: {
+    name: string;
+    code: string;
+    adjustment_percent: number;
+    advance_percent: number | null;
+    days: number | null;
+  } | null;
   quote?:
     | (Pick<
         Quote,
@@ -47,6 +56,9 @@ export function useOrders() {
           `
           *,
           occurrences (*),
+          price_table:price_tables!orders_price_table_id_fkey (name),
+          vehicle_type:vehicle_types!orders_vehicle_type_id_fkey (name, code, axes_count),
+          payment_term:payment_terms!orders_payment_term_id_fkey (name, code, adjustment_percent, advance_percent, days),
           quote:quotes (
             id,
             shipper_name,
@@ -86,6 +98,9 @@ export function useOrder(id: string) {
           `
           *,
           occurrences (*),
+          price_table:price_tables!orders_price_table_id_fkey (name),
+          vehicle_type:vehicle_types!orders_vehicle_type_id_fkey (name, code, axes_count),
+          payment_term:payment_terms!orders_payment_term_id_fkey (name, code, adjustment_percent, advance_percent, days),
           quote:quotes (
             id,
             shipper_name,
@@ -202,7 +217,6 @@ export function useConvertQuoteToOrder() {
 
   return useMutation({
     mutationFn: async (quoteId: string) => {
-      // Get the quote data
       const { data: quoteData, error: quoteError } = await supabase
         .from('quotes')
         .select('*')
@@ -211,14 +225,7 @@ export function useConvertQuoteToOrder() {
 
       if (quoteError) throw quoteError;
 
-      const quote = filterSupabaseSingle<{
-        id: string;
-        client_id: string;
-        client_name: string;
-        origin: string;
-        destination: string;
-        value: number;
-      }>(quoteData);
+      const quote = filterSupabaseSingle<Quote>(quoteData);
       if (!quote) throw new Error('Quote not found');
 
       const anttTotalRaw =
@@ -237,16 +244,13 @@ export function useConvertQuoteToOrder() {
         );
       }
 
-      // Get current user
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Generate OS number
       const { data: osNumber } = await supabase.rpc('generate_os_number');
 
-      // Create order from quote
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert(
@@ -257,10 +261,25 @@ export function useConvertQuoteToOrder() {
             client_name: quote.client_name,
             origin: quote.origin,
             destination: quote.destination,
+            origin_cep: quote.origin_cep,
+            destination_cep: quote.destination_cep,
             value: quote.value,
             created_by: user.id,
             carreteiro_antt: anttTotal,
             carreteiro_real: null,
+            cargo_type: quote.cargo_type,
+            weight: quote.weight,
+            volume: quote.volume,
+            price_table_id: quote.price_table_id,
+            vehicle_type_id: quote.vehicle_type_id,
+            payment_term_id: quote.payment_term_id,
+            km_distance: quote.km_distance,
+            toll_value: quote.toll_value,
+            pricing_breakdown: quote.pricing_breakdown,
+            freight_type: quote.freight_type,
+            freight_modality: quote.freight_modality,
+            shipper_id: quote.shipper_id,
+            shipper_name: quote.shipper_name,
           })
         )
         .select()
@@ -268,7 +287,6 @@ export function useConvertQuoteToOrder() {
 
       if (orderError) throw orderError;
 
-      // Update quote stage to 'ganho'
       await supabase
         .from('quotes')
         .update(asInsert({ stage: 'ganho' }))

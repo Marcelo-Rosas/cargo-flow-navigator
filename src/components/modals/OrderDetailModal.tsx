@@ -13,6 +13,12 @@ import {
   Pencil,
   Building2,
   Clock,
+  Package,
+  Scale,
+  Box,
+  CreditCard,
+  Route,
+  Landmark,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +30,8 @@ import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { DocumentList } from '@/components/documents/DocumentList';
 import { OccurrenceForm } from '@/components/forms/OccurrenceForm';
 import { OrderForm } from '@/components/forms/OrderForm';
+import { DriverQualificationPanel } from '@/components/operational/DriverQualificationPanel';
+import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
 import { useVehicleByPlate } from '@/hooks/useVehicles';
 import { useUpdateOrder } from '@/hooks/useOrders';
@@ -32,6 +40,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
+import { StoredPricingBreakdown, TollPlaza } from '@/lib/freightCalculator';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -40,6 +58,15 @@ type OrderStage = Database['public']['Enums']['order_stage'];
 
 interface OrderWithOccurrences extends Order {
   occurrences: Occurrence[];
+  price_table?: { name: string } | null;
+  vehicle_type?: { name: string; code: string; axes_count: number | null } | null;
+  payment_term?: {
+    name: string;
+    code: string;
+    adjustment_percent: number;
+    advance_percent: number | null;
+    days: number | null;
+  } | null;
   quote?:
     | (Pick<
         Quote,
@@ -177,9 +204,14 @@ export function OrderDetailModal({
     }
   };
 
+  // Parse pricing breakdown (cloned to order, fallback to quote)
+  const pricingBreakdown = (order?.pricing_breakdown ??
+    order?.quote?.pricing_breakdown) as unknown as StoredPricingBreakdown | null;
+  const tollPlazas: TollPlaza[] = pricingBreakdown?.meta?.tollPlazas ?? [];
+
   // ANTT piso mínimo (Tabela A / Carga Geral / sem retorno vazio)
   const breakdown =
-    (order?.quote?.pricing_breakdown as unknown as {
+    (pricingBreakdown as unknown as {
       meta?: {
         antt?: {
           total: number;
@@ -193,8 +225,13 @@ export function OrderDetailModal({
     } | null) ?? null;
   const savedAntt = breakdown?.meta?.antt;
 
-  const axesCount = savedAntt?.axesCount ?? order?.quote?.vehicle_type?.axes_count ?? null;
-  const kmDistance = savedAntt?.kmDistance ?? order?.quote?.km_distance ?? null;
+  const axesCount =
+    savedAntt?.axesCount ??
+    order?.vehicle_type?.axes_count ??
+    order?.quote?.vehicle_type?.axes_count ??
+    null;
+  const kmDistance =
+    savedAntt?.kmDistance ?? order?.km_distance ?? order?.quote?.km_distance ?? null;
 
   const { data: anttRate } = useAnttFloorRate({
     operationTable: 'A',
@@ -297,6 +334,15 @@ export function OrderDetailModal({
           <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
             <TabsList className="flex-shrink-0">
               <TabsTrigger value="details">Detalhes</TabsTrigger>
+              <TabsTrigger value="pedagios" className="gap-2">
+                <Landmark className="w-4 h-4" />
+                Pedágios
+                {tollPlazas.length > 0 && (
+                  <Badge variant="secondary" className="text-xs ml-1">
+                    {tollPlazas.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
               {showDocsTab && (
                 <TabsTrigger value="documents" className="gap-2">
                   <FileText className="w-4 h-4" />
@@ -322,10 +368,12 @@ export function OrderDetailModal({
               <TabsContent value="details" className="m-0 space-y-6">
                 {/* Contexto da OS (para continuidade do fluxo) */}
                 <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
-                  {order.quote?.shipper_name && (
+                  {(order.shipper_name || order.quote?.shipper_name) && (
                     <div>
                       <h4 className="font-semibold text-foreground">Embarcador</h4>
-                      <p className="text-foreground">{order.quote.shipper_name}</p>
+                      <p className="text-foreground">
+                        {order.shipper_name || order.quote?.shipper_name}
+                      </p>
                     </div>
                   )}
 
@@ -343,9 +391,9 @@ export function OrderDetailModal({
                       <span className="text-sm">Origem</span>
                     </div>
                     <p className="font-medium text-foreground">{order.origin}</p>
-                    {order.quote?.origin_cep && (
+                    {(order.origin_cep || order.quote?.origin_cep) && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        CEP: {order.quote.origin_cep}
+                        CEP: {order.origin_cep || order.quote?.origin_cep}
                       </p>
                     )}
                   </div>
@@ -355,13 +403,111 @@ export function OrderDetailModal({
                       <span className="text-sm">Destino</span>
                     </div>
                     <p className="font-medium text-foreground">{order.destination}</p>
-                    {order.quote?.destination_cep && (
+                    {(order.destination_cep || order.quote?.destination_cep) && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        CEP: {order.quote.destination_cep}
+                        CEP: {order.destination_cep || order.quote?.destination_cep}
                       </p>
                     )}
                   </div>
                 </div>
+
+                {/* Dados da Carga */}
+                {(order.cargo_type || order.weight || order.volume) && (
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-3">Dados da Carga</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      {order.cargo_type && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Package className="w-4 h-4" />
+                            <span className="text-xs">Tipo</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">{order.cargo_type}</p>
+                        </div>
+                      )}
+                      {order.weight != null && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Scale className="w-4 h-4" />
+                            <span className="text-xs">Peso</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {Number(order.weight) >= 1000
+                              ? `${(Number(order.weight) / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} t`
+                              : `${Number(order.weight).toLocaleString('pt-BR')} kg`}
+                          </p>
+                        </div>
+                      )}
+                      {order.volume != null && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Box className="w-4 h-4" />
+                            <span className="text-xs">Volume</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {Number(order.volume).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detalhes de Precificação */}
+                {(order.price_table ||
+                  order.vehicle_type ||
+                  order.payment_term ||
+                  order.km_distance) && (
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-3">Detalhes de Precificação</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {order.price_table && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <DollarSign className="w-4 h-4" />
+                            <span className="text-xs">Tabela de Preços</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {order.price_table.name}
+                          </p>
+                        </div>
+                      )}
+                      {order.vehicle_type && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Truck className="w-4 h-4" />
+                            <span className="text-xs">Veículo</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {order.vehicle_type.name} ({order.vehicle_type.code})
+                          </p>
+                        </div>
+                      )}
+                      {order.payment_term && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <CreditCard className="w-4 h-4" />
+                            <span className="text-xs">Prazo Pagamento</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {order.payment_term.name}
+                          </p>
+                        </div>
+                      )}
+                      {order.km_distance != null && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Route className="w-4 h-4" />
+                            <span className="text-xs">Distância</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {Number(order.km_distance).toLocaleString('pt-BR')} km
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Busca por placa (stage Busca Motorista) - preenche veículo, motorista e proprietário na OS */}
                 {isBuscaMotorista && canManage && (
@@ -514,6 +660,14 @@ export function OrderDetailModal({
                     )}
                   </div>
                 )}
+
+                {/* Qualificação do Motorista (busca_motorista stage) */}
+                {showDriverSection && order.driver_name && (
+                  <DriverQualificationPanel orderId={order.id} canManage={canManage} />
+                )}
+
+                {/* Compliance Widget */}
+                {showDriverSection && <ComplianceWidget orderId={order.id} />}
 
                 {/* Valores */}
                 <div className="grid grid-cols-2 gap-4">
@@ -674,6 +828,89 @@ export function OrderDetailModal({
                 </div>
               </TabsContent>
 
+              {/* Pedágios Tab */}
+              <TabsContent value="pedagios" className="m-0 space-y-4">
+                {tollPlazas.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Landmark className="h-4 w-4" />
+                        Praças de Pedágio da Rota
+                      </h4>
+                      <Badge variant="outline" className="text-xs">
+                        {tollPlazas.length} praça{tollPlazas.length !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                    <div className="rounded-md border overflow-auto max-h-[400px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10 text-center">#</TableHead>
+                            <TableHead>Praça</TableHead>
+                            <TableHead>Cidade/UF</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
+                            <TableHead className="text-right">TAG</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tollPlazas.map((plaza, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="text-center text-muted-foreground text-xs">
+                                {plaza.ordemPassagem || idx + 1}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium">{plaza.nome}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {plaza.cidade}
+                                {plaza.uf ? ` - ${plaza.uf}` : ''}
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                {plaza.valor.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </TableCell>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {plaza.valorTag.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                        <TableFooter>
+                          <TableRow className="font-semibold">
+                            <TableCell colSpan={3} className="text-right">
+                              Total ({tollPlazas.length} praça{tollPlazas.length !== 1 ? 's' : ''})
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {tollPlazas
+                                .reduce((sum, p) => sum + p.valor, 0)
+                                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {tollPlazas
+                                .reduce((sum, p) => sum + p.valorTag, 0)
+                                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </TableCell>
+                          </TableRow>
+                        </TableFooter>
+                      </Table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Landmark className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                    <p className="text-sm text-muted-foreground">
+                      Nenhuma praça de pedágio registrada.
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      Dados de pedágio são clonados da cotação ao criar a OS.
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+
               {showDocsTab && (
                 <TabsContent value="documents" className="m-0 space-y-6">
                   {canManage && <DocumentUpload orderId={order.id} orderStage={order.stage} />}
@@ -709,7 +946,11 @@ export function OrderDetailModal({
                             <div
                               className={cn(
                                 'absolute left-[-16px] top-5 w-0.5 h-full',
-                                isCompleted ? 'bg-emerald-400' : isCurrent ? 'bg-primary/30' : 'bg-border'
+                                isCompleted
+                                  ? 'bg-emerald-400'
+                                  : isCurrent
+                                    ? 'bg-primary/30'
+                                    : 'bg-border'
                               )}
                             />
                           )}
@@ -735,7 +976,10 @@ export function OrderDetailModal({
                                 {stage.label}
                               </span>
                               {isCurrent && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary"
+                                >
                                   ATUAL
                                 </Badge>
                               )}
