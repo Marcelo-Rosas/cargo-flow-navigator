@@ -39,6 +39,8 @@ export function useInviteUser() {
 
   return useMutation({
     mutationFn: async (payload: { email: string; fullName: string; perfil: UserProfile }) => {
+      // Conflict resolution: keep centralized edge invocation (JWT + refresh retry)
+      // and enforce a strict success contract for invite-user.
       const data = await invokeEdgeFunction<{
         success: boolean;
         userId: string;
@@ -47,8 +49,17 @@ export function useInviteUser() {
       }>('invite-user', {
         body: payload,
       });
+
       if (data?.error) throw new Error(data.error);
-      return data as { success: boolean; userId: string; message: string };
+      if (!data?.success || !data?.userId) {
+        throw new Error('Falha ao convidar usuário. Tente novamente.');
+      }
+
+      return {
+        success: data.success,
+        userId: data.userId,
+        message: data.message,
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles-list'] });
