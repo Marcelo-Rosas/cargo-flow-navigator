@@ -7,6 +7,11 @@ interface InviteBody {
   perfil: 'admin' | 'operacional' | 'financeiro';
 }
 
+interface ExistingProfile {
+  id: string;
+  user_id: string | null;
+}
+
 const VALID_PROFILES = ['admin', 'operacional', 'financeiro'];
 
 Deno.serve(async (req) => {
@@ -44,22 +49,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    const normalizedEmail = body.email?.trim().toLowerCase();
+    const normalizedFullName = body.fullName?.trim();
+
     // Validate fields
-    if (!body.email || !body.email.includes('@')) {
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
       return new Response(JSON.stringify({ error: 'E-mail inválido' }), {
         status: 400,
         headers: { ...corsHeaders, 'content-type': 'application/json' },
       });
     }
 
-    if (!body.email.toLowerCase().endsWith('@vectracargo.com.br')) {
+    if (!normalizedEmail.endsWith('@vectracargo.com.br')) {
       return new Response(JSON.stringify({ error: 'Somente e-mails @vectracargo.com.br são permitidos' }), {
         status: 400,
         headers: { ...corsHeaders, 'content-type': 'application/json' },
       });
     }
 
-    if (!body.fullName || body.fullName.trim().length < 2) {
+    if (!normalizedFullName || normalizedFullName.length < 2) {
       return new Response(JSON.stringify({ error: 'Nome completo obrigatório' }), {
         status: 400,
         headers: { ...corsHeaders, 'content-type': 'application/json' },
@@ -98,14 +106,47 @@ Deno.serve(async (req) => {
     const redirectTo = Deno.env.get('SITE_URL') || 'https://cargo-flow-navigator.vercel.app';
 
     const { data: inviteData, error: inviteError } = await serviceClient.auth.admin.inviteUserByEmail(
-      body.email,
+      normalizedEmail,
       {
-        data: { full_name: body.fullName },
+        data: { full_name: normalizedFullName },
         redirectTo,
       }
     );
 
     if (inviteError) {
+      const lowerMessage = inviteError.message.toLowerCase();
+      const isAlreadyRegistered =
+        lowerMessage.includes('already been registered') ||
+        lowerMessage.includes('already registered') ||
+        lowerMessage.includes('already exists');
+
+      if (isAlreadyRegistered) {
+        const { data: existingProfile } = await serviceClient
+          .from('profiles')
+          .select('id,user_id')
+          .ilike('email', normalizedEmail)
+          .maybeSingle();
+
+        const profile = existingProfile as ExistingProfile | null;
+
+        if (profile && body.perfil !== 'operacional') {
+          await serviceClient
+            .from('profiles')
+            .update({ perfil: body.perfil, full_name: normalizedFullName })
+            .or(`id.eq.${profile.id},user_id.eq.${profile.user_id ?? profile.id}`);
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            alreadyExists: true,
+            userId: profile?.user_id ?? profile?.id ?? null,
+            message: `Usuário ${normalizedEmail} já existe. Perfil validado com sucesso.`,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' } }
+        );
+      }
+
       return new Response(
         JSON.stringify({ error: `Erro ao convidar: ${inviteError.message}` }),
         { status: 400, headers: { ...corsHeaders, 'content-type': 'application/json' } }
@@ -116,7 +157,7 @@ Deno.serve(async (req) => {
     if (inviteData?.user?.id && body.perfil !== 'operacional') {
       await serviceClient
         .from('profiles')
-        .update({ perfil: body.perfil, full_name: body.fullName })
+        .update({ perfil: body.perfil, full_name: normalizedFullName })
         .or(`id.eq.${inviteData.user.id},user_id.eq.${inviteData.user.id}`);
     }
 
@@ -124,7 +165,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         userId: inviteData?.user?.id,
-        message: `Convite enviado para ${body.email}`,
+        message: `Convite enviado para ${normalizedEmail}`,
       }),
       { status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' } }
     );

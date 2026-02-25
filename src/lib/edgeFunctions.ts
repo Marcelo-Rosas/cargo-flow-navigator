@@ -11,6 +11,7 @@ function getPublishableKey(): string | undefined {
   return typeof key === 'string' && key.length > 0 ? key : undefined;
 }
 
+
 async function buildAuthHeaders(requireAuth: boolean): Promise<Record<string, string>> {
   const baseHeaders: Record<string, string> = {};
   const publishableKey = getPublishableKey();
@@ -71,6 +72,28 @@ export async function invokeEdgeFunction<T>(
   }
 
   if (error) {
+    const parsedMessage = await (async () => {
+      const context = (error as { context?: Response })?.context;
+      if (!context || typeof context.json !== 'function') return null;
+      try {
+        const payload = (await context.json()) as {
+          error?: string;
+          message?: string;
+          errors?: string[];
+        };
+        if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+          return payload.errors.join('; ');
+        }
+        return payload?.error || payload?.message || null;
+      } catch {
+        return null;
+      }
+    })();
+
+    if (parsedMessage) {
+      throw new Error(parsedMessage);
+    }
+
     throw error;
   }
 

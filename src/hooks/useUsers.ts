@@ -43,22 +43,24 @@ export function useInviteUser() {
       // and enforce a strict success contract for invite-user.
       const data = await invokeEdgeFunction<{
         success: boolean;
-        userId: string;
+        userId?: string | null;
         message: string;
         error?: string;
+        alreadyExists?: boolean;
       }>('invite-user', {
         body: payload,
       });
 
       if (data?.error) throw new Error(data.error);
-      if (!data?.success || !data?.userId) {
+      if (!data?.success) {
         throw new Error('Falha ao convidar usuário. Tente novamente.');
       }
 
       return {
         success: data.success,
-        userId: data.userId,
+        userId: data.userId ?? null,
         message: data.message,
+        alreadyExists: data.alreadyExists ?? false,
       };
     },
     onSuccess: () => {
