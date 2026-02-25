@@ -133,9 +133,10 @@ export default function Operations() {
   const [filterHasPendingDocs, setFilterHasPendingDocs] = useState<boolean | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  const activeFilterCount = filterStages.size
-    + (filterHasOccurrences !== null ? 1 : 0)
-    + (filterHasPendingDocs !== null ? 1 : 0);
+  const activeFilterCount =
+    filterStages.size +
+    (filterHasOccurrences !== null ? 1 : 0) +
+    (filterHasPendingDocs !== null ? 1 : 0);
 
   // Ordenação da tabela
   type SortKey = 'os_number' | 'client_name' | 'value' | 'created_at' | 'stage';
@@ -153,9 +154,11 @@ export default function Operations() {
 
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
-    return sortDir === 'asc'
-      ? <ArrowUp className="w-3 h-3 ml-1" />
-      : <ArrowDown className="w-3 h-3 ml-1" />;
+    return sortDir === 'asc' ? (
+      <ArrowUp className="w-3 h-3 ml-1" />
+    ) : (
+      <ArrowDown className="w-3 h-3 ml-1" />
+    );
   };
 
   // Enable realtime updates
@@ -242,7 +245,15 @@ export default function Operations() {
     });
 
     return sorted;
-  }, [orders, searchTerm, filterStages, filterHasOccurrences, filterHasPendingDocs, sortKey, sortDir]);
+  }, [
+    orders,
+    searchTerm,
+    filterStages,
+    filterHasOccurrences,
+    filterHasPendingDocs,
+    sortKey,
+    sortDir,
+  ]);
 
   const ordersByStage = useMemo(() => {
     const grouped: Record<OrderStage, OrderWithOccurrences[]> = {
@@ -297,11 +308,7 @@ export default function Operations() {
           order: activeOrder,
           newStage: targetStage.id,
         });
-        setCarreteiroRealCents(
-          activeOrder.carreteiro_antt != null
-            ? String(Math.round(Number(activeOrder.carreteiro_antt) * 100))
-            : ''
-        );
+        setCarreteiroRealCents('');
         return;
       }
 
@@ -330,8 +337,7 @@ export default function Operations() {
             order: activeOrder,
             newStage: 'documentacao',
           });
-          const antt = Number(activeOrder.carreteiro_antt ?? 0);
-          setCarreteiroRealCents(antt > 0 ? String(Math.round(antt * 100)) : '');
+          setCarreteiroRealCents('');
           toast.error('Informe o carreteiro real para avançar para Documentação');
           return;
         }
@@ -354,11 +360,7 @@ export default function Operations() {
           order: activeOrder,
           newStage: overOrder.stage,
         });
-        setCarreteiroRealCents(
-          activeOrder.carreteiro_antt != null
-            ? String(Math.round(Number(activeOrder.carreteiro_antt) * 100))
-            : ''
-        );
+        setCarreteiroRealCents('');
         return;
       }
 
@@ -389,8 +391,7 @@ export default function Operations() {
             order: activeOrder,
             newStage: 'documentacao',
           });
-          const antt = Number(activeOrder.carreteiro_antt ?? 0);
-          setCarreteiroRealCents(antt > 0 ? String(Math.round(antt * 100)) : '');
+          setCarreteiroRealCents('');
           toast.error('Informe o carreteiro real para avançar para Documentação');
           return;
         }
@@ -512,7 +513,12 @@ export default function Operations() {
           </div>
           <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="icon" className="relative" aria-label="Filtrar ordens de serviço">
+              <Button
+                variant="outline"
+                size="icon"
+                className="relative"
+                aria-label="Filtrar ordens de serviço"
+              >
                 <Filter className="w-4 h-4" />
                 {activeFilterCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
@@ -575,7 +581,9 @@ export default function Operations() {
                       variant={filterHasOccurrences === true ? 'default' : 'outline'}
                       size="sm"
                       className="h-7 text-xs flex-1"
-                      onClick={() => setFilterHasOccurrences(filterHasOccurrences === true ? null : true)}
+                      onClick={() =>
+                        setFilterHasOccurrences(filterHasOccurrences === true ? null : true)
+                      }
                     >
                       Com ocorrências
                     </Button>
@@ -583,7 +591,9 @@ export default function Operations() {
                       variant={filterHasOccurrences === false ? 'default' : 'outline'}
                       size="sm"
                       className="h-7 text-xs flex-1"
-                      onClick={() => setFilterHasOccurrences(filterHasOccurrences === false ? null : false)}
+                      onClick={() =>
+                        setFilterHasOccurrences(filterHasOccurrences === false ? null : false)
+                      }
                     >
                       Sem ocorrências
                     </Button>
@@ -598,7 +608,9 @@ export default function Operations() {
                       variant={filterHasPendingDocs === true ? 'default' : 'outline'}
                       size="sm"
                       className="h-7 text-xs flex-1"
-                      onClick={() => setFilterHasPendingDocs(filterHasPendingDocs === true ? null : true)}
+                      onClick={() =>
+                        setFilterHasPendingDocs(filterHasPendingDocs === true ? null : true)
+                      }
                     >
                       Docs pendentes
                     </Button>
@@ -606,7 +618,9 @@ export default function Operations() {
                       variant={filterHasPendingDocs === false ? 'default' : 'outline'}
                       size="sm"
                       className="h-7 text-xs flex-1"
-                      onClick={() => setFilterHasPendingDocs(filterHasPendingDocs === false ? null : false)}
+                      onClick={() =>
+                        setFilterHasPendingDocs(filterHasPendingDocs === false ? null : false)
+                      }
                     >
                       Docs completos
                     </Button>
@@ -695,13 +709,17 @@ export default function Operations() {
                           className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
                           onClick={() => handleSort('os_number')}
                         >
-                          <span className="inline-flex items-center">OS <SortIcon col="os_number" /></span>
+                          <span className="inline-flex items-center">
+                            OS <SortIcon col="os_number" />
+                          </span>
                         </th>
                         <th
                           className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
                           onClick={() => handleSort('client_name')}
                         >
-                          <span className="inline-flex items-center">Cliente <SortIcon col="client_name" /></span>
+                          <span className="inline-flex items-center">
+                            Cliente <SortIcon col="client_name" />
+                          </span>
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                           Rota
@@ -713,7 +731,9 @@ export default function Operations() {
                           className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
                           onClick={() => handleSort('stage')}
                         >
-                          <span className="inline-flex items-center">Status <SortIcon col="stage" /></span>
+                          <span className="inline-flex items-center">
+                            Status <SortIcon col="stage" />
+                          </span>
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                           Docs
@@ -722,7 +742,9 @@ export default function Operations() {
                           className="px-4 py-3 text-right text-sm font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
                           onClick={() => handleSort('value')}
                         >
-                          <span className="inline-flex items-center justify-end">Valor <SortIcon col="value" /></span>
+                          <span className="inline-flex items-center justify-end">
+                            Valor <SortIcon col="value" />
+                          </span>
                         </th>
                         {canManageOperations && (
                           <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground w-16">
@@ -775,23 +797,31 @@ export default function Operations() {
                                             toast.error('Anexe o POD antes de finalizar');
                                             return;
                                           }
-                                          if (order.stage === 'busca_motorista' && s.id === 'documentacao') {
-                                            setPendingMove({ orderId: order.id, order, newStage: s.id });
-                                            setCarreteiroRealCents(
-                                              order.carreteiro_antt != null
-                                                ? String(Math.round(Number(order.carreteiro_antt) * 100))
-                                                : ''
-                                            );
+                                          if (
+                                            order.stage === 'busca_motorista' &&
+                                            s.id === 'documentacao'
+                                          ) {
+                                            setPendingMove({
+                                              orderId: order.id,
+                                              order,
+                                              newStage: s.id,
+                                            });
+                                            setCarreteiroRealCents('');
                                             return;
                                           }
-                                          updateStageMutation.mutateAsync({ id: order.id, stage: s.id }).then(() => {
-                                            toast.success(`OS movida para ${s.label}`);
-                                          }).catch(() => {
-                                            toast.error('Erro ao mover OS');
-                                          });
+                                          updateStageMutation
+                                            .mutateAsync({ id: order.id, stage: s.id })
+                                            .then(() => {
+                                              toast.success(`OS movida para ${s.label}`);
+                                            })
+                                            .catch(() => {
+                                              toast.error('Erro ao mover OS');
+                                            });
                                         }}
                                       >
-                                        <span className={cn('w-2 h-2 rounded-full mr-2', s.color)} />
+                                        <span
+                                          className={cn('w-2 h-2 rounded-full mr-2', s.color)}
+                                        />
                                         {s.label}
                                       </DropdownMenuItem>
                                     ))}
@@ -946,10 +976,8 @@ export default function Operations() {
             </DialogTitle>
             <DialogDescription>
               Tem certeza que deseja cancelar a{' '}
-              <span className="font-semibold text-foreground">
-                {cancelOrder?.os_number}
-              </span>
-              {' '}({cancelOrder?.client_name})? Esta ação não pode ser desfeita.
+              <span className="font-semibold text-foreground">{cancelOrder?.os_number}</span> (
+              {cancelOrder?.client_name})? Esta ação não pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -992,8 +1020,21 @@ export default function Operations() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {pendingMove?.order.carreteiro_antt != null &&
+              Number(pendingMove.order.carreteiro_antt) > 0 && (
+                <div className="flex items-center justify-between rounded-md bg-muted/50 border border-border px-3 py-2">
+                  <span className="text-sm text-muted-foreground">Piso ANTT (referência)</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    R${' '}
+                    {Number(pendingMove.order.carreteiro_antt).toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+              )}
             <div className="grid gap-2">
-              <label className="text-sm font-medium text-foreground">Valor (R$)</label>
+              <label className="text-sm font-medium text-foreground">Valor negociado (R$)</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                   R$
