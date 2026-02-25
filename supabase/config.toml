@@ -27,5 +27,8 @@ verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization man
 [functions.ai-financial-agent]
 verify_jwt = false  # Função usa SERVICE_ROLE_KEY internamente
 
+[functions.ai-operational-agent]
+verify_jwt = false  # Função usa SERVICE_ROLE_KEY internamente
+
 [functions.invite-user]
 verify_jwt = false  # Função valida admin via is_admin() RPC

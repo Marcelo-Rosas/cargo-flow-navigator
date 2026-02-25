@@ -41,6 +41,9 @@ export const STAGE_NEXT_REQUIREMENTS = {
     { key: 'has_nfe', label: 'NF-e', group: 'fiscal' },
     { key: 'has_cte', label: 'CT-e', group: 'fiscal' },
     { key: 'has_mdfe', label: 'MDF-e', group: 'fiscal' },
+    { key: 'has_analise_gr', label: 'Análise GR', group: 'fiscal' },
+    { key: 'has_doc_rota', label: 'Doc. Rota', group: 'fiscal' },
+    { key: 'has_vpo', label: 'VPO', group: 'fiscal' },
   ],
 
   // Para sair de "coleta_realizada" e ir para "em_transito"

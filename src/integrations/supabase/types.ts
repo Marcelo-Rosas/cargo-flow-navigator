@@ -771,17 +771,20 @@ export type Database = {
           driver_name: string | null
           driver_phone: string | null
           eta: string | null
+          has_analise_gr: boolean | null
           has_antt: boolean | null
           has_antt_motorista: boolean | null
           has_cnh: boolean | null
           has_comp_residencia: boolean | null
           has_crlv: boolean | null
           has_cte: boolean
+          has_doc_rota: boolean | null
           has_gr: boolean | null
           has_mdf: boolean | null
           has_mdfe: boolean | null
           has_nfe: boolean
           has_pod: boolean
+          has_vpo: boolean | null
           id: string
           notes: string | null
           origin: string
@@ -813,17 +816,20 @@ export type Database = {
           driver_name?: string | null
           driver_phone?: string | null
           eta?: string | null
+          has_analise_gr?: boolean | null
           has_antt?: boolean | null
           has_antt_motorista?: boolean | null
           has_cnh?: boolean | null
           has_comp_residencia?: boolean | null
           has_crlv?: boolean | null
           has_cte?: boolean
+          has_doc_rota?: boolean | null
           has_gr?: boolean | null
           has_mdf?: boolean | null
           has_mdfe?: boolean | null
           has_nfe?: boolean
           has_pod?: boolean
+          has_vpo?: boolean | null
           id?: string
           notes?: string | null
           origin: string
@@ -855,17 +861,20 @@ export type Database = {
           driver_name?: string | null
           driver_phone?: string | null
           eta?: string | null
+          has_analise_gr?: boolean | null
           has_antt?: boolean | null
           has_antt_motorista?: boolean | null
           has_cnh?: boolean | null
           has_comp_residencia?: boolean | null
           has_crlv?: boolean | null
           has_cte?: boolean
+          has_doc_rota?: boolean | null
           has_gr?: boolean | null
           has_mdf?: boolean | null
           has_mdfe?: boolean | null
           has_nfe?: boolean
           has_pod?: boolean
+          has_vpo?: boolean | null
           id?: string
           notes?: string | null
           origin?: string
@@ -2042,6 +2051,9 @@ export type Database = {
         | "antt_motorista"
         | "mdfe"
         | "adiantamento"
+        | "analise_gr"
+        | "doc_rota"
+        | "comprovante_vpo"
       financial_doc_type: "FAT" | "PAG"
       financial_installment_status: "pendente" | "baixado"
       financial_source_type: "quote" | "order"
@@ -2201,6 +2213,9 @@ export const Constants = {
         "antt_motorista",
         "mdfe",
         "adiantamento",
+        "analise_gr",
+        "doc_rota",
+        "comprovante_vpo",
       ],
       financial_doc_type: ["FAT", "PAG"],
       financial_installment_status: ["pendente", "baixado"],

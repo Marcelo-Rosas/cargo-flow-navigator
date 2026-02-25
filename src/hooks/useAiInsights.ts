@@ -15,6 +15,8 @@ export interface AiInsight {
   summary_text: string;
   expires_at: string | null;
   created_at: string;
+  user_rating: number | null;
+  user_feedback: string | null;
 }
 
 // ─────────────────────────────────────────────────────
@@ -108,6 +110,33 @@ export function useRequestAiAnalysis() {
       });
       queryClient.invalidateQueries({ queryKey: ['ai-insights', 'dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['approval-requests'] });
+    },
+  });
+}
+
+/** Rate an AI insight (thumbs up/down or 1-5) */
+export function useRateInsight() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      insightId,
+      rating,
+      feedback,
+    }: {
+      insightId: string;
+      rating: number;
+      feedback?: string;
+    }) => {
+      const { error } = await supabase
+        .from('ai_insights' as 'documents')
+        .update({ user_rating: rating, user_feedback: feedback || null } as any)
+        .eq('id', insightId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-insights'] });
     },
   });
 }

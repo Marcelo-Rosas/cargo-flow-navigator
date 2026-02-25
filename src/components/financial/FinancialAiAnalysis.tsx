@@ -8,11 +8,13 @@ import {
   RefreshCw,
   AlertTriangle,
   TrendingUp,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { useEntityInsights, useRequestAiAnalysis } from '@/hooks/useAiInsights';
+import { useEntityInsights, useRequestAiAnalysis, useRateInsight } from '@/hooks/useAiInsights';
 import type { AiInsight } from '@/hooks/useAiInsights';
 
 // ─────────────────────────────────────────────────────
@@ -60,16 +62,32 @@ function InsightCard({ insight }: { insight: AiInsight }) {
   const analysis = insight.analysis as {
     risk?: string;
     margin?: number;
+    confidence_score?: number;
+    anomaly_detected?: boolean;
+    anomaly_type?: string;
+    urgency_level?: string;
+    approval_confidence?: number;
+    checklist?: Array<{ item: string; status: string }>;
     insights?: string[];
     recommendation?: string;
+    recommendation_detail?: string;
     summary?: string;
+    details?: string;
+    metrics?: Record<string, unknown>;
   };
 
   const risk = analysis?.risk || 'medio';
   const insights = analysis?.insights || [];
   const recommendation = analysis?.recommendation || '';
+  const recommendationDetail = analysis?.recommendation_detail || '';
   const summary = insight.summary_text || analysis?.summary || '';
-  const margin = analysis?.margin;
+  const details = analysis?.details || '';
+  const margin = analysis?.metrics?.margem_percent as number | undefined ?? analysis?.margin;
+  const confidenceScore = analysis?.confidence_score;
+  const anomalyType = analysis?.anomaly_type;
+  const urgencyLevel = analysis?.urgency_level;
+  const approvalConfidence = analysis?.approval_confidence;
+  const checklist = analysis?.checklist;
 
   return (
     <motion.div
@@ -78,20 +96,74 @@ function InsightCard({ insight }: { insight: AiInsight }) {
       transition={{ duration: 0.3 }}
       className="space-y-3"
     >
-      {/* Risk + Margin */}
-      <div className="flex items-center justify-between">
+      {/* Risk + Confidence */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <RiskBadge risk={risk} />
-        {margin !== undefined && margin !== null && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <TrendingUp className="w-3 h-3" />
-            <span>Margem: <strong className="text-foreground">{margin.toFixed(1)}%</strong></span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {margin !== undefined && margin !== null && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <TrendingUp className="w-3 h-3" />
+              <span>Margem: <strong className="text-foreground">{Number(margin).toFixed(1)}%</strong></span>
+            </div>
+          )}
+          {confidenceScore !== undefined && (
+            <Badge variant="outline" className="text-[10px]">
+              {confidenceScore}% confianca
+            </Badge>
+          )}
+        </div>
       </div>
+
+      {/* Anomaly / Urgency / Approval badges */}
+      {(anomalyType || urgencyLevel || approvalConfidence !== undefined) && (
+        <div className="flex flex-wrap gap-1.5">
+          {anomalyType && anomalyType !== 'none' && (
+            <Badge variant="outline" className="text-[10px] border-red-300 text-red-600">
+              <AlertTriangle className="w-3 h-3 mr-0.5" />
+              {anomalyType.replace(/_/g, ' ')}
+            </Badge>
+          )}
+          {urgencyLevel && (
+            <Badge variant="outline" className={`text-[10px] ${
+              urgencyLevel === 'critica' || urgencyLevel === 'alta' ? 'border-red-300 text-red-600' :
+              urgencyLevel === 'media' ? 'border-amber-300 text-amber-600' : 'border-gray-300 text-gray-500'
+            }`}>
+              Urgencia: {urgencyLevel}
+            </Badge>
+          )}
+          {approvalConfidence !== undefined && (
+            <Badge variant="outline" className="text-[10px]">
+              Confianca: {approvalConfidence}%
+            </Badge>
+          )}
+        </div>
+      )}
 
       {/* Summary */}
       {summary && (
         <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>
+      )}
+
+      {/* Details */}
+      {details && (
+        <p className="text-xs text-muted-foreground/80 leading-relaxed">{details}</p>
+      )}
+
+      {/* Checklist (for approvals) */}
+      {checklist && checklist.length > 0 && (
+        <div className="space-y-1.5">
+          <span className="text-xs font-medium">Checklist</span>
+          <div className="space-y-1">
+            {checklist.map((c, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${
+                  c.status === 'ok' ? 'bg-green-500' : c.status === 'alerta' ? 'bg-amber-500' : 'bg-red-500'
+                }`} />
+                <span className="text-muted-foreground">{c.item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Insights list */}
@@ -103,31 +175,78 @@ function InsightCard({ insight }: { insight: AiInsight }) {
           </div>
           <ul className="space-y-1 pl-5">
             {insights.map((item, i) => (
-              <li key={i} className="text-xs text-muted-foreground list-disc">{item}</li>
+              <li key={i} className="text-xs text-muted-foreground list-disc">
+                {typeof item === 'string' ? item : (item as any)?.description || JSON.stringify(item)}
+              </li>
             ))}
           </ul>
         </div>
       )}
 
       {/* Recommendation */}
-      {recommendation && (
+      {(recommendation || recommendationDetail) && (
         <div className="p-2.5 rounded-lg bg-muted/50 border border-border/50">
-          <p className="text-xs font-medium mb-1">Recomendação</p>
-          <p className="text-xs text-muted-foreground leading-relaxed">{recommendation}</p>
+          <p className="text-xs font-medium mb-1">Recomendacao</p>
+          {recommendation && <p className="text-xs font-semibold text-foreground">{recommendation}</p>}
+          {recommendationDetail && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{recommendationDetail}</p>}
         </div>
       )}
 
-      {/* Timestamp */}
-      <p className="text-[10px] text-muted-foreground/60">
-        Análise em {new Date(insight.created_at).toLocaleString('pt-BR', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })}
-      </p>
+      {/* Feedback + Timestamp */}
+      <div className="flex items-center justify-between pt-1">
+        <InsightFeedback insightId={insight.id} currentRating={insight.user_rating} />
+        <p className="text-[10px] text-muted-foreground/60">
+          Analise em {new Date(insight.created_at).toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </p>
+      </div>
     </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────
+// Insight Feedback (thumbs up/down)
+// ─────────────────────────────────────────────────────
+
+function InsightFeedback({ insightId, currentRating }: { insightId: string; currentRating: number | null }) {
+  const rateInsight = useRateInsight();
+
+  const handleRate = (rating: number) => {
+    if (currentRating === rating) return;
+    rateInsight.mutate({ insightId, rating });
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-[10px] text-muted-foreground mr-1">Util?</span>
+      <button
+        onClick={() => handleRate(5)}
+        disabled={rateInsight.isPending}
+        className={`p-1 rounded transition-colors ${
+          currentRating === 5
+            ? 'text-green-600 bg-green-50 dark:bg-green-900/30'
+            : 'text-muted-foreground/50 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
+        }`}
+      >
+        <ThumbsUp className="w-3 h-3" />
+      </button>
+      <button
+        onClick={() => handleRate(1)}
+        disabled={rateInsight.isPending}
+        className={`p-1 rounded transition-colors ${
+          currentRating === 1
+            ? 'text-red-600 bg-red-50 dark:bg-red-900/30'
+            : 'text-muted-foreground/50 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+        }`}
+      >
+        <ThumbsDown className="w-3 h-3" />
+      </button>
+    </div>
   );
 }
 
