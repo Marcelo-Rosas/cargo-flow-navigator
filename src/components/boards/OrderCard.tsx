@@ -11,6 +11,9 @@ import {
   AlertTriangle,
   CheckCircle,
   FileText,
+  Pencil,
+  XCircle,
+  Copy,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +45,7 @@ interface OrderCardProps {
   onEdit?: () => void;
   onRegisterOccurrence?: () => void;
   onUploadDocument?: () => void;
+  onCancelOrder?: () => void;
   canManageActions?: boolean;
 }
 
@@ -50,6 +54,7 @@ export function OrderCard({
   onEdit,
   onRegisterOccurrence,
   onUploadDocument,
+  onCancelOrder,
   canManageActions = true,
 }: OrderCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -179,6 +184,23 @@ export function OrderCard({
               <DropdownMenuItem
                 onClick={(e) => {
                   e.stopPropagation();
+                  onEdit?.();
+                }}
+              >
+                <Pencil className="w-4 h-4 mr-2" /> Ver / Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(order.os_number);
+                }}
+              >
+                <Copy className="w-4 h-4 mr-2" /> Copiar Nº OS
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
                   onUploadDocument?.();
                 }}
               >
@@ -202,6 +224,21 @@ export function OrderCard({
                 <AlertTriangle className="w-4 h-4 mr-2" />
                 Registrar Ocorrência
               </DropdownMenuItem>
+              {order.stage !== 'entregue' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCancelOrder?.();
+                    }}
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Cancelar OS
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

@@ -10,7 +10,20 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
-import { Plus, Filter, Search, List, LayoutGrid, Loader2 } from 'lucide-react';
+import {
+  Plus,
+  Filter,
+  Search,
+  List,
+  LayoutGrid,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  XCircle,
+  AlertTriangle,
+  FileText,
+  Copy,
+} from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { KanbanColumn } from '@/components/boards/KanbanColumn';
 import { OrderCard } from '@/components/boards/OrderCard';
@@ -21,6 +34,7 @@ import {
   useOrders,
   useUpdateOrderStage,
   useUpdateOrder,
+  useDeleteOrder,
   OrderWithOccurrences,
 } from '@/hooks/useOrders';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -41,25 +55,43 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { MaskedInput } from '@/components/ui/masked-input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 type OrderStage = Database['public']['Enums']['order_stage'];
 
 const ORDER_STAGES: { id: OrderStage; label: string; color: string }[] = [
-  { id: 'ordem_criada', label: 'Ordem Criada', color: 'bg-muted-foreground' },
-  { id: 'busca_motorista', label: 'Busca Motorista', color: 'bg-accent-foreground' },
+  { id: 'ordem_criada', label: 'Ordem Criada', color: 'bg-slate-500' },
+  { id: 'busca_motorista', label: 'Busca Motorista', color: 'bg-violet-500' },
   { id: 'documentacao', label: 'Documentação', color: 'bg-primary' },
-  { id: 'coleta_realizada', label: 'Coleta Realizada', color: 'bg-warning' },
-  { id: 'em_transito', label: 'Em Trânsito', color: 'bg-warning' },
-  { id: 'entregue', label: 'Entregue', color: 'bg-success' },
+  { id: 'coleta_realizada', label: 'Coleta Realizada', color: 'bg-orange-500' },
+  { id: 'em_transito', label: 'Em Trânsito', color: 'bg-blue-500' },
+  { id: 'entregue', label: 'Entregue', color: 'bg-emerald-500' },
 ];
 
+/** Dot color for Kanban column headers */
 const stageColors: Record<OrderStage, string> = {
-  ordem_criada: 'bg-muted-foreground',
-  busca_motorista: 'bg-accent-foreground',
+  ordem_criada: 'bg-slate-500',
+  busca_motorista: 'bg-violet-500',
   documentacao: 'bg-primary',
-  coleta_realizada: 'bg-warning',
-  em_transito: 'bg-warning',
-  entregue: 'bg-success',
+  coleta_realizada: 'bg-orange-500',
+  em_transito: 'bg-blue-500',
+  entregue: 'bg-emerald-500',
+};
+
+/** Badge classes for the List view (background + text) */
+const stageBadgeClasses: Record<OrderStage, string> = {
+  ordem_criada: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  busca_motorista: 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300',
+  documentacao: 'bg-primary/10 text-primary',
+  coleta_realizada: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
+  em_transito: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+  entregue: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
 };
 
 export default function Operations() {
@@ -70,6 +102,7 @@ export default function Operations() {
   const { data: orders, isLoading, isError, error, refetch } = useOrders();
   const updateStageMutation = useUpdateOrderStage();
   const updateOrderMutation = useUpdateOrder();
+  const deleteOrderMutation = useDeleteOrder();
   const [activeOrder, setActiveOrder] = useState<OrderWithOccurrences | null>(null);
   const [pendingMove, setPendingMove] = useState<{
     orderId: string;
@@ -82,6 +115,7 @@ export default function Operations() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderWithOccurrences | null>(null);
   const [occurrenceOrder, setOccurrenceOrder] = useState<OrderWithOccurrences | null>(null);
+  const [cancelOrder, setCancelOrder] = useState<OrderWithOccurrences | null>(null);
   const canManageOperations = canWrite;
 
   // Enable realtime updates
@@ -295,6 +329,17 @@ export default function Operations() {
     }
   };
 
+  const handleConfirmCancelOrder = async () => {
+    if (!cancelOrder) return;
+    try {
+      await deleteOrderMutation.mutateAsync(cancelOrder.id);
+      toast.success(`OS ${cancelOrder.os_number} cancelada com sucesso`);
+      setCancelOrder(null);
+    } catch {
+      toast.error('Erro ao cancelar OS');
+    }
+  };
+
   const activeOrdersCount = orders?.filter((o) => o.stage !== 'entregue').length || 0;
   const pendingDeliveries = orders?.filter((o) => o.stage === 'em_transito').length || 0;
 
@@ -419,6 +464,9 @@ export default function Operations() {
                         onRegisterOccurrence={
                           canManageOperations ? () => setOccurrenceOrder(order) : undefined
                         }
+                        onCancelOrder={
+                          canManageOperations ? () => setCancelOrder(order) : undefined
+                        }
                         canManageActions={canManageOperations}
                       />
                     ))}
@@ -471,6 +519,11 @@ export default function Operations() {
                         <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
                           Valor
                         </th>
+                        {canManageOperations && (
+                          <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground w-16">
+                            Ações
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -494,25 +547,31 @@ export default function Operations() {
                             </td>
                             <td className="px-4 py-3">
                               <span
-                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${stageColors[order.stage]} bg-opacity-20`}
+                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${stageBadgeClasses[order.stage]}`}
                               >
                                 {stage?.label}
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="flex gap-1">
+                              <div className="flex gap-1.5 flex-wrap">
                                 <span
-                                  className={`w-2 h-2 rounded-full ${order.has_nfe ? 'bg-success' : 'bg-muted'}`}
-                                  title="NF-e"
-                                />
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${order.has_nfe ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : 'bg-muted text-muted-foreground/50'}`}
+                                  title="Nota Fiscal Eletrônica"
+                                >
+                                  NF-e
+                                </span>
                                 <span
-                                  className={`w-2 h-2 rounded-full ${order.has_cte ? 'bg-success' : 'bg-muted'}`}
-                                  title="CT-e"
-                                />
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${order.has_cte ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : 'bg-muted text-muted-foreground/50'}`}
+                                  title="Conhecimento de Transporte"
+                                >
+                                  CT-e
+                                </span>
                                 <span
-                                  className={`w-2 h-2 rounded-full ${order.has_pod ? 'bg-success' : 'bg-muted'}`}
-                                  title="POD"
-                                />
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${order.has_pod ? 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300' : 'bg-muted text-muted-foreground/50'}`}
+                                  title="Comprovante de Entrega"
+                                >
+                                  POD
+                                </span>
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right font-medium text-foreground">
@@ -521,6 +580,65 @@ export default function Operations() {
                                 currency: 'BRL',
                               }).format(Number(order.value))}
                             </td>
+                            {canManageOperations && (
+                              <td className="px-4 py-3 text-center">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedOrder(order);
+                                      }}
+                                    >
+                                      <Pencil className="w-4 h-4 mr-2" /> Ver / Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigator.clipboard.writeText(order.os_number);
+                                        toast.success('Nº OS copiado');
+                                      }}
+                                    >
+                                      <Copy className="w-4 h-4 mr-2" /> Copiar Nº OS
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOccurrenceOrder(order);
+                                      }}
+                                    >
+                                      <AlertTriangle className="w-4 h-4 mr-2" /> Registrar
+                                      Ocorrência
+                                    </DropdownMenuItem>
+                                    {order.stage !== 'entregue' && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          className="text-destructive focus:text-destructive"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setCancelOrder(order);
+                                          }}
+                                        >
+                                          <XCircle className="w-4 h-4 mr-2" /> Cancelar OS
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -559,6 +677,49 @@ export default function Operations() {
           osNumber={occurrenceOrder.os_number}
         />
       )}
+
+      {/* Modal: Confirmar cancelamento de OS */}
+      <Dialog
+        open={!!cancelOrder}
+        onOpenChange={(open) => {
+          if (!open) setCancelOrder(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <XCircle className="w-5 h-5" />
+              Cancelar Ordem de Serviço
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja cancelar a{' '}
+              <span className="font-semibold text-foreground">
+                {cancelOrder?.os_number}
+              </span>
+              {' '}({cancelOrder?.client_name})? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelOrder(null)}>
+              Manter OS
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmCancelOrder}
+              disabled={deleteOrderMutation.isPending}
+            >
+              {deleteOrderMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Cancelando...
+                </>
+              ) : (
+                'Confirmar Cancelamento'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal: Carreteiro real ao mover Busca Motorista -> Documentação */}
       <Dialog

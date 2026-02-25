@@ -2,20 +2,16 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { callLLM } from '../_shared/aiClient.ts';
 // ─────────────────────────────────────────────────────
-// Pricing Constants (USD per 1M tokens)
+// Pricing Constants (USD per 1M tokens) — OpenAI
 // ─────────────────────────────────────────────────────
 const MODEL_PRICING = {
-  'claude-sonnet-4-20250514': {
-    input: 3,
-    output: 15,
-    cacheRead: 0.3,
-    cacheWrite: 3.75,
+  'gpt-4.1': {
+    input: 2,
+    output: 8,
   },
-  'claude-haiku-4-5-20250514': {
-    input: 1,
-    output: 5,
-    cacheRead: 0.1,
-    cacheWrite: 1.25,
+  'gpt-4.1-mini': {
+    input: 0.4,
+    output: 1.6,
   },
 };
 // ─────────────────────────────────────────────────────
@@ -23,30 +19,27 @@ const MODEL_PRICING = {
 // ─────────────────────────────────────────────────────
 function selectModel(analysisType) {
   switch (analysisType) {
-    // Complex reasoning → Sonnet
+    // Complex reasoning → GPT-4.1
     case 'approval_summary':
     case 'dashboard_insights':
-      return 'claude-sonnet-4-20250514';
-    // Structured / simpler analysis → Haiku (80% cheaper)
+      return 'gpt-4.1';
+    // Structured / simpler analysis → GPT-4.1-mini (80% cheaper)
     case 'quote_profitability':
     case 'financial_anomaly':
-      return 'claude-haiku-4-5-20250514';
+      return 'gpt-4.1-mini';
     default:
-      return 'claude-haiku-4-5-20250514';
+      return 'gpt-4.1-mini';
   }
 }
 // ─────────────────────────────────────────────────────
 // Cost Estimation
 // ─────────────────────────────────────────────────────
 function estimateCost(model, usage) {
-  const pricing = MODEL_PRICING[model] || MODEL_PRICING['claude-haiku-4-5-20250514'];
+  const pricing = MODEL_PRICING[model] || MODEL_PRICING['gpt-4.1-mini'];
   const perMillion = 1_000_000;
-  const inputCost = (usage.input_tokens / perMillion) * pricing.input;
-  const outputCost = (usage.output_tokens / perMillion) * pricing.output;
-  const cacheReadCost = ((usage.cache_read_input_tokens || 0) / perMillion) * pricing.cacheRead;
-  const cacheWriteCost =
-    ((usage.cache_creation_input_tokens || 0) / perMillion) * pricing.cacheWrite;
-  return inputCost + outputCost + cacheReadCost + cacheWriteCost;
+  const inputCost = ((usage?.input_tokens || 0) / perMillion) * pricing.input;
+  const outputCost = ((usage?.output_tokens || 0) / perMillion) * pricing.output;
+  return inputCost + outputCost;
 }
 // ─────────────────────────────────────────────────────
 // Budget Check

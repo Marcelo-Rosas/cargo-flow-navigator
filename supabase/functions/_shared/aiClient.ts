@@ -206,35 +206,36 @@ async function callOpenAI(params: CallLLMParams): Promise<CallLLMResult> {
 }
 
 export async function callLLM(params: CallLLMParams): Promise<CallLLMResult> {
-  const preferred: LLMProvider = params.modelHint || 'anthropic';
+  const preferred: LLMProvider = params.modelHint || 'openai';
 
-  const tryAnthropicFirst = preferred === 'anthropic';
+  const tryOpenAIFirst = preferred === 'openai';
 
-  const primary = tryAnthropicFirst ? callAnthropic : callOpenAI;
-  const secondary = tryAnthropicFirst ? callOpenAI : callAnthropic;
+  const primary = tryOpenAIFirst ? callOpenAI : callAnthropic;
+  const secondary = tryOpenAIFirst ? callAnthropic : callOpenAI;
 
   try {
     return await primary(params);
   } catch (e) {
     const err = e as any;
     const message: string = err?.message || String(err);
-    const anthropicError = err?.anthropicError;
 
-    const isCreditError =
-      anthropicError?.type === 'invalid_request_error' &&
-      typeof anthropicError?.message === 'string' &&
-      anthropicError.message.toLowerCase().includes('credit balance is too low');
-
-    const isNetworkOr5xx =
+    const isRecoverable =
+      /credit balance is too low/i.test(message) ||
+      /insufficient credit/i.test(message) ||
+      /insufficient_quota/i.test(message) ||
+      /rate_limit/i.test(message) ||
       /ECONNRESET|ENOTFOUND|ETIMEDOUT|Failed to fetch/i.test(message) ||
-      / 5\\d{2}\\b/.test(message);
+      / 5\d{2}\b/.test(message) ||
+      / 429\b/.test(message);
 
-    if (tryAnthropicFirst && (isCreditError || isNetworkOr5xx)) {
-      console.warn('Anthropic failed, falling back to OpenAI:', message);
+    if (isRecoverable) {
+      const fromProvider: LLMProvider = tryOpenAIFirst ? 'openai' : 'anthropic';
+      const toProvider: LLMProvider = tryOpenAIFirst ? 'anthropic' : 'openai';
+      console.warn(`${fromProvider} failed, falling back to ${toProvider}:`, message);
       await logProviderFallback({
-        from: 'anthropic',
-        to: 'openai',
-        reason: isCreditError ? 'anthropic_credit_exhausted' : 'anthropic_network_or_5xx',
+        from: fromProvider,
+        to: toProvider,
+        reason: message.substring(0, 200),
         analysisType: params.analysisType,
         entityType: params.entityType ?? null,
         entityId: params.entityId ?? null,
