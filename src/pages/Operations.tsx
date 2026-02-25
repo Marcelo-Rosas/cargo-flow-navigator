@@ -38,7 +38,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useOrders,
   useUpdateOrderStage,
-  useUpdateOrder,
   useDeleteOrder,
   OrderWithOccurrences,
 } from '@/hooks/useOrders';
@@ -59,7 +58,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MaskedInput } from '@/components/ui/masked-input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -110,15 +108,8 @@ export default function Operations() {
   const { canWrite } = useUserRole();
   const { data: orders, isLoading, isError, error, refetch } = useOrders();
   const updateStageMutation = useUpdateOrderStage();
-  const updateOrderMutation = useUpdateOrder();
   const deleteOrderMutation = useDeleteOrder();
   const [activeOrder, setActiveOrder] = useState<OrderWithOccurrences | null>(null);
-  const [pendingMove, setPendingMove] = useState<{
-    orderId: string;
-    order: OrderWithOccurrences;
-    newStage: OrderStage;
-  } | null>(null);
-  const [carreteiroRealCents, setCarreteiroRealCents] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -301,17 +292,6 @@ export default function Operations() {
         return;
       }
 
-      // Busca motorista -> Documentação: exige carreteiro real via modal
-      if (activeOrder.stage === 'busca_motorista' && targetStage.id === 'documentacao') {
-        setPendingMove({
-          orderId: activeOrder.id,
-          order: activeOrder,
-          newStage: targetStage.id,
-        });
-        setCarreteiroRealCents('');
-        return;
-      }
-
       try {
         await updateStageMutation.mutateAsync({
           id: activeOrder.id,
@@ -327,20 +307,6 @@ export default function Operations() {
           toast.error('Anexe o comprovante de entrega (POD) antes de finalizar');
           return;
         }
-        if (
-          msg.toLowerCase().includes('carreteiro real') ||
-          msg.toLowerCase().includes('documentação') ||
-          msg.toLowerCase().includes('documentacao')
-        ) {
-          setPendingMove({
-            orderId: activeOrder.id,
-            order: activeOrder,
-            newStage: 'documentacao',
-          });
-          setCarreteiroRealCents('');
-          toast.error('Informe o carreteiro real para avançar para Documentação');
-          return;
-        }
         toast.error('Erro ao mover OS');
       }
       return;
@@ -351,16 +317,6 @@ export default function Operations() {
     if (overOrder && activeOrder.stage !== overOrder.stage) {
       if (overOrder.stage === 'entregue' && !activeOrder.has_pod) {
         toast.error('É necessário anexar o comprovante de entrega (POD) antes de finalizar');
-        return;
-      }
-
-      if (activeOrder.stage === 'busca_motorista' && overOrder.stage === 'documentacao') {
-        setPendingMove({
-          orderId: activeOrder.id,
-          order: activeOrder,
-          newStage: overOrder.stage,
-        });
-        setCarreteiroRealCents('');
         return;
       }
 
@@ -381,43 +337,8 @@ export default function Operations() {
           toast.error('Anexe o comprovante de entrega (POD) antes de finalizar');
           return;
         }
-        if (
-          msg.toLowerCase().includes('carreteiro real') ||
-          msg.toLowerCase().includes('documentação') ||
-          msg.toLowerCase().includes('documentacao')
-        ) {
-          setPendingMove({
-            orderId: activeOrder.id,
-            order: activeOrder,
-            newStage: 'documentacao',
-          });
-          setCarreteiroRealCents('');
-          toast.error('Informe o carreteiro real para avançar para Documentação');
-          return;
-        }
         toast.error('Erro ao mover OS');
       }
-    }
-  };
-
-  const handleConfirmCarreteiroReal = async () => {
-    if (!pendingMove) return;
-    const valueReais = carreteiroRealCents ? Number(carreteiroRealCents) / 100 : 0;
-    if (valueReais <= 0) {
-      toast.error('Informe o valor do carreteiro real para avançar.');
-      return;
-    }
-    try {
-      await updateOrderMutation.mutateAsync({
-        id: pendingMove.orderId,
-        updates: { stage: pendingMove.newStage, carreteiro_real: valueReais },
-      });
-      toast.success('OS movida para Documentação');
-      setPendingMove(null);
-      setCarreteiroRealCents('');
-    } catch (error: unknown) {
-      const msg = (error instanceof Error ? error.message : String(error)).toString();
-      toast.error(msg || 'Erro ao atualizar OS');
     }
   };
 
@@ -797,18 +718,6 @@ export default function Operations() {
                                             toast.error('Anexe o POD antes de finalizar');
                                             return;
                                           }
-                                          if (
-                                            order.stage === 'busca_motorista' &&
-                                            s.id === 'documentacao'
-                                          ) {
-                                            setPendingMove({
-                                              orderId: order.id,
-                                              order,
-                                              newStage: s.id,
-                                            });
-                                            setCarreteiroRealCents('');
-                                            return;
-                                          }
                                           updateStageMutation
                                             .mutateAsync({ id: order.id, stage: s.id })
                                             .then(() => {
@@ -996,77 +905,6 @@ export default function Operations() {
                 </>
               ) : (
                 'Confirmar Cancelamento'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal: Carreteiro real ao mover Busca Motorista -> Documentação */}
-      <Dialog
-        open={!!pendingMove}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingMove(null);
-            setCarreteiroRealCents('');
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Carreteiro real</DialogTitle>
-            <DialogDescription>
-              Para avançar para Documentação é obrigatório informar o valor do carreteiro real (R$).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {pendingMove?.order.carreteiro_antt != null &&
-              Number(pendingMove.order.carreteiro_antt) > 0 && (
-                <div className="flex items-center justify-between rounded-md bg-muted/50 border border-border px-3 py-2">
-                  <span className="text-sm text-muted-foreground">Piso ANTT (referência)</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    R${' '}
-                    {Number(pendingMove.order.carreteiro_antt).toLocaleString('pt-BR', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
-              )}
-            <div className="grid gap-2">
-              <label className="text-sm font-medium text-foreground">Valor negociado (R$)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  R$
-                </span>
-                <MaskedInput
-                  mask="currency"
-                  placeholder="0,00"
-                  className="pl-10"
-                  value={carreteiroRealCents}
-                  onValueChange={(rawValue) => setCarreteiroRealCents(rawValue)}
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setPendingMove(null);
-                setCarreteiroRealCents('');
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleConfirmCarreteiroReal} disabled={updateOrderMutation.isPending}>
-              {updateOrderMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Salvando...
-                </>
-              ) : (
-                'Confirmar e mover'
               )}
             </Button>
           </DialogFooter>

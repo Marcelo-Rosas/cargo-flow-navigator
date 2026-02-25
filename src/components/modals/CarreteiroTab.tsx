@@ -305,13 +305,18 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
               <label className="text-xs text-muted-foreground block mb-1">
                 Valor Carreteiro Real (R$)
               </label>
-              <MaskedInput
-                mask="currency"
-                value={carreteiroRealCents}
-                onValueChange={(rawValue) => setCarreteiroRealCents(rawValue)}
-                placeholder="0,00"
-                className="h-10"
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
+                  R$
+                </span>
+                <MaskedInput
+                  mask="currency"
+                  value={carreteiroRealCents}
+                  onValueChange={(rawValue) => setCarreteiroRealCents(rawValue)}
+                  placeholder="0,00"
+                  className="h-10 pl-10"
+                />
+              </div>
             </div>
             <Button
               size="default"
