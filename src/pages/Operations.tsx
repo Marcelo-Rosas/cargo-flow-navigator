@@ -23,6 +23,11 @@ import {
   AlertTriangle,
   FileText,
   Copy,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronDown,
+  X,
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { KanbanColumn } from '@/components/boards/KanbanColumn';
@@ -62,6 +67,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 type OrderStage = Database['public']['Enums']['order_stage'];
 
@@ -118,6 +127,37 @@ export default function Operations() {
   const [cancelOrder, setCancelOrder] = useState<OrderWithOccurrences | null>(null);
   const canManageOperations = canWrite;
 
+  // Filtros avançados
+  const [filterStages, setFilterStages] = useState<Set<OrderStage>>(new Set());
+  const [filterHasOccurrences, setFilterHasOccurrences] = useState<boolean | null>(null);
+  const [filterHasPendingDocs, setFilterHasPendingDocs] = useState<boolean | null>(null);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  const activeFilterCount = filterStages.size
+    + (filterHasOccurrences !== null ? 1 : 0)
+    + (filterHasPendingDocs !== null ? 1 : 0);
+
+  // Ordenação da tabela
+  type SortKey = 'os_number' | 'client_name' | 'value' | 'created_at' | 'stage';
+  const [sortKey, setSortKey] = useState<SortKey>('created_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="w-3 h-3 ml-1" />
+      : <ArrowDown className="w-3 h-3 ml-1" />;
+  };
+
   // Enable realtime updates
   useRealtimeSubscription(['orders', 'occurrences']);
 
@@ -141,17 +181,68 @@ export default function Operations() {
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
-    if (!searchTerm) return orders;
-    const term = searchTerm.toLowerCase();
-    return orders.filter(
-      (o) =>
-        o.os_number.toLowerCase().includes(term) ||
-        o.client_name.toLowerCase().includes(term) ||
-        o.origin.toLowerCase().includes(term) ||
-        o.destination.toLowerCase().includes(term) ||
-        (o.driver_name && o.driver_name.toLowerCase().includes(term))
-    );
-  }, [orders, searchTerm]);
+    let result = orders;
+
+    // Text search
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(
+        (o) =>
+          o.os_number.toLowerCase().includes(term) ||
+          o.client_name.toLowerCase().includes(term) ||
+          o.origin.toLowerCase().includes(term) ||
+          o.destination.toLowerCase().includes(term) ||
+          (o.driver_name && o.driver_name.toLowerCase().includes(term))
+      );
+    }
+
+    // Stage filter
+    if (filterStages.size > 0) {
+      result = result.filter((o) => filterStages.has(o.stage));
+    }
+
+    // Occurrences filter
+    if (filterHasOccurrences === true) {
+      result = result.filter((o) => o.occurrences && o.occurrences.length > 0);
+    } else if (filterHasOccurrences === false) {
+      result = result.filter((o) => !o.occurrences || o.occurrences.length === 0);
+    }
+
+    // Pending docs filter
+    if (filterHasPendingDocs === true) {
+      result = result.filter((o) => !o.has_nfe || !o.has_cte || !o.has_pod);
+    } else if (filterHasPendingDocs === false) {
+      result = result.filter((o) => o.has_nfe && o.has_cte && o.has_pod);
+    }
+
+    // Sort (for list view)
+    const sorted = [...result].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'os_number':
+          cmp = a.os_number.localeCompare(b.os_number);
+          break;
+        case 'client_name':
+          cmp = a.client_name.localeCompare(b.client_name);
+          break;
+        case 'value':
+          cmp = Number(a.value) - Number(b.value);
+          break;
+        case 'stage': {
+          const stageOrder = ORDER_STAGES.map((s) => s.id);
+          cmp = stageOrder.indexOf(a.stage) - stageOrder.indexOf(b.stage);
+          break;
+        }
+        case 'created_at':
+        default:
+          cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    return sorted;
+  }, [orders, searchTerm, filterStages, filterHasOccurrences, filterHasPendingDocs, sortKey, sortDir]);
 
   const ordersByStage = useMemo(() => {
     const grouped: Record<OrderStage, OrderWithOccurrences[]> = {
@@ -419,9 +510,111 @@ export default function Operations() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="icon" aria-label="Filtrar ordens de serviço">
-            <Filter className="w-4 h-4" />
-          </Button>
+          <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" className="relative" aria-label="Filtrar ordens de serviço">
+                <Filter className="w-4 h-4" />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="end">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm">Filtros</h4>
+                  {activeFilterCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setFilterStages(new Set());
+                        setFilterHasOccurrences(null);
+                        setFilterHasPendingDocs(null);
+                      }}
+                    >
+                      <X className="w-3 h-3 mr-1" /> Limpar
+                    </Button>
+                  )}
+                </div>
+
+                {/* Stage filters */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground font-medium">Status</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ORDER_STAGES.map((s) => (
+                      <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={filterStages.has(s.id)}
+                          onCheckedChange={(checked) => {
+                            setFilterStages((prev) => {
+                              const next = new Set(prev);
+                              if (checked) next.add(s.id);
+                              else next.delete(s.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        <span className="text-xs flex items-center gap-1.5">
+                          <span className={cn('w-2 h-2 rounded-full', s.color)} />
+                          {s.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Occurrences filter */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground font-medium">Ocorrências</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={filterHasOccurrences === true ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-7 text-xs flex-1"
+                      onClick={() => setFilterHasOccurrences(filterHasOccurrences === true ? null : true)}
+                    >
+                      Com ocorrências
+                    </Button>
+                    <Button
+                      variant={filterHasOccurrences === false ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-7 text-xs flex-1"
+                      onClick={() => setFilterHasOccurrences(filterHasOccurrences === false ? null : false)}
+                    >
+                      Sem ocorrências
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Docs filter */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground font-medium">Documentos</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={filterHasPendingDocs === true ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-7 text-xs flex-1"
+                      onClick={() => setFilterHasPendingDocs(filterHasPendingDocs === true ? null : true)}
+                    >
+                      Docs pendentes
+                    </Button>
+                    <Button
+                      variant={filterHasPendingDocs === false ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-7 text-xs flex-1"
+                      onClick={() => setFilterHasPendingDocs(filterHasPendingDocs === false ? null : false)}
+                    >
+                      Docs completos
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
           {canManageOperations && (
             <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
               <Plus className="w-4 h-4" />
@@ -498,11 +691,17 @@ export default function Operations() {
                   <table className="w-full">
                     <thead className="bg-muted/50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                          OS
+                        <th
+                          className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                          onClick={() => handleSort('os_number')}
+                        >
+                          <span className="inline-flex items-center">OS <SortIcon col="os_number" /></span>
                         </th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                          Cliente
+                        <th
+                          className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                          onClick={() => handleSort('client_name')}
+                        >
+                          <span className="inline-flex items-center">Cliente <SortIcon col="client_name" /></span>
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                           Rota
@@ -510,14 +709,20 @@ export default function Operations() {
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                           Motorista
                         </th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                          Status
+                        <th
+                          className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                          onClick={() => handleSort('stage')}
+                        >
+                          <span className="inline-flex items-center">Status <SortIcon col="stage" /></span>
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                           Docs
                         </th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
-                          Valor
+                        <th
+                          className="px-4 py-3 text-right text-sm font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                          onClick={() => handleSort('value')}
+                        >
+                          <span className="inline-flex items-center justify-end">Valor <SortIcon col="value" /></span>
                         </th>
                         {canManageOperations && (
                           <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground w-16">
@@ -546,11 +751,59 @@ export default function Operations() {
                               {order.driver_name || '-'}
                             </td>
                             <td className="px-4 py-3">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${stageBadgeClasses[order.stage]}`}
-                              >
-                                {stage?.label}
-                              </span>
+                              {canManageOperations && order.stage !== 'entregue' ? (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      className={cn(
+                                        'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all',
+                                        stageBadgeClasses[order.stage]
+                                      )}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {stage?.label}
+                                      <ChevronDown className="w-3 h-3 opacity-60" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="start">
+                                    {ORDER_STAGES.filter((s) => s.id !== order.stage).map((s) => (
+                                      <DropdownMenuItem
+                                        key={s.id}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (s.id === 'entregue' && !order.has_pod) {
+                                            toast.error('Anexe o POD antes de finalizar');
+                                            return;
+                                          }
+                                          if (order.stage === 'busca_motorista' && s.id === 'documentacao') {
+                                            setPendingMove({ orderId: order.id, order, newStage: s.id });
+                                            setCarreteiroRealCents(
+                                              order.carreteiro_antt != null
+                                                ? String(Math.round(Number(order.carreteiro_antt) * 100))
+                                                : ''
+                                            );
+                                            return;
+                                          }
+                                          updateStageMutation.mutateAsync({ id: order.id, stage: s.id }).then(() => {
+                                            toast.success(`OS movida para ${s.label}`);
+                                          }).catch(() => {
+                                            toast.error('Erro ao mover OS');
+                                          });
+                                        }}
+                                      >
+                                        <span className={cn('w-2 h-2 rounded-full mr-2', s.color)} />
+                                        {s.label}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              ) : (
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${stageBadgeClasses[order.stage]}`}
+                                >
+                                  {stage?.label}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex gap-1.5 flex-wrap">

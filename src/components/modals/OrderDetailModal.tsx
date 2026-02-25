@@ -12,6 +12,7 @@ import {
   DollarSign,
   Pencil,
   Building2,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -310,6 +311,10 @@ export function OrderDetailModal({
                     {occurrences?.length}
                   </span>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="timeline" className="gap-2">
+                <Clock className="w-4 h-4" />
+                Timeline
               </TabsTrigger>
             </TabsList>
 
@@ -676,6 +681,101 @@ export function OrderDetailModal({
                   <DocumentList orderId={order.id} />
                 </TabsContent>
               )}
+
+              {/* Timeline Tab */}
+              <TabsContent value="timeline" className="m-0 space-y-4">
+                <h4 className="font-semibold text-foreground">Linha do Tempo</h4>
+                <div className="relative pl-6 space-y-0">
+                  {(() => {
+                    const STAGE_FLOW: { id: OrderStage; label: string; color: string }[] = [
+                      { id: 'ordem_criada', label: 'Ordem Criada', color: 'bg-slate-500' },
+                      { id: 'busca_motorista', label: 'Busca Motorista', color: 'bg-violet-500' },
+                      { id: 'documentacao', label: 'Documentação', color: 'bg-primary' },
+                      { id: 'coleta_realizada', label: 'Coleta Realizada', color: 'bg-orange-500' },
+                      { id: 'em_transito', label: 'Em Trânsito', color: 'bg-blue-500' },
+                      { id: 'entregue', label: 'Entregue', color: 'bg-emerald-500' },
+                    ];
+                    const currentIdx = STAGE_FLOW.findIndex((s) => s.id === order.stage);
+
+                    return STAGE_FLOW.map((stage, idx) => {
+                      const isCompleted = idx < currentIdx;
+                      const isCurrent = idx === currentIdx;
+                      const isFuture = idx > currentIdx;
+
+                      return (
+                        <div key={stage.id} className="relative flex items-start pb-6 last:pb-0">
+                          {/* Vertical line */}
+                          {idx < STAGE_FLOW.length - 1 && (
+                            <div
+                              className={cn(
+                                'absolute left-[-16px] top-5 w-0.5 h-full',
+                                isCompleted ? 'bg-emerald-400' : isCurrent ? 'bg-primary/30' : 'bg-border'
+                              )}
+                            />
+                          )}
+                          {/* Dot */}
+                          <div
+                            className={cn(
+                              'absolute left-[-20px] top-1 w-3 h-3 rounded-full border-2 z-10',
+                              isCompleted
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : isCurrent
+                                  ? `${stage.color} border-primary ring-4 ring-primary/20`
+                                  : 'bg-background border-muted-foreground/30'
+                            )}
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  'text-sm font-medium',
+                                  isFuture ? 'text-muted-foreground/50' : 'text-foreground'
+                                )}
+                              >
+                                {stage.label}
+                              </span>
+                              {isCurrent && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary">
+                                  ATUAL
+                                </Badge>
+                              )}
+                              {isCompleted && (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {isCurrent
+                                ? `Desde ${formatDate(order.updated_at)}`
+                                : isCompleted
+                                  ? 'Concluído'
+                                  : 'Pendente'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Timestamps */}
+                <Separator />
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Criada em</span>
+                    <span className="text-foreground">{formatDate(order.created_at)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Última atualização</span>
+                    <span className="text-foreground">{formatDate(order.updated_at)}</span>
+                  </div>
+                  {order.eta && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">ETA</span>
+                      <span className="text-foreground">{formatDate(order.eta)}</span>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
 
               <TabsContent value="occurrences" className="m-0 space-y-4">
                 <div className="flex justify-between items-center">
