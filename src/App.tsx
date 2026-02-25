@@ -22,6 +22,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const Approvals = lazy(() => import('./pages/Approvals'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const Auth = lazy(() => import('./pages/Auth'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
           <Suspense fallback={<div style={{ padding: 16 }}>Carregando…</div>}>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
               <Route
                 path="/"
