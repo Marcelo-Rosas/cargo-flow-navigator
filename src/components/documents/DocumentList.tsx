@@ -35,6 +35,9 @@ const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
   mdfe: { label: 'MDF-e', color: 'bg-primary/10 text-primary' },
   pod: { label: 'POD', color: 'bg-warning/10 text-warning-foreground' },
   adiantamento: { label: 'Adiantamento', color: 'bg-success/10 text-success' },
+  analise_gr: { label: 'Análise GR', color: 'bg-amber-500/10 text-amber-600' },
+  doc_rota: { label: 'Doc. Rota', color: 'bg-violet-500/10 text-violet-600' },
+  comprovante_vpo: { label: 'VPO', color: 'bg-teal-500/10 text-teal-600' },
   outros: { label: 'Outros', color: 'bg-muted text-muted-foreground' },
 };
 
@@ -90,7 +93,10 @@ export function DocumentList({ orderId, quoteId }: DocumentListProps) {
   return (
     <div className="space-y-2">
       {documents.map((doc) => {
-        const typeInfo = TYPE_LABELS[doc.type];
+        const typeInfo = TYPE_LABELS[doc.type] ?? {
+          label: doc.type,
+          color: 'bg-muted text-muted-foreground',
+        };
         return (
           <div
             key={doc.id}
