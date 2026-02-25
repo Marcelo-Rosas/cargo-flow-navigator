@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 // ─────────────────────────────────────────────────────
 // Types
@@ -72,6 +73,7 @@ export function useDashboardInsights() {
 /** Trigger AI analysis on demand */
 export function useRequestAiAnalysis() {
   const queryClient = useQueryClient();
+  const { session } = useAuth();
 
   return useMutation({
     mutationFn: async ({
@@ -83,8 +85,17 @@ export function useRequestAiAnalysis() {
       entityId: string;
       entityType: string;
     }) => {
+      // Get a fresh session to avoid stale/expired JWTs
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token ?? session?.access_token;
+
+      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
       const { data, error } = await supabase.functions.invoke('ai-financial-agent', {
         body: { analysisType, entityId, entityType },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (error) throw error;

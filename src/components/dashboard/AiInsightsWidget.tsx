@@ -6,10 +6,12 @@ import {
   Lightbulb,
   RefreshCw,
   Loader2,
+  XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDashboardInsights, useRequestAiAnalysis } from '@/hooks/useAiInsights';
+import { useToast } from '@/hooks/use-toast';
 
 const typeIcons: Record<string, typeof TrendingUp> = {
   opportunity: Lightbulb,
@@ -26,6 +28,7 @@ const typeColors: Record<string, string> = {
 export function AiInsightsWidget() {
   const { data: insight, isLoading } = useDashboardInsights();
   const requestAnalysis = useRequestAiAnalysis();
+  const { toast } = useToast();
 
   const analysis = insight?.analysis ?? null;
   const insights = (analysis?.insights as Array<Record<string, string>>) ?? [];
@@ -33,11 +36,28 @@ export function AiInsightsWidget() {
   const risk = (analysis?.risk as string) ?? null;
 
   const handleRefresh = () => {
-    requestAnalysis.mutate({
-      analysisType: 'dashboard_insights',
-      entityId: '',
-      entityType: '',
-    });
+    requestAnalysis.mutate(
+      {
+        analysisType: 'dashboard_insights',
+        entityId: '',
+        entityType: '',
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: 'Análise gerada',
+            description: 'Os insights foram atualizados com sucesso.',
+          });
+        },
+        onError: (error) => {
+          toast({
+            title: 'Erro ao gerar análise',
+            description: error instanceof Error ? error.message : 'Erro desconhecido. Tente novamente.',
+            variant: 'destructive',
+          });
+        },
+      },
+    );
   };
 
   return (
@@ -89,6 +109,19 @@ export function AiInsightsWidget() {
         <div className="flex items-center justify-center py-6 text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin mr-2" />
           <span className="text-sm">Carregando insights...</span>
+        </div>
+      )}
+
+      {/* Error state */}
+      {requestAnalysis.isError && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 mb-3">
+          <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-medium text-red-700 dark:text-red-400">Falha ao gerar análise</p>
+            <p className="text-xs text-red-600 dark:text-red-500 mt-0.5">
+              {requestAnalysis.error instanceof Error ? requestAnalysis.error.message : 'Erro desconhecido'}
+            </p>
+          </div>
         </div>
       )}
 
