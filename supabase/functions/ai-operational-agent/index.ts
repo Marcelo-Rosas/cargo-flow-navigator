@@ -1,4 +1,4 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { executeDriverQualificationWorker } from '../_shared/workers/driverQualificationWorker.ts';
 import { executeStageGateWorker } from '../_shared/workers/stageGateWorker.ts';
@@ -6,6 +6,11 @@ import { executeComplianceCheckWorker } from '../_shared/workers/complianceCheck
 import { executeOperationalReportWorker } from '../_shared/workers/operationalReportWorker.ts';
 import { executeRegulatoryUpdateWorker } from '../_shared/workers/regulatoryUpdateWorker.ts';
 import { executeOperationalInsightsWorker } from '../_shared/workers/operationalInsightsWorker.ts';
+
+declare const Deno: {
+  env: { get(key: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
 
 // ─────────────────────────────────────────────────────
 // Model Routing

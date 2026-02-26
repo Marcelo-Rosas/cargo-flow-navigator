@@ -303,6 +303,7 @@ export type Database = {
           nfe_key: string | null;
           order_id: string | null;
           quote_id: string | null;
+          trip_id: string | null;
           type: Database['public']['Enums']['document_type'];
           updated_at: string;
           uploaded_by: string;
@@ -318,6 +319,7 @@ export type Database = {
           nfe_key?: string | null;
           order_id?: string | null;
           quote_id?: string | null;
+          trip_id?: string | null;
           type: Database['public']['Enums']['document_type'];
           updated_at?: string;
           uploaded_by: string;
@@ -754,6 +756,7 @@ export type Database = {
         Row: {
           assigned_to: string | null;
           cargo_type: string | null;
+          driver_id: string | null;
           carrier_advance_date: string | null;
           carrier_balance_date: string | null;
           carrier_payment_term_id: string | null;
@@ -813,6 +816,7 @@ export type Database = {
           waiting_time_cost: number | null;
           waiting_time_hours: number | null;
           weight: number | null;
+          trip_id: string | null;
         };
         Insert: {
           assigned_to?: string | null;
@@ -876,6 +880,7 @@ export type Database = {
           waiting_time_cost?: number | null;
           waiting_time_hours?: number | null;
           weight?: number | null;
+          trip_id?: string | null;
         };
         Update: {
           assigned_to?: string | null;
@@ -892,6 +897,7 @@ export type Database = {
           destination?: string;
           destination_cep?: string | null;
           driver_antt?: string | null;
+          driver_id?: string | null;
           driver_cnh?: string | null;
           driver_name?: string | null;
           driver_phone?: string | null;
@@ -928,6 +934,7 @@ export type Database = {
           shipper_name?: string | null;
           stage?: Database['public']['Enums']['order_stage'];
           toll_value?: number | null;
+          trip_id?: string | null;
           updated_at?: string;
           value?: number;
           vehicle_brand?: string | null;
@@ -1072,6 +1079,84 @@ export type Database = {
           user_id?: string | null;
         };
         Relationships: [];
+      };
+      payment_proofs: {
+        Row: {
+          id: string;
+          order_id: string;
+          trip_id: string | null;
+          document_id: string;
+          proof_type: 'adiantamento' | 'saldo' | 'outros';
+          method: 'pix' | 'boleto' | 'outro' | null;
+          amount: number | null;
+          paid_at: string | null;
+          transaction_id: string | null;
+          payee_name: string | null;
+          payee_document: string | null;
+          extracted_fields: Record<string, unknown>;
+          extraction_confidence: number | null;
+          status: 'pending' | 'matched' | 'mismatch';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          trip_id?: string | null;
+          document_id: string;
+          proof_type: 'adiantamento' | 'saldo' | 'outros';
+          method?: 'pix' | 'boleto' | 'outro' | null;
+          amount?: number | null;
+          paid_at?: string | null;
+          transaction_id?: string | null;
+          payee_name?: string | null;
+          payee_document?: string | null;
+          extracted_fields?: Record<string, unknown>;
+          extraction_confidence?: number | null;
+          status?: 'pending' | 'matched' | 'mismatch';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          order_id?: string;
+          trip_id?: string | null;
+          document_id?: string;
+          proof_type?: 'adiantamento' | 'saldo' | 'outros';
+          method?: 'pix' | 'boleto' | 'outro' | null;
+          amount?: number | null;
+          paid_at?: string | null;
+          transaction_id?: string | null;
+          payee_name?: string | null;
+          payee_document?: string | null;
+          extracted_fields?: Record<string, unknown>;
+          extraction_confidence?: number | null;
+          status?: 'pending' | 'matched' | 'mismatch';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'payment_proofs_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'payment_proofs_trip_id_fkey';
+            columns: ['trip_id'];
+            isOneToOne: false;
+            referencedRelation: 'trips';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'payment_proofs_document_id_fkey';
+            columns: ['document_id'];
+            isOneToOne: true;
+            referencedRelation: 'documents';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       price_table_rows: {
         Row: {
@@ -1289,6 +1374,189 @@ export type Database = {
             isOneToOne: true;
             referencedRelation: 'valid_users';
             referencedColumns: ['user_id'];
+          },
+        ];
+      };
+      trip_cost_items: {
+        Row: {
+          id: string;
+          trip_id: string;
+          order_id: string | null;
+          scope: 'TRIP' | 'OS';
+          category: string;
+          description: string | null;
+          amount: number;
+          currency: string;
+          source: 'breakdown' | 'manual' | 'api' | 'xml';
+          reference_key: string | null;
+          reference_id: string | null;
+          idempotency_key: string | null;
+          is_frozen: boolean;
+          manually_edited_at: string | null;
+          manually_edited_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          trip_id: string;
+          order_id?: string | null;
+          scope: 'TRIP' | 'OS';
+          category: string;
+          description?: string | null;
+          amount?: number;
+          currency?: string;
+          source?: 'breakdown' | 'manual' | 'api' | 'xml';
+          reference_key?: string | null;
+          reference_id?: string | null;
+          idempotency_key?: string | null;
+          is_frozen?: boolean;
+          manually_edited_at?: string | null;
+          manually_edited_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          trip_id?: string;
+          order_id?: string | null;
+          scope?: 'TRIP' | 'OS';
+          category?: string;
+          description?: string | null;
+          amount?: number;
+          currency?: string;
+          source?: 'breakdown' | 'manual' | 'api' | 'xml';
+          reference_key?: string | null;
+          reference_id?: string | null;
+          idempotency_key?: string | null;
+          is_frozen?: boolean;
+          manually_edited_at?: string | null;
+          manually_edited_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'trip_cost_items_trip_id_fkey';
+            columns: ['trip_id'];
+            isOneToOne: false;
+            referencedRelation: 'trips';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'trip_cost_items_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      trip_orders: {
+        Row: {
+          id: string;
+          trip_id: string;
+          order_id: string;
+          apportion_key: 'revenue' | 'weight' | 'volume' | 'km' | 'equal' | 'manual';
+          apportion_factor: number;
+          manual_percent: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trip_id: string;
+          order_id: string;
+          apportion_key?: 'revenue' | 'weight' | 'volume' | 'km' | 'equal' | 'manual';
+          apportion_factor?: number;
+          manual_percent?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          trip_id?: string;
+          order_id?: string;
+          apportion_key?: 'revenue' | 'weight' | 'volume' | 'km' | 'equal' | 'manual';
+          apportion_factor?: number;
+          manual_percent?: number | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'trip_orders_trip_id_fkey';
+            columns: ['trip_id'];
+            isOneToOne: false;
+            referencedRelation: 'trips';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'trip_orders_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      trips: {
+        Row: {
+          id: string;
+          trip_number: string;
+          vehicle_plate: string;
+          driver_id: string;
+          vehicle_type_id: string | null;
+          departure_at: string | null;
+          status_operational: 'aberta' | 'em_transito' | 'finalizada' | 'cancelada';
+          financial_status: 'open' | 'closing' | 'closed';
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          closed_at: string | null;
+          closed_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          trip_number: string;
+          vehicle_plate: string;
+          driver_id: string;
+          vehicle_type_id?: string | null;
+          departure_at?: string | null;
+          status_operational?: 'aberta' | 'em_transito' | 'finalizada' | 'cancelada';
+          financial_status?: 'open' | 'closing' | 'closed';
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          closed_at?: string | null;
+          closed_by?: string | null;
+        };
+        Update: {
+          trip_number?: string;
+          vehicle_plate?: string;
+          driver_id?: string;
+          vehicle_type_id?: string | null;
+          departure_at?: string | null;
+          status_operational?: 'aberta' | 'em_transito' | 'finalizada' | 'cancelada';
+          financial_status?: 'open' | 'closing' | 'closed';
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          closed_at?: string | null;
+          closed_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'trips_driver_id_fkey';
+            columns: ['driver_id'];
+            isOneToOne: false;
+            referencedRelation: 'drivers';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'trips_vehicle_type_id_fkey';
+            columns: ['vehicle_type_id'];
+            isOneToOne: false;
+            referencedRelation: 'vehicle_types';
+            referencedColumns: ['id'];
           },
         ];
       };

@@ -28,10 +28,7 @@ interface EventResult {
 // ─────────────────────────────────────────────────────
 
 function serviceClient(): SupabaseClient {
-  return createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 }
 
 async function logAction(
@@ -63,7 +60,7 @@ async function callEdgeFunction(fnName: string, body: Record<string, unknown>) {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -89,10 +86,9 @@ async function handleQuoteStageChanged(
   // Quote won → auto-create order + financial documents
   if (new_stage === 'ganho') {
     // 1. Auto-create order from quote
-    const { data: orderResult, error: orderErr } = await sb.rpc(
-      'auto_create_order_from_quote',
-      { p_quote_id: event.entity_id }
-    );
+    const { data: orderResult, error: orderErr } = await sb.rpc('auto_create_order_from_quote', {
+      p_quote_id: event.entity_id,
+    });
 
     if (orderErr) {
       // If RPC doesn't exist yet, try manual creation
@@ -112,14 +108,18 @@ async function handleQuoteStageChanged(
       if (!fatErr) actions.push('fat_created');
 
       // 3. Log notification for client + trigger immediate send
-      const { data: quoteWonLog } = await sb.from('notification_logs').insert({
-        template_key: 'quote_won',
-        channel: 'email',
-        recipient_email: client_email as string,
-        status: 'pending',
-        entity_type: 'quote',
-        entity_id: event.entity_id,
-      }).select('id').single();
+      const { data: quoteWonLog } = await sb
+        .from('notification_logs')
+        .insert({
+          template_key: 'quote_won',
+          channel: 'email',
+          recipient_email: client_email as string,
+          status: 'pending',
+          entity_type: 'quote',
+          entity_id: event.entity_id,
+        })
+        .select('id')
+        .single();
       if (quoteWonLog) await triggerNotificationHub(sb, quoteWonLog.id);
       actions.push('notification_queued:quote_won');
     }
@@ -151,10 +151,7 @@ async function handleQuoteStageChanged(
   return { success: true, actions };
 }
 
-async function handleOrderCreated(
-  sb: SupabaseClient,
-  event: WorkflowEvent
-): Promise<EventResult> {
+async function handleOrderCreated(sb: SupabaseClient, event: WorkflowEvent): Promise<EventResult> {
   const { quote_id, carreteiro_antt, os_number } = event.payload;
   const actions: string[] = [];
 
@@ -170,13 +167,17 @@ async function handleOrderCreated(
   }
 
   // Queue notification + trigger immediate send
-  const { data: orderCreatedLog } = await sb.from('notification_logs').insert({
-    template_key: 'order_created',
-    channel: 'email',
-    status: 'pending',
-    entity_type: 'order',
-    entity_id: event.entity_id,
-  }).select('id').single();
+  const { data: orderCreatedLog } = await sb
+    .from('notification_logs')
+    .insert({
+      template_key: 'order_created',
+      channel: 'email',
+      status: 'pending',
+      entity_type: 'order',
+      entity_id: event.entity_id,
+    })
+    .select('id')
+    .single();
   if (orderCreatedLog) await triggerNotificationHub(sb, orderCreatedLog.id);
   actions.push('notification_queued:order_created');
 
@@ -192,14 +193,18 @@ async function handleOrderStageChanged(
 
   // Driver assigned (moved to busca_motorista with driver info)
   if (new_stage === 'busca_motorista' && driver_phone) {
-    const { data: driverLog } = await sb.from('notification_logs').insert({
-      template_key: 'driver_assigned',
-      channel: 'whatsapp',
-      recipient_phone: driver_phone as string,
-      status: 'pending',
-      entity_type: 'order',
-      entity_id: event.entity_id,
-    }).select('id').single();
+    const { data: driverLog } = await sb
+      .from('notification_logs')
+      .insert({
+        template_key: 'driver_assigned',
+        channel: 'whatsapp',
+        recipient_phone: driver_phone as string,
+        status: 'pending',
+        entity_type: 'order',
+        entity_id: event.entity_id,
+      })
+      .select('id')
+      .single();
     if (driverLog) await triggerNotificationHub(sb, driverLog.id);
     actions.push('notification_queued:driver_assigned_whatsapp');
 
@@ -244,10 +249,7 @@ async function handleOrderStageChanged(
         .maybeSingle();
 
       if (fatDoc && fatDoc.status === 'INCLUIR') {
-        await sb
-          .from('financial_documents')
-          .update({ status: 'GERADO' })
-          .eq('id', fatDoc.id);
+        await sb.from('financial_documents').update({ status: 'GERADO' }).eq('id', fatDoc.id);
         actions.push('fat_advanced:GERADO');
       }
     }
@@ -261,21 +263,22 @@ async function handleOrderStageChanged(
       .maybeSingle();
 
     if (pagDoc && pagDoc.status === 'INCLUIR') {
-      await sb
-        .from('financial_documents')
-        .update({ status: 'GERADO' })
-        .eq('id', pagDoc.id);
+      await sb.from('financial_documents').update({ status: 'GERADO' }).eq('id', pagDoc.id);
       actions.push('pag_advanced:GERADO');
     }
 
     // Notify client of delivery
-    const { data: deliveryLog } = await sb.from('notification_logs').insert({
-      template_key: 'delivery_confirmed',
-      channel: 'both',
-      status: 'pending',
-      entity_type: 'order',
-      entity_id: event.entity_id,
-    }).select('id').single();
+    const { data: deliveryLog } = await sb
+      .from('notification_logs')
+      .insert({
+        template_key: 'delivery_confirmed',
+        channel: 'both',
+        status: 'pending',
+        entity_type: 'order',
+        entity_id: event.entity_id,
+      })
+      .select('id')
+      .single();
     if (deliveryLog) await triggerNotificationHub(sb, deliveryLog.id);
     actions.push('notification_queued:delivery_confirmed');
   }
@@ -355,13 +358,17 @@ async function handleFinancialStatusChanged(
             }
 
             // Notify approver
-            const { data: approvalReqLog1 } = await sb.from('notification_logs').insert({
-              template_key: 'approval_requested',
-              channel: 'email',
-              status: 'pending',
-              entity_type: 'financial_document',
-              entity_id: event.entity_id,
-            }).select('id').single();
+            const { data: approvalReqLog1 } = await sb
+              .from('notification_logs')
+              .insert({
+                template_key: 'approval_requested',
+                channel: 'email',
+                status: 'pending',
+                entity_type: 'financial_document',
+                entity_id: event.entity_id,
+              })
+              .select('id')
+              .single();
             if (approvalReqLog1) await triggerNotificationHub(sb, approvalReqLog1.id);
             actions.push('notification_queued:approval_requested');
             break;
@@ -383,13 +390,17 @@ async function handleFinancialStatusChanged(
           });
           actions.push(`approval_created:${rule.approval_type}`);
 
-          const { data: approvalReqLog2 } = await sb.from('notification_logs').insert({
-            template_key: 'approval_requested',
-            channel: 'email',
-            status: 'pending',
-            entity_type: 'financial_document',
-            entity_id: event.entity_id,
-          }).select('id').single();
+          const { data: approvalReqLog2 } = await sb
+            .from('notification_logs')
+            .insert({
+              template_key: 'approval_requested',
+              channel: 'email',
+              status: 'pending',
+              entity_type: 'financial_document',
+              entity_id: event.entity_id,
+            })
+            .select('id')
+            .single();
           if (approvalReqLog2) await triggerNotificationHub(sb, approvalReqLog2.id);
           actions.push('notification_queued:approval_requested');
           break;
@@ -440,25 +451,33 @@ async function handleApprovalDecided(
     }
 
     // Notify requestor
-    const { data: approvedLog } = await sb.from('notification_logs').insert({
-      template_key: 'approval_decided',
-      channel: 'email',
-      status: 'pending',
-      entity_type: entity_type as string,
-      entity_id: entity_id as string,
-    }).select('id').single();
+    const { data: approvedLog } = await sb
+      .from('notification_logs')
+      .insert({
+        template_key: 'approval_decided',
+        channel: 'email',
+        status: 'pending',
+        entity_type: entity_type as string,
+        entity_id: entity_id as string,
+      })
+      .select('id')
+      .single();
     if (approvedLog) await triggerNotificationHub(sb, approvedLog.id);
     actions.push('notification_queued:approval_approved');
   }
 
   if (decision === 'rejected') {
-    const { data: rejectedLog } = await sb.from('notification_logs').insert({
-      template_key: 'approval_decided',
-      channel: 'email',
-      status: 'pending',
-      entity_type: entity_type as string,
-      entity_id: entity_id as string,
-    }).select('id').single();
+    const { data: rejectedLog } = await sb
+      .from('notification_logs')
+      .insert({
+        template_key: 'approval_decided',
+        channel: 'email',
+        status: 'pending',
+        entity_type: entity_type as string,
+        entity_id: entity_id as string,
+      })
+      .select('id')
+      .single();
     if (rejectedLog) await triggerNotificationHub(sb, rejectedLog.id);
     actions.push('notification_queued:approval_rejected');
   }
@@ -499,17 +518,35 @@ async function handleDocumentUploaded(
     actions.push(`flag_set:${flag}`);
   }
 
+  // Comprovantes de pagamento (adiantamento/saldo carreteiro) → process-payment-proof
+  if (['adiantamento_carreteiro', 'saldo_carreteiro'].includes(type as string)) {
+    try {
+      await callEdgeFunction('process-payment-proof', { documentId: event.entity_id });
+      actions.push('payment_proof_processing_triggered');
+    } catch (e) {
+      actions.push(`payment_proof_failed:${(e as Error).message}`);
+    }
+  }
+
   // Check if order can auto-advance
   const { data: order } = await sb
     .from('orders')
-    .select('stage, has_nfe, has_cte, has_pod, has_cnh, has_crlv, has_antt, has_analise_gr, has_doc_rota, has_vpo')
+    .select(
+      'stage, has_nfe, has_cte, has_pod, has_cnh, has_crlv, has_antt, has_analise_gr, has_doc_rota, has_vpo'
+    )
     .eq('id', order_id as string)
     .maybeSingle();
 
   if (order) {
     // documentacao → coleta_realizada: requires NF-e + CT-e + Análise GR + Doc Rota + VPO
-    if (order.stage === 'documentacao' && order.has_nfe && order.has_cte
-        && order.has_analise_gr && order.has_doc_rota && order.has_vpo) {
+    if (
+      order.stage === 'documentacao' &&
+      order.has_nfe &&
+      order.has_cte &&
+      order.has_analise_gr &&
+      order.has_doc_rota &&
+      order.has_vpo
+    ) {
       await sb
         .from('orders')
         .update({ stage: 'coleta_realizada' })
@@ -542,33 +579,45 @@ async function handleDriverQualified(
   const actions: string[] = [];
 
   if (status === 'aprovado') {
-    const { data: approvedLog } = await sb.from('notification_logs').insert({
-      template_key: 'driver_qualification_approved',
-      channel: 'whatsapp',
-      status: 'pending',
-      entity_type: 'order',
-      entity_id: event.entity_id,
-    }).select('id').single();
+    const { data: approvedLog } = await sb
+      .from('notification_logs')
+      .insert({
+        template_key: 'driver_qualification_approved',
+        channel: 'whatsapp',
+        status: 'pending',
+        entity_type: 'order',
+        entity_id: event.entity_id,
+      })
+      .select('id')
+      .single();
     if (approvedLog) await triggerNotificationHub(sb, approvedLog.id);
     actions.push('notification_queued:driver_qualification_approved');
   } else if (status === 'bloqueado') {
-    const { data: blockedLog } = await sb.from('notification_logs').insert({
-      template_key: 'driver_qualification_blocked',
-      channel: 'whatsapp',
-      status: 'pending',
-      entity_type: 'order',
-      entity_id: event.entity_id,
-    }).select('id').single();
+    const { data: blockedLog } = await sb
+      .from('notification_logs')
+      .insert({
+        template_key: 'driver_qualification_blocked',
+        channel: 'whatsapp',
+        status: 'pending',
+        entity_type: 'order',
+        entity_id: event.entity_id,
+      })
+      .select('id')
+      .single();
     if (blockedLog) await triggerNotificationHub(sb, blockedLog.id);
     actions.push('notification_queued:driver_qualification_blocked');
   } else if (status === 'em_analise') {
-    const { data: reviewLog } = await sb.from('notification_logs').insert({
-      template_key: 'driver_qualification_review',
-      channel: 'whatsapp',
-      status: 'pending',
-      entity_type: 'order',
-      entity_id: event.entity_id,
-    }).select('id').single();
+    const { data: reviewLog } = await sb
+      .from('notification_logs')
+      .insert({
+        template_key: 'driver_qualification_review',
+        channel: 'whatsapp',
+        status: 'pending',
+        entity_type: 'order',
+        entity_id: event.entity_id,
+      })
+      .select('id')
+      .single();
     if (reviewLog) await triggerNotificationHub(sb, reviewLog.id);
     actions.push('notification_queued:driver_qualification_review');
   }
@@ -604,13 +653,17 @@ async function handleComplianceViolation(
   actions.push('approval_created:compliance_override');
 
   // Notify via WhatsApp + Email
-  const { data: violationLog } = await sb.from('notification_logs').insert({
-    template_key: 'compliance_violation',
-    channel: 'both',
-    status: 'pending',
-    entity_type: 'order',
-    entity_id: event.entity_id,
-  }).select('id').single();
+  const { data: violationLog } = await sb
+    .from('notification_logs')
+    .insert({
+      template_key: 'compliance_violation',
+      channel: 'both',
+      status: 'pending',
+      entity_type: 'order',
+      entity_id: event.entity_id,
+    })
+    .select('id')
+    .single();
   if (violationLog) await triggerNotificationHub(sb, violationLog.id);
   actions.push('notification_queued:compliance_violation');
 
@@ -621,7 +674,10 @@ async function handleComplianceViolation(
 // Main: Event Dispatcher
 // ─────────────────────────────────────────────────────
 
-async function processEvents(sb: SupabaseClient, eventId?: string): Promise<{
+async function processEvents(
+  sb: SupabaseClient,
+  eventId?: string
+): Promise<{
   processed: number;
   results: Array<{ eventId: string; event_type: string; result: EventResult }>;
 }> {
@@ -634,11 +690,7 @@ async function processEvents(sb: SupabaseClient, eventId?: string): Promise<{
     .limit(20);
 
   if (eventId) {
-    query = sb
-      .from('workflow_events')
-      .select('*')
-      .eq('id', eventId)
-      .eq('status', 'pending');
+    query = sb.from('workflow_events').select('*').eq('id', eventId).eq('status', 'pending');
   }
 
   const { data: events, error: fetchErr } = await query;
@@ -649,10 +701,7 @@ async function processEvents(sb: SupabaseClient, eventId?: string): Promise<{
 
   for (const event of events as WorkflowEvent[]) {
     // Mark as processing
-    await sb
-      .from('workflow_events')
-      .update({ status: 'processing' })
-      .eq('id', event.id);
+    await sb.from('workflow_events').update({ status: 'processing' }).eq('id', event.id);
 
     try {
       let result: EventResult;

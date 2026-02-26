@@ -1,0 +1,72 @@
+Segue um prompt técnico e específico para colar no **Cursor** (vale também para Claude Code). Ele implementa exatamente o que você decidiu: **/auth para signup/invite**, **/reset-password para recovery**, e remove qualquer dependência de `window.location.origin` em links de e-mail.
+
+---
+
+## Prompt (Cursor)
+
+Você é um agente de código atuando no repositório **C:\Users\marce\cargo-flow-navigator**. Faça um patch para corrigir os fluxos de Auth do Supabase (signup / invite / reset password) garantindo que **NENHUM link de e-mail use domínios de preview da Vercel** (`*-marcelo-rosas-projects.vercel.app`). Todos os redirects devem apontar explicitamente para o domínio de produção:
+
+- PROD_ORIGIN = `https://cargo-flow-navigator.vercel.app`
+
+### Requisitos funcionais (não interpretar diferente)
+1) **Signup (confirmação de e-mail)** deve redirecionar para:
+   - `https://cargo-flow-navigator.vercel.app/auth`
+
+2) **Recovery (reset password)** deve redirecionar para:
+   - `https://cargo-flow-navigator.vercel.app/reset-password`
+
+3) **Invite users (admin invite)** deve redirecionar para:
+   - `https://cargo-flow-navigator.vercel.app/auth`
+
+4) Remover/evitar uso de `window.location.origin` como origem de redirects em e-mails, para impedir que preview domains contaminem Redirect URLs do Supabase.
+
+### Arquivos alvo
+- `src/hooks/useAuth.tsx` (AuthProvider)
+- `supabase/functions/invite-user/index.ts` (Edge Function invite-user)
+
+### Mudanças exatas
+
+#### A) src/hooks/useAuth.tsx
+- Introduzir uma constante local (ou importável) no topo do arquivo:
+  ```ts
+  const PROD_ORIGIN = 'https://cargo-flow-navigator.vercel.app';
+  ```
+- Alterar a função `signUp` para usar:
+  - `emailRedirectTo: `${PROD_ORIGIN}/auth``
+- Manter `resetPassword` como:
+  - `redirectTo: `${PROD_ORIGIN}/reset-password``
+- Não modificar lógica de sessão/onAuthStateChange.
+
+#### B) supabase/functions/invite-user/index.ts
+- Ajustar o `redirectTo` passado para `inviteUserByEmail` para sempre apontar para `/auth`:
+  - Base:
+    - se existir `Deno.env.get('SITE_URL')`, usar como base
+    - senão usar `https://cargo-flow-navigator.vercel.app`
+  - Montar:
+    ```ts
+    const base = Deno.env.get('SITE_URL') ?? 'https://cargo-flow-navigator.vercel.app';
+    const redirectTo = `${base}/auth`;
+    ```
+- Garantir que **não** passe somente o domínio sem rota.
+- Não logar secrets.
+- Não alterar regras de autorização existentes (RPC is_admin etc.).
+
+### Validação (obrigatória no final)
+1) Grep no repo para garantir que não existe mais:
+   - `emailRedirectTo: \`${window.location.origin}`
+   - `redirectTo: \`${window.location.origin}`
+2) Garantir que as strings finais aparecem no código:
+   - `https://cargo-flow-navigator.vercel.app/auth`
+   - `https://cargo-flow-navigator.vercel.app/reset-password`
+
+### Saída
+- Fazer o patch com diffs claros.
+- No final, explicar em 5 bullets:
+  - o que mudou
+  - por que evita preview domain
+  - quais rotas o Supabase precisa ter allowlisted (listar exatamente: `/`, `/auth`, `/reset-password`, `http://localhost:8080/`)
+  - como testar signup / reset / invite manualmente
+
+Não faça mudanças fora desse escopo.
+
+---

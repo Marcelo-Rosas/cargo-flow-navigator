@@ -58,6 +58,10 @@ export interface FinancialKanbanRow {
   carreteiro_real?: number | null;
   carreteiro_antt?: number | null;
 
+  // Trip
+  trip_id?: string | null;
+  trip_number?: string | null;
+
   // Allow additional fields from views
   [key: string]: unknown;
 }

@@ -1,0 +1,440 @@
+Plano - Vectra Cargo
+
+
+
+ai_usage_tracking
+├── id (UUID PK)
+├── analysis_type (TEXT)
+├── model_used (TEXT) — 'haiku-4.5' | 'sonnet-4'
+├── input_tokens (INT)
+├── output_tokens (INT)
+├── cache_read_tokens (INT)
+├── cache_creation_tokens (INT)
+├── estimated_cost_usd (NUMERIC(10,6))
+├── status (TEXT) — 'success' | 'rate_limited' | 'budget_exceeded' | 'cached'
+├── entity_type / entity_id (TEXT/UUID)
+├── duration_ms (INT)
+├── created_at (TIMESTAMPTZ)
+
+ai_budget_config
+├── id (UUID PK)
+├── key (TEXT UNIQUE) — 'daily_limit_usd' | 'monthly_limit_usd' | 'alert_threshold_pct'
+├── value (NUMERIC)
+├── updated_by (UUID)
+├── updated_at (TIMESTAMPTZ)
+```
+
+**Arquivo**: `supabase/migrations/YYYYMMDD_ai_usage_tracking.sql`
+
+### Modificar: `ai-financial-agent/index.ts`
+
+Adicionar antes de cada chamada Claude:
+```
+1. checkBudget(analysisType) → { allowed, remaining, model }
+2. checkCachedInsight(entityType, entityId) → insight | null
+3. selectModel(analysisType) → 'haiku-4.5' | 'sonnet-4'
+4. Prompt caching: cache_control no system prompt
+5. logUsage(response.usage) → INSERT em ai_usage_tracking
+6. Retry 429 com exponential backoff
+```
+
+### Novo componente: Widget de Uso no Dashboard (`AiUsageDashboard.tsx`)
+
+Para o manager visualizar:
+- Gasto hoje / budget diário (barra de progresso)
+- Gasto mês / budget mensal
+- Chamadas por tipo (donut chart)
+- Tokens consumidos vs cacheados
+- Alertas de rate limit
+- Botão para ajustar budgets
+
+### Novos hooks
+
+| Hook | Descrição |
+|------|-----------|
+| `useAiUsageStats.ts` | Query de estatísticas de uso (dia/mês/tipo) |
+| `useAiBudgetConfig.ts` | CRUD do budget config (admin only) |
+
+### Arquivos a modificar
+
+| Arquivo | Mudança |
+|---------|---------|
+| `supabase/functions/ai-financial-agent/index.ts` | Adicionar budget check, model routing, caching, retry, usage logging |
+| `supabase/functions/workflow-orchestrator/index.ts` | Adicionar smart triggering (skip AI para entidades pequenas) |
+| `src/pages/Dashboard.tsx` | Adicionar AiUsageDashboard widget (apenas para role admin) |
+| `src/components/dashboard/AiInsightsWidget.tsx` | Mostrar indicador "modelo usado" e "custo desta análise" |
+
+---
+
+## Estimativa de Custos Mensais
+
+### Cenário: 200 cotações/mês, 150 OS, 300 docs financeiros
+
+| Análise | Frequência | Modelo | Tokens/chamada | Custo |
+|---------|------------|--------|----------------|-------|
+| Quote profitability | ~100/mês (filtro >R$5k) | Haiku | ~2K in + 500 out | $0.45 |
+| Financial anomaly | ~150/mês | Haiku | ~1.5K in + 300 out | $0.30 |
+| Approval summary | ~30/mês | Sonnet | ~3K in + 800 out | $0.39 |
+| Dashboard insights | ~30/mês (1/dia) | Sonnet | ~4K in + 1K out | $0.81 |
+| **TOTAL estimado** | | | | **~$1.95/mês** |
+
+Com prompt caching ativo, custo real ~30% menor: **~$1.40/mês**
+
+---
+
+## Verificação / Como testar
+
+1. **Budget check**: Setar budget diário = $0.01 → verificar que AI retorna fallback após 1ª chamada
+2. **Model routing**: Chamar `quote_profitability` → verificar que usa Haiku; `approval_summary` → Sonnet
+3. **Prompt caching**: Fazer 2 chamadas em <5min → verificar `cache_read_input_tokens > 0` na 2ª
+4. **Smart triggering**: Criar cotação de R$1.000 → verificar que AI NÃO é chamado
+5. **429 retry**: Simular rate limit → verificar que tenta 3x com backoff
+6. **Usage dashboard**: Fazer 5 chamadas → verificar widget atualizado com gasto correto
+7. **Response caching**: Chamar análise 2x para mesma entidade → 2ª retorna do banco
+
+---
+
+## Ordem de Implementação
+
+| # | Item | Complexidade | Estimativa |
+|---|------|-------------|------------|
+| 1 | Migration: `ai_usage_tracking` + `ai_budget_config` + seed | Baixa | 0.5 dia |
+| 2 | Refatorar `ai-financial-agent`: budget check + model routing | Média | 1 dia |
+| 3 | Adicionar prompt caching + retry 429 + usage logging | Média | 1 dia |
+| 4 | Smart triggering no `workflow-orchestrator` | Baixa | 0.5 dia |
+| 5 | Frontend: `AiUsageDashboard` widget + hooks | Média | 1 dia |
+| **Total** | | | **~4 dias** |
+
+---
+
+## Sources da pesquisa
+
+- [Rate Limits - Claude API](https://platform.claude.com/docs/en/api/rate-limits)
+- [Prompt Caching - Claude Docs](https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching)
+- [Pricing - Claude API](https://platform.claude.com/docs/en/about-claude/pricing)
+- [Claude API Quota Tiers Guide](https://www.aifreeapi.com/en/posts/claude-api-quota-tiers-limits)
+
+---
+---
+
+# (Referência) Plano Original: Sistema Multi-Agente
+
+## Contexto Original
+
+O Cargo Flow Navigator possui workflows manuais (cotações, ordens de serviço, financeiro) sem automação entre etapas. Todas as transições de stage dependem de ação humana no frontend, o que gera:
+- Atrasos na comunicação com clientes e motoristas
+- Documentos financeiros (FAT/PAG) criados manualmente
+- Nenhuma análise inteligente de rentabilidade
+- Sem fluxo de aprovação gerencial
+- Notificações apenas via toast no browser (nada por email/WhatsApp)
+
+**Objetivo**: Criar um sistema multi-agente (Hierarchical + Human-in-the-loop) que automatize todo o pipeline logístico.
+
+**Stack de integração**: Supabase (Event Bus + Edge Functions) + **OpenClaw** (AI Agent + WhatsApp + Orchestration Skills) + Claude API (Análise Financeira)
+
+---
+
+## Arquitetura Multi-Agente
+```
+┌─────────────────────────────────────────────────────────┐
+│                    SUPABASE (Event Bus)                  │
+│  DB Triggers → workflow_events table → DB Webhooks       │
+└──────────────┬──────────────────────────┬───────────────┘
+               │                          │
+    ┌──────────▼──────────┐    ┌─────────▼────────────┐
+    │  ORCHESTRATOR AGENT │    │  OpenClaw Gateway     │
+    │  (Edge Function)    │    │  (WhatsApp + Cron)    │
+    │  - Route events     │    │  - WhatsApp msgs      │
+    │  - Validate rules   │    │  - Scheduled jobs     │
+    │  - Chain actions     │    │  - AI Skills          │
+    └───┬────┬────┬───────┘    └───┬──────┬────────────┘
+        │    │    │                │      │
+   ┌────▼┐ ┌▼───┐│ ┌─────────────▼┐  ┌──▼──────────────┐
+   │Email│ │FAT/││ │ Notification  │  │ AI Financial     │
+   │Agent│ │PAG ││ │ Skill         │  │ Analysis Skill   │
+   │Resend││Agent││ │ (WhatsApp)   │  │ (Claude API)     │
+   └─────┘ └────┘│ └──────────────┘  └─────────────────┘
+                  │
+          ┌───────▼────────┐
+          │ Approval Agent │
+          │ (DB + UI + AI) │
+          └────────────────┘
+```
+
+---
+
+## Fase 1: Event Bus + Approval Workflow + AI Analysis (PRIORIDADE)
+
+### 1.1 — Event Bus (Tabelas + Triggers)
+
+**Novas tabelas SQL:**
+```
+workflow_events
+├── id (UUID PK)
+├── event_type (TEXT) — 'quote.stage_changed', 'order.created', etc.
+├── entity_type (TEXT) — 'quote', 'order', 'financial_document'
+├── entity_id (UUID)
+├── payload (JSONB) — dados do evento
+├── status (TEXT) — 'pending' | 'processing' | 'completed' | 'failed'
+├── retry_count / max_retries (INT)
+├── error_message (TEXT)
+├── created_at / processed_at (TIMESTAMPTZ)
+└── created_by (UUID)
+
+workflow_event_logs
+├── id (UUID PK)
+├── event_id (UUID FK → workflow_events)
+├── action (TEXT) — 'notification_sent', 'stage_advanced'
+├── agent (TEXT) — 'notification-hub', 'ai-analyst'
+├── details (JSONB)
+└── created_at (TIMESTAMPTZ)
+```
+
+**Database Triggers a criar:**
+| Trigger | Tabela | Quando | Evento gerado |
+|---------|--------|--------|---------------|
+| `trg_emit_quote_stage_event` | `quotes` | AFTER UPDATE OF stage | `quote.stage_changed` |
+| `trg_emit_order_stage_event` | `orders` | AFTER UPDATE OF stage | `order.stage_changed` |
+| `trg_emit_order_created_event` | `orders` | AFTER INSERT | `order.created` |
+| `trg_emit_financial_status_event` | `financial_documents` | AFTER UPDATE OF status | `financial.status_changed` |
+| `trg_emit_document_uploaded_event` | `documents` | AFTER INSERT | `document.uploaded` |
+
+**Arquivo**: `supabase/migrations/YYYYMMDD_workflow_events.sql`
+
+### 1.2 — Approval Workflow
+
+**Novas tabelas SQL:**
+```
+approval_requests
+├── id (UUID PK)
+├── entity_type (TEXT)
+├── entity_id (UUID)
+├── approval_type (TEXT) — 'financial_release', 'high_value_quote'
+├── status (TEXT) — 'pending' | 'approved' | 'rejected' | 'expired'
+├── requested_by (UUID)
+├── assigned_to (UUID) — aprovador específico
+├── assigned_to_role (TEXT) — ou aprovação por role
+├── title / description (TEXT)
+├── ai_analysis (JSONB) — resumo gerado pelo Claude
+├── decision_notes (TEXT)
+├── decided_by (UUID) / decided_at (TIMESTAMPTZ)
+└── created_at / updated_at / expires_at (TIMESTAMPTZ)
+
+approval_rules
+├── id (UUID PK)
+├── name (TEXT)
+├── entity_type (TEXT)
+├── trigger_condition (JSONB) — ex: {"field":"total_amount", ">": 50000}
+├── approval_type (TEXT)
+├── approver_role (TEXT) DEFAULT 'admin'
+├── auto_approve_after_hours (INT nullable)
+└── active (BOOLEAN)
+```
+
+**Regras iniciais (seed data):**
+- FAT > R$50.000 → aprovação admin
+- PAG qualquer → aprovação financeiro
+- Cotação com margem < 10% → aprovação admin
+
+**Arquivo**: `supabase/migrations/YYYYMMDD_approval_workflow.sql`
+
+**Novos componentes frontend:**
+| Arquivo | Descrição |
+|---------|-----------|
+| `src/pages/Approvals.tsx` | Página dedicada de aprovações |
+| `src/components/approvals/ApprovalBanner.tsx` | Banner no Dashboard/Financial com contagem de pendentes |
+| `src/components/approvals/ApprovalModal.tsx` | Modal com dados da entidade + análise AI + botões aprovar/rejeitar |
+| `src/components/approvals/ApprovalList.tsx` | Lista de aprovações com filtros |
+| `src/hooks/useApprovalRequests.ts` | Hook CRUD + realtime |
+
+**Rota**: Adicionar `/aprovacoes` em `App.tsx` (roles: admin, financeiro)
+
+### 1.3 — AI Financial Analysis Agent
+
+**Nova Edge Function**: `supabase/functions/ai-financial-agent/index.ts`
+
+Usa a Anthropic REST API diretamente (Deno runtime):
+```
+POST /ai-financial-agent
+Body: {
+  analysisType: 'quote_profitability' | 'financial_anomaly' | 'approval_summary' | 'dashboard_insights'
+  entityId: string
+  entityType: string
+}
+```
+
+**Tipos de análise:**
+
+1. **quote_profitability** — Quando cotação chega em `precificacao`:
+   - Compara valor vs piso ANTT
+   - Analisa margem vs média histórica
+   - Retorna: risco (baixo/médio/alto), margem %, recomendação
+
+2. **financial_anomaly** — Quando documento financeiro é criado:
+   - Compara montante vs faixa histórica para rotas similares
+   - Verifica condições de pagamento incomuns
+   - Retorna: flags de anomalia, severidade
+
+3. **approval_summary** — Quando `approval_request` é criado:
+   - Resume dados da entidade para o aprovador
+   - Destaca fatores de risco
+   - Fornece recomendação aprovar/rejeitar com justificativa
+   - Salvo em `approval_requests.ai_analysis`
+
+4. **dashboard_insights** — Diário via pg_cron:
+   - Analisa últimos 30 dias
+   - Identifica tendências, taxa de conversão, gargalos
+   - Salvo em tabela `ai_insights`
+
+**Nova tabela:**
+```
+ai_insights
+├── id (UUID PK)
+├── insight_type (TEXT)
+├── entity_type / entity_id (TEXT/UUID)
+├── analysis (JSONB) — { risk, margin, recommendation }
+├── summary_text (TEXT)
+├── expires_at / created_at (TIMESTAMPTZ)
+```
+
+**Novos componentes frontend:**
+| Arquivo | Descrição |
+|---------|-----------|
+| `src/components/dashboard/AiInsightsWidget.tsx` | Card de insights AI no Dashboard |
+| `src/components/financial/FinancialAiAnalysis.tsx` | Painel de análise AI no modal financeiro |
+| `src/hooks/useAiInsights.ts` | Hook para buscar insights |
+
+### 1.4 — Workflow Orchestrator
+
+**Nova Edge Function**: `supabase/functions/workflow-orchestrator/index.ts`
+
+Chamada via **Database Webhook** (Supabase) no INSERT da tabela `workflow_events`.
+
+**Lógica central:**
+1. Busca eventos `status = 'pending'` (batch de 20)
+2. Marca como `processing`
+3. Roteia por `event_type` para o handler correto
+4. Sucesso → `completed` | Falha → retry ou `failed`
+
+**Tabela de roteamento:**
+| event_type | Condição | Ações |
+|------------|----------|-------|
+| `quote.stage_changed` → `ganho` | sempre | 1) Auto-criar OS (RPC) 2) Auto-criar FAT 3) Notificar cliente |
+| `quote.stage_changed` → `precificacao` | sempre | 1) Análise AI de rentabilidade |
+| `order.created` | sempre | 1) Auto-criar PAG (se tem carreteiro) |
+| `order.stage_changed` → `busca_motorista` | driver_phone != null | 1) WhatsApp para motorista (via OpenClaw) |
+| `order.stage_changed` → `entregue` | sempre | 1) FAT → GERADO 2) PAG → GERADO 3) Notificar cliente |
+| `document.uploaded` | tipo POD/NFe/CTe | 1) Checar requisitos → auto-avançar stage |
+| `financial.status_changed` → `GERADO` | total > threshold | 1) Criar approval_request 2) AI analysis 3) Notificar aprovador |
+| `financial.status_changed` → `GERADO` | total ≤ threshold | 1) Auto-avançar para AGUARDANDO |
+| `approval.decided` = approved | sempre | 1) Auto-avançar documento financeiro |
+| `installment.overdue` | pg_cron diário | 1) Email + WhatsApp de cobrança |
+
+---
+
+## Fase 2: Notification Hub + OpenClaw Integration
+
+### 2.1 — Notification Hub (Email)
+
+**Nova Edge Function**: `supabase/functions/notification-hub/index.ts`
+```
+POST /notification-hub
+Body: {
+  channel: 'email' | 'whatsapp' | 'both'
+  template: string           // template key
+  recipients: [{ email?, phone?, name? }]
+  data: Record<string, any>  // variáveis do template
+  entityType? / entityId?
+}
+```
+
+Refatora a lógica existente do `send-quote-email` para templates reutilizáveis.
+
+**Novas tabelas:**
+```
+notification_templates
+├── key (TEXT UNIQUE) — 'quote_sent', 'driver_assigned', 'overdue_reminder'
+├── channel (TEXT) — 'email' | 'whatsapp' | 'both'
+├── subject_template / body_template / html_template (TEXT)
+└── active (BOOLEAN)
+
+notification_logs
+├── template_key / channel / status (TEXT)
+├── recipient_email / recipient_phone (TEXT)
+├── external_id (TEXT) — ID do Resend ou WhatsApp
+├── entity_type / entity_id
+└── created_at (TIMESTAMPTZ)
+```
+
+**Templates iniciais:**
+| Key | Canal | Descrição |
+|-----|-------|-----------|
+| `quote_sent` | email | Cotação enviada ao cliente (migrar lógica existente) |
+| `quote_won` | email | Confirmação de cotação aceita |
+| `order_created` | email | Confirmação de criação de OS |
+| `driver_assigned` | whatsapp | Notificação ao motorista com dados da coleta |
+| `delivery_confirmed` | both | Confirmação de entrega ao cliente |
+| `overdue_reminder` | both | Lembrete de parcela vencida |
+| `approval_requested` | email+whatsapp | Pedido de aprovação para gerente |
+| `approval_decided` | email | Resultado da aprovação |
+
+### 2.2 — OpenClaw Integration (WhatsApp + AI Jobs)
+
+**OpenClaw Skills a criar:**
+
+1. **`cargo-whatsapp-notifier`** — Skill que recebe webhooks do Supabase e envia WhatsApp
+```
+   openclaw cron add \
+     --name "Check pending notifications" \
+     --cron "*/1 * * * *" \
+     --message "Buscar notification_logs pendentes em Supabase e enviar via WhatsApp"
+```
+
+2. **`cargo-overdue-checker`** — Job diário de cobranças
+```
+   openclaw cron add \
+     --name "Daily overdue check" \
+     --cron "0 9 * * *" \
+     --tz "America/Sao_Paulo" \
+     --message "Verificar parcelas vencidas no Supabase e enviar lembretes WhatsApp"
+```
+
+3. **`cargo-ai-digest`** — Resumo diário para gestores
+```
+   openclaw cron add \
+     --name "Daily AI digest" \
+     --cron "0 8 * * 1-5" \
+     --tz "America/Sao_Paulo" \
+     --message "Gerar resumo diário: cotações pendentes, OS em andamento, documentos financeiros, aprovações pendentes"
+     --channel whatsapp
+```
+
+**Integração OpenClaw ↔ Supabase:**
+- OpenClaw chama a Supabase REST API (PostgREST) para ler/escrever dados
+- notification-hub enfileira mensagens WhatsApp na tabela `notification_logs`
+- OpenClaw skill consome essas mensagens e envia via WhatsApp nativo
+- Ou: workflow-orchestrator faz HTTP call direto para a OpenClaw API para envios imediatos
+
+---
+
+## Fase 3: Automated Jumps + State Machine
+
+### 3.1 — State Machine Configurável
+
+**Novas tabelas:**
+```
+workflow_definitions
+├── entity_type (TEXT UNIQUE) — 'quote', 'order', 'financial_fat', 'financial_pag'
+├── stages (JSONB) — array ordenado de stages
+└── active (BOOLEAN)
+
+workflow_transitions
+├── workflow_id (UUID FK)
+├── from_stage / to_stage (TEXT)
+├── conditions (JSONB) — condições para permitir
+├── required_fields (JSONB) — campos obrigatórios
+├── required_documents (JSONB) — documentos necessários
+├── requires_approval (BOOLEAN)
+├── approval_type (TEXT)
+├── post_actions (JSONB) — ações pós-transição
+└── UNIQUE(workflow_id, from_stage, to_stage)

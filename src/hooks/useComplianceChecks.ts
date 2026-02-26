@@ -23,17 +23,6 @@ type CompliancePayload = {
   status?: 'ok' | 'warning' | 'violation';
 };
 
-function pickPreferredArray<T>(
-  primary: T[] | null | undefined,
-  secondary: T[] | null | undefined,
-  tertiary: T[] | null | undefined
-): T[] {
-  if (Array.isArray(primary) && primary.length > 0) return primary;
-  if (Array.isArray(secondary) && secondary.length > 0) return secondary;
-  if (Array.isArray(tertiary) && tertiary.length > 0) return tertiary;
-  return Array.isArray(primary) ? primary : [];
-}
-
 // ─────────────────────────────────────────────────────
 // Queries
 // ─────────────────────────────────────────────────────
@@ -56,22 +45,20 @@ export function useComplianceChecks(orderId: string) {
 
       const rows = (data ?? []) as Array<Record<string, unknown>>;
       return rows.map((row) => {
-        const result = ('result' in row ? (row.result as CompliancePayload | null) : null) ?? {};
+        const result = (row.result as CompliancePayload | null) ?? {};
         const aiAnalysis = (row.ai_analysis as CompliancePayload | null) ?? {};
-        const directRules = row.rules_evaluated as ComplianceCheck['rules_evaluated'] | null;
-        const directViolations = row.violations as ComplianceCheck['violations'] | null;
 
-        const rulesEvaluated = pickPreferredArray(
-          directRules,
-          result.rules_evaluated,
-          aiAnalysis.rules_evaluated
-        );
+        const rulesEvaluated =
+          (row.rules_evaluated as ComplianceCheck['rules_evaluated'] | null) ??
+          result.rules_evaluated ??
+          aiAnalysis.rules_evaluated ??
+          [];
 
-        const violations = pickPreferredArray(
-          directViolations,
-          result.violations,
-          aiAnalysis.violations
-        );
+        const violations =
+          (row.violations as ComplianceCheck['violations'] | null) ??
+          result.violations ??
+          aiAnalysis.violations ??
+          [];
 
         const status =
           (row.status as ComplianceCheck['status'] | null) ??
