@@ -6,6 +6,20 @@ interface AnalysisMeta {
   [key: string]: unknown;
 }
 
+export interface OccurrenceDetail {
+  description: string;
+  severity: string;
+}
+
+export interface RealProfitabilityMetrics {
+  custo_carreteiro_real: number;
+  resultado_liquido_real: number;
+  margem_percent_real: number;
+  desvio_margem_prevista_real?: number;
+  is_reconciled: boolean;
+  ocorrencias?: OccurrenceDetail[];
+}
+
 export interface QuoteProfitabilityResult extends AnalysisMeta {
   risk: 'baixo' | 'medio' | 'alto';
   confidence_score?: number;
@@ -19,6 +33,7 @@ export interface QuoteProfitabilityResult extends AnalysisMeta {
   recommendation?: string;
   summary?: string;
   details?: string;
+  real_profitability?: RealProfitabilityMetrics;
 }
 
 export interface FinancialAnomalyResult extends AnalysisMeta {

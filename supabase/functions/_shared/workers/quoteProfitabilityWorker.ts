@@ -3,7 +3,12 @@ import {
   SYSTEM_PROMPT_QUOTE_PROFITABILITY,
   MAX_TOKENS_QUOTE,
 } from '../prompts/system_quote_profitability.ts';
-import { validateAndParse, type QuoteProfitabilityResult } from '../prompts/schemas.ts';
+import {
+  validateAndParse,
+  type QuoteProfitabilityResult,
+  type OccurrenceDetail,
+  type RealProfitabilityMetrics,
+} from '../prompts/schemas.ts';
 
 interface WorkerContext {
   entityId: string;
@@ -12,10 +17,56 @@ interface WorkerContext {
   previousInsights?: string;
 }
 
-async function fetchQuoteData(sb: any, entityId: string) {
+// ---------------------------------------------------------------------------
+// Tipos internos de dados brutos
+// ---------------------------------------------------------------------------
+
+interface OrderData {
+  id: string;
+  value: number | null;
+  carreteiro_real: number | null;
+  stage: string;
+}
+
+interface ReconciliationData {
+  paid_amount: number;
+  delta_amount: number;
+  is_reconciled: boolean;
+}
+
+interface FetchQuoteResult {
+  quote: any;
+  orderData: OrderData | null;
+  reconciliation: ReconciliationData | null;
+}
+
+// ---------------------------------------------------------------------------
+// Coleta de dados
+// ---------------------------------------------------------------------------
+
+async function fetchQuoteData(sb: any, entityId: string): Promise<FetchQuoteResult> {
   const { data: quote, error } = await sb.from('quotes').select('*').eq('id', entityId).single();
   if (error || !quote) throw new Error(`Quote not found: ${entityId}`);
-  return quote;
+
+  // Busca OS associada à cotação (pode não existir)
+  const { data: order } = await sb
+    .from('orders')
+    .select('id, value, carreteiro_real, stage')
+    .eq('quote_id', entityId)
+    .maybeSingle();
+
+  let reconciliation: ReconciliationData | null = null;
+
+  if (order?.id) {
+    const { data: recon } = await sb
+      .from('v_order_payment_reconciliation')
+      .select('paid_amount, delta_amount, is_reconciled')
+      .eq('order_id', order.id)
+      .maybeSingle();
+    reconciliation = recon ?? null;
+  }
+
+  return { quote, orderData: order ?? null, reconciliation };
 }
 
 async function fetchHistoricalMargins(sb: any) {
@@ -59,10 +110,71 @@ async function fetchClientHistory(sb: any, clientName: string) {
   return clientQuotes || [];
 }
 
+async function fetchOccurrences(sb: any, orderId: string): Promise<OccurrenceDetail[]> {
+  const { data: occurrences } = await sb
+    .from('occurrences')
+    .select('description, severity')
+    .eq('order_id', orderId);
+
+  return (occurrences || []).map((o: any) => ({
+    description: o.description || 'Sem descrição',
+    severity: o.severity || 'baixa',
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Cálculo da rentabilidade real
+// ---------------------------------------------------------------------------
+
+function calcRealProfitability(
+  quote: any,
+  orderData: OrderData,
+  reconciliation: ReconciliationData | null,
+  occurrences: OccurrenceDetail[]
+): RealProfitabilityMetrics | null {
+  const receitaBruta = Number(orderData.value);
+  if (!receitaBruta || receitaBruta <= 0) return null;
+
+  // Prioriza o valor pago conciliado (comprovante real); fallback para negociado
+  const custoCarreteiro = reconciliation?.is_reconciled
+    ? Number(reconciliation.paid_amount)
+    : orderData.carreteiro_real != null
+      ? Number(orderData.carreteiro_real)
+      : null;
+
+  if (custoCarreteiro == null) return null;
+
+  const resultadoLiquidoReal = receitaBruta - custoCarreteiro;
+  const margemPercentReal = (resultadoLiquidoReal / receitaBruta) * 100;
+
+  const predictedMargin =
+    quote.pricing_breakdown?.profitability?.margemPercent ??
+    quote.pricing_breakdown?.profitability?.margem_percent;
+
+  const result: RealProfitabilityMetrics = {
+    custo_carreteiro_real: custoCarreteiro,
+    resultado_liquido_real: resultadoLiquidoReal,
+    margem_percent_real: margemPercentReal,
+    is_reconciled: reconciliation?.is_reconciled ?? false,
+    ocorrencias: occurrences.length > 0 ? occurrences : undefined,
+  };
+
+  if (predictedMargin != null) {
+    result.desvio_margem_prevista_real = margemPercentReal - Number(predictedMargin);
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Montagem do prompt
+// ---------------------------------------------------------------------------
+
 function buildPrompt(
   quote: any,
   historical: any,
   clientHistory: any[],
+  realProfitability: RealProfitabilityMetrics | null,
   previousInsights?: string
 ): string {
   const breakdown = quote.pricing_breakdown;
@@ -91,10 +203,10 @@ function buildPrompt(
 **Cliente**: ${quote.client_name}
 **Rota**: ${quote.origin} -> ${quote.destination}
 **Distancia**: ${kmDistance || 'N/A'} km
-**Valor total**: R$ ${quoteValue.toFixed(2)}
-**Valor por km**: R$ ${valorPorKm}
+**Valor total (Previsto)**: R$ ${quoteValue.toFixed(2)}
+**Valor por km (Previsto)**: R$ ${valorPorKm}
 
-**Breakdown de Rentabilidade**:
+**Breakdown de Rentabilidade (Previsto)**:
 - Custos carreteiro: R$ ${profitability?.custosCarreteiro ?? profitability?.custos_carreteiro ?? 'N/A'}
 - Custos diretos: R$ ${profitability?.custosDiretos ?? profitability?.custos_diretos ?? 'N/A'}
 - Margem bruta: R$ ${profitability?.margemBruta ?? profitability?.margem_bruta ?? 'N/A'}
@@ -112,23 +224,71 @@ function buildPrompt(
 - Margem media deste cliente: ${avgClientMargin ? avgClientMargin.toFixed(1) + '%' : 'Sem historico'}
 - Cotacoes ganhas: ${clientHistory.filter((q: any) => q.stage === 'ganho').length}`;
 
+  // Bloco de rentabilidade real — só presente quando a OS está finalizada
+  if (realProfitability) {
+    prompt += `\n\n--- Ordem de Servico Finalizada (Dados Reais) ---`;
+    prompt += `\n**Custo Carreteiro (Real)**: R$ ${realProfitability.custo_carreteiro_real.toFixed(2)}`;
+    prompt += `\n**Resultado Liquido (Real)**: R$ ${realProfitability.resultado_liquido_real.toFixed(2)}`;
+    prompt += `\n**Margem % Real**: ${realProfitability.margem_percent_real.toFixed(1)}%`;
+    prompt += `\n**Status Conciliacao**: ${realProfitability.is_reconciled ? 'CONCILIADO (custo final confirmado por comprovante)' : 'PENDENTE (custo negociado, sem comprovante)'}`;
+
+    if (realProfitability.desvio_margem_prevista_real != null) {
+      const desvio = realProfitability.desvio_margem_prevista_real;
+      prompt += `\n**Desvio Previsto vs Real**: ${desvio > 0 ? '+' : ''}${desvio.toFixed(1)}%`;
+    }
+
+    if (realProfitability.ocorrencias && realProfitability.ocorrencias.length > 0) {
+      prompt += `\n**Ocorrencias Operacionais (${realProfitability.ocorrencias.length})**:`;
+      realProfitability.ocorrencias.forEach((o) => {
+        prompt += `\n- [${o.severity.toUpperCase()}] ${o.description}`;
+      });
+    }
+  }
+
   if (previousInsights) {
     prompt += `\n\n**Analises anteriores desta entidade**:\n${previousInsights}`;
   }
 
-  prompt += `\n\nAvalie se esta cotacao e rentavel, se esta acima ou abaixo da media, e se o preco esta adequado em relacao ao piso ANTT.`;
+  if (realProfitability) {
+    prompt += `\n\nAvalie a rentabilidade desta operacao comparando previsto vs real. Identifique os fatores que causaram desvio na margem e avalie se o preco estava adequado em relacao ao piso ANTT e ao historico.`;
+  } else {
+    prompt += `\n\nAvalie se esta cotacao e rentavel, se esta acima ou abaixo da media, e se o preco esta adequado em relacao ao piso ANTT.`;
+  }
 
   return prompt;
 }
 
+// ---------------------------------------------------------------------------
+// Worker principal
+// ---------------------------------------------------------------------------
+
 export async function executeQuoteProfitabilityWorker(ctx: WorkerContext) {
-  const [quote, historical] = await Promise.all([
+  const [{ quote, orderData, reconciliation }, historical] = await Promise.all([
     fetchQuoteData(ctx.sb, ctx.entityId),
     fetchHistoricalMargins(ctx.sb),
   ]);
 
   const clientHistory = await fetchClientHistory(ctx.sb, quote.client_name);
-  const prompt = buildPrompt(quote, historical, clientHistory, ctx.previousInsights);
+
+  // Busca ocorrências da OS (se existir e estiver entregue)
+  let occurrences: OccurrenceDetail[] = [];
+  if (orderData?.id && orderData.stage === 'entregue') {
+    occurrences = await fetchOccurrences(ctx.sb, orderData.id);
+  }
+
+  // Calcula rentabilidade real (só quando OS entregue e custo disponível)
+  const realProfitability =
+    orderData?.stage === 'entregue'
+      ? calcRealProfitability(quote, orderData, reconciliation, occurrences)
+      : null;
+
+  const prompt = buildPrompt(
+    quote,
+    historical,
+    clientHistory,
+    realProfitability,
+    ctx.previousInsights
+  );
 
   const startTime = Date.now();
   const result = await callLLM({
@@ -147,6 +307,11 @@ export async function executeQuoteProfitabilityWorker(ctx: WorkerContext) {
   analysis._cost_usd = 0;
   analysis._provider = result.provider;
   analysis._duration_ms = durationMs;
+
+  // Anexa dados reais calculados no worker (não delegados ao LLM)
+  if (realProfitability) {
+    analysis.real_profitability = realProfitability;
+  }
 
   await ctx.sb.from('ai_insights').insert({
     insight_type: 'quote_profitability',
