@@ -37,6 +37,7 @@ import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurren
 import { useVehicleByPlate } from '@/hooks/useVehicles';
 import { useUpdateOrder } from '@/hooks/useOrders';
 import { useEnsureFinancialDocument } from '@/hooks/useEnsureFinancialDocument';
+import { useOrderReconciliation } from '@/hooks/useReconciliation';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
@@ -116,6 +117,39 @@ const STAGES_WITH_DOCS_TAB: OrderStage[] = [
   'em_transito',
   'entregue',
 ];
+
+function OrderReconciliationSummary({ orderId }: { orderId: string }) {
+  const { data: r } = useOrderReconciliation(orderId);
+  if (!r || Number(r.expected_amount) <= 0) return null;
+  const fmt = (v: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+  return (
+    <div className="p-4 rounded-lg bg-muted/30 border border-border">
+      <p className="text-sm font-semibold text-foreground mb-3">Conciliação de Pagamento</p>
+      <div className="grid grid-cols-3 gap-4 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Esperado</p>
+          <p className="font-semibold">{fmt(r.expected_amount)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Pago</p>
+          <p className="font-semibold">{fmt(r.paid_amount)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Delta</p>
+          <p
+            className={cn(
+              'font-semibold',
+              r.is_reconciled ? 'text-success' : 'text-warning-foreground'
+            )}
+          >
+            {fmt(r.delta_amount)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const STAGE_LABELS: Record<OrderStage, { label: string; color: string }> = {
   ordem_criada: { label: 'Ordem Criada', color: 'bg-muted text-muted-foreground' },
@@ -927,6 +961,9 @@ export function OrderDetailModal({
               {showDocsTab && (
                 <TabsContent value="documents" className="m-0 space-y-6">
                   {canManage && <DocumentUpload orderId={order.id} orderStage={order.stage} />}
+                  {order.carreteiro_real != null && Number(order.carreteiro_real) > 0 && (
+                    <OrderReconciliationSummary orderId={order.id} />
+                  )}
                   <Separator />
                   <DocumentList orderId={order.id} />
                 </TabsContent>

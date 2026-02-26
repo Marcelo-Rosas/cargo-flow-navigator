@@ -10,13 +10,16 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FileText, Truck } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { KanbanColumn } from '@/components/boards/KanbanColumn';
 import { FinancialCard } from '@/components/financial/FinancialCard';
+import { TripReconciliationCard } from '@/components/financial/TripReconciliationCard';
 import { FinancialDetailModal } from '@/components/modals/FinancialDetailModal';
 import { TabButton } from '@/components/financial/TabButton';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useFinancialBoardData } from '@/hooks/useFinancialBoardData';
+import { useTripsReconciliation } from '@/hooks/useReconciliation';
 import { useUpdateFinancialDocumentStatus } from '@/hooks/useUpdateFinancialDocumentStatus';
 import { FAT_COLUMNS, PAG_COLUMNS } from '@/lib/financial-kanban';
 import type { FinancialDocType } from '@/types/financial';
@@ -24,15 +27,19 @@ import type { FinancialKanbanRow } from '@/types/financial';
 import { toast } from 'sonner';
 
 type TabKey = 'receber' | 'pagar';
+type PagViewMode = 'os' | 'trip';
 
 export default function Financial() {
   const [tab, setTab] = useState<TabKey>('receber');
+  const [pagViewMode, setPagViewMode] = useState<PagViewMode>('os');
   const [activeDoc, setActiveDoc] = useState<FinancialKanbanRow | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<FinancialKanbanRow | null>(null);
 
   const activeType = useMemo(() => (tab === 'receber' ? 'FAT' : 'PAG') as FinancialDocType, [tab]);
   const receber = useFinancialBoardData('FAT', { enabled: tab === 'receber' });
   const pagar = useFinancialBoardData('PAG', { enabled: tab === 'pagar' });
+  const showTripsMode = tab === 'pagar' && pagViewMode === 'trip';
+  const tripsReconciliation = useTripsReconciliation({ enabled: showTripsMode });
 
   const boardData = tab === 'receber' ? receber : pagar;
   const columnsConfig = activeType === 'FAT' ? FAT_COLUMNS : PAG_COLUMNS;
@@ -119,24 +126,59 @@ export default function Financial() {
           </motion.p>
         </div>
 
-        <div className="flex gap-2">
-          <TabButton
-            active={tab === 'receber'}
-            onClick={() => setTab('receber')}
-            label="Receber"
-            count={totalReceber}
-            overdueCount={receber.overdueCount}
-          />
-          <TabButton
-            active={tab === 'pagar'}
-            onClick={() => setTab('pagar')}
-            label="Pagar"
-            count={totalPagar}
-            overdueCount={pagar.overdueCount}
-          />
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex gap-2">
+            <TabButton
+              active={tab === 'receber'}
+              onClick={() => setTab('receber')}
+              label="Receber"
+              count={totalReceber}
+              overdueCount={receber.overdueCount}
+            />
+            <TabButton
+              active={tab === 'pagar'}
+              onClick={() => setTab('pagar')}
+              label="Pagar"
+              count={totalPagar}
+              overdueCount={pagar.overdueCount}
+            />
+          </div>
+          {tab === 'pagar' && (
+            <ToggleGroup
+              type="single"
+              value={pagViewMode}
+              onValueChange={(v) => v && setPagViewMode(v as PagViewMode)}
+              className="border rounded-md p-0.5 bg-muted/30"
+            >
+              <ToggleGroupItem value="os" className="gap-1.5 text-xs">
+                <FileText className="w-3.5 h-3.5" />
+                Por OS
+              </ToggleGroupItem>
+              <ToggleGroupItem value="trip" className="gap-1.5 text-xs">
+                <Truck className="w-3.5 h-3.5" />
+                Por Trip
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
         </div>
 
-        {boardData.isLoading ? (
+        {tab === 'pagar' && pagViewMode === 'trip' ? (
+          tripsReconciliation.isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : tripsReconciliation.isError ? (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 text-destructive">
+              Erro ao carregar trips
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {(tripsReconciliation.data ?? []).map((trip) => (
+                <TripReconciliationCard key={trip.trip_id} trip={trip} />
+              ))}
+            </div>
+          )
+        ) : boardData.isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
@@ -180,11 +222,14 @@ export default function Financial() {
           </DndContext>
         )}
 
-        {boardData.rows.length === 0 && !boardData.isLoading && (
-          <div className="w-full py-16 text-center text-muted-foreground">
-            Nenhum registro encontrado.
-          </div>
-        )}
+        {((showTripsMode && (tripsReconciliation.data ?? []).length === 0) ||
+          (!showTripsMode && boardData.rows.length === 0)) &&
+          !boardData.isLoading &&
+          !tripsReconciliation.isLoading && (
+            <div className="w-full py-16 text-center text-muted-foreground">
+              Nenhum registro encontrado.
+            </div>
+          )}
       </div>
 
       <FinancialDetailModal

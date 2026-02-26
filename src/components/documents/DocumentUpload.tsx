@@ -28,6 +28,8 @@ interface DocumentUploadProps {
   orderStage?: OrderStage;
   financialContext?: 'carrier_payment';
   onSuccess?: () => void;
+  /** Called after upload when type is adiantamento_carreteiro or saldo_carreteiro (to trigger process-payment-proof) */
+  onCarrierPaymentDocCreated?: (documentId: string, type: DocumentType) => void;
 }
 
 interface UploadingFile {
@@ -125,12 +127,15 @@ const DOCUMENT_TYPE_TO_ORDER_FIELD: Record<string, keyof Order | null> = {
   outros: null,
 };
 
+const CARRIER_PAYMENT_TYPES: DocumentType[] = ['adiantamento_carreteiro', 'saldo_carreteiro'];
+
 export function DocumentUpload({
   orderId,
   quoteId,
   orderStage,
   financialContext,
   onSuccess,
+  onCarrierPaymentDocCreated,
 }: DocumentUploadProps) {
   const { user } = useAuth();
   const createDocumentMutation = useCreateDocument();
@@ -194,7 +199,7 @@ export function DocumentUpload({
 
       // Store the storage path (NOT a public URL) — access via signed URL at read time
       // uploadData.path is already the bare path: <user_id>/<timestamp>-<random>.<ext>
-      await createDocumentMutation.mutateAsync({
+      const created = await createDocumentMutation.mutateAsync({
         file_name: file.name,
         file_url: uploadData.path,
         file_size: file.size,
@@ -203,6 +208,10 @@ export function DocumentUpload({
         quote_id: quoteId || null,
         uploaded_by: user.id,
       });
+
+      if (CARRIER_PAYMENT_TYPES.includes(type) && created?.id && onCarrierPaymentDocCreated) {
+        onCarrierPaymentDocCreated(created.id, type);
+      }
 
       // Update order document flags baseado no tipo
       if (orderId) {

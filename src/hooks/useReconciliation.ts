@@ -83,7 +83,7 @@ export function useTripReconciliation(tripId: string | null | undefined) {
   });
 }
 
-export function useTripsReconciliation() {
+export function useTripsReconciliation(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['reconciliation', 'trips'],
     queryFn: async (): Promise<TripPaymentReconciliation[]> => {
@@ -95,5 +95,6 @@ export function useTripsReconciliation() {
       if (error) throw error;
       return filterSupabaseRows<TripPaymentReconciliation>(data);
     },
+    enabled: options?.enabled ?? true,
   });
 }

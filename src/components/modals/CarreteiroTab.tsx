@@ -1,5 +1,16 @@
 import { useState, useMemo, useEffect } from 'react';
-import { DollarSign, Save, Loader2, Send, TrendingDown, TrendingUp } from 'lucide-react';
+import {
+  DollarSign,
+  Save,
+  Loader2,
+  Send,
+  TrendingDown,
+  TrendingUp,
+  Truck,
+  CheckCircle2,
+  AlertCircle,
+  XCircle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,6 +27,9 @@ import { DocumentList } from '@/components/documents/DocumentList';
 import { useUpdateOrder } from '@/hooks/useOrders';
 import { usePaymentTerms } from '@/hooks/usePricingRules';
 import { useEnsureFinancialDocument } from '@/hooks/useEnsureFinancialDocument';
+import { useTripsForOrder } from '@/hooks/useTrips';
+import { useOrderReconciliation } from '@/hooks/useReconciliation';
+import { useProcessPaymentProof } from '@/hooks/usePaymentProofs';
 import { supabase } from '@/integrations/supabase/client';
 import { asInsert } from '@/lib/supabase-utils';
 import { cn } from '@/lib/utils';
@@ -34,6 +48,13 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
   const updateOrderMutation = useUpdateOrder();
   const ensureFinancialDocMutation = useEnsureFinancialDocument();
   const { data: paymentTermsList } = usePaymentTerms(true);
+  const { data: trip } = useTripsForOrder(order.id);
+  const { data: reconciliation } = useOrderReconciliation(order.id);
+  const processPaymentProofMutation = useProcessPaymentProof();
+
+  const handleCarrierPaymentDocCreated = (documentId: string) => {
+    processPaymentProofMutation.mutate(documentId, { onError: () => {} });
+  };
 
   // ---------- Valor Negociado ----------
   const initialCents =
@@ -458,6 +479,65 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
         </>
       )}
 
+      {/* ── Badge Trip + Resumo Conciliação ── */}
+      {(trip || reconciliation) && (
+        <>
+          <Separator />
+          <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+            {trip && (
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Trip</span>
+                <span className="font-mono text-sm">{trip.trip_number}</span>
+              </div>
+            )}
+            {reconciliation && Number(reconciliation.expected_amount) > 0 && (
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground text-xs">Esperado</p>
+                  <p className="font-semibold">{formatCurrency(reconciliation.expected_amount)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Pago</p>
+                  <p className="font-semibold">{formatCurrency(reconciliation.paid_amount)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Delta</p>
+                  <p
+                    className={cn(
+                      'font-semibold',
+                      reconciliation.is_reconciled ? 'text-success' : 'text-warning-foreground'
+                    )}
+                  >
+                    {formatCurrency(reconciliation.delta_amount)}
+                  </p>
+                </div>
+              </div>
+            )}
+            {reconciliation && (
+              <div className="flex items-center gap-2">
+                {reconciliation.is_reconciled ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-success">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Conciliado
+                  </span>
+                ) : reconciliation.proofs_count > 0 ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-destructive">
+                    <XCircle className="w-3.5 h-3.5" />
+                    Divergente
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-warning-foreground">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    Pendente
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       {/* ── Comprovantes de Pagamento ── */}
       <Separator />
       <div>
@@ -466,6 +546,7 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
           orderId={order.id}
           orderStage={order.stage}
           financialContext="carrier_payment"
+          onCarrierPaymentDocCreated={handleCarrierPaymentDocCreated}
         />
         <div className="mt-4">
           <DocumentList orderId={order.id} />

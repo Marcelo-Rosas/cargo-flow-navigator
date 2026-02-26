@@ -62,6 +62,13 @@ export interface FinancialKanbanRow {
   trip_id?: string | null;
   trip_number?: string | null;
 
+  // Reconciliation (PAG)
+  expected_amount?: number | null;
+  paid_amount?: number | null;
+  delta_amount?: number | null;
+  is_reconciled?: boolean | null;
+  proofs_count?: number | null;
+
   // Allow additional fields from views
   [key: string]: unknown;
 }
