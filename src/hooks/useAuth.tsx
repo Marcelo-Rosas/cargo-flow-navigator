@@ -2,7 +2,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-const PROD_ORIGIN = 'https://cargo-flow-navigator.vercel.app';
+const SITE_ORIGIN = window.location.origin;
 
 interface AuthContextType {
   user: User | null;
@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
       options: {
-        emailRedirectTo: `${PROD_ORIGIN}/auth`,
+        emailRedirectTo: `${SITE_ORIGIN}/auth`,
         data: { full_name: fullName },
       },
     });
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${PROD_ORIGIN}/reset-password`,
+      redirectTo: `${SITE_ORIGIN}/reset-password`,
     });
     return { error: error as Error | null };
   };
@@ -76,7 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, resetPassword, updatePassword }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, signIn, signUp, signOut, resetPassword, updatePassword }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -153,7 +153,8 @@ Deno.serve(async (req) => {
         },
       }
     );
-    const base = Deno.env.get('SITE_URL') ?? 'https://cargo-flow-navigator.vercel.app';
+    const base =
+      Deno.env.get('SITE_URL') ?? 'https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app';
     const redirectTo = `${base}/auth`;
     const { data: inviteData, error: inviteError } =
       await serviceClient.auth.admin.inviteUserByEmail(body.email, {
