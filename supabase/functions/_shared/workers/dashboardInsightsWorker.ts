@@ -143,14 +143,16 @@ function buildPrompt(
 - Total de ordens: ${data.orders.length}
 - Ordens por stage: ${JSON.stringify(ordersByStage)}
 
-**Financeiro**:
-- A receber pendente (FAT nao liquidado): R$ ${totalReceivablePending.toFixed(2)}
-- Ja recebido (FAT liquidado): R$ ${totalReceivableSettled.toFixed(2)}
-- A pagar pendente (PAG nao liquidado): R$ ${totalPayablePending.toFixed(2)}
-- Ja pago (PAG liquidado): R$ ${totalPayableSettled.toFixed(2)}
-- Resultado bruto pendente: R$ ${(totalReceivablePending - totalPayablePending).toFixed(2)}
-- Resultado bruto realizado: R$ ${(totalReceivableSettled - totalPayableSettled).toFixed(2)}
+**Financeiro (ATENCAO: nao confundir valores pendentes com valores ja liquidados)**:
+- FATURAMENTO PENDENTE (FAT ainda nao recebido, aguardando pagamento do cliente): R$ ${totalReceivablePending.toFixed(2)}
+- FATURAMENTO JA RECEBIDO (FAT liquidado, dinheiro ja entrou no caixa): R$ ${totalReceivableSettled.toFixed(2)}
+- DESPESAS PENDENTES (PAG ainda nao pago, aguardando pagamento a fornecedores): R$ ${totalPayablePending.toFixed(2)}
+- DESPESAS JA PAGAS (PAG liquidado, dinheiro ja saiu do caixa): R$ ${totalPayableSettled.toFixed(2)}
+- Saldo pendente (faturamento pendente - despesas pendentes): R$ ${(totalReceivablePending - totalPayablePending).toFixed(2)}
+- Saldo realizado (ja recebido - ja pago): R$ ${(totalReceivableSettled - totalPayableSettled).toFixed(2)}
 - Documentos financeiros gerados: ${data.financialDocs.length}
+
+IMPORTANTE: Ao mencionar "a receber" nos insights, use SOMENTE o valor de FATURAMENTO PENDENTE (R$ ${totalReceivablePending.toFixed(2)}). NAO some com o valor ja recebido. O valor ja recebido (R$ ${totalReceivableSettled.toFixed(2)}) ja entrou no caixa e nao e mais "a receber".
 
 **Aprovacoes pendentes**: ${data.pendingApprovals}
 ${crossEntityContext}
