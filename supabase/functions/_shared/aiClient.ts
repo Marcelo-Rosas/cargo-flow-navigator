@@ -206,7 +206,23 @@ async function callOpenAI(params: CallLLMParams): Promise<CallLLMResult> {
 }
 
 export async function callLLM(params: CallLLMParams): Promise<CallLLMResult> {
-  const preferred: LLMProvider = params.modelHint || 'openai';
+  const hasAnthropicKey = !!Deno.env.get('ANTHROPIC_API_KEY');
+  const hasOpenAIKey = !!Deno.env.get('OPENAI_API_KEY');
+
+  // Resolve preferred provider: honour modelHint first, then fall back to
+  // whichever key is actually available so we never fail with "not configured"
+  // when the other provider is ready to go.
+  let preferred: LLMProvider;
+  if (params.modelHint) {
+    preferred = params.modelHint;
+  } else if (hasAnthropicKey && !hasOpenAIKey) {
+    preferred = 'anthropic';
+  } else if (hasOpenAIKey && !hasAnthropicKey) {
+    preferred = 'openai';
+  } else {
+    // Both keys present (or neither) – default to openai for backwards compat
+    preferred = 'openai';
+  }
 
   const tryOpenAIFirst = preferred === 'openai';
 
@@ -220,6 +236,7 @@ export async function callLLM(params: CallLLMParams): Promise<CallLLMResult> {
     const message: string = err?.message || String(err);
 
     const isRecoverable =
+      /not configured/i.test(message) ||
       /credit balance is too low/i.test(message) ||
       /insufficient credit/i.test(message) ||
       /insufficient_quota/i.test(message) ||
