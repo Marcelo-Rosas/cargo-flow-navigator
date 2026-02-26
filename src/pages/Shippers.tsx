@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 import { ShipperForm } from '@/components/forms/ShipperForm';
+import { formatCpfDisplay } from '@/components/ui/masked-input';
 import { Database } from '@/integrations/supabase/types';
 import { useDebounce } from '@/hooks/useDebounce';
 import {
@@ -111,7 +112,7 @@ export default function Shippers() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nome, CNPJ, e-mail..."
+              placeholder="Buscar por nome, CPF, CNPJ, e-mail..."
               className="pl-10 w-80"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -173,7 +174,7 @@ export default function Shippers() {
                     Embarcador
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                    CNPJ
+                    CPF / CNPJ
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                     Contato
@@ -205,7 +206,7 @@ export default function Shippers() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-foreground font-mono text-sm">
-                      {shipper.cnpj || '-'}
+                      {(shipper.cpf ? formatCpfDisplay(shipper.cpf) : null) || shipper.cnpj || '-'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="space-y-1">

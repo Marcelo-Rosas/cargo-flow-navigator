@@ -19,12 +19,14 @@ import { useCreateShipper, useUpdateShipper } from '@/hooks/useShippers';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
-import { zodCnpj, zodPhone, zodCep } from '@/lib/validators';
+import { zodCpf, zodCnpj, zodPhone, zodCep } from '@/lib/validators';
+import { MaskedInput } from '@/components/ui/masked-input';
 
 type Shipper = Database['public']['Tables']['shippers']['Row'];
 
 const shipperSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(200, 'Nome muito longo'),
+  cpf: zodCpf,
   cnpj: zodCnpj,
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   phone: zodPhone,
@@ -58,6 +60,7 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
     resolver: zodResolver(shipperSchema),
     defaultValues: {
       name: '',
+      cpf: '',
       cnpj: '',
       email: '',
       phone: '',
@@ -73,6 +76,7 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
     if (shipper) {
       form.reset({
         name: shipper.name,
+        cpf: shipper.cpf || '',
         cnpj: shipper.cnpj || '',
         email: shipper.email || '',
         phone: shipper.phone || '',
@@ -85,6 +89,7 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
     } else {
       form.reset({
         name: '',
+        cpf: '',
         cnpj: '',
         email: '',
         phone: '',
@@ -160,6 +165,7 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
           id: shipper.id,
           updates: {
             name: data.name,
+            cpf: data.cpf || null,
             cnpj: data.cnpj || null,
             email: data.email || null,
             phone: data.phone || null,
@@ -174,6 +180,7 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
       } else {
         await createShipperMutation.mutateAsync({
           name: data.name,
+          cpf: data.cpf || null,
           cnpj: data.cnpj || null,
           email: data.email || null,
           phone: data.phone || null,
@@ -211,6 +218,26 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
                   <FormLabel>Nome / Razão Social *</FormLabel>
                   <FormControl>
                     <Input placeholder="Empresa LTDA" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="cpf"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>CPF</FormLabel>
+                  <FormControl>
+                    <MaskedInput
+                      mask="cpf"
+                      placeholder="000.000.000-00"
+                      value={field.value || ''}
+                      onValueChange={(rawValue) => field.onChange(rawValue ?? '')}
+                      onBlur={field.onBlur}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

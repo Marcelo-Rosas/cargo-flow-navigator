@@ -1759,6 +1759,7 @@ export type Database = {
           address: string | null;
           city: string | null;
           cnpj: string | null;
+          cpf: string | null;
           created_at: string;
           created_by: string | null;
           email: string | null;
@@ -1774,6 +1775,7 @@ export type Database = {
           address?: string | null;
           city?: string | null;
           cnpj?: string | null;
+          cpf?: string | null;
           created_at?: string;
           created_by?: string | null;
           email?: string | null;
@@ -1789,6 +1791,7 @@ export type Database = {
           address?: string | null;
           city?: string | null;
           cnpj?: string | null;
+          cpf?: string | null;
           created_at?: string;
           created_by?: string | null;
           email?: string | null;

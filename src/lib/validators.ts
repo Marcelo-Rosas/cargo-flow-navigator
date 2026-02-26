@@ -85,6 +85,15 @@ export function validatePlate(plate: string): boolean {
 // ─── Schemas Zod reutilizáveis ────────────────────────────────────────────────
 
 /**
+ * Campo CPF opcional com validação de formato e dígito verificador.
+ * Aceita vazio ("") → null
+ */
+export const zodCpf = z
+  .string()
+  .optional()
+  .refine((v) => !v || digits(v).length === 0 || validateCpf(v), 'CPF inválido');
+
+/**
  * Campo CNPJ opcional com validação de formato e dígito verificador.
  * Aceita vazio ("") → null
  */
