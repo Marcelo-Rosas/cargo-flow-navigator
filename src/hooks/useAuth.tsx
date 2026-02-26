@@ -2,6 +2,8 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+const PROD_ORIGIN = 'https://cargo-flow-navigator.vercel.app';
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -46,12 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl,
+        emailRedirectTo: `${PROD_ORIGIN}/auth`,
         data: { full_name: fullName },
       },
     });
@@ -63,10 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
-    // URL fixa de produção para garantir que o link de recovery sempre aponte corretamente
-    const prodOrigin = 'https://cargo-flow-navigator.vercel.app';
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${prodOrigin}/reset-password`,
+      redirectTo: `${PROD_ORIGIN}/reset-password`,
     });
     return { error: error as Error | null };
   };
