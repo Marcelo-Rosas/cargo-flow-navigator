@@ -128,7 +128,7 @@ async function handleQuoteStageChanged(
   // Quote reached pricing stage → trigger AI analysis
   if (new_stage === 'precificacao') {
     try {
-      await callEdgeFunction('ai-financial-agent', {
+      await callEdgeFunction('ai-orchestrator-agent', {
         analysisType: 'quote_profitability',
         entityId: event.entity_id,
         entityType: 'quote',
@@ -347,7 +347,7 @@ async function handleFinancialStatusChanged(
 
             // Request AI analysis for the approval
             try {
-              await callEdgeFunction('ai-financial-agent', {
+              await callEdgeFunction('ai-orchestrator-agent', {
                 analysisType: 'approval_summary',
                 entityId: event.entity_id,
                 entityType: 'financial_document',
