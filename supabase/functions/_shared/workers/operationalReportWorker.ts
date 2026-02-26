@@ -117,6 +117,7 @@ export async function executeOperationalReportWorker(ctx: WorkerContext) {
     prompt,
     system: SYSTEM_PROMPT_OPERATIONAL_REPORT,
     maxTokens: MAX_TOKENS_OPERATIONAL_REPORT,
+    modelHint: 'openai',
     analysisType: 'operational_report',
     entityType: null,
     entityId: null,

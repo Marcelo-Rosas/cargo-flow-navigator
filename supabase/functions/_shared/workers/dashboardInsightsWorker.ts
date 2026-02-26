@@ -145,6 +145,7 @@ export async function executeDashboardInsightsWorker(ctx: WorkerContext) {
     prompt,
     system: SYSTEM_PROMPT_DASHBOARD,
     maxTokens: MAX_TOKENS_DASHBOARD,
+    modelHint: 'anthropic',
     analysisType: 'dashboard_insights',
     entityType: null,
     entityId: null,

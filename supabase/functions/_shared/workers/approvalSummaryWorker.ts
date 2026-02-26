@@ -127,6 +127,7 @@ export async function executeApprovalSummaryWorker(ctx: WorkerContext) {
     prompt,
     system: SYSTEM_PROMPT_APPROVAL,
     maxTokens: MAX_TOKENS_APPROVAL,
+    modelHint: 'anthropic',
     analysisType: 'approval_summary',
     entityType: ctx.entityType,
     entityId: ctx.entityId,

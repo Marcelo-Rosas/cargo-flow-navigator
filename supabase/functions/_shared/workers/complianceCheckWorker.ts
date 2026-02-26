@@ -226,6 +226,7 @@ export async function executeComplianceCheckWorker(ctx: WorkerContext) {
     prompt,
     system: SYSTEM_PROMPT_COMPLIANCE,
     maxTokens: MAX_TOKENS_COMPLIANCE,
+    modelHint: 'anthropic',
     analysisType: 'compliance_check',
     entityType: 'order',
     entityId: ctx.orderId,

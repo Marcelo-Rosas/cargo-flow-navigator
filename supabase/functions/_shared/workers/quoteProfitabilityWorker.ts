@@ -135,6 +135,7 @@ export async function executeQuoteProfitabilityWorker(ctx: WorkerContext) {
     prompt,
     system: SYSTEM_PROMPT_QUOTE_PROFITABILITY,
     maxTokens: MAX_TOKENS_QUOTE,
+    modelHint: 'anthropic',
     analysisType: 'quote_profitability',
     entityType: 'quote',
     entityId: ctx.entityId,

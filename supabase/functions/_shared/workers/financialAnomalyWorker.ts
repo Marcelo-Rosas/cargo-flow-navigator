@@ -296,6 +296,7 @@ export async function executeFinancialAnomalyWorker(ctx: WorkerContext) {
     prompt,
     system: SYSTEM_PROMPT_FINANCIAL_ANOMALY,
     maxTokens: MAX_TOKENS_ANOMALY,
+    modelHint: 'anthropic',
     analysisType: 'financial_anomaly',
     entityType: 'financial_document',
     entityId: ctx.entityId,

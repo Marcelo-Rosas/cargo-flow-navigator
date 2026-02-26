@@ -177,6 +177,7 @@ export async function executeOperationalInsightsWorker(ctx: WorkerContext) {
     prompt,
     system: SYSTEM_PROMPT_DASHBOARD,
     maxTokens: MAX_TOKENS_DASHBOARD,
+    modelHint: 'openai',
     analysisType: 'operational_insights',
     entityType: null,
     entityId: null,

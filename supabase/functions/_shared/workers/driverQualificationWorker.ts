@@ -95,6 +95,7 @@ export async function executeDriverQualificationWorker(ctx: WorkerContext) {
     prompt,
     system: SYSTEM_PROMPT_DRIVER_QUALIFICATION,
     maxTokens: MAX_TOKENS_DRIVER_QUALIFICATION,
+    modelHint: 'openai',
     analysisType: 'driver_qualification',
     entityType: 'order',
     entityId: ctx.orderId,
