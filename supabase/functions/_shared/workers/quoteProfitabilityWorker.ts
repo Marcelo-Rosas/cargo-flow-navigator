@@ -18,7 +18,7 @@ interface WorkerContext {
 }
 
 // ---------------------------------------------------------------------------
-// Tipos internos de dados brutos
+// Tipos internos
 // ---------------------------------------------------------------------------
 
 interface OrderData {
@@ -40,6 +40,16 @@ interface FetchQuoteResult {
   reconciliation: ReconciliationData | null;
 }
 
+interface HistoricalData {
+  margins: number[];
+  avg: number | null;
+  stdDev: number | null;
+  count: number;
+  /** true quando o benchmark foi filtrado pela faixa de km da cotação */
+  usedKmFilter: boolean;
+  kmRange: { min: number; max: number } | null;
+}
+
 // ---------------------------------------------------------------------------
 // Coleta de dados
 // ---------------------------------------------------------------------------
@@ -48,7 +58,6 @@ async function fetchQuoteData(sb: any, entityId: string): Promise<FetchQuoteResu
   const { data: quote, error } = await sb.from('quotes').select('*').eq('id', entityId).single();
   if (error || !quote) throw new Error(`Quote not found: ${entityId}`);
 
-  // Busca OS associada à cotação (pode não existir)
   const { data: order } = await sb
     .from('orders')
     .select('id, value, carreteiro_real, stage')
@@ -56,7 +65,6 @@ async function fetchQuoteData(sb: any, entityId: string): Promise<FetchQuoteResu
     .maybeSingle();
 
   let reconciliation: ReconciliationData | null = null;
-
   if (order?.id) {
     const { data: recon } = await sb
       .from('v_order_payment_reconciliation')
@@ -69,15 +77,42 @@ async function fetchQuoteData(sb: any, entityId: string): Promise<FetchQuoteResu
   return { quote, orderData: order ?? null, reconciliation };
 }
 
-async function fetchHistoricalMargins(sb: any) {
-  const { data: recentQuotes } = await sb
-    .from('quotes')
-    .select('value, pricing_breakdown, client_name, origin, destination')
-    .eq('stage', 'ganho')
-    .order('created_at', { ascending: false })
-    .limit(30);
+/**
+ * Busca margens históricas de cotações ganhas.
+ * Quando kmDistance > 0, filtra por ±20% da distância da cotação atual.
+ * Se o filtro retornar menos de 5 resultados, faz fallback para o benchmark global.
+ */
+async function fetchHistoricalMargins(sb: any, kmDistance: number): Promise<HistoricalData> {
+  const MIN_FILTERED = 5;
 
-  const margins = (recentQuotes || [])
+  async function queryMargins(filtered: boolean): Promise<any[]> {
+    let q = sb
+      .from('quotes')
+      .select('pricing_breakdown, km_distance')
+      .eq('stage', 'ganho')
+      .order('created_at', { ascending: false })
+      .limit(filtered ? 50 : 30);
+
+    if (filtered && kmDistance > 0) {
+      const kmMin = kmDistance * 0.8;
+      const kmMax = kmDistance * 1.2;
+      q = q.gte('km_distance', kmMin).lte('km_distance', kmMax);
+    }
+
+    const { data } = await q;
+    return data || [];
+  }
+
+  let usedKmFilter = kmDistance > 0;
+  let rows = await queryMargins(usedKmFilter);
+
+  // Fallback para benchmark global se amostra filtrada for insuficiente
+  if (usedKmFilter && rows.length < MIN_FILTERED) {
+    rows = await queryMargins(false);
+    usedKmFilter = false;
+  }
+
+  const margins = rows
     .map(
       (q: any) =>
         q.pricing_breakdown?.profitability?.margemPercent ??
@@ -91,12 +126,17 @@ async function fetchHistoricalMargins(sb: any) {
   const stdDev =
     margins.length > 1
       ? Math.sqrt(
-          margins.reduce((sum: number, m: number) => sum + Math.pow(m - (avg || 0), 2), 0) /
+          margins.reduce((sum: number, m: number) => sum + Math.pow(m - (avg ?? 0), 2), 0) /
             margins.length
         )
       : null;
 
-  return { margins, avg, stdDev, count: margins.length };
+  const kmRange =
+    usedKmFilter && kmDistance > 0
+      ? { min: Math.round(kmDistance * 0.8), max: Math.round(kmDistance * 1.2) }
+      : null;
+
+  return { margins, avg, stdDev, count: margins.length, usedKmFilter, kmRange };
 }
 
 async function fetchClientHistory(sb: any, clientName: string) {
@@ -123,8 +163,32 @@ async function fetchOccurrences(sb: any, orderId: string): Promise<OccurrenceDet
 }
 
 // ---------------------------------------------------------------------------
-// Cálculo da rentabilidade real
+// Cálculos locais (não delegados ao LLM)
 // ---------------------------------------------------------------------------
+
+/** Margem média das cotações do cliente (extraída de pricing_breakdown). */
+function calcAvgClientMargin(clientHistory: any[]): number | null {
+  const margins = clientHistory
+    .map(
+      (q: any) =>
+        q.pricing_breakdown?.profitability?.margemPercent ??
+        q.pricing_breakdown?.profitability?.margem_percent
+    )
+    .filter((m: any) => m != null) as number[];
+
+  return margins.length > 0
+    ? margins.reduce((a: number, b: number) => a + b, 0) / margins.length
+    : null;
+}
+
+/**
+ * Desvio da margem atual em relação à média histórica (pontos percentuais).
+ * Positivo = acima da média; negativo = abaixo.
+ */
+function calcDesvioMedia(currentMargin: number | null, avg: number | null): number | null {
+  if (currentMargin == null || avg == null) return null;
+  return currentMargin - avg;
+}
 
 function calcRealProfitability(
   quote: any,
@@ -135,7 +199,6 @@ function calcRealProfitability(
   const receitaBruta = Number(orderData.value);
   if (!receitaBruta || receitaBruta <= 0) return null;
 
-  // Prioriza o valor pago conciliado (comprovante real); fallback para negociado
   const custoCarreteiro = reconciliation?.is_reconciled
     ? Number(reconciliation.paid_amount)
     : orderData.carreteiro_real != null
@@ -172,8 +235,11 @@ function calcRealProfitability(
 
 function buildPrompt(
   quote: any,
-  historical: any,
-  clientHistory: any[],
+  historical: HistoricalData,
+  avgClientMargin: number | null,
+  desvioMediaPct: number | null,
+  clientHistoryCount: number,
+  clientWonCount: number,
   realProfitability: RealProfitabilityMetrics | null,
   previousInsights?: string
 ): string {
@@ -181,21 +247,25 @@ function buildPrompt(
   const profitability = breakdown?.profitability;
   const meta = breakdown?.meta;
 
-  const clientMargins = clientHistory
-    .map(
-      (q: any) =>
-        q.pricing_breakdown?.profitability?.margemPercent ??
-        q.pricing_breakdown?.profitability?.margem_percent
-    )
-    .filter((m: any) => m != null);
-  const avgClientMargin =
-    clientMargins.length > 0
-      ? clientMargins.reduce((a: number, b: number) => a + b, 0) / clientMargins.length
-      : null;
-
   const kmDistance = Number(quote.km_distance) || 0;
   const quoteValue = Number(quote.value) || 0;
   const valorPorKm = kmDistance > 0 ? (quoteValue / kmDistance).toFixed(2) : 'N/A';
+
+  // Benchmark label: informa se foi filtrado por rota ou é global
+  const benchmarkLabel =
+    historical.usedKmFilter && historical.kmRange
+      ? `${historical.count} cotacoes ganhas com ${historical.kmRange.min}-${historical.kmRange.max} km`
+      : `${historical.count} cotacoes ganhas (benchmark global)`;
+
+  // Posição em relação à média: calculada no worker
+  const margem_vs_media_label =
+    desvioMediaPct == null
+      ? 'N/A'
+      : Math.abs(desvioMediaPct) <= 1
+        ? `na_media (${desvioMediaPct > 0 ? '+' : ''}${desvioMediaPct.toFixed(1)} pp)`
+        : desvioMediaPct > 0
+          ? `acima (${'+' + desvioMediaPct.toFixed(1)} pp)`
+          : `abaixo (${desvioMediaPct.toFixed(1)} pp)`;
 
   let prompt = `Analise a rentabilidade desta cotacao de frete:
 
@@ -216,15 +286,16 @@ function buildPrompt(
 **ANTT Piso**: R$ ${meta?.antt?.total ?? meta?.antt_piso_carreteiro ?? 'N/A'}
 **Status margem**: ${meta?.marginStatus ?? meta?.margin_status ?? 'N/A'}
 
-**Comparativo historico (${historical.count} cotacoes ganhas)**:
-- Margem media: ${historical.avg ? historical.avg.toFixed(1) + '%' : 'Sem dados'}
-- Desvio padrao: ${historical.stdDev ? historical.stdDev.toFixed(1) + '%' : 'N/A'}
+**Benchmark historico (${benchmarkLabel})**:
+- Margem media: ${historical.avg != null ? historical.avg.toFixed(1) + '%' : 'Sem dados'}
+- Desvio padrao: ${historical.stdDev != null ? historical.stdDev.toFixed(1) + '%' : 'N/A'}
+- Posicao desta cotacao vs media [pre-calculado]: ${margem_vs_media_label}
+- Desvio_da_media_pct [pre-calculado]: ${desvioMediaPct != null ? desvioMediaPct.toFixed(2) : 'N/A'}
 
-**Historico do cliente (${clientHistory.length} cotacoes)**:
-- Margem media deste cliente: ${avgClientMargin ? avgClientMargin.toFixed(1) + '%' : 'Sem historico'}
-- Cotacoes ganhas: ${clientHistory.filter((q: any) => q.stage === 'ganho').length}`;
+**Historico do cliente (${clientHistoryCount} cotacoes)**:
+- Margem media deste cliente [pre-calculado]: ${avgClientMargin != null ? avgClientMargin.toFixed(2) + '%' : 'Sem historico'}
+- Cotacoes ganhas: ${clientWonCount}`;
 
-  // Bloco de rentabilidade real — só presente quando a OS está finalizada
   if (realProfitability) {
     prompt += `\n\n--- Ordem de Servico Finalizada (Dados Reais) ---`;
     prompt += `\n**Custo Carreteiro (Real)**: R$ ${realProfitability.custo_carreteiro_real.toFixed(2)}`;
@@ -249,11 +320,9 @@ function buildPrompt(
     prompt += `\n\n**Analises anteriores desta entidade**:\n${previousInsights}`;
   }
 
-  if (realProfitability) {
-    prompt += `\n\nAvalie a rentabilidade desta operacao comparando previsto vs real. Identifique os fatores que causaram desvio na margem e avalie se o preco estava adequado em relacao ao piso ANTT e ao historico.`;
-  } else {
-    prompt += `\n\nAvalie se esta cotacao e rentavel, se esta acima ou abaixo da media, e se o preco esta adequado em relacao ao piso ANTT.`;
-  }
+  prompt += realProfitability
+    ? `\n\nAvalie a rentabilidade desta operacao comparando previsto vs real. Use os valores pre-calculados de desvio_da_media_pct e margem_vs_media diretamente no JSON de resposta. Identifique os fatores que causaram desvio na margem e avalie se o preco estava adequado em relacao ao piso ANTT e ao historico.`
+    : `\n\nAvalie se esta cotacao e rentavel. Use os valores pre-calculados de desvio_da_media_pct e margem_vs_media diretamente no JSON de resposta. Avalie se o preco esta adequado em relacao ao piso ANTT e ao historico de ${historical.usedKmFilter ? 'rotas similares' : 'todas as rotas'}.`;
 
   return prompt;
 }
@@ -263,20 +332,34 @@ function buildPrompt(
 // ---------------------------------------------------------------------------
 
 export async function executeQuoteProfitabilityWorker(ctx: WorkerContext) {
-  const [{ quote, orderData, reconciliation }, historical] = await Promise.all([
-    fetchQuoteData(ctx.sb, ctx.entityId),
-    fetchHistoricalMargins(ctx.sb),
+  // Fase 1: busca cotação (necessária para extrair km_distance e client_name)
+  const { quote, orderData, reconciliation } = await fetchQuoteData(ctx.sb, ctx.entityId);
+
+  // Fase 2: fetches paralelos que dependem da cotação
+  const kmDistance = Number(quote.km_distance) || 0;
+  const [historicalFinal, clientHistory] = await Promise.all([
+    fetchHistoricalMargins(ctx.sb, kmDistance),
+    fetchClientHistory(ctx.sb, quote.client_name),
   ]);
 
-  const clientHistory = await fetchClientHistory(ctx.sb, quote.client_name);
+  // P2: calcular métricas de benchmark no worker (antes do prompt)
+  const currentMargin =
+    Number(
+      quote.pricing_breakdown?.profitability?.margemPercent ??
+        quote.pricing_breakdown?.profitability?.margem_percent
+    ) || null;
 
-  // Busca ocorrências da OS (se existir e estiver entregue)
+  const avgClientMargin = calcAvgClientMargin(clientHistory);
+  const desvioMediaPct = calcDesvioMedia(currentMargin, historicalFinal.avg);
+
+  const clientWonCount = clientHistory.filter((q: any) => q.stage === 'ganho').length;
+
+  // Ocorrências e rentabilidade real (P1)
   let occurrences: OccurrenceDetail[] = [];
   if (orderData?.id && orderData.stage === 'entregue') {
     occurrences = await fetchOccurrences(ctx.sb, orderData.id);
   }
 
-  // Calcula rentabilidade real (só quando OS entregue e custo disponível)
   const realProfitability =
     orderData?.stage === 'entregue'
       ? calcRealProfitability(quote, orderData, reconciliation, occurrences)
@@ -284,8 +367,11 @@ export async function executeQuoteProfitabilityWorker(ctx: WorkerContext) {
 
   const prompt = buildPrompt(
     quote,
-    historical,
-    clientHistory,
+    historicalFinal,
+    avgClientMargin,
+    desvioMediaPct,
+    clientHistory.length,
+    clientWonCount,
     realProfitability,
     ctx.previousInsights
   );
@@ -308,7 +394,13 @@ export async function executeQuoteProfitabilityWorker(ctx: WorkerContext) {
   analysis._provider = result.provider;
   analysis._duration_ms = durationMs;
 
-  // Anexa dados reais calculados no worker (não delegados ao LLM)
+  // P2: sobrescreve desvio_da_media_pct com o valor calculado deterministicamente no worker
+  if (desvioMediaPct != null) {
+    if (!analysis.metrics) analysis.metrics = {};
+    analysis.metrics.desvio_da_media_pct = Number(desvioMediaPct.toFixed(2));
+  }
+
+  // P1: anexa dados reais
   if (realProfitability) {
     analysis.real_profitability = realProfitability;
   }
