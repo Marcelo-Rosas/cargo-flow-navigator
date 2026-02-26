@@ -1,4 +1,12 @@
-export interface QuoteProfitabilityResult {
+interface AnalysisMeta {
+  _model?: string;
+  _cost_usd?: number;
+  _provider?: string;
+  _duration_ms?: number;
+  [key: string]: unknown;
+}
+
+export interface QuoteProfitabilityResult extends AnalysisMeta {
   risk: 'baixo' | 'medio' | 'alto';
   confidence_score?: number;
   metrics?: {
@@ -13,7 +21,7 @@ export interface QuoteProfitabilityResult {
   details?: string;
 }
 
-export interface FinancialAnomalyResult {
+export interface FinancialAnomalyResult extends AnalysisMeta {
   risk: 'baixo' | 'medio' | 'alto';
   anomaly_detected?: boolean;
   anomaly_type?:
@@ -39,7 +47,7 @@ export interface FinancialAnomalyResult {
   details?: string;
 }
 
-export interface ApprovalSummaryResult {
+export interface ApprovalSummaryResult extends AnalysisMeta {
   risk: 'baixo' | 'medio' | 'alto';
   urgency_level?: 'baixa' | 'media' | 'alta' | 'critica';
   approval_confidence?: number;
@@ -54,7 +62,7 @@ export interface ApprovalSummaryResult {
   summary?: string;
 }
 
-export interface DriverQualificationResult {
+export interface DriverQualificationResult extends AnalysisMeta {
   risk: 'baixo' | 'medio' | 'alto';
   risk_score?: number;
   risk_flags?: Array<{ flag: string; severity: 'info' | 'warning' | 'critical'; detail: string }>;
@@ -85,7 +93,7 @@ export interface ComplianceViolation {
   remediation?: string;
 }
 
-export interface ComplianceCheckResult {
+export interface ComplianceCheckResult extends AnalysisMeta {
   risk: 'baixo' | 'medio' | 'alto';
   status?: 'ok' | 'warning' | 'violation';
   rules_evaluated?: ComplianceRuleEvaluation[];
@@ -102,7 +110,7 @@ export interface DashboardInsight {
   priority?: 'alta' | 'media' | 'baixa';
 }
 
-export interface DashboardInsightsResult {
+export interface DashboardInsightsResult extends AnalysisMeta {
   risk: 'baixo' | 'medio' | 'alto';
   insights?: DashboardInsight[];
   metrics?: {
