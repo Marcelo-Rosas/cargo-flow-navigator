@@ -1,5 +1,13 @@
 project_id = "epgedaiukjippepujuzc"
 
+[auth]
+site_url = "https://cargo-flow-navigator.vercel.app"
+additional_redirect_urls = [
+  "https://cargo-flow-navigator.vercel.app/auth",
+  "https://cargo-flow-navigator.vercel.app/reset-password",
+  "http://localhost:8080/",
+]
+
 [functions.import-price-table]
 verify_jwt = true
 
