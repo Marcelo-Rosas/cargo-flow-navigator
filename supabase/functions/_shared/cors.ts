@@ -25,7 +25,7 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   const allowed =
     getEnv('ALLOWED_ORIGINS') ||
     getEnv('ALLOWED_ORIGIN') ||
-    'http://localhost:8080,https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app';
+    'http://localhost:8080,https://cargo-flow-navigator.vercel.app';
   const origins = allowed.split(',').map((o) => o.trim());
   const requestOrigin = req.headers.get('Origin');
 
