@@ -37,6 +37,7 @@ import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurren
 import { useVehicleByPlate } from '@/hooks/useVehicles';
 import { useUpdateOrder } from '@/hooks/useOrders';
 import { useEnsureFinancialDocument } from '@/hooks/useEnsureFinancialDocument';
+import { useTripsForOrder, useLinkOrderToTrip } from '@/hooks/useTrips';
 import { useOrderReconciliation } from '@/hooks/useReconciliation';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -181,6 +182,8 @@ export function OrderDetailModal({
   );
   const updateOrderMutation = useUpdateOrder();
   const ensureFinancialDocumentMutation = useEnsureFinancialDocument();
+  const { data: tripForOrder } = useTripsForOrder(order?.id);
+  const linkOrderToTripMutation = useLinkOrderToTrip();
 
   useEffect(() => {
     if (order?.vehicle_plate != null) setPlateInput(order.vehicle_plate);
@@ -309,6 +312,17 @@ export function OrderDetailModal({
     }).format(new Date(date));
   };
 
+  const canLinkToTrip =
+    showDriverSection && canManage && order.vehicle_plate && order.driver_id && !tripForOrder;
+  const handleLinkToTrip = async () => {
+    try {
+      await linkOrderToTripMutation.mutateAsync(order.id);
+      toast.success('OS vinculada à viagem');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao vincular viagem');
+    }
+  };
+
   const handleResolveOccurrence = async (occurrenceId: string) => {
     if (!user) return;
     try {
@@ -333,7 +347,30 @@ export function OrderDetailModal({
                 <Badge className={cn(stageInfo.color)}>{stageInfo.label}</Badge>
               </DialogTitle>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {canLinkToTrip && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLinkToTrip}
+                    disabled={linkOrderToTripMutation.isPending}
+                    className="gap-2"
+                  >
+                    {linkOrderToTripMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Truck className="w-4 h-4" />
+                    )}
+                    Criar/Vincular Viagem
+                  </Button>
+                )}
+                {tripForOrder && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Truck className="w-3 h-3" />
+                    {tripForOrder.trip_number}
+                  </Badge>
+                )}
                 {canConvertToPAG && (
                   <Button
                     type="button"

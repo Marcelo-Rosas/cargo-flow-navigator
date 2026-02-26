@@ -163,6 +163,59 @@ export function useCreateTrip() {
   });
 }
 
+export function useTripCostItems(tripId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['trip_cost_items', tripId],
+    queryFn: async () => {
+      if (!tripId) return [];
+      const { data, error } = await supabase
+        .from('trip_cost_items')
+        .select('*')
+        .eq('trip_id', asDb(tripId))
+        .order('scope', { ascending: true })
+        .order('category');
+
+      if (error) throw error;
+      return filterSupabaseRows<Database['public']['Tables']['trip_cost_items']['Row']>(data);
+    },
+    enabled: !!tripId,
+  });
+}
+
+export function useLinkOrderToTrip() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (orderId: string) => {
+      const { data, error } = await supabase.rpc('link_order_to_trip', {
+        p_order_id: orderId,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+}
+
+export function useSyncCostItemsFromBreakdown() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (tripId: string) => {
+      const { error } = await supabase.rpc('sync_cost_items_from_breakdown', {
+        p_trip_id: tripId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, tripId) => {
+      queryClient.invalidateQueries({ queryKey: ['trip_cost_items', tripId] });
+    },
+  });
+}
+
 export function useUpdateTrip() {
   const queryClient = useQueryClient();
 

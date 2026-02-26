@@ -51,15 +51,23 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
   const tollValue = doc.toll_value != null ? Number(doc.toll_value) : 0;
 
   const breakdown = doc.pricing_breakdown as Record<string, unknown> | null;
+  const breakdownComponents = (breakdown?.components ?? null) as {
+    toll?: number;
+    gris?: number;
+    tso?: number;
+  } | null;
   const breakdownTotals = (breakdown?.totals ?? null) as {
     receitaBruta?: number;
     das?: number;
     totalCliente?: number;
+    icms?: number;
   } | null;
   const breakdownProfitability = (breakdown?.profitability ?? null) as {
     margemPercent?: number;
     resultadoLiquido?: number;
     margemBruta?: number;
+    custosCarreteiro?: number;
+    custosDescarga?: number;
   } | null;
 
   return (
@@ -215,6 +223,73 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
                       <span className="text-[10px]">Pedágio</span>
                     </div>
                     <p className="font-medium text-xs">{formatCurrency(tollValue)}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Custos detalhados do breakdown */}
+          {(breakdownComponents || breakdownProfitability) && (
+            <div>
+              <h4 className="font-semibold text-foreground text-sm mb-3">Custos detalhados</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {breakdownComponents?.toll != null && Number(breakdownComponents.toll) > 0 && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                      <Landmark className="w-3.5 h-3.5" />
+                      <span className="text-[10px]">Pedágio</span>
+                    </div>
+                    <p className="font-semibold text-sm">
+                      {formatCurrency(Number(breakdownComponents.toll))}
+                    </p>
+                  </div>
+                )}
+                {breakdownProfitability?.custosCarreteiro != null &&
+                  Number(breakdownProfitability.custosCarreteiro) > 0 && (
+                    <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                      <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                        <Truck className="w-3.5 h-3.5" />
+                        <span className="text-[10px]">Carreteiro</span>
+                      </div>
+                      <p className="font-semibold text-sm">
+                        {formatCurrency(Number(breakdownProfitability.custosCarreteiro))}
+                      </p>
+                    </div>
+                  )}
+                {breakdownProfitability?.custosDescarga != null &&
+                  Number(breakdownProfitability.custosDescarga) > 0 && (
+                    <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                      <span className="text-[10px] text-muted-foreground">Descarga</span>
+                      <p className="font-semibold text-sm">
+                        {formatCurrency(Number(breakdownProfitability.custosDescarga))}
+                      </p>
+                    </div>
+                  )}
+                {breakdownTotals?.das != null && Number(breakdownTotals.das) > 0 && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <span className="text-[10px] text-muted-foreground">DAS</span>
+                    <p className="font-semibold text-sm">
+                      {formatCurrency(Number(breakdownTotals.das))}
+                    </p>
+                  </div>
+                )}
+                {breakdownComponents?.gris != null && Number(breakdownComponents.gris) > 0 && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <span className="text-[10px] text-muted-foreground">GRIS</span>
+                    <p className="font-semibold text-sm">
+                      {formatCurrency(Number(breakdownComponents.gris))}
+                    </p>
+                  </div>
+                )}
+                {breakdownComponents?.tso != null && Number(breakdownComponents.tso) > 0 && (
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <span className="text-[10px] text-muted-foreground">TSO</span>
+                    <p className="font-semibold text-sm">
+                      {formatCurrency(Number(breakdownComponents.tso))}
+                    </p>
                   </div>
                 )}
               </div>
