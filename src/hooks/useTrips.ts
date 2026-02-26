@@ -163,6 +163,32 @@ export function useCreateTrip() {
   });
 }
 
+export function useTripOrdersWithOrders(tripId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['trip_orders', tripId],
+    queryFn: async () => {
+      if (!tripId) return [];
+      const { data, error } = await supabase
+        .from('trip_orders')
+        .select(
+          `
+          id, trip_id, order_id, apportion_key, apportion_factor, manual_percent,
+          order:orders (id, os_number, value)
+        `
+        )
+        .eq('trip_id', asDb(tripId));
+
+      if (error) throw error;
+      return filterSupabaseRows<
+        Database['public']['Tables']['trip_orders']['Row'] & {
+          order?: { id: string; os_number: string; value: number | null } | null;
+        }
+      >(data);
+    },
+    enabled: !!tripId,
+  });
+}
+
 export function useTripCostItems(tripId: string | null | undefined) {
   return useQuery({
     queryKey: ['trip_cost_items', tripId],

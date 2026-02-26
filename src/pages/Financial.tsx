@@ -15,6 +15,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { KanbanColumn } from '@/components/boards/KanbanColumn';
 import { FinancialCard } from '@/components/financial/FinancialCard';
 import { TripReconciliationCard } from '@/components/financial/TripReconciliationCard';
+import { TripDetailModal } from '@/components/modals/TripDetailModal';
 import { FinancialDetailModal } from '@/components/modals/FinancialDetailModal';
 import { TabButton } from '@/components/financial/TabButton';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -34,6 +35,7 @@ export default function Financial() {
   const [pagViewMode, setPagViewMode] = useState<PagViewMode>('os');
   const [activeDoc, setActiveDoc] = useState<FinancialKanbanRow | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<FinancialKanbanRow | null>(null);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
 
   const activeType = useMemo(() => (tab === 'receber' ? 'FAT' : 'PAG') as FinancialDocType, [tab]);
   const receber = useFinancialBoardData('FAT', { enabled: tab === 'receber' });
@@ -174,7 +176,11 @@ export default function Financial() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {(tripsReconciliation.data ?? []).map((trip) => (
-                <TripReconciliationCard key={trip.trip_id} trip={trip} />
+                <TripReconciliationCard
+                  key={trip.trip_id}
+                  trip={trip}
+                  onClick={() => setSelectedTripId(trip.trip_id)}
+                />
               ))}
             </div>
           )
@@ -236,6 +242,12 @@ export default function Financial() {
         open={!!selectedDoc}
         onClose={() => setSelectedDoc(null)}
         doc={selectedDoc}
+      />
+
+      <TripDetailModal
+        open={!!selectedTripId}
+        onClose={() => setSelectedTripId(null)}
+        tripId={selectedTripId}
       />
     </MainLayout>
   );

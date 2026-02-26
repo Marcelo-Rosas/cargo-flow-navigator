@@ -8,22 +8,19 @@ select
   t.driver_id,
   t.status_operational,
   t.financial_status,
-  count(distinct to2.order_id) as orders_count,
-  coalesce(sum(o.value), 0)::numeric as receita_bruta,
-  coalesce(sum(tci_t.amount), 0)::numeric as custos_trip,
-  coalesce(sum(tci_o.amount), 0)::numeric as custos_os,
-  (coalesce(sum(tci_t.amount), 0) + coalesce(sum(tci_o.amount), 0))::numeric as custos_diretos,
-  (coalesce(sum(o.value), 0) - coalesce(sum(tci_t.amount), 0) - coalesce(sum(tci_o.amount), 0))::numeric as margem_bruta,
+  (select count(*) from public.trip_orders to2 where to2.trip_id = t.id)::int as orders_count,
+  coalesce((select sum(o.value) from public.trip_orders to2 join public.orders o on o.id = to2.order_id where to2.trip_id = t.id), 0)::numeric as receita_bruta,
+  coalesce((select sum(amount) from public.trip_cost_items where trip_id = t.id and scope = 'TRIP'), 0)::numeric as custos_trip,
+  coalesce((select sum(amount) from public.trip_cost_items where trip_id = t.id and scope = 'OS'), 0)::numeric as custos_os,
+  coalesce((select sum(amount) from public.trip_cost_items where trip_id = t.id), 0)::numeric as custos_diretos,
+  (coalesce((select sum(o.value) from public.trip_orders to2 join public.orders o on o.id = to2.order_id where to2.trip_id = t.id), 0)
+   - coalesce((select sum(amount) from public.trip_cost_items where trip_id = t.id), 0))::numeric as margem_bruta,
   case
-    when coalesce(sum(o.value), 0) > 0 then
+    when (select coalesce(sum(o.value), 0) from public.trip_orders to2 join public.orders o on o.id = to2.order_id where to2.trip_id = t.id) > 0 then
       round(
-        ((coalesce(sum(o.value), 0) - coalesce(sum(tci_t.amount), 0) - coalesce(sum(tci_o.amount), 0))
-         / sum(o.value) * 100)::numeric, 2)
+        ((coalesce((select sum(o.value) from public.trip_orders to2 join public.orders o on o.id = to2.order_id where to2.trip_id = t.id), 0)
+          - coalesce((select sum(amount) from public.trip_cost_items where trip_id = t.id), 0))
+         / (select sum(o.value) from public.trip_orders to2 join public.orders o on o.id = to2.order_id where to2.trip_id = t.id) * 100)::numeric, 2)
     else null
   end as margem_percent
-from public.trips t
-left join public.trip_orders to2 on to2.trip_id = t.id
-left join public.orders o on o.id = to2.order_id
-left join public.trip_cost_items tci_t on tci_t.trip_id = t.id and tci_t.scope = 'TRIP' and tci_t.order_id is null
-left join public.trip_cost_items tci_o on tci_o.trip_id = t.id and tci_o.scope = 'OS'
-group by t.id, t.trip_number, t.vehicle_plate, t.driver_id, t.status_operational, t.financial_status;
+from public.trips t;
