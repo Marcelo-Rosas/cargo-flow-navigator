@@ -24,7 +24,8 @@ async function fetchOperationalData(sb: any) {
       sb
         .from('financial_documents')
         .select('type, status, total_amount, created_at')
-        .gte('created_at', thirtyDaysAgo),
+        .gte('created_at', thirtyDaysAgo)
+        .not('status', 'in', '("CANCELADO")'),
       sb
         .from('approval_requests')
         .select('*', { count: 'exact', head: true })
@@ -99,12 +100,34 @@ function buildPrompt(
   const avgMargin =
     margins.length > 0 ? (margins.reduce((a, b) => a + b, 0) / margins.length).toFixed(1) : 'N/A';
 
-  let totalReceivable = 0;
-  let totalPayable = 0;
+  // Status que indicam valor ainda pendente (não recebido/pago)
+  const pendingStatuses = new Set(['INCLUIR', 'GERADO', 'AGUARDANDO']);
+  // Status que indicam valor já liquidado
+  const settledStatuses = new Set(['RECEBIDO', 'PAGO', 'FINALIZADO']);
+
+  let totalReceivablePending = 0;
+  let totalReceivableSettled = 0;
+  let totalPayablePending = 0;
+  let totalPayableSettled = 0;
+
   for (const fd of data.financialDocs) {
-    if (fd.type === 'FAT') totalReceivable += Number(fd.total_amount) || 0;
-    if (fd.type === 'PAG') totalPayable += Number(fd.total_amount) || 0;
+    const amount = Number(fd.total_amount) || 0;
+    const status = (fd.status ?? '').toUpperCase();
+    const isPending = pendingStatuses.has(status);
+
+    if (fd.type === 'FAT') {
+      if (isPending) totalReceivablePending += amount;
+      else if (settledStatuses.has(status)) totalReceivableSettled += amount;
+    }
+    if (fd.type === 'PAG') {
+      if (isPending) totalPayablePending += amount;
+      else if (settledStatuses.has(status)) totalPayableSettled += amount;
+    }
   }
+
+  const wonQuoteValue = data.quotes
+    .filter((q: any) => q.stage === 'ganho')
+    .reduce((acc: number, q: any) => acc + (Number(q.value) || 0), 0);
 
   return `Analise os dados operacionais dos ultimos 30 dias da Vectra Cargo e gere insights executivos:
 
@@ -112,6 +135,7 @@ function buildPrompt(
 - Total de cotacoes: ${totalQuotes}
 - Cotacoes por stage: ${JSON.stringify(quotesByStage)}
 - Valor total das cotacoes: R$ ${totalQuoteValue.toFixed(2)}
+- Valor das cotacoes ganhas: R$ ${wonQuoteValue.toFixed(2)}
 - Taxa de conversao: ${conversionRate}%
 - Margem media das cotacoes: ${avgMargin}%
 
@@ -120,9 +144,12 @@ function buildPrompt(
 - Ordens por stage: ${JSON.stringify(ordersByStage)}
 
 **Financeiro**:
-- Total a receber (FAT): R$ ${totalReceivable.toFixed(2)}
-- Total a pagar (PAG): R$ ${totalPayable.toFixed(2)}
-- Resultado bruto estimado: R$ ${(totalReceivable - totalPayable).toFixed(2)}
+- A receber pendente (FAT nao liquidado): R$ ${totalReceivablePending.toFixed(2)}
+- Ja recebido (FAT liquidado): R$ ${totalReceivableSettled.toFixed(2)}
+- A pagar pendente (PAG nao liquidado): R$ ${totalPayablePending.toFixed(2)}
+- Ja pago (PAG liquidado): R$ ${totalPayableSettled.toFixed(2)}
+- Resultado bruto pendente: R$ ${(totalReceivablePending - totalPayablePending).toFixed(2)}
+- Resultado bruto realizado: R$ ${(totalReceivableSettled - totalPayableSettled).toFixed(2)}
 - Documentos financeiros gerados: ${data.financialDocs.length}
 
 **Aprovacoes pendentes**: ${data.pendingApprovals}

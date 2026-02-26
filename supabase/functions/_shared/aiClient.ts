@@ -209,18 +209,32 @@ export async function callLLM(params: CallLLMParams): Promise<CallLLMResult> {
   const hasAnthropicKey = !!Deno.env.get('ANTHROPIC_API_KEY');
   const hasOpenAIKey = !!Deno.env.get('OPENAI_API_KEY');
 
+  // Fail fast if no AI keys are configured at all
+  if (!hasAnthropicKey && !hasOpenAIKey) {
+    throw new Error(
+      'Nenhuma chave de IA configurada. Configure ANTHROPIC_API_KEY ou OPENAI_API_KEY nos secrets do Supabase (Dashboard → Edge Functions → Secrets).'
+    );
+  }
+
   // Resolve preferred provider: honour modelHint first, then fall back to
   // whichever key is actually available so we never fail with "not configured"
   // when the other provider is ready to go.
   let preferred: LLMProvider;
   if (params.modelHint) {
-    preferred = params.modelHint;
+    // If the hinted provider has no key but the other does, override the hint
+    if (params.modelHint === 'anthropic' && !hasAnthropicKey && hasOpenAIKey) {
+      preferred = 'openai';
+    } else if (params.modelHint === 'openai' && !hasOpenAIKey && hasAnthropicKey) {
+      preferred = 'anthropic';
+    } else {
+      preferred = params.modelHint;
+    }
   } else if (hasAnthropicKey && !hasOpenAIKey) {
     preferred = 'anthropic';
   } else if (hasOpenAIKey && !hasAnthropicKey) {
     preferred = 'openai';
   } else {
-    // Both keys present (or neither) – default to openai for backwards compat
+    // Both keys present – default to openai for backwards compat
     preferred = 'openai';
   }
 
@@ -228,6 +242,7 @@ export async function callLLM(params: CallLLMParams): Promise<CallLLMResult> {
 
   const primary = tryOpenAIFirst ? callOpenAI : callAnthropic;
   const secondary = tryOpenAIFirst ? callAnthropic : callOpenAI;
+  const secondaryHasKey = tryOpenAIFirst ? hasAnthropicKey : hasOpenAIKey;
 
   try {
     return await primary(params);
@@ -245,7 +260,7 @@ export async function callLLM(params: CallLLMParams): Promise<CallLLMResult> {
       / 5\d{2}\b/.test(message) ||
       / 429\b/.test(message);
 
-    if (isRecoverable) {
+    if (isRecoverable && secondaryHasKey) {
       const fromProvider: LLMProvider = tryOpenAIFirst ? 'openai' : 'anthropic';
       const toProvider: LLMProvider = tryOpenAIFirst ? 'anthropic' : 'openai';
       console.warn(`${fromProvider} failed, falling back to ${toProvider}:`, message);
