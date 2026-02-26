@@ -5,6 +5,7 @@ import { useDocumentsByOrder, useDocumentsByQuote, useDeleteDocument } from '@/h
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
+import { openDocument, downloadDocument } from '@/lib/storage';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +39,11 @@ const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
   analise_gr: { label: 'Análise GR', color: 'bg-amber-500/10 text-amber-600' },
   doc_rota: { label: 'Doc. Rota', color: 'bg-violet-500/10 text-violet-600' },
   comprovante_vpo: { label: 'VPO', color: 'bg-teal-500/10 text-teal-600' },
+  adiantamento_carreteiro: {
+    label: 'Adiant. Carreteiro',
+    color: 'bg-orange-500/10 text-orange-600',
+  },
+  saldo_carreteiro: { label: 'Saldo Carreteiro', color: 'bg-orange-500/10 text-orange-600' },
   outros: { label: 'Outros', color: 'bg-muted text-muted-foreground' },
 };
 
@@ -53,6 +59,22 @@ export function DocumentList({ orderId, quoteId }: DocumentListProps) {
       toast.success('Documento excluído');
     } catch (error) {
       toast.error('Erro ao excluir documento');
+    }
+  };
+
+  const handleOpen = async (doc: Document) => {
+    try {
+      await openDocument(doc.file_url);
+    } catch {
+      toast.error('Erro ao abrir documento. Tente novamente.');
+    }
+  };
+
+  const handleDownload = async (doc: Document) => {
+    try {
+      await downloadDocument(doc.file_url, doc.file_name);
+    } catch {
+      toast.error('Erro ao baixar documento. Tente novamente.');
     }
   };
 
@@ -119,16 +141,24 @@ export function DocumentList({ orderId, quoteId }: DocumentListProps) {
             </div>
 
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleOpen(doc)}
+                title="Visualizar"
+              >
+                <ExternalLink className="w-4 h-4" />
               </Button>
 
-              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                <a href={doc.file_url} download={doc.file_name}>
-                  <Download className="w-4 h-4" />
-                </a>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleDownload(doc)}
+                title="Baixar"
+              >
+                <Download className="w-4 h-4" />
               </Button>
 
               <AlertDialog>

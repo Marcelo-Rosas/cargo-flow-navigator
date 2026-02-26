@@ -192,13 +192,11 @@ export function DocumentUpload({
 
       setUploadingFiles((prev) => prev.map((f) => (f.file === file ? { ...f, progress: 70 } : f)));
 
-      // Get public URL
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadData.path);
-
-      // Create document record
+      // Store the storage path (NOT a public URL) — access via signed URL at read time
+      // uploadData.path is already the bare path: <user_id>/<timestamp>-<random>.<ext>
       await createDocumentMutation.mutateAsync({
         file_name: file.name,
-        file_url: urlData.publicUrl,
+        file_url: uploadData.path,
         file_size: file.size,
         type,
         order_id: orderId || null,

@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { openDocument, downloadDocument } from '@/lib/storage';
 import { useDocuments, useDeleteDocument } from '@/hooks/useDocuments';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -353,22 +354,26 @@ export default function Documents() {
                             size="icon"
                             className="h-8 w-8"
                             aria-label="Visualizar documento"
-                            asChild
+                            onClick={() =>
+                              openDocument(doc.file_url).catch(() =>
+                                toast.error('Erro ao abrir documento')
+                              )
+                            }
                           >
-                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                              <Eye className="w-4 h-4" />
-                            </a>
+                            <Eye className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
                             aria-label="Baixar documento"
-                            asChild
+                            onClick={() =>
+                              downloadDocument(doc.file_url, doc.file_name).catch(() =>
+                                toast.error('Erro ao baixar documento')
+                              )
+                            }
                           >
-                            <a href={doc.file_url} download={doc.file_name}>
-                              <Download className="w-4 h-4" />
-                            </a>
+                            <Download className="w-4 h-4" />
                           </Button>
                           {canWrite && (
                             <AlertDialog>
