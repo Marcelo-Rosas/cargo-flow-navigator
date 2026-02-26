@@ -68,6 +68,28 @@ export function useDashboardInsights() {
   });
 }
 
+/** Fetch latest operational insights */
+export function useOperationalInsights() {
+  return useQuery({
+    queryKey: ['ai-insights', 'operational'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_insights' as 'documents')
+        .select('*')
+        .eq('insight_type', 'operational_insights')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        if (error.code === '42P01') return null;
+        throw error;
+      }
+      return (data?.[0] ?? null) as unknown as AiInsight | null;
+    },
+    refetchInterval: 5 * 60 * 1000,
+  });
+}
+
 // ─────────────────────────────────────────────────────
 // Mutations
 // ─────────────────────────────────────────────────────
@@ -93,7 +115,9 @@ export function useRequestAiAnalysis() {
 
       if (!token) throw new Error('Sessão expirada. Faça login novamente.');
 
-      const { data, error } = await supabase.functions.invoke('ai-financial-agent', {
+      const fnName =
+        analysisType === 'operational_insights' ? 'ai-operational-agent' : 'ai-financial-agent';
+      const { data, error } = await supabase.functions.invoke(fnName, {
         body: { analysisType, entityId, entityType },
         headers: {
           Authorization: `Bearer ${token}`,
@@ -109,6 +133,7 @@ export function useRequestAiAnalysis() {
         queryKey: ['ai-insights', variables.entityType, variables.entityId],
       });
       queryClient.invalidateQueries({ queryKey: ['ai-insights', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['ai-insights', 'operational'] });
       queryClient.invalidateQueries({ queryKey: ['approval-requests'] });
     },
   });
@@ -130,7 +155,7 @@ export function useRateInsight() {
     }) => {
       const { error } = await supabase
         .from('ai_insights' as 'documents')
-        .update({ user_rating: rating, user_feedback: feedback || null } as any)
+        .update({ user_rating: rating, user_feedback: feedback || null } as Record<string, unknown>)
         .eq('id', insightId);
 
       if (error) throw error;

@@ -17,6 +17,12 @@ export interface ComplianceCheck {
   created_at: string;
 }
 
+type CompliancePayload = {
+  rules_evaluated?: Array<{ rule: string; passed: boolean; detail: string }>;
+  violations?: Array<{ rule: string; severity: string; detail: string; remediation: string }>;
+  status?: 'ok' | 'warning' | 'violation';
+};
+
 // ─────────────────────────────────────────────────────
 // Queries
 // ─────────────────────────────────────────────────────
@@ -36,7 +42,37 @@ export function useComplianceChecks(orderId: string) {
         if (error.code === '42P01') return [];
         throw error;
       }
-      return (data ?? []) as unknown as ComplianceCheck[];
+
+      const rows = (data ?? []) as Array<Record<string, unknown>>;
+      return rows.map((row) => {
+        const result = (row.result as CompliancePayload | null) ?? {};
+        const aiAnalysis = (row.ai_analysis as CompliancePayload | null) ?? {};
+
+        const rulesEvaluated =
+          (row.rules_evaluated as ComplianceCheck['rules_evaluated'] | null) ??
+          result.rules_evaluated ??
+          aiAnalysis.rules_evaluated ??
+          [];
+
+        const violations =
+          (row.violations as ComplianceCheck['violations'] | null) ??
+          result.violations ??
+          aiAnalysis.violations ??
+          [];
+
+        const status =
+          (row.status as ComplianceCheck['status'] | null) ??
+          result.status ??
+          aiAnalysis.status ??
+          'ok';
+
+        return {
+          ...(row as unknown as ComplianceCheck),
+          rules_evaluated: rulesEvaluated,
+          violations,
+          status,
+        };
+      });
     },
     enabled: !!orderId,
   });

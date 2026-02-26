@@ -15,7 +15,12 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useDashboardInsights, useRequestAiAnalysis, useRateInsight } from '@/hooks/useAiInsights';
+import {
+  useDashboardInsights,
+  useOperationalInsights,
+  useRequestAiAnalysis,
+  useRateInsight,
+} from '@/hooks/useAiInsights';
 import { useToast } from '@/hooks/use-toast';
 
 const typeIcons: Record<string, typeof TrendingUp> = {
@@ -43,7 +48,10 @@ const trendIcons: Record<string, typeof TrendingUp> = {
 };
 
 export function AiInsightsWidget() {
-  const { data: insight, isLoading } = useDashboardInsights();
+  const { data: dashboardInsight, isLoading: isDashboardLoading } = useDashboardInsights();
+  const { data: operationalInsight, isLoading: isOperationalLoading } = useOperationalInsights();
+  const insight = dashboardInsight ?? operationalInsight;
+  const isLoading = isDashboardLoading || isOperationalLoading;
   const requestAnalysis = useRequestAiAnalysis();
   const { toast } = useToast();
 
@@ -72,11 +80,12 @@ export function AiInsightsWidget() {
         onError: (error) => {
           toast({
             title: 'Erro ao gerar análise',
-            description: error instanceof Error ? error.message : 'Erro desconhecido. Tente novamente.',
+            description:
+              error instanceof Error ? error.message : 'Erro desconhecido. Tente novamente.',
             variant: 'destructive',
           });
         },
-      },
+      }
     );
   };
 
@@ -137,9 +146,13 @@ export function AiInsightsWidget() {
         <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 mb-3">
           <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
           <div>
-            <p className="text-xs font-medium text-red-700 dark:text-red-400">Falha ao gerar análise</p>
+            <p className="text-xs font-medium text-red-700 dark:text-red-400">
+              Falha ao gerar análise
+            </p>
             <p className="text-xs text-red-600 dark:text-red-500 mt-0.5">
-              {requestAnalysis.error instanceof Error ? requestAnalysis.error.message : 'Erro desconhecido'}
+              {requestAnalysis.error instanceof Error
+                ? requestAnalysis.error.message
+                : 'Erro desconhecido'}
             </p>
           </div>
         </div>
@@ -149,10 +162,13 @@ export function AiInsightsWidget() {
       {!isLoading && !insight && (
         <div className="text-center py-6">
           <Brain className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground mb-3">
-            Nenhuma análise disponível ainda
-          </p>
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={requestAnalysis.isPending}>
+          <p className="text-sm text-muted-foreground mb-3">Nenhuma análise disponível ainda</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={requestAnalysis.isPending}
+          >
             {requestAnalysis.isPending ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
@@ -172,18 +188,23 @@ export function AiInsightsWidget() {
       {insight && (
         <div className="space-y-3">
           {/* Summary */}
-          {summary && (
-            <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>
-          )}
+          {summary && <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>}
 
           {/* Trend indicator */}
           {trendDirection && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {(() => {
                 const TrendIcon = trendIcons[trendDirection] || Minus;
-                return <TrendIcon className={`w-3.5 h-3.5 ${trendDirection === 'up' ? 'text-green-500' : trendDirection === 'down' ? 'text-red-500' : 'text-gray-400'}`} />;
+                return (
+                  <TrendIcon
+                    className={`w-3.5 h-3.5 ${trendDirection === 'up' ? 'text-green-500' : trendDirection === 'down' ? 'text-red-500' : 'text-gray-400'}`}
+                  />
+                );
               })()}
-              <span>Tendencia: {trendDirection === 'up' ? 'alta' : trendDirection === 'down' ? 'queda' : 'estavel'}</span>
+              <span>
+                Tendencia:{' '}
+                {trendDirection === 'up' ? 'alta' : trendDirection === 'down' ? 'queda' : 'estavel'}
+              </span>
             </div>
           )}
 
@@ -207,14 +228,15 @@ export function AiInsightsWidget() {
                   <div className="flex items-center gap-1.5">
                     <p className="text-xs font-semibold">{item.title}</p>
                     {item.priority && (
-                      <Badge variant="outline" className={`text-[9px] px-1 py-0 ${priorityBadge[item.priority] || ''}`}>
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] px-1 py-0 ${priorityBadge[item.priority] || ''}`}
+                      >
                         {item.priority}
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {item.description}
-                  </p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
                   {item.action_item && (
                     <div className="flex items-center gap-1 mt-1 text-[10px] text-primary/70">
                       <ArrowRight className="w-2.5 h-2.5" />
@@ -227,14 +249,26 @@ export function AiInsightsWidget() {
           })}
 
           {/* Feedback + Timestamp */}
-          <DashboardFeedback insightId={insight.id} currentRating={(insight as any).user_rating} createdAt={insight.created_at} />
+          <DashboardFeedback
+            insightId={insight.id}
+            currentRating={insight.user_rating}
+            createdAt={insight.created_at}
+          />
         </div>
       )}
     </motion.div>
   );
 }
 
-function DashboardFeedback({ insightId, currentRating, createdAt }: { insightId: string; currentRating: number | null; createdAt: string }) {
+function DashboardFeedback({
+  insightId,
+  currentRating,
+  createdAt,
+}: {
+  insightId: string;
+  currentRating: number | null;
+  createdAt: string;
+}) {
   const rateInsight = useRateInsight();
   const handleRate = (rating: number) => {
     if (currentRating === rating) return;
