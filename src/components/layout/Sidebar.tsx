@@ -25,8 +25,18 @@ import { useUserRole, type UserProfile } from '@/hooks/useUserRole';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/comercial', icon: TrendingUp, label: 'Comercial' },
-  { path: '/operacional', icon: Truck, label: 'Operação' },
+  {
+    path: '/comercial',
+    icon: TrendingUp,
+    label: 'Comercial',
+    roles: ['admin', 'financeiro', 'operacional'] as UserProfile[],
+  },
+  {
+    path: '/operacional',
+    icon: Truck,
+    label: 'Operação',
+    roles: ['admin', 'financeiro', 'operacional'] as UserProfile[],
+  },
   { path: '/documentos', icon: FileText, label: 'Documentos' },
   { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
   { path: '/clientes', icon: Users, label: 'Clientes' },

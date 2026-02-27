@@ -1089,6 +1089,7 @@ export type Database = {
           proof_type: 'adiantamento' | 'saldo' | 'outros';
           method: 'pix' | 'boleto' | 'outro' | null;
           amount: number | null;
+          expected_amount: number | null;
           paid_at: string | null;
           transaction_id: string | null;
           payee_name: string | null;
@@ -1107,6 +1108,7 @@ export type Database = {
           proof_type: 'adiantamento' | 'saldo' | 'outros';
           method?: 'pix' | 'boleto' | 'outro' | null;
           amount?: number | null;
+          expected_amount?: number | null;
           paid_at?: string | null;
           transaction_id?: string | null;
           payee_name?: string | null;
@@ -1124,6 +1126,7 @@ export type Database = {
           proof_type?: 'adiantamento' | 'saldo' | 'outros';
           method?: 'pix' | 'boleto' | 'outro' | null;
           amount?: number | null;
+          expected_amount?: number | null;
           paid_at?: string | null;
           transaction_id?: string | null;
           payee_name?: string | null;

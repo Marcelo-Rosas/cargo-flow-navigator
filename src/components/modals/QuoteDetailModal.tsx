@@ -150,10 +150,7 @@ export function QuoteDetailModal({
       seen.add(adv);
       opts.push({
         value: String(adv),
-        label:
-          adv === 0
-            ? 'À vista'
-            : `${adv}% Adiantamento / ${100 - adv}% Saldo`,
+        label: adv === 0 ? 'À vista' : `${adv}% Adiantamento / ${100 - adv}% Saldo`,
       });
     }
     return opts.sort((a, b) => Number(a.value) - Number(b.value));
@@ -347,7 +344,9 @@ export function QuoteDetailModal({
     (originalMarginPercent !== undefined && originalMarginPercent < TARGET_MARGIN_PERCENT);
 
   // Visão contábil desejada:
-  // Margem Bruta = Total Cliente - Piso ANTT - Carga/Descarga - Provisionamento DAS
+  // Margem Bruta = Total Cliente - Custo Carreteiro (real) - Carga/Descarga - Provisionamento DAS
+  // Usa custosCarreteiro do breakdown (custo real da tabela) em vez de Piso ANTT para cargas leves.
+  // Fallback para Piso ANTT quando custosCarreteiro não disponível (compatibilidade).
   // Resultado Líquido = Margem Bruta - Overhead
   // Margem % = Resultado Líquido / Total Cliente
   const totalClienteView =
@@ -358,9 +357,18 @@ export function QuoteDetailModal({
       : 0;
 
   const pisoAnttView = Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0);
+  const custosCarreteiroView =
+    breakdown?.profitability?.custosCarreteiro ??
+    (breakdown?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
+    null;
+  const custoCarreteiroParaMargem =
+    custosCarreteiroView != null && Number(custosCarreteiroView) > 0
+      ? Number(custosCarreteiroView)
+      : pisoAnttView;
   const cargaDescargaView = breakdown?.profitability?.custosDescarga ?? 0;
   const provisaoDasView = breakdown?.totals?.das ?? 0;
-  const margemBrutaView = totalClienteView - pisoAnttView - cargaDescargaView - provisaoDasView;
+  const margemBrutaView =
+    totalClienteView - custoCarreteiroParaMargem - cargaDescargaView - provisaoDasView;
 
   const overheadView = breakdown?.profitability?.overhead ?? 0;
   const resultadoLiquidoView = margemBrutaView - overheadView;
@@ -520,35 +528,34 @@ export function QuoteDetailModal({
           </DialogHeader>
 
           {/* Mini cards: Adiantamento e Saldo (qualquer split %) */}
-          {paymentTerm &&
-            (paymentTerm.advance_percent ?? 0) > 0 && (
-              <div className="grid grid-cols-2 gap-3 -mt-2">
-                <div className="p-3 rounded-lg border bg-primary/5 border-primary/20">
-                  <p className="text-xs text-muted-foreground mb-0.5">
-                    Adiantamento {paymentTerm.advance_percent}%
-                  </p>
-                  <p className="font-semibold text-foreground">
-                    {formatCurrency((totalClienteView * (paymentTerm.advance_percent ?? 0)) / 100)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {quote.advance_due_date ? formatDate(quote.advance_due_date) : '—'}
-                  </p>
-                </div>
-                <div className="p-3 rounded-lg border bg-muted/30 border-border">
-                  <p className="text-xs text-muted-foreground mb-0.5">
-                    Saldo {100 - (paymentTerm.advance_percent ?? 0)}%
-                  </p>
-                  <p className="font-semibold text-foreground">
-                    {formatCurrency(
-                      (totalClienteView * (100 - (paymentTerm.advance_percent ?? 0))) / 100
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {quote.balance_due_date ? formatDate(quote.balance_due_date) : '—'}
-                  </p>
-                </div>
+          {paymentTerm && (paymentTerm.advance_percent ?? 0) > 0 && (
+            <div className="grid grid-cols-2 gap-3 -mt-2">
+              <div className="p-3 rounded-lg border bg-primary/5 border-primary/20">
+                <p className="text-xs text-muted-foreground mb-0.5">
+                  Adiantamento {paymentTerm.advance_percent}%
+                </p>
+                <p className="font-semibold text-foreground">
+                  {formatCurrency((totalClienteView * (paymentTerm.advance_percent ?? 0)) / 100)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {quote.advance_due_date ? formatDate(quote.advance_due_date) : '—'}
+                </p>
               </div>
-            )}
+              <div className="p-3 rounded-lg border bg-muted/30 border-border">
+                <p className="text-xs text-muted-foreground mb-0.5">
+                  Saldo {100 - (paymentTerm.advance_percent ?? 0)}%
+                </p>
+                <p className="font-semibold text-foreground">
+                  {formatCurrency(
+                    (totalClienteView * (100 - (paymentTerm.advance_percent ?? 0))) / 100
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {quote.balance_due_date ? formatDate(quote.balance_due_date) : '—'}
+                </p>
+              </div>
+            </div>
+          )}
 
           <Tabs defaultValue="resumo" className="mt-4">
             <TabsList className="grid w-full grid-cols-3">
@@ -1280,17 +1287,22 @@ export function QuoteDetailModal({
                             <TableCell className="text-center text-muted-foreground text-xs">
                               {plaza.ordemPassagem || idx + 1}
                             </TableCell>
-                            <TableCell className="text-sm font-medium">
-                              {plaza.nome}
-                            </TableCell>
+                            <TableCell className="text-sm font-medium">{plaza.nome}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {plaza.cidade}{plaza.uf ? ` - ${plaza.uf}` : ''}
+                              {plaza.cidade}
+                              {plaza.uf ? ` - ${plaza.uf}` : ''}
                             </TableCell>
                             <TableCell className="text-right text-sm">
-                              {plaza.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              {plaza.valor.toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
-                              {plaza.valorTag.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              {plaza.valorTag.toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1322,7 +1334,8 @@ export function QuoteDetailModal({
                     Nenhuma praça de pedágio registrada.
                   </p>
                   <p className="text-xs text-muted-foreground/70 mt-1">
-                    Edite a cotação e clique &quot;Calcular KM&quot; para carregar as praças da rota.
+                    Edite a cotação e clique &quot;Calcular KM&quot; para carregar as praças da
+                    rota.
                   </p>
                 </div>
               )}

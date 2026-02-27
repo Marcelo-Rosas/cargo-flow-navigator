@@ -219,7 +219,26 @@ async function fetchOrderAndQuote(sb: any, orderId: string) {
       .single();
     quote = data;
   }
-  return { order, quote };
+
+  const [{ data: paymentProofs }, { data: reconciliation }] = await Promise.all([
+    sb
+      .from('payment_proofs')
+      .select('id, amount, expected_amount, proof_type, status')
+      .eq('order_id', orderId),
+    sb
+      .from('v_order_payment_reconciliation' as never)
+      .select('*')
+      .eq('order_id', orderId)
+      .maybeSingle(),
+  ]);
+
+  const orderEnriched = {
+    ...order,
+    payment_proofs: paymentProofs || [],
+    reconciliation: reconciliation || null,
+  };
+
+  return { order: orderEnriched, quote };
 }
 
 function getPeriodStart(reportType: 'daily' | 'weekly'): string {

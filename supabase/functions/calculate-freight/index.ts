@@ -246,10 +246,10 @@ Deno.serve(async (req) => {
           min_freight: Number(ltlRow.min_freight) || 9.28,
           min_freight_cargo_limit: Number(ltlRow.min_freight_cargo_limit) || 3093.81,
           min_tso: Number(ltlRow.min_tso) || 4.64,
-          gris_percent: Number(ltlRow.gris_percent) || 0.30,
+          gris_percent: Number(ltlRow.gris_percent) || 0.3,
           gris_min: Number(ltlRow.gris_min) || 9.28,
           gris_min_cargo_limit: Number(ltlRow.gris_min_cargo_limit) || 3093.81,
-          dispatch_fee: Number(ltlRow.dispatch_fee) || 102.90,
+          dispatch_fee: Number(ltlRow.dispatch_fee) || 102.9,
         };
       } else {
         // Fallback NTC Dez/25
@@ -257,10 +257,10 @@ Deno.serve(async (req) => {
           min_freight: 9.28,
           min_freight_cargo_limit: 3093.81,
           min_tso: 4.64,
-          gris_percent: 0.30,
+          gris_percent: 0.3,
           gris_min: 9.28,
           gris_min_cargo_limit: 3093.81,
-          dispatch_fee: 102.90,
+          dispatch_fee: 102.9,
         };
         fallbacksApplied.push('ltl_parameters: usando fallback NTC Dez/25');
       }
@@ -321,18 +321,19 @@ Deno.serve(async (req) => {
 
           if (modality === 'fracionado') {
             // =====================================================
-            // NTC FRACIONADO (LTL) Dez/25
+            // NTC FRACIONADO (LTL) Dez/25 — R$/kg × peso em todas as faixas
             // =====================================================
             const weightCol = getLtlWeightColumn(billableWeightKg);
 
             if (weightCol) {
-              // ≤ 200 kg: valor fixo por CTe
-              baseCost = Number(priceRow[weightCol]) || 0;
+              // ≤ 200 kg: peso × R$/kg da faixa (proporcional)
+              const ratePerKg = Number(priceRow[weightCol]) || 0;
+              baseCost = billableWeightKg * ratePerKg;
               console.log(
-                `[calculate-freight] NTC Fracionado | Faixa: ${kmBandLabel}, col: ${weightCol}, frete: R$ ${baseCost}`
+                `[calculate-freight] NTC Fracionado | Faixa: ${kmBandLabel}, col: ${weightCol}, rate: ${ratePerKg}/kg, frete: R$ ${baseCost}`
               );
             } else {
-              // > 200 kg: R$/kg × peso faturável
+              // > 200 kg: peso × R$/kg
               const ratePerKg = Number(priceRow.weight_rate_above_200) || 0;
               baseCost = billableWeightKg * ratePerKg;
               console.log(
@@ -340,11 +341,11 @@ Deno.serve(async (req) => {
               );
             }
 
-            // Fracionado: GRIS e TSO vem de ltl_parameters (não da linha)
-            grisPercent = ltlParams?.gris_percent ?? 0.30;
+            // Fracionado: GRIS e TSO da linha (variam por faixa km), fallback ltl_parameters
+            grisPercent = Number(priceRow.gris_percent) ?? ltlParams?.gris_percent ?? 0.3;
             tsoPercent = Number(priceRow.tso_percent) || 0;
             costValuePercent = Number(priceRow.cost_value_percent) || 0;
-            dispatchFee = ltlParams?.dispatch_fee ?? 102.90;
+            dispatchFee = ltlParams?.dispatch_fee ?? 102.9;
           } else {
             // =====================================================
             // NTC LOTAÇÃO (FTL) Dez/25 — fluxo original inalterado
@@ -354,8 +355,7 @@ Deno.serve(async (req) => {
 
             grisPercent = Number(priceRow.gris_percent) || 0;
             tsoPercent = Number(priceRow.tso_percent) || 0;
-            // NTC Lotação Dez/25: RCTR-C não compõe base de cálculo.
-            costValuePercent = 0;
+            costValuePercent = Number(priceRow.cost_value_percent) || 0;
 
             console.log(
               `[calculate-freight] NTC Lotação Dez/25 | Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, frete_peso: ${baseCost}`

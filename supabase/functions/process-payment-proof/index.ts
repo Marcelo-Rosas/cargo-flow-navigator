@@ -14,6 +14,12 @@ type DocumentRow = {
 type OrderRow = {
   id: string;
   trip_id: string | null;
+  carreteiro_real: number | null;
+  carrier_payment_term_id: string | null;
+};
+
+type PaymentTermRow = {
+  advance_percent: number | null;
 };
 
 function isUuid(v: string): boolean {
@@ -106,19 +112,39 @@ Deno.serve(async (req) => {
 
     const { data: order } = await sb
       .from('orders')
-      .select('id, trip_id')
+      .select('id, trip_id, carreteiro_real, carrier_payment_term_id')
       .eq('id', d.order_id)
       .maybeSingle();
 
-    const tripId = (order as OrderRow | null)?.trip_id ?? null;
-
+    const ord = order as OrderRow | null;
+    const tripId = ord?.trip_id ?? null;
     const proofType = mapProofType(d.type);
+
+    let expectedAmount: number | null = null;
+    const carreteiroReal = ord?.carreteiro_real != null ? Number(ord.carreteiro_real) : null;
+    if (carreteiroReal != null && carreteiroReal > 0 && ord?.carrier_payment_term_id) {
+      const { data: pt } = await sb
+        .from('payment_terms')
+        .select('advance_percent')
+        .eq('id', ord.carrier_payment_term_id)
+        .maybeSingle();
+      const advancePercent = (pt as PaymentTermRow | null)?.advance_percent ?? 0;
+      if (proofType === 'adiantamento') {
+        expectedAmount = (carreteiroReal * advancePercent) / 100;
+      } else {
+        expectedAmount = (carreteiroReal * (100 - advancePercent)) / 100;
+      }
+    } else if (carreteiroReal != null && carreteiroReal > 0 && proofType === 'saldo') {
+      expectedAmount = carreteiroReal;
+    }
+
     const row = {
       order_id: d.order_id,
       trip_id: tripId,
       document_id: d.id,
       proof_type: proofType,
       amount: null as number | null,
+      expected_amount: expectedAmount,
       status: 'pending' as const,
       extracted_fields: {} as Record<string, unknown>,
     };

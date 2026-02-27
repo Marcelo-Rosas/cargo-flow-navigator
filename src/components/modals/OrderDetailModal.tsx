@@ -20,6 +20,8 @@ import {
   Route,
   Landmark,
   RefreshCw,
+  XCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -128,6 +130,8 @@ function OrderReconciliationSummary({ orderId }: { orderId: string }) {
   if (!r || Number(r.expected_amount) <= 0) return null;
   const fmt = (v: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+  const isPendingConfirmation =
+    r.proofs_count > 0 && r.paid_amount === 0 && Number(r.expected_amount) > 0;
   return (
     <div className="p-4 rounded-lg bg-muted/30 border border-border">
       <p className="text-sm font-semibold text-foreground mb-3">Conciliação de Pagamento</p>
@@ -151,6 +155,29 @@ function OrderReconciliationSummary({ orderId }: { orderId: string }) {
             {fmt(r.delta_amount)}
           </p>
         </div>
+      </div>
+      <div className="flex items-center gap-2 mt-3">
+        {r.is_reconciled ? (
+          <span className="inline-flex items-center gap-1 text-xs text-success">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Conciliado
+          </span>
+        ) : isPendingConfirmation ? (
+          <span className="inline-flex items-center gap-1 text-xs text-warning-foreground">
+            <AlertCircle className="w-3.5 h-3.5" />
+            Pendente confirmação
+          </span>
+        ) : r.proofs_count > 0 ? (
+          <span className="inline-flex items-center gap-1 text-xs text-destructive">
+            <XCircle className="w-3.5 h-3.5" />
+            Divergente
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs text-warning-foreground">
+            <AlertCircle className="w-3.5 h-3.5" />
+            Pendente
+          </span>
+        )}
       </div>
     </div>
   );

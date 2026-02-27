@@ -113,7 +113,23 @@ export function FinancialCard({ row, onEdit, canManageActions = true }: Financia
                 )}
                 {row.is_reconciled === false &&
                   row.proofs_count != null &&
-                  row.proofs_count > 0 && (
+                  row.proofs_count > 0 &&
+                  (row.paid_amount ?? 0) === 0 &&
+                  row.expected_amount != null &&
+                  Number(row.expected_amount) > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-warning-foreground bg-warning/10 rounded px-1.5 py-0.5">
+                      <AlertCircle className="w-3 h-3" />
+                      Pendente confirmação
+                    </span>
+                  )}
+                {row.is_reconciled === false &&
+                  row.proofs_count != null &&
+                  row.proofs_count > 0 &&
+                  !(
+                    (row.paid_amount ?? 0) === 0 &&
+                    row.expected_amount != null &&
+                    Number(row.expected_amount) > 0
+                  ) && (
                     <span className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5">
                       <XCircle className="w-3 h-3" />
                       Divergente

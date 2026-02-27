@@ -131,6 +131,59 @@ function evaluatePreEntrega(order: any): RuleEvaluation[] {
   ];
 }
 
+function evaluatePaymentReconciliation(order: any): RuleEvaluation[] {
+  const carreteiroReal = Number(order.carreteiro_real ?? 0);
+  const proofs = order.payment_proofs || [];
+  const recon = order.reconciliation;
+
+  if (carreteiroReal <= 0) {
+    return [];
+  }
+
+  if (proofs.length === 0) {
+    return [
+      {
+        rule: 'Comprovante de pagamento ao carreteiro',
+        passed: false,
+        detail: 'Comprovante de pagamento ausente',
+      },
+    ];
+  }
+
+  if (recon?.is_reconciled) {
+    return [
+      {
+        rule: 'Comprovante de pagamento ao carreteiro',
+        passed: true,
+        detail: `Conciliado: R$ ${Number(recon.paid_amount ?? 0).toFixed(2)} pago vs R$ ${Number(recon.expected_amount ?? 0).toFixed(2)} esperado`,
+      },
+    ];
+  }
+
+  const hasAnyAmount = proofs.some((p: any) => p.amount != null && Number(p.amount) > 0);
+  if (hasAnyAmount) {
+    const delta = Math.abs(Number(recon?.delta_amount ?? 0));
+    const tolerance = 1;
+    if (delta > tolerance) {
+      return [
+        {
+          rule: 'Comprovante de pagamento ao carreteiro',
+          passed: false,
+          detail: `Divergência entre valor esperado (R$ ${Number(recon?.expected_amount ?? 0).toFixed(2)}) e valor do comprovante (R$ ${Number(recon?.paid_amount ?? 0).toFixed(2)})`,
+        },
+      ];
+    }
+  }
+
+  return [
+    {
+      rule: 'Comprovante de pagamento ao carreteiro',
+      passed: false,
+      detail: 'Comprovante anexado, valor a confirmar',
+    },
+  ];
+}
+
 function evaluateRules(order: any, quote: any, checkType: CheckType): RuleEvaluation[] {
   switch (checkType) {
     case 'pre_contratacao':
@@ -144,6 +197,7 @@ function evaluateRules(order: any, quote: any, checkType: CheckType): RuleEvalua
         ...evaluatePreContratacao(order),
         ...evaluatePreColeta(order, quote),
         ...evaluatePreEntrega(order),
+        ...evaluatePaymentReconciliation(order),
       ];
   }
 }

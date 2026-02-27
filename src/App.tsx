@@ -51,7 +51,7 @@ const App = () => (
               <Route
                 path="/comercial"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRoles={['admin', 'financeiro', 'operacional']}>
                     <Commercial />
                   </ProtectedRoute>
                 }
@@ -59,7 +59,7 @@ const App = () => (
               <Route
                 path="/operacional"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRoles={['admin', 'financeiro', 'operacional']}>
                     <Operations />
                   </ProtectedRoute>
                 }

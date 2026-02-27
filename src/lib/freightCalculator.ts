@@ -502,17 +502,18 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   let dispatchFee = 0;
 
   if (isLtl) {
-    // NTC Fracionado (LTL): faixas de peso por CTe
+    // NTC Fracionado (LTL): R$/kg × peso em todas as faixas (proporcional)
     const weightCol = getLtlWeightColumn(billableWeightKg);
     if (weightCol) {
-      // ≤ 200 kg: valor fixo por CTe
-      baseCost = round2(Number((row as Record<string, unknown>)[weightCol]) || 0);
+      // ≤ 200 kg: peso × R$/kg da faixa
+      const ratePerKg = Number((row as Record<string, unknown>)[weightCol]) || 0;
+      baseCost = round2(billableWeightKg * ratePerKg);
     } else {
-      // > 200 kg: R$/kg × peso faturável
+      // > 200 kg: peso × R$/kg
       const ratePerKg = Number((row as Record<string, unknown>).weight_rate_above_200) || 0;
       baseCost = round2(billableWeightKg * ratePerKg);
     }
-    dispatchFee = input.ltlParams?.dispatchFee ?? 102.90;
+    dispatchFee = input.ltlParams?.dispatchFee ?? 102.9;
   } else {
     // Lotação (FTL): cost_per_ton → cost_per_kg fallback
     const costPerTon = Number(row.cost_per_ton) || 0;
@@ -526,7 +527,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   // ---- STEP 3: COMPONENTES PERCENTUAIS SOBRE VALOR DA CARGA ----
   let grisPercent: number;
   const tsoPercent = Number(row.tso_percent) || 0;
-  const costValuePercent = isLtl ? (Number(row.cost_value_percent) || 0) : 0; // Lotação: RCTR-C = 0
+  const costValuePercent = Number(row.cost_value_percent) || 0;
 
   if (isLtl && input.ltlParams) {
     // Fracionado: GRIS vem de ltl_parameters

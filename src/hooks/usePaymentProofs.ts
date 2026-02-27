@@ -15,7 +15,7 @@ export function usePaymentProofsByOrder(orderId: string | null | undefined) {
         .select(
           `
           *,
-          document:documents (id, file_name, file_path, type, created_at)
+          document:documents (id, file_name, file_url, type, created_at)
         `
         )
         .eq('order_id', asDb(orderId))
@@ -27,7 +27,7 @@ export function usePaymentProofsByOrder(orderId: string | null | undefined) {
           document?: {
             id: string;
             file_name: string | null;
-            file_path: string | null;
+            file_url: string | null;
             type: string;
             created_at: string;
           } | null;
@@ -48,7 +48,7 @@ export function usePaymentProofsByTrip(tripId: string | null | undefined) {
         .select(
           `
           *,
-          document:documents (id, file_name, file_path, type, created_at),
+          document:documents (id, file_name, file_url, type, created_at),
           order:orders (id, os_number, carreteiro_real)
         `
         )
@@ -61,7 +61,7 @@ export function usePaymentProofsByTrip(tripId: string | null | undefined) {
           document?: {
             id: string;
             file_name: string | null;
-            file_path: string | null;
+            file_url: string | null;
             type: string;
             created_at: string;
           } | null;
@@ -93,6 +93,25 @@ export function useProcessPaymentProof() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data ?? { success: false };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payment_proofs'] });
+      queryClient.invalidateQueries({ queryKey: ['reconciliation'] });
+    },
+  });
+}
+
+export function useUpdatePaymentProofAmount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, amount }: { id: string; amount: number }): Promise<void> => {
+      const { error } = await supabase
+        .from('payment_proofs')
+        .update({ amount, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payment_proofs'] });

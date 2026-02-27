@@ -23,7 +23,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { MaskedInput } from '@/components/ui/masked-input';
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
-import { DocumentList } from '@/components/documents/DocumentList';
+import { CarrierPaymentProofList } from '@/components/documents/CarrierPaymentProofList';
 import { useUpdateOrder } from '@/hooks/useOrders';
 import { usePaymentTerms } from '@/hooks/usePricingRules';
 import { useEnsureFinancialDocument } from '@/hooks/useEnsureFinancialDocument';
@@ -521,6 +521,13 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     Conciliado
                   </span>
+                ) : reconciliation.proofs_count > 0 &&
+                  reconciliation.paid_amount === 0 &&
+                  Number(reconciliation.expected_amount) > 0 ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-warning-foreground">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    Pendente confirmação
+                  </span>
                 ) : reconciliation.proofs_count > 0 ? (
                   <span className="inline-flex items-center gap-1 text-xs text-destructive">
                     <XCircle className="w-3.5 h-3.5" />
@@ -549,7 +556,7 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
           onCarrierPaymentDocCreated={handleCarrierPaymentDocCreated}
         />
         <div className="mt-4">
-          <DocumentList orderId={order.id} />
+          <CarrierPaymentProofList orderId={order.id} />
         </div>
       </div>
     </div>
