@@ -283,10 +283,15 @@ export interface RouteRsKm {
   count: number; // nº de OS com carreteiro_real nessa rota
 }
 
-/** Agrega R$/KM por rota para exibição no Dashboard e Relatórios. */
-export function useRsKmByRoute() {
+/** Agrega R$/KM por rota para exibição no Dashboard.
+ *  Rotas identificadas por par de UF (SC→MG, SP→RJ…).
+ *  Linhas sem UF identificável são ignoradas (não agrupadas em "Outras"). */
+export function useRsKmByRoute(filter?: { month?: number | null; year?: number | null }) {
+  const year = filter?.year ?? null;
+  const month = filter?.month ?? null;
+
   return useQuery({
-    queryKey: ['rskm-by-route'],
+    queryKey: ['rskm-by-route', year, month],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
@@ -296,6 +301,7 @@ export function useRsKmByRoute() {
           carreteiro_antt,
           origin,
           destination,
+          created_at,
           quote:quotes(km_distance, pricing_breakdown)
         `
         )
@@ -308,13 +314,25 @@ export function useRsKmByRoute() {
         carreteiro_antt: number | null;
         origin: string;
         destination: string;
+        created_at: string;
         quote: {
           km_distance: number | null;
           pricing_breakdown: unknown;
         } | null;
       };
 
-      const rows = filterSupabaseRows<RawRow>(data);
+      const allRows = filterSupabaseRows<RawRow>(data);
+
+      // Aplica filtro de período em JS (evita complexidade de tipo no builder)
+      const rows =
+        year !== null
+          ? allRows.filter((row) => {
+              const d = new Date(row.created_at);
+              if (d.getFullYear() !== year) return false;
+              if (month !== null && d.getMonth() + 1 !== month) return false;
+              return true;
+            })
+          : allRows;
 
       const grouped: Record<string, { sumAntt: number; sumReal: number; count: number }> = {};
 
@@ -324,10 +342,10 @@ export function useRsKmByRoute() {
         const km = Number(row.quote?.km_distance ?? 0);
         if (km <= 0 || carrReal <= 0) continue;
 
-        // Determinar rota: preferência ao routeUfLabel salvo no breakdown
+        // Preferência: routeUfLabel salvo no breakdown; fallback: extrai UF de origin/destination
         const bd = row.quote?.pricing_breakdown as StoredPricingBreakdown | null;
-        const route =
-          bd?.meta?.routeUfLabel || formatRouteUf(row.origin, row.destination) || 'Outras';
+        const route = bd?.meta?.routeUfLabel || formatRouteUf(row.origin, row.destination);
+        if (!route) continue; // Ignora linhas sem par UF identificável
 
         if (!grouped[route]) grouped[route] = { sumAntt: 0, sumReal: 0, count: 0 };
         grouped[route].sumReal += carrReal / km;
@@ -352,15 +370,19 @@ export interface RouteRsKmDetailed extends RouteRsKm {
   quoteCount: number; // nº de cotações com km_distance nessa rota
 }
 
-/** Versão estendida com contagem de cotações por rota — para a página de Relatórios. */
-export function useRsKmDetailedReport() {
+/** Versão estendida com contagem de cotações por rota — para a página de Relatórios.
+ *  Rotas identificadas por par de UF; linhas sem UF são ignoradas. */
+export function useRsKmDetailedReport(filter?: { month?: number | null; year?: number | null }) {
+  const year = filter?.year ?? null;
+  const month = filter?.month ?? null;
+
   return useQuery({
-    queryKey: ['rskm-detailed-report'],
+    queryKey: ['rskm-detailed-report', year, month],
     queryFn: async () => {
-      // Cotações com km_distance — para calcular R$/KM da referência ANTT por rota
+      // Cotações com km_distance — para calcular quoteCount por rota
       const { data: quotesData } = await supabase
         .from('quotes')
-        .select('km_distance, pricing_breakdown, origin, destination')
+        .select('km_distance, pricing_breakdown, origin, destination, created_at')
         .not('km_distance', 'is', null);
 
       type QuoteRow = {
@@ -368,14 +390,25 @@ export function useRsKmDetailedReport() {
         pricing_breakdown: unknown;
         origin: string;
         destination: string;
+        created_at: string;
       };
-      const quotes = filterSupabaseRows<QuoteRow>(quotesData);
+      const allQuotes = filterSupabaseRows<QuoteRow>(quotesData);
+      const quotes =
+        year !== null
+          ? allQuotes.filter((q) => {
+              const d = new Date(q.created_at);
+              if (d.getFullYear() !== year) return false;
+              if (month !== null && d.getMonth() + 1 !== month) return false;
+              return true;
+            })
+          : allQuotes;
 
-      // Contagem de cotações por rota
+      // Contagem de cotações por rota (apenas rotas com UF identificável)
       const quoteCountByRoute: Record<string, number> = {};
       for (const q of quotes) {
         const bd = q.pricing_breakdown as StoredPricingBreakdown | null;
-        const route = bd?.meta?.routeUfLabel || formatRouteUf(q.origin, q.destination) || 'Outras';
+        const route = bd?.meta?.routeUfLabel || formatRouteUf(q.origin, q.destination);
+        if (!route) continue;
         quoteCountByRoute[route] = (quoteCountByRoute[route] || 0) + 1;
       }
 
@@ -383,7 +416,7 @@ export function useRsKmDetailedReport() {
       const { data: ordersData, error } = await supabase
         .from('orders')
         .select(
-          `carreteiro_real, carreteiro_antt, origin, destination,
+          `carreteiro_real, carreteiro_antt, origin, destination, created_at,
            quote:quotes(km_distance, pricing_breakdown)`
         )
         .not('carreteiro_real', 'is', null);
@@ -395,9 +428,19 @@ export function useRsKmDetailedReport() {
         carreteiro_antt: number | null;
         origin: string;
         destination: string;
+        created_at: string;
         quote: { km_distance: number | null; pricing_breakdown: unknown } | null;
       };
-      const orders = filterSupabaseRows<OrderRow>(ordersData);
+      const allOrders = filterSupabaseRows<OrderRow>(ordersData);
+      const orders =
+        year !== null
+          ? allOrders.filter((o) => {
+              const d = new Date(o.created_at);
+              if (d.getFullYear() !== year) return false;
+              if (month !== null && d.getMonth() + 1 !== month) return false;
+              return true;
+            })
+          : allOrders;
 
       const grouped: Record<string, { sumAntt: number; sumReal: number; count: number }> = {};
       for (const row of orders) {
@@ -407,8 +450,8 @@ export function useRsKmDetailedReport() {
         if (km <= 0 || carrReal <= 0) continue;
 
         const bd = row.quote?.pricing_breakdown as StoredPricingBreakdown | null;
-        const route =
-          bd?.meta?.routeUfLabel || formatRouteUf(row.origin, row.destination) || 'Outras';
+        const route = bd?.meta?.routeUfLabel || formatRouteUf(row.origin, row.destination);
+        if (!route) continue; // Ignora linhas sem par UF identificável
 
         if (!grouped[route]) grouped[route] = { sumAntt: 0, sumReal: 0, count: 0 };
         grouped[route].sumReal += carrReal / km;

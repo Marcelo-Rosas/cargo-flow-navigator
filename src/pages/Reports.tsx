@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3, Route, TrendingDown, TrendingUp, Loader2, Info } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -12,6 +13,24 @@ import {
 } from '@/components/ui/table';
 import { useRsKmDetailedReport } from '@/hooks/useDashboardStats';
 import { cn } from '@/lib/utils';
+
+const REPORT_MONTHS = [
+  { label: 'Janeiro', value: 1 },
+  { label: 'Fevereiro', value: 2 },
+  { label: 'Março', value: 3 },
+  { label: 'Abril', value: 4 },
+  { label: 'Maio', value: 5 },
+  { label: 'Junho', value: 6 },
+  { label: 'Julho', value: 7 },
+  { label: 'Agosto', value: 8 },
+  { label: 'Setembro', value: 9 },
+  { label: 'Outubro', value: 10 },
+  { label: 'Novembro', value: 11 },
+  { label: 'Dezembro', value: 12 },
+] as const;
+
+const REPORT_THIS_YEAR = new Date().getFullYear();
+const REPORT_YEARS = [REPORT_THIS_YEAR, REPORT_THIS_YEAR - 1, REPORT_THIS_YEAR - 2] as const;
 
 function StatCard({
   title,
@@ -50,7 +69,12 @@ function StatCard({
 }
 
 export default function Reports() {
-  const { data: routes, isLoading } = useRsKmDetailedReport();
+  const [reportYear, setReportYear] = useState<number | null>(REPORT_THIS_YEAR);
+  const [reportMonth, setReportMonth] = useState<number | null>(null);
+  const { data: routes, isLoading } = useRsKmDetailedReport({
+    year: reportYear,
+    month: reportMonth,
+  });
 
   // Resumo geral
   const allWithReal = routes?.filter((r) => r.count > 0) ?? [];
@@ -92,6 +116,37 @@ export default function Reports() {
             Análise comparativa de custo R$/km — referência ANTT vs carreteiro real pago
           </motion.p>
         </div>
+        <motion.div
+          className="flex items-center gap-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.15 }}
+        >
+          <select
+            value={reportMonth ?? ''}
+            onChange={(e) => setReportMonth(e.target.value ? Number(e.target.value) : null)}
+            className="text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground cursor-pointer"
+          >
+            <option value="">Todos os meses</option>
+            {REPORT_MONTHS.map(({ label, value }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={reportYear ?? ''}
+            onChange={(e) => setReportYear(e.target.value ? Number(e.target.value) : null)}
+            className="text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground cursor-pointer"
+          >
+            <option value="">Todos os anos</option>
+            {REPORT_YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </motion.div>
       </div>
 
       {isLoading ? (

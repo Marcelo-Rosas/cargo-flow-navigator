@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   TrendingUp,
@@ -46,6 +47,25 @@ import { AutomationActivityFeed } from '@/components/dashboard/AutomationActivit
 import { AiUsageDashboard } from '@/components/dashboard/AiUsageDashboard';
 import { useUserRole } from '@/hooks/useUserRole';
 
+// ── Filtro R$/km ────────────────────────────────────────────────────
+const RSKM_MONTHS = [
+  { label: 'Janeiro', value: 1 },
+  { label: 'Fevereiro', value: 2 },
+  { label: 'Março', value: 3 },
+  { label: 'Abril', value: 4 },
+  { label: 'Maio', value: 5 },
+  { label: 'Junho', value: 6 },
+  { label: 'Julho', value: 7 },
+  { label: 'Agosto', value: 8 },
+  { label: 'Setembro', value: 9 },
+  { label: 'Outubro', value: 10 },
+  { label: 'Novembro', value: 11 },
+  { label: 'Dezembro', value: 12 },
+] as const;
+
+const THIS_YEAR = new Date().getFullYear();
+const RSKM_YEARS = [THIS_YEAR, THIS_YEAR - 1, THIS_YEAR - 2] as const;
+
 // Fallback data for empty states
 const emptyConversionData = [
   { name: 'Jan', value: 0 },
@@ -87,7 +107,12 @@ export default function Dashboard() {
     refetch: refetchRevenue,
   } = useRevenueByClientData();
 
-  const { data: rsKmRoutes, isLoading: rsKmLoading } = useRsKmByRoute();
+  const [rsKmYear, setRsKmYear] = useState<number | null>(THIS_YEAR);
+  const [rsKmMonth, setRsKmMonth] = useState<number | null>(null);
+  const { data: rsKmRoutes, isLoading: rsKmLoading } = useRsKmByRoute({
+    year: rsKmYear,
+    month: rsKmMonth,
+  });
 
   // Enable realtime updates
   useRealtimeSubscription(['quotes', 'orders', 'occurrences']);
@@ -201,7 +226,9 @@ export default function Dashboard() {
       <ApprovalBanner />
 
       {/* KPI Cards */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 ${isOperacional ? 'lg:grid-cols-4' : 'lg:grid-cols-3 xl:grid-cols-6'} gap-4 mb-8 auto-rows-fr`}>
+      <div
+        className={`grid grid-cols-1 md:grid-cols-2 ${isOperacional ? 'lg:grid-cols-4' : 'lg:grid-cols-3 xl:grid-cols-6'} gap-4 mb-8 auto-rows-fr`}
+      >
         {statsLoading ? (
           <div className="col-span-full flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -276,12 +303,36 @@ export default function Dashboard() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <Route className="w-5 h-5 text-primary" />
           <h2 className="text-lg font-semibold text-foreground">Custo por Rota (R$/km)</h2>
-          <span className="text-xs text-muted-foreground ml-1">
-            — comparativo ANTT vs carreteiro real pago
-          </span>
+          <span className="text-xs text-muted-foreground">— ANTT vs carreteiro real</span>
+          <div className="ml-auto flex items-center gap-2">
+            <select
+              value={rsKmMonth ?? ''}
+              onChange={(e) => setRsKmMonth(e.target.value ? Number(e.target.value) : null)}
+              className="text-xs border border-border rounded px-2 py-1 bg-background text-foreground cursor-pointer"
+            >
+              <option value="">Todos os meses</option>
+              {RSKM_MONTHS.map(({ label, value }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={rsKmYear ?? ''}
+              onChange={(e) => setRsKmYear(e.target.value ? Number(e.target.value) : null)}
+              className="text-xs border border-border rounded px-2 py-1 bg-background text-foreground cursor-pointer"
+            >
+              <option value="">Todos os anos</option>
+              {RSKM_YEARS.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {rsKmLoading ? (
@@ -290,9 +341,15 @@ export default function Dashboard() {
           </div>
         ) : !rsKmRoutes || rsKmRoutes.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
-            Nenhuma OS com valor de carreteiro real preenchido.
-            <br />
-            Preencha o campo <strong>Carreteiro Real</strong> nas OS para ver este relatório.
+            {rsKmYear !== null || rsKmMonth !== null ? (
+              'Nenhuma OS com carreteiro real no período selecionado.'
+            ) : (
+              <>
+                Nenhuma OS com valor de carreteiro real preenchido.
+                <br />
+                Preencha o campo <strong>Carreteiro Real</strong> nas OS para ver este relatório.
+              </>
+            )}
           </p>
         ) : (
           <Table>
@@ -339,7 +396,9 @@ export default function Dashboard() {
       </motion.div>
 
       {/* AI Insights + Activity Feed + Usage */}
-      <div className={`grid grid-cols-1 ${(isAdmin || isFinanceiro) ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6 mb-8`}>
+      <div
+        className={`grid grid-cols-1 ${isAdmin || isFinanceiro ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6 mb-8`}
+      >
         <AiInsightsWidget />
         <AutomationActivityFeed />
         {(isAdmin || isFinanceiro) && <AiUsageDashboard />}
