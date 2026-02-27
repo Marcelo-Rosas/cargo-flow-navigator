@@ -305,7 +305,7 @@ function DashboardFeedback({
       {createdAt && (
         <p className="text-[10px] text-muted-foreground">
           Atualizado em{' '}
-          {new Date(createdAt).toLocaleDateString('pt-BR', {
+          {new Date(createdAt).toLocaleString('pt-BR', {
             day: '2-digit',
             month: 'short',
             hour: '2-digit',

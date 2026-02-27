@@ -1,52 +1,9 @@
 import { motion } from 'framer-motion';
-import { AlertTriangle, FileWarning, Clock, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { AlertTriangle, FileWarning, Clock, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-interface Alert {
-  id: string;
-  type: 'critical' | 'warning' | 'info';
-  title: string;
-  description: string;
-  time: string;
-  action?: {
-    label: string;
-    onClick?: () => void;
-  };
-}
-
-interface AlertsWidgetProps {
-  alerts?: Alert[];
-}
-
-const mockAlerts: Alert[] = [
-  {
-    id: '1',
-    type: 'critical',
-    title: 'Documento Vencido',
-    description: 'CT-e da OS-2024-0002 pendente há 48h',
-    time: 'Agora',
-    action: { label: 'Resolver' },
-  },
-  {
-    id: '2',
-    type: 'warning',
-    title: 'Atraso na Entrega',
-    description: 'OS-2024-0003 ultrapassou ETA previsto',
-    time: 'Há 2h',
-    action: { label: 'Ver OS' },
-  },
-  {
-    id: '3',
-    type: 'info',
-    title: 'Comprovante Pendente',
-    description: '3 entregas aguardando upload de canhoto',
-    time: 'Hoje',
-    action: { label: 'Verificar' },
-  },
-];
+import { useActiveAlerts, type ActiveAlert } from '@/hooks/useActiveAlerts';
 
 const alertStyles = {
   critical: {
@@ -66,37 +23,56 @@ const alertStyles = {
   },
 };
 
-export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
+function extractOs(text: string) {
+  const m = text.match(/OS-\d{4}-\d{4}/i);
+  return m ? m[0].toUpperCase() : null;
+}
+
+function AlertItem({ alert, index }: { alert: ActiveAlert; index: number }) {
   const navigate = useNavigate();
-  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
+  const style = alertStyles[alert.type];
+  const Icon = style.icon;
 
-  const visibleAlerts = useMemo(
-    () => alerts.filter((a) => !dismissed.has(a.id)),
-    [alerts, dismissed]
-  );
-
-  const extractOs = (text: string) => {
-    const m = text.match(/OS-\d{4}-\d{4}/i);
-    return m ? m[0].toUpperCase() : null;
-  };
-
-  const defaultAction = (alert: Alert) => {
-    const os = extractOs(`${alert.title} ${alert.description}`);
-
-    if (alert.action?.label === 'Resolver') {
-      if (os) return navigate(`/documentos?q=${encodeURIComponent(os)}`);
-      return navigate('/documentos');
-    }
-
+  const handleAction = () => {
+    if (alert.action?.label === 'Verificar') return navigate('/documentos');
     if (alert.action?.label === 'Ver OS') {
-      if (os) return navigate(`/operacional?q=${encodeURIComponent(os)}`);
-      return navigate('/operacional');
+      const os = extractOs(`${alert.title} ${alert.description}`);
+      return os ? navigate(`/operacional?q=${encodeURIComponent(os)}`) : navigate('/operacional');
     }
-
-    if (alert.action?.label === 'Verificar') {
-      return navigate('/documentos');
+    if (alert.action?.label === 'Resolver') {
+      const os = extractOs(`${alert.title} ${alert.description}`);
+      return os ? navigate(`/documentos?q=${encodeURIComponent(os)}`) : navigate('/documentos');
     }
   };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3, delay: 0.1 * index }}
+      className={cn('p-4 rounded-lg border flex items-start gap-3', style.bg)}
+    >
+      <div className={cn('mt-0.5', style.iconColor)}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-foreground">{alert.title}</p>
+        <p className="text-sm text-muted-foreground">{alert.description}</p>
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-xs text-muted-foreground">{alert.time}</span>
+          {alert.action && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleAction}>
+              {alert.action.label}
+            </Button>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+export function AlertsWidget() {
+  const { data: alerts = [], isLoading } = useActiveAlerts();
 
   return (
     <motion.div
@@ -107,58 +83,31 @@ export function AlertsWidget({ alerts = mockAlerts }: AlertsWidgetProps) {
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-foreground">Alertas Críticos</h3>
-        <span className="text-sm text-muted-foreground">{alerts.length} pendentes</span>
+        {!isLoading && (
+          <span className="text-sm text-muted-foreground">{alerts.length} pendentes</span>
+        )}
       </div>
 
-      <div className="space-y-3">
-        {alerts.map((alert, index) => {
-          const style = alertStyles[alert.type];
-          const Icon = style.icon;
+      {isLoading && (
+        <div className="flex items-center justify-center py-8 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          <span className="text-sm">Verificando alertas...</span>
+        </div>
+      )}
 
-          return (
-            <motion.div
-              key={alert.id}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 * index }}
-              className={cn('p-4 rounded-lg border flex items-start gap-3', style.bg)}
-            >
-              <div className={cn('mt-0.5', style.iconColor)}>
-                <Icon className="w-5 h-5" />
-              </div>
+      {!isLoading && alerts.length === 0 && (
+        <div className="flex items-center justify-center py-8 text-muted-foreground">
+          <span className="text-sm">Nenhum alerta crítico no momento</span>
+        </div>
+      )}
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-foreground">{alert.title}</p>
-                    <p className="text-sm text-muted-foreground">{alert.description}</p>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-muted-foreground">{alert.time}</span>
-                  {alert.action && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => {
-                        if (alert.action?.onClick) return alert.action.onClick();
-                        defaultAction(alert);
-                      }}
-                    >
-                      {alert.action.label}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
+      {!isLoading && alerts.length > 0 && (
+        <div className="space-y-3">
+          {alerts.map((alert, index) => (
+            <AlertItem key={alert.id} alert={alert} index={index} />
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }

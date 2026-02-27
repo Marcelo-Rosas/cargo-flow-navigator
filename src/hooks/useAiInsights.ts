@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 
 // ─────────────────────────────────────────────────────
 // Types
@@ -97,7 +96,6 @@ export function useOperationalInsights() {
 /** Trigger AI analysis on demand */
 export function useRequestAiAnalysis() {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
 
   return useMutation({
     mutationFn: async ({
@@ -109,14 +107,26 @@ export function useRequestAiAnalysis() {
       entityId: string;
       entityType: string;
     }) => {
-      // Get a fresh session to avoid stale/expired JWTs
+      // Get a fresh session; refresh if expired
       const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token ?? session?.access_token;
-
+      let token = sessionData?.session?.access_token;
+      if (!token) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        token = refreshData?.session?.access_token ?? undefined;
+      }
       if (!token) throw new Error('Sessão expirada. Faça login novamente.');
 
-      const fnName =
-        analysisType === 'operational_insights' ? 'ai-operational-agent' : 'ai-financial-agent';
+      const OPERATIONAL_TYPES = new Set([
+        'operational_insights',
+        'driver_qualification',
+        'stage_gate_validation',
+        'compliance_check',
+        'operational_report',
+        'regulatory_update',
+      ]);
+      const fnName = OPERATIONAL_TYPES.has(analysisType)
+        ? 'ai-operational-orchestrator'
+        : 'ai-financial-agent';
       const { data, error } = await supabase.functions.invoke(fnName, {
         body: { analysisType, entityId, entityType },
         headers: {
