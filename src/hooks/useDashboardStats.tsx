@@ -31,6 +31,8 @@ function getMonthRange(monthsAgo: number) {
 export function useDashboardStats() {
   return useQuery({
     queryKey: ['dashboard-stats'],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const currentMonth = getMonthRange(0);
       const lastMonth = getMonthRange(1);
@@ -107,10 +109,13 @@ export function useDashboardStats() {
 
       let conversionTrend: TrendData | null = null;
       if (lastMonthTotal > 0 && currentMonthTotal > 0) {
-        const conversionChange = currentConversionRate - lastConversionRate;
+        const relativeChange =
+          lastConversionRate > 0
+            ? ((currentConversionRate - lastConversionRate) / lastConversionRate) * 100
+            : 0;
         conversionTrend = {
-          value: Math.abs(Math.round(conversionChange)),
-          isPositive: conversionChange >= 0,
+          value: Math.abs(Math.round(relativeChange)),
+          isPositive: relativeChange >= 0,
         };
       }
 
