@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { filterSupabaseRows } from '@/lib/supabase-utils';
+import { calcConversionRate, filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -171,7 +171,7 @@ export function useMonthlyTrends() {
       Object.keys(monthlyData).forEach((monthKey) => {
         const total = totalQuotesPerMonth[monthKey] || 0;
         const won = wonQuotesPerMonth[monthKey] || 0;
-        monthlyData[monthKey].conversionRate = total > 0 ? Math.round((won / total) * 100) : 0;
+        monthlyData[monthKey].conversionRate = calcConversionRate(won, total);
       });
 
       return Object.values(monthlyData);

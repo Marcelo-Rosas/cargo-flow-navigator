@@ -34,3 +34,11 @@ export function asDb<T>(value: T): any {
 export function asInsert<T>(payload: T): any {
   return payload;
 }
+
+/**
+ * Calculates conversion rate as a rounded integer percentage (0–100).
+ * Returns 0 when total is 0 to avoid division by zero.
+ */
+export function calcConversionRate(won: number, total: number): number {
+  return total > 0 ? Math.round((won / total) * 100) : 0;
+}

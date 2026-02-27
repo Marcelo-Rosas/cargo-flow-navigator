@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { asDb, filterSupabaseRows } from '@/lib/supabase-utils';
+import { asDb, calcConversionRate, filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { StoredPricingBreakdown, formatRouteUf } from '@/lib/freightCalculator';
 
@@ -53,7 +53,7 @@ export function useDashboardStats() {
 
       const totalQuotes = validAllQuotes.length;
       const wonQuotes = validAllQuotes.filter((q) => q.stage === 'ganho').length;
-      const conversionRate = totalQuotes > 0 ? Math.round((wonQuotes / totalQuotes) * 100) : 0;
+      const conversionRate = calcConversionRate(wonQuotes, totalQuotes);
 
       // Calculate pipeline trend (current month quotes vs last month)
       const { data: currentMonthQuotes } = await supabase
