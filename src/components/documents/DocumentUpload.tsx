@@ -22,11 +22,15 @@ type DocumentType = Database['public']['Enums']['document_type'];
 type Order = Database['public']['Tables']['orders']['Row'];
 type OrderStage = Order['stage'];
 
+const DRIVER_DOC_TYPES: DocumentType[] = ['cnh', 'crlv', 'comp_residencia', 'antt_motorista'];
+
 interface DocumentUploadProps {
   orderId?: string;
   quoteId?: string;
   orderStage?: OrderStage;
   financialContext?: 'carrier_payment';
+  /** Quando true, filtra CNH/CRLV/comp.res./ANTT do seletor (docs herdados da viagem) */
+  driverDocsInherited?: boolean;
   onSuccess?: () => void;
   /** Called after upload when type is adiantamento_carreteiro or saldo_carreteiro (to trigger process-payment-proof) */
   onCarrierPaymentDocCreated?: (documentId: string, type: DocumentType) => void;
@@ -136,6 +140,7 @@ export function DocumentUpload({
   quoteId,
   orderStage,
   financialContext,
+  driverDocsInherited,
   onSuccess,
   onCarrierPaymentDocCreated,
 }: DocumentUploadProps) {
@@ -151,7 +156,7 @@ export function DocumentUpload({
   ];
 
   // Pega os tipos disponíveis: carrier payment, cotação ou ordem (por estágio)
-  const availableTypes =
+  let availableTypes =
     financialContext === 'carrier_payment'
       ? CARRIER_PAYMENT_DOCUMENT_TYPES
       : quoteId && !orderId
@@ -160,7 +165,14 @@ export function DocumentUpload({
           ? DOCUMENT_TYPES_BY_STAGE[orderStage]
           : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
 
-  const [selectedType, setSelectedType] = useState<DocumentType>(availableTypes[0].value);
+  // Quando docs do motorista foram herdados da viagem, remove do seletor
+  if (driverDocsInherited && orderId && financialContext !== 'carrier_payment') {
+    availableTypes = availableTypes.filter((t) => !DRIVER_DOC_TYPES.includes(t.value));
+  }
+
+  const [selectedType, setSelectedType] = useState<DocumentType>(
+    availableTypes[0]?.value ?? 'outros'
+  );
 
   // Atualiza o tipo selecionado quando o estágio muda
   useEffect(() => {

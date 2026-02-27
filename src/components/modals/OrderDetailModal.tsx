@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import {
   MapPin,
@@ -19,6 +19,7 @@ import {
   CreditCard,
   Route,
   Landmark,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,7 @@ import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
 import { useVehicleByPlate } from '@/hooks/useVehicles';
 import { useUpdateOrder } from '@/hooks/useOrders';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEnsureFinancialDocument } from '@/hooks/useEnsureFinancialDocument';
 import { useTripsForOrder, useLinkOrderToTrip } from '@/hooks/useTrips';
 import { useOrderReconciliation } from '@/hooks/useReconciliation';
@@ -53,6 +55,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -287,6 +291,215 @@ export function OrderDetailModal({
         })
       : null);
 
+  const quoteAxes = savedAntt?.axesCount ?? order?.quote?.vehicle_type?.axes_count ?? null;
+  const orderAxes = order?.vehicle_type?.axes_count ?? null;
+  const axesDivergence = quoteAxes != null && orderAxes != null && quoteAxes !== orderAxes;
+  const originCep = (order?.origin_cep || order?.quote?.origin_cep || '').replace(/\D/g, '');
+  const destinationCep = (order?.destination_cep || order?.quote?.destination_cep || '').replace(
+    /\D/g,
+    ''
+  );
+  const hasCeps = originCep.length === 8 && destinationCep.length === 8;
+
+  const queryClient = useQueryClient();
+  const [isRecalculatingToll, setIsRecalculatingToll] = useState(false);
+  const [manualTollValue, setManualTollValue] = useState<string>('');
+  const [isEditingToll, setIsEditingToll] = useState(false);
+
+  const handleRecalculateToll = useCallback(async () => {
+    if (!order || !hasCeps || isRecalculatingToll) return;
+    const axes = orderAxes ?? undefined;
+    setIsRecalculatingToll(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('calculate-distance-webrouter', {
+        body: {
+          origin_cep: originCep,
+          destination_cep: destinationCep,
+          axes_count: axes,
+        },
+      });
+      if (error || !data?.success) {
+        const errMsg = data?.error || (error as Error)?.message || 'Erro ao calcular pedágio';
+        toast.error(errMsg);
+        return;
+      }
+      const toll = Number(data.data?.toll) || 0;
+      const plazas: TollPlaza[] = Array.isArray(data.data?.toll_plazas)
+        ? data.data.toll_plazas
+        : [];
+      const current = (order.pricing_breakdown as unknown as StoredPricingBreakdown | null) ?? null;
+      const baseMeta = current?.meta || {
+        routeUfLabel: null,
+        kmBandLabel: null,
+        kmStatus: 'OK' as const,
+        marginStatus: 'UNKNOWN' as const,
+        marginPercent: 0,
+      };
+      const updated: StoredPricingBreakdown = {
+        calculatedAt: current?.calculatedAt || new Date().toISOString(),
+        version: current?.version || '4.0-fob-lotacao-markup-scope',
+        status: current?.status || 'OK',
+        error: current?.error,
+        meta: {
+          ...baseMeta,
+          tollPlazas: plazas,
+          antt: current?.meta?.antt
+            ? {
+                ...current.meta.antt,
+                axesCount: orderAxes ?? current.meta.antt.axesCount,
+              }
+            : current?.meta?.antt,
+        },
+        weights: current?.weights || {
+          cubageWeight: 0,
+          billableWeight: 0,
+          tonBillable: 0,
+        },
+        components: {
+          ...(current?.components || {}),
+          toll,
+        } as StoredPricingBreakdown['components'],
+        totals: current?.totals || {
+          receitaBruta: 0,
+          das: 0,
+          icms: 0,
+          totalImpostos: 0,
+          totalCliente: 0,
+        },
+        profitability: current?.profitability || {
+          custosCarreteiro: 0,
+          custosDescarga: 0,
+          custosDiretos: 0,
+          margemBruta: 0,
+          overhead: 0,
+          resultadoLiquido: 0,
+          margemPercent: 0,
+        },
+        rates: current?.rates || {
+          dasPercent: 14,
+          icmsPercent: 0,
+          grisPercent: 0,
+          tsoPercent: 0,
+          costValuePercent: 0,
+          markupPercent: 30,
+          overheadPercent: 15,
+          targetMarginPercent: 15,
+        },
+        conditionalFeesBreakdown: current?.conditionalFeesBreakdown,
+      };
+      await updateOrderMutation.mutateAsync({
+        id: order.id,
+        updates: {
+          toll_value: toll,
+          pricing_breakdown: updated as unknown as typeof order.pricing_breakdown,
+        },
+      });
+      toast.success(`Pedágio recalculado: R$ ${toll.toFixed(2)} (${plazas.length} praças)`);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Erro ao recalcular pedágio');
+    } finally {
+      setIsRecalculatingToll(false);
+    }
+  }, [
+    order,
+    hasCeps,
+    isRecalculatingToll,
+    orderAxes,
+    originCep,
+    destinationCep,
+    updateOrderMutation,
+    queryClient,
+  ]);
+
+  const handleSaveManualToll = useCallback(async () => {
+    if (!order) return;
+    const val = parseFloat(manualTollValue);
+    if (!Number.isFinite(val) || val < 0) {
+      toast.error('Informe um valor de pedágio válido');
+      return;
+    }
+    const current = (order.pricing_breakdown as unknown as StoredPricingBreakdown | null) ?? null;
+    const minimalMeta = {
+      routeUfLabel: null as string | null,
+      kmBandLabel: null as string | null,
+      kmStatus: 'OK' as const,
+      marginStatus: 'UNKNOWN' as const,
+      marginPercent: 0,
+    };
+    const minimalBreakdown: StoredPricingBreakdown = {
+      calculatedAt: new Date().toISOString(),
+      version: '4.0-fob-lotacao-markup-scope',
+      status: 'OK',
+      meta: minimalMeta,
+      weights: { cubageWeight: 0, billableWeight: 0, tonBillable: 0 },
+      components: {
+        baseCost: 0,
+        baseFreight: 0,
+        toll: 0,
+        gris: 0,
+        tso: 0,
+        rctrc: 0,
+        adValorem: 0,
+        tde: 0,
+        tear: 0,
+        aluguelMaquinas: 0,
+        dispatchFee: 0,
+        conditionalFeesTotal: 0,
+        waitingTimeCost: 0,
+        dasProvision: 0,
+      },
+      totals: {
+        receitaBruta: 0,
+        das: 0,
+        icms: 0,
+        totalImpostos: 0,
+        totalCliente: 0,
+      },
+      profitability: {
+        custosCarreteiro: 0,
+        custosDescarga: 0,
+        custosDiretos: 0,
+        margemBruta: 0,
+        overhead: 0,
+        resultadoLiquido: 0,
+        margemPercent: 0,
+      },
+      rates: {
+        dasPercent: 14,
+        icmsPercent: 0,
+        grisPercent: 0,
+        tsoPercent: 0,
+        costValuePercent: 0,
+        markupPercent: 30,
+        overheadPercent: 15,
+        targetMarginPercent: 15,
+      },
+    };
+    const updated: StoredPricingBreakdown = {
+      ...(current || minimalBreakdown),
+      components: {
+        ...(current?.components || minimalBreakdown.components),
+        toll: val,
+      },
+    };
+    try {
+      await updateOrderMutation.mutateAsync({
+        id: order.id,
+        updates: {
+          toll_value: val,
+          pricing_breakdown: updated as unknown as typeof order.pricing_breakdown,
+        },
+      });
+      toast.success('Valor do pedágio atualizado');
+      setIsEditingToll(false);
+      setManualTollValue('');
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Erro ao salvar pedágio');
+    }
+  }, [order, manualTollValue, updateOrderMutation, queryClient]);
+
   if (!order) return null;
 
   const stageInfo = STAGE_LABELS[order.stage];
@@ -365,7 +578,7 @@ export function OrderDetailModal({
                     Criar/Vincular Viagem
                   </Button>
                 )}
-                {tripForOrder && (
+                {tripForOrder && !Array.isArray(tripForOrder) && 'trip_number' in tripForOrder && (
                   <Badge variant="secondary" className="gap-1">
                     <Truck className="w-3 h-3" />
                     {tripForOrder.trip_number}
@@ -908,6 +1121,78 @@ export function OrderDetailModal({
 
               {/* Pedágios Tab */}
               <TabsContent value="pedagios" className="m-0 space-y-4">
+                {axesDivergence && (
+                  <Alert variant="destructive" className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <AlertDescription>
+                      O veículo da OS tem {orderAxes} eixos; a cotação usou {quoteAxes} eixos. O
+                      pedágio pode estar incorreto.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {canManage && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {hasCeps ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRecalculateToll}
+                        disabled={isRecalculatingToll}
+                      >
+                        {isRecalculatingToll ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                        )}
+                        Recalcular pedágio
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Preencha CEPs de origem e destino para recalcular o pedágio.
+                      </p>
+                    )}
+                    {!isEditingToll ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setIsEditingToll(true);
+                          setManualTollValue(
+                            order.toll_value != null ? String(Number(order.toll_value)) : ''
+                          );
+                        }}
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Editar valor manualmente
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Valor pedágio (R$)"
+                          className="w-36"
+                          value={manualTollValue}
+                          onChange={(e) => setManualTollValue(e.target.value)}
+                        />
+                        <Button size="sm" onClick={handleSaveManualToll}>
+                          Salvar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setIsEditingToll(false);
+                            setManualTollValue('');
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {tollPlazas.length > 0 ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -997,7 +1282,34 @@ export function OrderDetailModal({
 
               {showDocsTab && (
                 <TabsContent value="documents" className="m-0 space-y-6">
-                  {canManage && <DocumentUpload orderId={order.id} orderStage={order.stage} />}
+                  {canManage && (
+                    <>
+                      {order.trip_id &&
+                        order.has_cnh &&
+                        order.has_crlv &&
+                        order.has_comp_residencia &&
+                        order.has_antt_motorista && (
+                          <Alert>
+                            <AlertDescription>
+                              Documentação do motorista incluída na viagem.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      <DocumentUpload
+                        orderId={order.id}
+                        orderStage={order.stage}
+                        driverDocsInherited={
+                          !!(
+                            order.trip_id &&
+                            order.has_cnh &&
+                            order.has_crlv &&
+                            order.has_comp_residencia &&
+                            order.has_antt_motorista
+                          )
+                        }
+                      />
+                    </>
+                  )}
                   {order.carreteiro_real != null && Number(order.carreteiro_real) > 0 && (
                     <OrderReconciliationSummary orderId={order.id} />
                   )}

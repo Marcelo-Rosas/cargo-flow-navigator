@@ -222,6 +222,7 @@ export function useLinkOrderToTrip() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trips'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
   });
 }
