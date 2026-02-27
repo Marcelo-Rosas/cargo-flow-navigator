@@ -1,14 +1,25 @@
-interface WorkerContext {
-  orderId: string;
+export interface StageGateWorkerContext {
+  orderData: any;
   targetStage: string;
-  model: string;
-  sb: any;
 }
 
-interface StageGateAnalysis {
+export interface StageGateAnalysis {
   allowed: boolean;
   missing_requirements: string[];
   warnings: string[];
+}
+
+export interface StageGateWorkerResult {
+  analysis: StageGateAnalysis;
+  durationMs: number;
+  provider: 'rules';
+  notifications: Array<{
+    template_key: string;
+    entity_type: string;
+    entity_id: string;
+    status: string;
+    metadata: Record<string, unknown>;
+  }>;
 }
 
 const STAGE_ORDER = [
@@ -68,83 +79,52 @@ function evaluateTransition(order: any, target: Stage): StageGateAnalysis {
       missing.push(`Estágio-alvo desconhecido: ${target}`);
   }
 
-  return {
-    allowed: missing.length === 0,
-    missing_requirements: missing,
-    warnings,
-  };
+  return { allowed: missing.length === 0, missing_requirements: missing, warnings };
 }
 
-async function notifyStageBlocked(
-  sb: any,
-  orderId: string,
-  currentStage: string,
-  targetStage: string,
-  missing: string[]
-) {
-  try {
-    await sb.from('notification_logs').insert({
+export async function executeStageGateWorker(
+  ctx: StageGateWorkerContext
+): Promise<StageGateWorkerResult> {
+  const startTime = Date.now();
+  const { orderData, targetStage: rawTargetStage } = ctx;
+
+  const currentStage = orderData.stage as Stage;
+  const targetStage = rawTargetStage as Stage;
+
+  if (!STAGE_ORDER.includes(currentStage))
+    throw new Error(`Estágio atual inválido: ${currentStage}`);
+  if (!STAGE_ORDER.includes(targetStage)) throw new Error(`Estágio-alvo inválido: ${targetStage}`);
+
+  let analysis: StageGateAnalysis;
+
+  if (!isValidTransition(currentStage, targetStage)) {
+    analysis = {
+      allowed: false,
+      missing_requirements: [
+        `Transição inválida: ${currentStage} → ${targetStage}. Somente avanço sequencial é permitido.`,
+      ],
+      warnings: [],
+    };
+  } else {
+    analysis = evaluateTransition(orderData, targetStage);
+  }
+
+  const durationMs = Date.now() - startTime;
+  const notifications: StageGateWorkerResult['notifications'] = [];
+
+  if (!analysis.allowed) {
+    notifications.push({
       template_key: 'stage_gate_blocked',
       entity_type: 'order',
-      entity_id: orderId,
+      entity_id: orderData.id,
+      status: 'pending',
       metadata: {
         current_stage: currentStage,
         target_stage: targetStage,
-        missing_requirements: missing,
+        missing_requirements: analysis.missing_requirements,
       },
     });
-  } catch (e) {
-    console.error('Failed to insert stage-gate notification:', e);
-  }
-}
-
-export async function executeStageGateWorker(ctx: WorkerContext) {
-  const startTime = Date.now();
-
-  const { data: order, error } = await ctx.sb
-    .from('orders')
-    .select('*')
-    .eq('id', ctx.orderId)
-    .single();
-  if (error || !order) throw new Error(`Order not found: ${ctx.orderId}`);
-
-  const currentStage = order.stage as Stage;
-  const targetStage = ctx.targetStage as Stage;
-
-  if (!STAGE_ORDER.includes(currentStage)) {
-    throw new Error(`Estágio atual inválido: ${currentStage}`);
-  }
-  if (!STAGE_ORDER.includes(targetStage)) {
-    throw new Error(`Estágio-alvo inválido: ${targetStage}`);
   }
 
-  if (!isValidTransition(currentStage, targetStage)) {
-    const durationMs = Date.now() - startTime;
-    return {
-      analysis: {
-        allowed: false,
-        missing_requirements: [
-          `Transição inválida: ${currentStage} → ${targetStage}. Somente avanço sequencial é permitido.`,
-        ],
-        warnings: [],
-      } satisfies StageGateAnalysis,
-      durationMs,
-      provider: 'rules' as const,
-    };
-  }
-
-  const analysis = evaluateTransition(order, targetStage);
-  const durationMs = Date.now() - startTime;
-
-  if (!analysis.allowed) {
-    await notifyStageBlocked(
-      ctx.sb,
-      ctx.orderId,
-      currentStage,
-      targetStage,
-      analysis.missing_requirements
-    );
-  }
-
-  return { analysis, durationMs, provider: 'rules' as const };
+  return { analysis, durationMs, provider: 'rules', notifications };
 }

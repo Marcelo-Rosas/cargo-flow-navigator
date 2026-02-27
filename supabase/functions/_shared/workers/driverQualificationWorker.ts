@@ -5,39 +5,27 @@ import {
 } from '../prompts/system_driver_qualification.ts';
 import { validateAndParse, type DriverQualificationResult } from '../prompts/schemas.ts';
 
-interface WorkerContext {
-  orderId: string;
+export interface DriverQualificationWorkerContext {
+  orderData: any;
   model: string;
-  sb: any;
   previousInsights?: string;
 }
 
-const ORDER_SELECT_FIELDS = [
-  'os_number',
-  'driver_name',
-  'driver_phone',
-  'driver_cnh',
-  'driver_antt',
-  'vehicle_plate',
-  'vehicle_brand',
-  'vehicle_model',
-  'vehicle_type_name',
-  'owner_name',
-  'owner_phone',
-  'has_cnh',
-  'has_crlv',
-  'has_comp_residencia',
-  'has_antt_motorista',
-].join(', ');
-
-async function fetchOrderData(sb: any, orderId: string) {
-  const { data: order, error } = await sb
-    .from('orders')
-    .select(ORDER_SELECT_FIELDS)
-    .eq('id', orderId)
-    .single();
-  if (error || !order) throw new Error(`Order not found: ${orderId}`);
-  return order;
+export interface DriverQualificationWorkerResult {
+  analysis: DriverQualificationResult;
+  durationMs: number;
+  provider: string;
+  notifications: Array<{
+    template_key: string;
+    channel: string;
+    recipient_phone?: string;
+    entity_type: string;
+    entity_id: string;
+    status: string;
+    payload: Record<string, unknown>;
+  }>;
+  ai_insight_data: Record<string, unknown>;
+  driver_qualification_data: Record<string, unknown>;
 }
 
 function buildPrompt(order: any, previousInsights?: string): string {
@@ -86,9 +74,11 @@ function mapQualificationStatus(
   return 'em_analise';
 }
 
-export async function executeDriverQualificationWorker(ctx: WorkerContext) {
-  const order = await fetchOrderData(ctx.sb, ctx.orderId);
-  const prompt = buildPrompt(order, ctx.previousInsights);
+export async function executeDriverQualificationWorker(
+  ctx: DriverQualificationWorkerContext
+): Promise<DriverQualificationWorkerResult> {
+  const { orderData, model, previousInsights } = ctx;
+  const prompt = buildPrompt(orderData, previousInsights);
 
   const startTime = Date.now();
   const result = await callLLM({
@@ -98,27 +88,21 @@ export async function executeDriverQualificationWorker(ctx: WorkerContext) {
     modelHint: 'openai',
     analysisType: 'driver_qualification',
     entityType: 'order',
-    entityId: ctx.orderId,
+    entityId: orderData.id,
   });
   const durationMs = Date.now() - startTime;
 
   const analysis = validateAndParse<DriverQualificationResult>(result.text, 'driver_qualification');
-  analysis._model = ctx.model;
+  analysis._model = model;
   analysis._cost_usd = 0;
   analysis._provider = result.provider;
   analysis._duration_ms = durationMs;
 
   const dbStatus = mapQualificationStatus(analysis.qualification_status);
 
-  const { data: existing } = await ctx.sb
-    .from('driver_qualifications')
-    .select('id')
-    .eq('order_id', ctx.orderId)
-    .maybeSingle();
-
-  const qualRow = {
-    order_id: ctx.orderId,
-    driver_name: order.driver_name || null,
+  const driver_qualification_data = {
+    order_id: orderData.id,
+    driver_name: orderData.driver_name || null,
     status: dbStatus,
     checklist: analysis.checklist || {},
     risk_flags: analysis.risk_flags || [],
@@ -126,40 +110,39 @@ export async function executeDriverQualificationWorker(ctx: WorkerContext) {
     ai_analysis: analysis,
   };
 
-  if (existing) {
-    await ctx.sb.from('driver_qualifications').update(qualRow).eq('id', existing.id);
-  } else {
-    await ctx.sb.from('driver_qualifications').insert(qualRow);
-  }
-
-  await ctx.sb.from('ai_insights').insert({
+  const ai_insight_data = {
     insight_type: 'driver_qualification',
     entity_type: 'order',
-    entity_id: ctx.orderId,
+    entity_id: orderData.id,
     analysis,
     summary_text: analysis.summary || result.text.substring(0, 300),
     expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-  });
+  };
 
-  const notifications: Array<{ template_key: string; channel: string; recipient_phone: string }> =
-    [];
-
+  const notifications: DriverQualificationWorkerResult['notifications'] = [];
   const riskScore = Number(analysis.risk_score) || 0;
-  if (riskScore < 70 && order.driver_phone) {
-    await ctx.sb.from('notification_logs').insert({
-      template_key: 'driver_qualification_alert',
-      channel: 'whatsapp',
-      recipient_phone: order.driver_phone,
-      status: 'pending',
-      entity_type: 'order',
-      entity_id: ctx.orderId,
-    });
+  if (riskScore < 70 && orderData.driver_phone) {
     notifications.push({
       template_key: 'driver_qualification_alert',
       channel: 'whatsapp',
-      recipient_phone: order.driver_phone,
+      recipient_phone: orderData.driver_phone,
+      entity_type: 'order',
+      entity_id: orderData.id,
+      status: 'pending',
+      payload: {
+        summary: analysis.summary,
+        risk_score: analysis.risk_score,
+        qualification_status: analysis.qualification_status,
+      },
     });
   }
 
-  return { analysis, durationMs, provider: result.provider, notifications };
+  return {
+    analysis,
+    durationMs,
+    provider: result.provider,
+    notifications,
+    ai_insight_data,
+    driver_qualification_data,
+  };
 }

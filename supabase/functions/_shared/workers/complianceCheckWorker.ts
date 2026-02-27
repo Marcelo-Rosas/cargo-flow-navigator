@@ -2,37 +2,35 @@ import { callLLM } from '../aiClient.ts';
 import { SYSTEM_PROMPT_COMPLIANCE, MAX_TOKENS_COMPLIANCE } from '../prompts/system_compliance.ts';
 import { validateAndParse, type ComplianceCheckResult } from '../prompts/schemas.ts';
 
-type CheckType = 'pre_contratacao' | 'pre_coleta' | 'pre_entrega' | 'auditoria_periodica';
+export type CheckType = 'pre_contratacao' | 'pre_coleta' | 'pre_entrega' | 'auditoria_periodica';
 
-interface WorkerContext {
-  orderId: string;
+export interface ComplianceCheckWorkerContext {
+  orderData: any;
+  quoteData: any | null;
   checkType: CheckType;
   model: string;
-  sb: any;
   previousInsights?: string;
+}
+
+export interface ComplianceCheckWorkerResult {
+  analysis: ComplianceCheckResult;
+  durationMs: number;
+  provider: string;
+  notifications: Array<{
+    template_key: string;
+    entity_type: string;
+    entity_id: string;
+    status: string;
+    metadata: Record<string, unknown>;
+  }>;
+  ai_insight_data: Record<string, unknown>;
+  compliance_check_data: Record<string, unknown>;
 }
 
 interface RuleEvaluation {
   rule: string;
   passed: boolean;
   detail: string;
-}
-
-async function fetchOrderWithQuote(sb: any, orderId: string) {
-  const { data: order, error } = await sb.from('orders').select('*').eq('id', orderId).single();
-  if (error || !order) throw new Error(`Order not found: ${orderId}`);
-
-  let quote: any = null;
-  if (order.quote_id) {
-    const { data } = await sb
-      .from('quotes')
-      .select('*, pricing_breakdown')
-      .eq('id', order.quote_id)
-      .single();
-    quote = data;
-  }
-
-  return { order, quote };
 }
 
 function evaluatePreContratacao(order: any): RuleEvaluation[] {
@@ -192,34 +190,13 @@ ${rules.map((r) => `- [${r.passed ? 'OK' : 'FALHA'}] ${r.rule}: ${r.detail}`).jo
   return prompt;
 }
 
-async function notifyViolations(
-  sb: any,
-  orderId: string,
-  checkType: CheckType,
-  violations: Array<{ rule: string; severity: string }>
-) {
-  try {
-    await sb.from('notification_logs').insert({
-      template_key: 'compliance_violation',
-      entity_type: 'order',
-      entity_id: orderId,
-      metadata: {
-        check_type: checkType,
-        violation_count: violations.length,
-        critical_count: violations.filter((v) => v.severity === 'critical').length,
-        rules: violations.map((v) => v.rule),
-      },
-    });
-  } catch (e) {
-    console.error('Failed to insert compliance notification:', e);
-  }
-}
+export async function executeComplianceCheckWorker(
+  ctx: ComplianceCheckWorkerContext
+): Promise<ComplianceCheckWorkerResult> {
+  const { orderData, quoteData, checkType, model, previousInsights } = ctx;
 
-export async function executeComplianceCheckWorker(ctx: WorkerContext) {
-  const { order, quote } = await fetchOrderWithQuote(ctx.sb, ctx.orderId);
-
-  const rules = evaluateRules(order, quote, ctx.checkType);
-  const prompt = buildPrompt(order, quote, ctx.checkType, rules, ctx.previousInsights);
+  const rules = evaluateRules(orderData, quoteData, checkType);
+  const prompt = buildPrompt(orderData, quoteData, checkType, rules, previousInsights);
 
   const startTime = Date.now();
   const result = await callLLM({
@@ -229,44 +206,59 @@ export async function executeComplianceCheckWorker(ctx: WorkerContext) {
     modelHint: 'anthropic',
     analysisType: 'compliance_check',
     entityType: 'order',
-    entityId: ctx.orderId,
+    entityId: orderData.id,
   });
   const durationMs = Date.now() - startTime;
 
   const analysis = validateAndParse<ComplianceCheckResult>(result.text, 'compliance_check');
-  analysis._model = ctx.model;
+  analysis._model = model;
   analysis._cost_usd = 0;
   analysis._provider = result.provider;
   analysis._duration_ms = durationMs;
 
   const failedRules = rules.filter((r) => !r.passed);
-  if (!analysis.status && failedRules.length > 0) {
-    analysis.status = 'warning';
-  }
-  if (!analysis.rules_evaluated) {
-    analysis.rules_evaluated = rules;
-  }
+  if (!analysis.status && failedRules.length > 0) analysis.status = 'warning';
+  if (!analysis.rules_evaluated) analysis.rules_evaluated = rules;
 
-  await ctx.sb.from('compliance_checks').insert({
-    order_id: ctx.orderId,
-    check_type: ctx.checkType,
+  const compliance_check_data = {
+    order_id: orderData.id,
+    check_type: checkType,
     result: analysis,
     status: analysis.status || (failedRules.length > 0 ? 'warning' : 'ok'),
-  });
+  };
 
-  await ctx.sb.from('ai_insights').insert({
+  const ai_insight_data = {
     insight_type: 'compliance_check',
     entity_type: 'order',
-    entity_id: ctx.orderId,
+    entity_id: orderData.id,
     analysis,
     summary_text: analysis.summary || result.text.substring(0, 300),
     expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-  });
+  };
 
   const violations = analysis.violations || [];
+  const notifications: ComplianceCheckWorkerResult['notifications'] = [];
   if (violations.length > 0) {
-    await notifyViolations(ctx.sb, ctx.orderId, ctx.checkType, violations);
+    notifications.push({
+      template_key: 'compliance_violation',
+      entity_type: 'order',
+      entity_id: orderData.id,
+      status: 'pending',
+      metadata: {
+        check_type: checkType,
+        violation_count: violations.length,
+        critical_count: violations.filter((v) => v.severity === 'critical').length,
+        rules: violations.map((v) => v.rule),
+      },
+    });
   }
 
-  return { analysis, durationMs, provider: result.provider };
+  return {
+    analysis,
+    durationMs,
+    provider: result.provider,
+    notifications,
+    ai_insight_data,
+    compliance_check_data,
+  };
 }

@@ -5,55 +5,45 @@ import {
 } from '../prompts/system_operational_report.ts';
 import { validateAndParse, type OperationalReportResult } from '../prompts/schemas.ts';
 
-interface WorkerContext {
+export interface OperationalReportData {
+  allOrders: any[];
+  createdOrders: any[];
+  completedOrders: any[];
+  occurrences: any[];
+  complianceChecks: any[];
+  pendingDocsCount: number;
+}
+
+export interface OperationalReportWorkerContext {
+  operationalData: OperationalReportData;
   reportType: 'daily' | 'weekly';
   model: string;
-  sb: any;
 }
 
-function getPeriodStart(reportType: 'daily' | 'weekly'): string {
-  const hours = reportType === 'daily' ? 24 : 7 * 24;
-  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+export interface OperationalReportWorkerResult {
+  analysis: OperationalReportResult;
+  durationMs: number;
+  provider: string;
+  notifications: Array<{
+    template: string;
+    channel: string;
+    payload: Record<string, unknown>;
+    status: string;
+    created_at: string;
+  }>;
+  operational_report_data: Record<string, unknown>;
 }
 
-async function fetchOperationalData(sb: any, periodStart: string) {
-  const [
-    { data: allOrders },
-    { data: createdOrders },
-    { data: completedOrders },
-    { data: occurrences },
-    { data: complianceChecks },
-    { count: pendingDocsCount },
-  ] = await Promise.all([
-    sb.from('orders').select('stage, created_at, value'),
-    sb.from('orders').select('id').gte('created_at', periodStart),
-    sb
-      .from('orders')
-      .select('id, created_at')
-      .eq('stage', 'entregue')
-      .gte('created_at', periodStart),
-    sb.from('occurrences').select('severity, status, created_at').gte('created_at', periodStart),
-    sb
-      .from('compliance_checks')
-      .select('status, violation_type, created_at')
-      .gte('created_at', periodStart),
-    sb.from('order_documents').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-  ]);
-
-  return {
-    allOrders: allOrders || [],
-    createdOrders: createdOrders || [],
-    completedOrders: completedOrders || [],
-    occurrences: occurrences || [],
-    complianceChecks: complianceChecks || [],
-    pendingDocsCount: pendingDocsCount || 0,
-  };
+function groupBy(items: any[], key: string): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const item of items) {
+    const k = String(item[key] || 'unknown');
+    result[k] = (result[k] || 0) + 1;
+  }
+  return result;
 }
 
-function buildPrompt(
-  data: Awaited<ReturnType<typeof fetchOperationalData>>,
-  reportType: 'daily' | 'weekly'
-): string {
+function buildPrompt(data: OperationalReportData, reportType: 'daily' | 'weekly'): string {
   const ordersByStage: Record<string, number> = {};
   for (const o of data.allOrders) {
     ordersByStage[o.stage] = (ordersByStage[o.stage] || 0) + 1;
@@ -97,20 +87,12 @@ function buildPrompt(
 Gere um resumo executivo formatado para WhatsApp (texto simples, curto, máx 500 chars) e identifique alertas prioritários.`;
 }
 
-function groupBy(items: any[], key: string): Record<string, number> {
-  const result: Record<string, number> = {};
-  for (const item of items) {
-    const k = String(item[key] || 'unknown');
-    result[k] = (result[k] || 0) + 1;
-  }
-  return result;
-}
+export async function executeOperationalReportWorker(
+  ctx: OperationalReportWorkerContext
+): Promise<OperationalReportWorkerResult> {
+  const { operationalData, reportType, model } = ctx;
 
-export async function executeOperationalReportWorker(ctx: WorkerContext) {
-  const periodStart = getPeriodStart(ctx.reportType);
-  const data = await fetchOperationalData(ctx.sb, periodStart);
-
-  const prompt = buildPrompt(data, ctx.reportType);
+  const prompt = buildPrompt(operationalData, reportType);
 
   const startTime = Date.now();
   const result = await callLLM({
@@ -125,29 +107,37 @@ export async function executeOperationalReportWorker(ctx: WorkerContext) {
   const durationMs = Date.now() - startTime;
 
   const analysis = validateAndParse<OperationalReportResult>(result.text, 'operational_report');
-  analysis._model = ctx.model;
+  analysis._model = model;
   analysis._cost_usd = 0;
   analysis._provider = result.provider;
   analysis._duration_ms = durationMs;
 
-  await ctx.sb.from('operational_reports').insert({
-    report_type: ctx.reportType,
+  const operational_report_data = {
+    report_type: reportType,
     analysis,
     summary_text: analysis.summary || result.text.substring(0, 500),
     created_at: new Date().toISOString(),
-  });
+  };
 
-  await ctx.sb.from('notification_queue').insert({
-    template: 'daily_operational_report',
-    channel: 'both',
-    payload: {
-      summary: analysis.summary,
-      risk: analysis.risk,
-      alerts: analysis.alerts,
+  const notifications: OperationalReportWorkerResult['notifications'] = [
+    {
+      template: 'daily_operational_report',
+      channel: 'both',
+      payload: {
+        summary: analysis.summary,
+        risk: analysis.risk,
+        alerts: analysis.alerts,
+      },
+      status: 'pending',
+      created_at: new Date().toISOString(),
     },
-    status: 'pending',
-    created_at: new Date().toISOString(),
-  });
+  ];
 
-  return { analysis, durationMs, provider: result.provider };
+  return {
+    analysis,
+    durationMs,
+    provider: result.provider,
+    notifications,
+    operational_report_data,
+  };
 }

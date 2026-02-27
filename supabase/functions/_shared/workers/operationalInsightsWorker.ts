@@ -1,48 +1,27 @@
 import { callLLM } from '../aiClient.ts';
 import {
-  SYSTEM_PROMPT_DASHBOARD,
-  MAX_TOKENS_DASHBOARD,
-} from '../prompts/system_dashboard_insights.ts';
+  SYSTEM_PROMPT_OPERATIONAL_INSIGHTS,
+  MAX_TOKENS_OPERATIONAL_INSIGHTS,
+} from '../prompts/system_operational_insights.ts';
 import { validateAndParse, type DashboardInsightsResult } from '../prompts/schemas.ts';
 
-interface WorkerContext {
-  model: string;
-  sb: any;
+export interface OperationalInsightsData {
+  orders: any[];
+  occurrences: any[];
+  complianceChecks: any[];
+  driverQualifications: any[];
 }
 
-async function fetchOperationalMetrics(sb: any) {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+export interface OperationalInsightsWorkerContext {
+  operationalData: OperationalInsightsData;
+  model: string;
+}
 
-  const [
-    { data: orders },
-    { data: occurrences },
-    { data: complianceChecks },
-    { data: driverQualifications },
-  ] = await Promise.all([
-    sb
-      .from('orders')
-      .select('id, stage, value, created_at, origin, destination, carreteiro_real, carreteiro_antt')
-      .gte('created_at', thirtyDaysAgo),
-    sb
-      .from('occurrences')
-      .select('severity, status, type, created_at, resolved_at, order_id')
-      .gte('created_at', thirtyDaysAgo),
-    sb
-      .from('compliance_checks')
-      .select('status, violation_type, entity_type, created_at')
-      .gte('created_at', thirtyDaysAgo),
-    sb
-      .from('driver_qualifications')
-      .select('driver_id, status, expires_at, qualification_type')
-      .gte('created_at', thirtyDaysAgo),
-  ]);
-
-  return {
-    orders: orders || [],
-    occurrences: occurrences || [],
-    complianceChecks: complianceChecks || [],
-    driverQualifications: driverQualifications || [],
-  };
+export interface OperationalInsightsWorkerResult {
+  analysis: DashboardInsightsResult;
+  durationMs: number;
+  provider: string;
+  ai_insight_data: Record<string, unknown>;
 }
 
 function identifyBottlenecks(orders: any[]): Record<string, number> {
@@ -77,9 +56,7 @@ function computeRouteIssues(orders: any[], occurrences: any[]): Record<string, n
   const routeIssues: Record<string, number> = {};
   for (const occ of occurrences) {
     const route = orderRoutes[occ.order_id];
-    if (route) {
-      routeIssues[route] = (routeIssues[route] || 0) + 1;
-    }
+    if (route) routeIssues[route] = (routeIssues[route] || 0) + 1;
   }
 
   return Object.fromEntries(
@@ -112,7 +89,7 @@ function computeCarreteiroTrends(orders: any[]): {
   };
 }
 
-function buildPrompt(data: Awaited<ReturnType<typeof fetchOperationalMetrics>>): string {
+function buildPrompt(data: OperationalInsightsData): string {
   const bottlenecks = identifyBottlenecks(data.orders);
   const avgResolution = computeAvgResolutionTime(data.occurrences);
   const routeIssues = computeRouteIssues(data.orders, data.occurrences);
@@ -168,15 +145,17 @@ Gere 3-5 insights acionáveis focados em:
 Cada insight deve ter uma ação concreta sugerida.`;
 }
 
-export async function executeOperationalInsightsWorker(ctx: WorkerContext) {
-  const data = await fetchOperationalMetrics(ctx.sb);
-  const prompt = buildPrompt(data);
+export async function executeOperationalInsightsWorker(
+  ctx: OperationalInsightsWorkerContext
+): Promise<OperationalInsightsWorkerResult> {
+  const { operationalData, model } = ctx;
+  const prompt = buildPrompt(operationalData);
 
   const startTime = Date.now();
   const result = await callLLM({
     prompt,
-    system: SYSTEM_PROMPT_DASHBOARD,
-    maxTokens: MAX_TOKENS_DASHBOARD,
+    system: SYSTEM_PROMPT_OPERATIONAL_INSIGHTS,
+    maxTokens: MAX_TOKENS_OPERATIONAL_INSIGHTS,
     modelHint: 'openai',
     analysisType: 'operational_insights',
     entityType: null,
@@ -185,19 +164,19 @@ export async function executeOperationalInsightsWorker(ctx: WorkerContext) {
   const durationMs = Date.now() - startTime;
 
   const analysis = validateAndParse<DashboardInsightsResult>(result.text, 'operational_insights');
-  analysis._model = ctx.model;
+  analysis._model = model;
   analysis._cost_usd = 0;
   analysis._provider = result.provider;
   analysis._duration_ms = durationMs;
 
-  await ctx.sb.from('ai_insights').insert({
+  const ai_insight_data = {
     insight_type: 'operational_insights',
     entity_type: null,
     entity_id: null,
     analysis,
     summary_text: analysis.summary || result.text.substring(0, 300),
     expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-  });
+  };
 
-  return { analysis, durationMs, provider: result.provider };
+  return { analysis, durationMs, provider: result.provider, ai_insight_data };
 }
