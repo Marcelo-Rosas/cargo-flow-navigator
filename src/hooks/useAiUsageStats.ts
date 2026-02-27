@@ -68,8 +68,8 @@ export function useAiUsageStats() {
 
       return data as unknown as AiUsageStats;
     },
-    refetchInterval: 30_000, // Refresh every 30 seconds
-    staleTime: 15_000,
+    refetchInterval: 5 * 60_000, // Refresh every 5 min
+    staleTime: 2 * 60_000,
   });
 }
 
@@ -108,6 +108,6 @@ export function useRecentAiUsage(limit = 20) {
 
       return (data || []) as unknown as UsageEntry[];
     },
-    refetchInterval: 30_000,
+    refetchInterval: 5 * 60_000,
   });
 }

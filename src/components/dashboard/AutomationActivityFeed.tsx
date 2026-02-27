@@ -1,22 +1,20 @@
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap,
-  Mail,
   FileText,
   ShieldCheck,
   Truck,
-  Brain,
   AlertCircle,
   CheckCircle2,
   Clock,
+  ChevronDown,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useRecentWorkflowEvents } from '@/hooks/useWorkflowEvents';
 
-const eventTypeConfig: Record<
-  string,
-  { label: string; icon: typeof Zap; color: string }
-> = {
+const eventTypeConfig: Record<string, { label: string; icon: typeof Zap; color: string }> = {
   'quote.stage_changed': {
     label: 'Cotação',
     icon: FileText,
@@ -67,7 +65,7 @@ function getEventDescription(event: {
     case 'approval.decided':
       return `${p.decision === 'approved' ? 'Aprovado' : 'Rejeitado'}: ${p.approval_type || ''}`;
     case 'document.uploaded':
-      return `${(p.type as string || '').toUpperCase()} enviado${p.file_name ? `: ${p.file_name}` : ''}`;
+      return `${((p.type as string) || '').toUpperCase()} enviado${p.file_name ? `: ${p.file_name}` : ''}`;
     default:
       return event.event_type;
   }
@@ -84,8 +82,11 @@ function timeAgo(date: string): string {
   return `${days}d`;
 }
 
+const PAGE_SIZE = 15;
+
 export function AutomationActivityFeed() {
-  const { data: events = [], isLoading } = useRecentWorkflowEvents(15);
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const { data: events = [], isLoading } = useRecentWorkflowEvents(limit);
 
   return (
     <motion.div
@@ -147,9 +148,7 @@ export function AutomationActivityFeed() {
                   <EventIcon className="w-3 h-3" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs leading-tight truncate">
-                    {getEventDescription(event)}
-                  </p>
+                  <p className="text-xs leading-tight truncate">{getEventDescription(event)}</p>
                 </div>
                 <div className="shrink-0 flex items-center gap-1">
                   {event.status === 'completed' ? (
@@ -166,6 +165,21 @@ export function AutomationActivityFeed() {
           })}
         </AnimatePresence>
       </div>
+
+      {/* Load more */}
+      {!isLoading && events.length >= limit && (
+        <div className="mt-3 flex justify-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground h-7 gap-1"
+            onClick={() => setLimit((prev) => prev + PAGE_SIZE)}
+          >
+            <ChevronDown className="w-3 h-3" />
+            Ver mais
+          </Button>
+        </div>
+      )}
     </motion.div>
   );
 }

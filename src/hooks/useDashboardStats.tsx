@@ -32,6 +32,7 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ['dashboard-stats'],
     staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const currentMonth = getMonthRange(0);
