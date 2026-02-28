@@ -6,17 +6,33 @@ import { Database } from '@/integrations/supabase/types';
 type Document = Database['public']['Tables']['documents']['Row'];
 type DocumentInsert = Database['public']['Tables']['documents']['Insert'];
 
+export type DocumentWithRelations = Document & {
+  os_number?: string | null;
+  quote_code?: string | null;
+};
+
 export function useDocuments() {
   return useQuery({
     queryKey: ['documents'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
-        .select('*')
+        .select('*, orders:order_id(os_number), quotes:quote_id(quote_code)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return filterSupabaseRows<Document>(data);
+      type DocWithJoins = Document & {
+        orders: { os_number: string } | null;
+        quotes: { quote_code: string } | null;
+      };
+      const rows = filterSupabaseRows<DocWithJoins>(data);
+      return rows.map((row) => ({
+        ...row,
+        os_number: row.orders?.os_number ?? null,
+        quote_code: row.quotes?.quote_code ?? null,
+        orders: undefined,
+        quotes: undefined,
+      })) as DocumentWithRelations[];
     },
   });
 }

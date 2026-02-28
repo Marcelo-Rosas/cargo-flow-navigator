@@ -39,8 +39,6 @@ export function useInviteUser() {
 
   return useMutation({
     mutationFn: async (payload: { email: string; fullName: string; perfil: UserProfile }) => {
-      // Conflict resolution: keep centralized edge invocation (JWT + refresh retry)
-      // and enforce a strict success contract for invite-user.
       const data = await invokeEdgeFunction<{
         success: boolean;
         userId?: string | null;

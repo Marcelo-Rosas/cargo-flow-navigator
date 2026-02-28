@@ -11,6 +11,9 @@ import {
   AlertTriangle,
   CheckCircle,
   FileText,
+  Pencil,
+  XCircle,
+  Copy,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +45,7 @@ interface OrderCardProps {
   onEdit?: () => void;
   onRegisterOccurrence?: () => void;
   onUploadDocument?: () => void;
+  onCancelOrder?: () => void;
   canManageActions?: boolean;
 }
 
@@ -50,6 +54,7 @@ export function OrderCard({
   onEdit,
   onRegisterOccurrence,
   onUploadDocument,
+  onCancelOrder,
   canManageActions = true,
 }: OrderCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -92,6 +97,14 @@ export function OrderCard({
   const progressPercentage = totalDocs > 0 ? (completedDocs / totalDocs) * 100 : 0;
   const hasPendingDocs = requirements.some((doc) => !order[doc.key as keyof Order]);
 
+  const hasAllDriverDocs =
+    !!order.has_cnh &&
+    !!order.has_crlv &&
+    !!order.has_comp_residencia &&
+    !!order.has_antt_motorista;
+  const driverDocsInherited =
+    order.stage === 'busca_motorista' && order.trip_id != null && hasAllDriverDocs;
+
   return (
     <motion.div
       ref={setNodeRef}
@@ -126,8 +139,18 @@ export function OrderCard({
             <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-semibold text-foreground">{order.os_number}</h4>
 
+              {/* Badge: documentação do motorista incluída na viagem (herdada) */}
+              {driverDocsInherited && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] uppercase px-2 py-0.5 border-success/50 text-success bg-success/10"
+                >
+                  Documentação do motorista incluída na viagem
+                </Badge>
+              )}
+
               {/* Badge de gate: obrigatoriedades para avançar para a próxima fase (por estágio) */}
-              {hasDocumentsToShow && hasPendingDocs && nextStage && (
+              {hasDocumentsToShow && hasPendingDocs && nextStage && !driverDocsInherited && (
                 <Badge
                   variant="outline"
                   className={cn(
@@ -179,6 +202,23 @@ export function OrderCard({
               <DropdownMenuItem
                 onClick={(e) => {
                   e.stopPropagation();
+                  onEdit?.();
+                }}
+              >
+                <Pencil className="w-4 h-4 mr-2" /> Ver / Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(order.os_number);
+                }}
+              >
+                <Copy className="w-4 h-4 mr-2" /> Copiar Nº OS
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
                   onUploadDocument?.();
                 }}
               >
@@ -202,6 +242,21 @@ export function OrderCard({
                 <AlertTriangle className="w-4 h-4 mr-2" />
                 Registrar Ocorrência
               </DropdownMenuItem>
+              {order.stage !== 'entregue' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCancelOrder?.();
+                    }}
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Cancelar OS
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

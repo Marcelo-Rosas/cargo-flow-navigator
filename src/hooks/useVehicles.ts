@@ -173,11 +173,13 @@ export function useUpdateVehicle() {
         .from('vehicles')
         .update(asInsert(updates))
         .eq('id', asDb(id))
-        .select()
-        .single();
+        .select();
 
       if (error) throw error;
-      return data;
+      if (!data || data.length === 0) {
+        throw new Error('Veículo não encontrado ou sem permissão para editar');
+      }
+      return data[0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });

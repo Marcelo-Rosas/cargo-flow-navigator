@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { filterSupabaseRows } from '@/lib/supabase-utils';
+import { calcConversionRate, filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -171,7 +171,7 @@ export function useMonthlyTrends() {
       Object.keys(monthlyData).forEach((monthKey) => {
         const total = totalQuotesPerMonth[monthKey] || 0;
         const won = wonQuotesPerMonth[monthKey] || 0;
-        monthlyData[monthKey].conversionRate = total > 0 ? Math.round((won / total) * 100) : 0;
+        monthlyData[monthKey].conversionRate = calcConversionRate(won, total);
       });
 
       return Object.values(monthlyData);
@@ -239,8 +239,28 @@ export function usePerformanceMetrics() {
         .filter((o) => o.stage === 'entregue')
         .reduce((acc, o) => acc + Number(o.value), 0);
 
+      // Average delivery time: days from created_at to updated_at for entregue orders (last 60d)
+      const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: deliveredOrders } = await supabase
+        .from('orders')
+        .select('created_at, updated_at')
+        .eq('stage', 'entregue')
+        .gte('updated_at', sixtyDaysAgo);
+
+      const validDelivered = filterSupabaseRows<{ created_at: string; updated_at: string }>(
+        deliveredOrders
+      );
+      let avgDeliveryTime = 0;
+      if (validDelivered.length > 0) {
+        const totalDays = validDelivered.reduce((acc, o) => {
+          const diffMs = new Date(o.updated_at).getTime() - new Date(o.created_at).getTime();
+          return acc + diffMs / (1000 * 60 * 60 * 24);
+        }, 0);
+        avgDeliveryTime = Math.round((totalDays / validDelivered.length) * 10) / 10;
+      }
+
       return {
-        avgDeliveryTime: 3.5, // Placeholder - would need delivery date tracking
+        avgDeliveryTime,
         avgQuoteValue,
         avgOrderValue,
         quotesThisMonth: allQuotes.length,

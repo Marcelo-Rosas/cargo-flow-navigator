@@ -20,6 +20,7 @@ import {
   FileText,
   Loader2,
   Landmark,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,11 +35,16 @@ import {
   AdditionalFeesSelection,
   defaultAdditionalFeesSelection,
 } from '@/components/quotes/AdditionalFeesSection';
-import type { Database } from '@/integrations/supabase/types';
+import type { Database, Json } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
 import { usePricingParameter, useConditionalFees, usePaymentTerms } from '@/hooks/usePricingRules';
 import { useUpdateQuote } from '@/hooks/useQuotes';
+import {
+  useCalculateFreight,
+  buildStoredBreakdownFromEdgeResponse,
+} from '@/hooks/useCalculateFreight';
+import type { CalculateFreightInput } from '@/types/freight';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { supabase } from '@/integrations/supabase/client';
@@ -108,6 +114,7 @@ export function QuoteDetailModal({
   }, [quote?.id, quote?.payment_term_id]);
   const queryClient = useQueryClient();
   const updateQuoteMutation = useUpdateQuote();
+  const calculateFreightMutation = useCalculateFreight();
 
   // Initialize additional fees selection from breakdown
   const getInitialFeesSelection = useCallback((): AdditionalFeesSelection => {
@@ -150,10 +157,7 @@ export function QuoteDetailModal({
       seen.add(adv);
       opts.push({
         value: String(adv),
-        label:
-          adv === 0
-            ? 'À vista'
-            : `${adv}% Adiantamento / ${100 - adv}% Saldo`,
+        label: adv === 0 ? 'À vista' : `${adv}% Adiantamento / ${100 - adv}% Saldo`,
       });
     }
     return opts.sort((a, b) => Number(a.value) - Number(b.value));
@@ -347,7 +351,9 @@ export function QuoteDetailModal({
     (originalMarginPercent !== undefined && originalMarginPercent < TARGET_MARGIN_PERCENT);
 
   // Visão contábil desejada:
-  // Margem Bruta = Total Cliente - Piso ANTT - Carga/Descarga - Provisionamento DAS
+  // Margem Bruta = Total Cliente - Custo Carreteiro (real) - Carga/Descarga - Provisionamento DAS
+  // Usa custosCarreteiro do breakdown (custo real da tabela) em vez de Piso ANTT para cargas leves.
+  // Fallback para Piso ANTT quando custosCarreteiro não disponível (compatibilidade).
   // Resultado Líquido = Margem Bruta - Overhead
   // Margem % = Resultado Líquido / Total Cliente
   const totalClienteView =
@@ -358,9 +364,18 @@ export function QuoteDetailModal({
       : 0;
 
   const pisoAnttView = Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0);
+  const custosCarreteiroView =
+    breakdown?.profitability?.custosCarreteiro ??
+    (breakdown?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
+    null;
+  const custoCarreteiroParaMargem =
+    custosCarreteiroView != null && Number(custosCarreteiroView) > 0
+      ? Number(custosCarreteiroView)
+      : pisoAnttView;
   const cargaDescargaView = breakdown?.profitability?.custosDescarga ?? 0;
   const provisaoDasView = breakdown?.totals?.das ?? 0;
-  const margemBrutaView = totalClienteView - pisoAnttView - cargaDescargaView - provisaoDasView;
+  const margemBrutaView =
+    totalClienteView - custoCarreteiroParaMargem - cargaDescargaView - provisaoDasView;
 
   const overheadView = breakdown?.profitability?.overhead ?? 0;
   const resultadoLiquidoView = margemBrutaView - overheadView;
@@ -426,6 +441,55 @@ export function QuoteDetailModal({
     } catch {
       toast.error('Erro ao salvar adiantamento');
       setSelectedAdvancePercent(prev);
+    }
+  };
+
+  const handleRecalcular = async () => {
+    if (!quote) return;
+    const bd = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+    const weightKg = Number(quote.weight) || 0;
+    const volumeM3 = Number(quote.volume) || 0;
+    if (weightKg <= 0 && volumeM3 <= 0) {
+      toast.error('Peso ou volume obrigatório para recalcular');
+      return;
+    }
+    const payload: CalculateFreightInput = {
+      origin: quote.origin,
+      destination: quote.destination,
+      km_distance: Number(quote.km_distance) || 0,
+      weight_kg: weightKg > 0 ? weightKg : 1,
+      volume_m3: volumeM3,
+      cargo_value: Number(quote.cargo_value) || 0,
+      toll_value: Number(quote.toll_value ?? bd?.components?.toll ?? 0),
+      price_table_id: quote.price_table_id ?? undefined,
+      vehicle_type_code: (vehicleType as { code?: string } | null)?.code,
+      payment_term_code: (paymentTerm as { code?: string } | null)?.code ?? 'D30',
+      descarga_value: bd?.profitability?.custosDescarga ?? 0,
+      aluguel_maquinas_value: bd?.components?.aluguelMaquinas ?? 0,
+      conditional_fees:
+        conditionalFeesData && bd?.meta?.selectedConditionalFeeIds?.length
+          ? (bd.meta.selectedConditionalFeeIds as string[])
+              .map((id) => conditionalFeesData.find((f) => f.id === id)?.code)
+              .filter((c): c is string => !!c)
+          : undefined,
+      waiting_hours: bd?.meta?.waitingTimeHours ?? undefined,
+    };
+    try {
+      const response = await calculateFreightMutation.mutateAsync(payload);
+      const newBreakdown = buildStoredBreakdownFromEdgeResponse(response, bd);
+      await updateQuoteMutation.mutateAsync({
+        id: quote.id,
+        updates: {
+          pricing_breakdown: newBreakdown as unknown as Json,
+          value: response.totals.total_cliente,
+        },
+      });
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      toast.success('Memória de cálculo recalculada com sucesso');
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : 'Erro ao recalcular. Verifique os dados da cotação.'
+      );
     }
   };
 
@@ -511,44 +575,64 @@ export function QuoteDetailModal({
                   </>
                 )}
                 {canManage && (
-                  <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)}>
-                    <Pencil className="w-4 h-4" />
-                  </Button>
+                  <>
+                    {breakdown && quote?.price_table_id && quote?.km_distance && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRecalcular}
+                        disabled={
+                          calculateFreightMutation.isPending || updateQuoteMutation.isPending
+                        }
+                        className="gap-1.5"
+                        title="Recalcular memória de cálculo (usa custo real da tabela)"
+                      >
+                        {calculateFreightMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        )}
+                        Recalcular
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
           </DialogHeader>
 
           {/* Mini cards: Adiantamento e Saldo (qualquer split %) */}
-          {paymentTerm &&
-            (paymentTerm.advance_percent ?? 0) > 0 && (
-              <div className="grid grid-cols-2 gap-3 -mt-2">
-                <div className="p-3 rounded-lg border bg-primary/5 border-primary/20">
-                  <p className="text-xs text-muted-foreground mb-0.5">
-                    Adiantamento {paymentTerm.advance_percent}%
-                  </p>
-                  <p className="font-semibold text-foreground">
-                    {formatCurrency((totalClienteView * (paymentTerm.advance_percent ?? 0)) / 100)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {quote.advance_due_date ? formatDate(quote.advance_due_date) : '—'}
-                  </p>
-                </div>
-                <div className="p-3 rounded-lg border bg-muted/30 border-border">
-                  <p className="text-xs text-muted-foreground mb-0.5">
-                    Saldo {100 - (paymentTerm.advance_percent ?? 0)}%
-                  </p>
-                  <p className="font-semibold text-foreground">
-                    {formatCurrency(
-                      (totalClienteView * (100 - (paymentTerm.advance_percent ?? 0))) / 100
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {quote.balance_due_date ? formatDate(quote.balance_due_date) : '—'}
-                  </p>
-                </div>
+          {paymentTerm && (paymentTerm.advance_percent ?? 0) > 0 && (
+            <div className="grid grid-cols-2 gap-3 -mt-2">
+              <div className="p-3 rounded-lg border bg-primary/5 border-primary/20">
+                <p className="text-xs text-muted-foreground mb-0.5">
+                  Adiantamento {paymentTerm.advance_percent}%
+                </p>
+                <p className="font-semibold text-foreground">
+                  {formatCurrency((totalClienteView * (paymentTerm.advance_percent ?? 0)) / 100)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {quote.advance_due_date ? formatDate(quote.advance_due_date) : '—'}
+                </p>
               </div>
-            )}
+              <div className="p-3 rounded-lg border bg-muted/30 border-border">
+                <p className="text-xs text-muted-foreground mb-0.5">
+                  Saldo {100 - (paymentTerm.advance_percent ?? 0)}%
+                </p>
+                <p className="font-semibold text-foreground">
+                  {formatCurrency(
+                    (totalClienteView * (100 - (paymentTerm.advance_percent ?? 0))) / 100
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {quote.balance_due_date ? formatDate(quote.balance_due_date) : '—'}
+                </p>
+              </div>
+            </div>
+          )}
 
           <Tabs defaultValue="resumo" className="mt-4">
             <TabsList className="grid w-full grid-cols-3">
@@ -1280,17 +1364,22 @@ export function QuoteDetailModal({
                             <TableCell className="text-center text-muted-foreground text-xs">
                               {plaza.ordemPassagem || idx + 1}
                             </TableCell>
-                            <TableCell className="text-sm font-medium">
-                              {plaza.nome}
-                            </TableCell>
+                            <TableCell className="text-sm font-medium">{plaza.nome}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {plaza.cidade}{plaza.uf ? ` - ${plaza.uf}` : ''}
+                              {plaza.cidade}
+                              {plaza.uf ? ` - ${plaza.uf}` : ''}
                             </TableCell>
                             <TableCell className="text-right text-sm">
-                              {plaza.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              {plaza.valor.toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
-                              {plaza.valorTag.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              {plaza.valorTag.toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1322,7 +1411,8 @@ export function QuoteDetailModal({
                     Nenhuma praça de pedágio registrada.
                   </p>
                   <p className="text-xs text-muted-foreground/70 mt-1">
-                    Edite a cotação e clique &quot;Calcular KM&quot; para carregar as praças da rota.
+                    Edite a cotação e clique &quot;Calcular KM&quot; para carregar as praças da
+                    rota.
                   </p>
                 </div>
               )}

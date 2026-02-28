@@ -1,7 +1,17 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { GripVertical } from 'lucide-react';
+import {
+  GripVertical,
+  CreditCard,
+  Package,
+  Route,
+  Landmark,
+  Truck,
+  CheckCircle2,
+  AlertCircle,
+  XCircle,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { FinancialKanbanRow } from '@/types/financial';
@@ -38,7 +48,10 @@ export function FinancialCard({ row, onEdit, canManageActions = true }: Financia
     transition,
   };
 
-  const rawAmount = row.total_amount ?? row.quote_value ?? row.order_value ?? 0;
+  const rawAmount =
+    row.type === 'PAG'
+      ? (row.carreteiro_real ?? row.total_amount ?? row.order_value ?? 0)
+      : (row.total_amount ?? row.quote_value ?? row.order_value ?? 0);
   const amount = Number(rawAmount);
   const name = (row.client_name ?? row.supplier_name ?? '—') as string;
   const dueDate = (row.next_due_date ?? row.due_date) as string | null | undefined;
@@ -87,6 +100,84 @@ export function FinancialCard({ row, onEdit, canManageActions = true }: Financia
               </p>
             )}
             <p className="text-lg font-semibold text-foreground">{formatCurrency(amount)}</p>
+
+            {/* Trip chip + reconciliation badge (PAG) */}
+            {(row.trip_id ?? row.trip_number) && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
+                  <Truck className="w-3 h-3" />
+                  {row.trip_number ?? `Trip`}
+                </span>
+                {row.is_reconciled === true && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-success bg-success/10 rounded px-1.5 py-0.5">
+                    <CheckCircle2 className="w-3 h-3" />
+                    OK
+                  </span>
+                )}
+                {row.is_reconciled === false &&
+                  row.proofs_count != null &&
+                  row.proofs_count > 0 &&
+                  (row.paid_amount ?? 0) === 0 &&
+                  row.expected_amount != null &&
+                  Number(row.expected_amount) > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-warning-foreground bg-warning/10 rounded px-1.5 py-0.5">
+                      <AlertCircle className="w-3 h-3" />
+                      Pendente confirmação
+                    </span>
+                  )}
+                {row.is_reconciled === false &&
+                  row.proofs_count != null &&
+                  row.proofs_count > 0 &&
+                  !(
+                    (row.paid_amount ?? 0) === 0 &&
+                    row.expected_amount != null &&
+                    Number(row.expected_amount) > 0
+                  ) && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5">
+                      <XCircle className="w-3 h-3" />
+                      Divergente
+                    </span>
+                  )}
+                {row.is_reconciled === false &&
+                  (row.proofs_count ?? 0) === 0 &&
+                  row.expected_amount != null &&
+                  Number(row.expected_amount) > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-warning-foreground bg-warning/10 rounded px-1.5 py-0.5">
+                      <AlertCircle className="w-3 h-3" />
+                      Pendente
+                    </span>
+                  )}
+              </div>
+            )}
+
+            {/* Enriched info chips */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              {row.payment_term_name && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
+                  <CreditCard className="w-3 h-3" />
+                  {row.payment_term_name}
+                </span>
+              )}
+              {row.cargo_type && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
+                  <Package className="w-3 h-3" />
+                  {row.cargo_type}
+                </span>
+              )}
+              {row.km_distance != null && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
+                  <Route className="w-3 h-3" />
+                  {Number(row.km_distance).toLocaleString('pt-BR')} km
+                </span>
+              )}
+              {row.toll_value != null && Number(row.toll_value) > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
+                  <Landmark className="w-3 h-3" />
+                  {formatCurrency(Number(row.toll_value))}
+                </span>
+              )}
+            </div>
+
             {dueDate && (
               <p className="text-xs text-muted-foreground">Venc: {formatDate(dueDate)}</p>
             )}

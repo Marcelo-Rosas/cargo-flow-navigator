@@ -95,5 +95,13 @@ const MaskedInput = React.forwardRef<HTMLInputElement, MaskedInputProps>(
 
 MaskedInput.displayName = 'MaskedInput';
 
+/** Formata string de dígitos para CPF (000.000.000-00) */
+export function formatCpfDisplay(value: string | null | undefined): string {
+  if (!value) return '';
+  const d = value.replace(/\D/g, '').slice(0, 11);
+  if (d.length !== 11) return value;
+  return maskConfig.cpf.format(d);
+}
+
 export { MaskedInput };
 export type { MaskedInputProps, MaskType };

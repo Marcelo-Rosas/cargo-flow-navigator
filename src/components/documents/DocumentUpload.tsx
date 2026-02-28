@@ -22,11 +22,29 @@ type DocumentType = Database['public']['Enums']['document_type'];
 type Order = Database['public']['Tables']['orders']['Row'];
 type OrderStage = Order['stage'];
 
+const DRIVER_DOC_TYPES: DocumentType[] = ['cnh', 'crlv', 'comp_residencia', 'antt_motorista'];
+
+/** Tipos da aba Doc-Mot (documentos motorista/veículo) */
+const DOC_MOT_TYPES: { value: DocumentType; label: string }[] = [
+  { value: 'cnh', label: 'CNH (Motorista)' },
+  { value: 'crlv', label: 'CRLV (Veículo)' },
+  { value: 'comp_residencia', label: 'Comprovante de Residência' },
+  { value: 'antt_motorista', label: 'ANTT (Motorista)' },
+  { value: 'outros', label: 'Outros' },
+];
+
 interface DocumentUploadProps {
   orderId?: string;
   quoteId?: string;
   orderStage?: OrderStage;
+  financialContext?: 'carrier_payment';
+  /** Quando true, exibe apenas tipos Doc-Mot (CNH, CRLV, comp.res., ANTT) */
+  docMotContext?: boolean;
+  /** Quando true, filtra CNH/CRLV/comp.res./ANTT do seletor (docs herdados da viagem) */
+  driverDocsInherited?: boolean;
   onSuccess?: () => void;
+  /** Called after upload when type is adiantamento_carreteiro or saldo_carreteiro (to trigger process-payment-proof) */
+  onCarrierPaymentDocCreated?: (documentId: string, type: DocumentType) => void;
 }
 
 interface UploadingFile {
@@ -54,6 +72,9 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'nfe', label: 'NF-e' },
     { value: 'cte', label: 'CT-e' },
     { value: 'mdfe', label: 'MDF-e' },
+    { value: 'analise_gr', label: 'Análise GR (Gerenciamento de Risco)' },
+    { value: 'doc_rota', label: 'Documento de Rota' },
+    { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
     { value: 'outros', label: 'Outros' },
   ],
   coleta_realizada: [
@@ -64,6 +85,10 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'nfe', label: 'NF-e' },
     { value: 'cte', label: 'CT-e' },
     { value: 'mdfe', label: 'MDF-e' },
+    { value: 'analise_gr', label: 'Análise GR (Gerenciamento de Risco)' },
+    { value: 'doc_rota', label: 'Documento de Rota' },
+    { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
+    { value: 'pod', label: 'Canhoto (POD - Comprovante de Entrega)' },
     { value: 'outros', label: 'Outros' },
   ],
   em_transito: [
@@ -74,6 +99,10 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'nfe', label: 'NF-e' },
     { value: 'cte', label: 'CT-e' },
     { value: 'mdfe', label: 'MDF-e' },
+    { value: 'analise_gr', label: 'Análise GR (Gerenciamento de Risco)' },
+    { value: 'doc_rota', label: 'Documento de Rota' },
+    { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
+    { value: 'pod', label: 'Canhoto (POD - Comprovante de Entrega)' },
     { value: 'outros', label: 'Outros' },
   ],
   entregue: [
@@ -84,10 +113,23 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'nfe', label: 'NF-e' },
     { value: 'cte', label: 'CT-e' },
     { value: 'mdfe', label: 'MDF-e' },
-    { value: 'pod', label: 'POD (Comprovante de Entrega)' },
+    { value: 'analise_gr', label: 'Análise GR (Gerenciamento de Risco)' },
+    { value: 'doc_rota', label: 'Documento de Rota' },
+    { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
+    { value: 'pod', label: 'Canhoto (POD - Comprovante de Entrega)' },
     { value: 'outros', label: 'Outros' },
   ],
 };
+
+// Tipos de documento para pagamento/custos do carreteiro (aba Carreteiro)
+const CARRIER_PAYMENT_DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
+  { value: 'adiantamento_carreteiro', label: 'Adiantamento (Carreteiro)' },
+  { value: 'saldo_carreteiro', label: 'Saldo (Carreteiro)' },
+  { value: 'doc_rota', label: 'Documento de Rota' },
+  { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
+  { value: 'comprovante_descarga', label: 'Comprovante Descarga' },
+  { value: 'outros', label: 'Outros' },
+];
 
 // Mapeamento de tipo de documento para campo booleano da ordem
 const DOCUMENT_TYPE_TO_ORDER_FIELD: Record<string, keyof Order | null> = {
@@ -98,11 +140,26 @@ const DOCUMENT_TYPE_TO_ORDER_FIELD: Record<string, keyof Order | null> = {
   nfe: 'has_nfe',
   cte: 'has_cte',
   mdfe: 'has_mdfe',
+  analise_gr: 'has_analise_gr',
+  doc_rota: 'has_doc_rota',
+  comprovante_vpo: 'has_vpo',
+  comprovante_descarga: 'has_comprovante_descarga',
   pod: 'has_pod',
   outros: null,
 };
 
-export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: DocumentUploadProps) {
+const CARRIER_PAYMENT_TYPES: DocumentType[] = ['adiantamento_carreteiro', 'saldo_carreteiro'];
+
+export function DocumentUpload({
+  orderId,
+  quoteId,
+  orderStage,
+  financialContext,
+  docMotContext,
+  driverDocsInherited,
+  onSuccess,
+  onCarrierPaymentDocCreated,
+}: DocumentUploadProps) {
   const { user } = useAuth();
   const createDocumentMutation = useCreateDocument();
   const updateOrderMutation = useUpdateOrder();
@@ -114,15 +171,29 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
     { value: 'outros', label: 'Outros' },
   ];
 
-  // Pega os tipos disponíveis: ordem (por estágio) ou cotação
-  const availableTypes =
-    quoteId && !orderId
-      ? QUOTE_DOCUMENT_TYPES
-      : orderStage
-        ? DOCUMENT_TYPES_BY_STAGE[orderStage]
-        : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
+  // Pega os tipos disponíveis: doc_mot, carrier payment, cotação ou ordem (por estágio)
+  let availableTypes = docMotContext
+    ? DOC_MOT_TYPES
+    : financialContext === 'carrier_payment'
+      ? CARRIER_PAYMENT_DOCUMENT_TYPES
+      : quoteId && !orderId
+        ? QUOTE_DOCUMENT_TYPES
+        : orderStage
+          ? DOCUMENT_TYPES_BY_STAGE[orderStage]
+          : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
 
-  const [selectedType, setSelectedType] = useState<DocumentType>(availableTypes[0].value);
+  // Na aba Docs, remover tipos Doc-Mot (CNH, CRLV, etc.) — estão na aba Doc-Mot
+  if (!docMotContext && !financialContext && orderId) {
+    availableTypes = availableTypes.filter((t) => !DRIVER_DOC_TYPES.includes(t.value));
+  }
+  // Quando docs do motorista foram herdados da viagem, remove do seletor
+  if (driverDocsInherited && orderId && financialContext !== 'carrier_payment' && !docMotContext) {
+    availableTypes = availableTypes.filter((t) => !DRIVER_DOC_TYPES.includes(t.value));
+  }
+
+  const [selectedType, setSelectedType] = useState<DocumentType>(
+    availableTypes[0]?.value ?? 'outros'
+  );
 
   // Atualiza o tipo selecionado quando o estágio muda
   useEffect(() => {
@@ -161,19 +232,21 @@ export function DocumentUpload({ orderId, quoteId, orderStage, onSuccess }: Docu
 
       setUploadingFiles((prev) => prev.map((f) => (f.file === file ? { ...f, progress: 70 } : f)));
 
-      // Get public URL
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(uploadData.path);
-
-      // Create document record
-      await createDocumentMutation.mutateAsync({
+      // Store the storage path (NOT a public URL) — access via signed URL at read time
+      // uploadData.path is already the bare path: <user_id>/<timestamp>-<random>.<ext>
+      const created = await createDocumentMutation.mutateAsync({
         file_name: file.name,
-        file_url: urlData.publicUrl,
+        file_url: uploadData.path,
         file_size: file.size,
         type,
         order_id: orderId || null,
         quote_id: quoteId || null,
         uploaded_by: user.id,
       });
+
+      if (CARRIER_PAYMENT_TYPES.includes(type) && created?.id && onCarrierPaymentDocCreated) {
+        onCarrierPaymentDocCreated(created.id, type);
+      }
 
       // Update order document flags baseado no tipo
       if (orderId) {

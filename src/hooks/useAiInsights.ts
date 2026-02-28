@@ -15,6 +15,8 @@ export interface AiInsight {
   summary_text: string;
   expires_at: string | null;
   created_at: string;
+  user_rating: number | null;
+  user_feedback: string | null;
 }
 
 // ─────────────────────────────────────────────────────
@@ -66,6 +68,28 @@ export function useDashboardInsights() {
   });
 }
 
+/** Fetch latest operational insights */
+export function useOperationalInsights() {
+  return useQuery({
+    queryKey: ['ai-insights', 'operational'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_insights' as 'documents')
+        .select('*')
+        .eq('insight_type', 'operational_insights')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        if (error.code === '42P01') return null;
+        throw error;
+      }
+      return (data?.[0] ?? null) as unknown as AiInsight | null;
+    },
+    refetchInterval: 5 * 60 * 1000,
+  });
+}
+
 // ─────────────────────────────────────────────────────
 // Mutations
 // ─────────────────────────────────────────────────────
@@ -93,7 +117,7 @@ export function useRequestAiAnalysis() {
       entityType: string;
     }) => {
       const primaryFnName = OPERATIONAL_TYPES.has(analysisType)
-        ? 'ai-operational-agent'
+        ? 'ai-operational-orchestrator'
         : 'ai-financial-agent';
 
       let data: { error?: string; success?: boolean };
@@ -125,7 +149,35 @@ export function useRequestAiAnalysis() {
         queryKey: ['ai-insights', variables.entityType, variables.entityId],
       });
       queryClient.invalidateQueries({ queryKey: ['ai-insights', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['ai-insights', 'operational'] });
       queryClient.invalidateQueries({ queryKey: ['approval-requests'] });
+    },
+  });
+}
+
+/** Rate an AI insight (thumbs up/down or 1-5) */
+export function useRateInsight() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      insightId,
+      rating,
+      feedback,
+    }: {
+      insightId: string;
+      rating: number;
+      feedback?: string;
+    }) => {
+      const { error } = await supabase
+        .from('ai_insights' as 'documents')
+        .update({ user_rating: rating, user_feedback: feedback || null } as Record<string, unknown>)
+        .eq('id', insightId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-insights'] });
     },
   });
 }

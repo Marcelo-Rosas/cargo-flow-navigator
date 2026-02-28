@@ -151,7 +151,16 @@ const COLUMN_MAPPINGS: Record<string, string[]> = {
     'preço_kg',
     'frete_kg',
   ],
-  cost_value_percent: ['cost_value_percent', 'custo_valor', 'percent_valor', 'valor%', '%valor', 'valor_percent'],
+  cost_value_percent: [
+    'cost_value_percent',
+    'custo_valor',
+    'percent_valor',
+    'valor%',
+    '%valor',
+    'valor_percent',
+    'custo_valo_tso',
+    'custo valor tso',
+  ],
   gris_percent: ['gris_percent', 'gris', 'gris%', '%gris'],
   // TSO aceita ambos: tso_percent (novo) e ad_valorem_percent (legado)
   tso_percent: [
@@ -167,15 +176,89 @@ const COLUMN_MAPPINGS: Record<string, string[]> = {
   ],
   toll_percent: ['toll_percent', 'pedagio', 'pedagio%', 'toll', '%pedagio'],
   // LTL (Fracionado) weight range columns
-  weight_rate_10: ['weight_rate_10', '10', 'de_1_a_10', '1_a_10_kg', 'ate_10kg', 'ate_10'],
-  weight_rate_20: ['weight_rate_20', '20', 'de_11_a_20', '11_a_20_kg', 'ate_20kg', 'ate_20'],
-  weight_rate_30: ['weight_rate_30', '30', 'de_21_a_30', '21_a_30_kg', 'ate_30kg', 'ate_30'],
-  weight_rate_50: ['weight_rate_50', '50', 'de_31_a_50', '31_a_50_kg', 'ate_50kg', 'ate_50'],
-  weight_rate_70: ['weight_rate_70', '70', 'de_51_a_70', '51_a_70_kg', 'ate_70kg', 'ate_70'],
-  weight_rate_100: ['weight_rate_100', '100', 'de_71_a_100', '71_a_100_kg', 'ate_100kg', 'ate_100'],
-  weight_rate_150: ['weight_rate_150', '150', 'de_101_a_150', '101_a_150_kg', 'ate_150kg', 'ate_150'],
-  weight_rate_200: ['weight_rate_200', '200', 'de_151_a_200', '151_a_200_kg', 'ate_200kg', 'ate_200'],
-  weight_rate_above_200: ['weight_rate_above_200', 'acima_200', 'acima_de_200', 'acima_200_kg', 'r$/kg', 'r$porkg'],
+  weight_rate_10: [
+    'weight_rate_10',
+    '10',
+    'de_1_a_10',
+    '1_a_10_kg',
+    'de 1 a 10 k',
+    'de_1_a_10_k',
+    'ate_10kg',
+    'ate_10',
+  ],
+  weight_rate_20: [
+    'weight_rate_20',
+    '20',
+    'de_11_a_20',
+    '11_a_20_kg',
+    'de 11 a 20',
+    'ate_20kg',
+    'ate_20',
+  ],
+  weight_rate_30: [
+    'weight_rate_30',
+    '30',
+    'de_21_a_30',
+    '21_a_30_kg',
+    'de 21 a 30',
+    'ate_30kg',
+    'ate_30',
+  ],
+  weight_rate_50: [
+    'weight_rate_50',
+    '50',
+    'de_31_a_50',
+    '31_a_50_kg',
+    'de 31 a 50',
+    'ate_50kg',
+    'ate_50',
+  ],
+  weight_rate_70: [
+    'weight_rate_70',
+    '70',
+    'de_51_a_70',
+    '51_a_70_kg',
+    'de 51 a 70',
+    'ate_70kg',
+    'ate_70',
+  ],
+  weight_rate_100: [
+    'weight_rate_100',
+    '100',
+    'de_71_a_100',
+    '71_a_100_kg',
+    'de 71 a 100',
+    'ate_100kg',
+    'ate_100',
+  ],
+  weight_rate_150: [
+    'weight_rate_150',
+    '150',
+    'de_101_a_150',
+    '101_a_150_kg',
+    'de 101 a 150',
+    'ate_150kg',
+    'ate_150',
+  ],
+  weight_rate_200: [
+    'weight_rate_200',
+    '200',
+    'de_151_a_200',
+    '151_a_200_kg',
+    'de 151 a 200',
+    'ate_200kg',
+    'ate_200',
+  ],
+  weight_rate_above_200: [
+    'weight_rate_above_200',
+    'acima_200',
+    'acima_de_200',
+    'acima_200_kg',
+    'r$/kg',
+    'r$porkg',
+    'r$/kg acim',
+    'r$porkg_acim',
+  ],
 };
 
 function findColumnIndex(headers: string[], fieldName: string): number {
@@ -233,6 +316,16 @@ function validatePriceRow(
   return { isValid: errors.length === 0, errors };
 }
 
+/** Auto-detect CSV delimiter from first line (comma vs semicolon) */
+function detectCsvDelimiter(firstLine: string): string {
+  const byComma = firstLine.split(',').length;
+  const bySemicolon = firstLine.split(';').length;
+  // Use whichever gives more columns; minimum 3 for a valid price table
+  if (byComma >= 3 && byComma >= bySemicolon) return ',';
+  if (bySemicolon >= 3) return ';';
+  return ',';
+}
+
 export function parseCSVPriceTable(
   content: string,
   delimiter: string = ';'
@@ -251,8 +344,11 @@ export function parseCSVPriceTable(
     };
   }
 
+  // Auto-detect delimiter when default is used (CSV often uses comma)
+  const resolvedDelimiter = delimiter === ';' ? detectCsvDelimiter(lines[0]) : delimiter;
+
   // Detect headers (first non-empty line)
-  const headers = lines[0].split(delimiter).map((h) => h.trim());
+  const headers = lines[0].split(resolvedDelimiter).map((h) => h.trim());
 
   // Find column indices
   const kmFromIdx = findColumnIndex(headers, 'km_from');
@@ -286,7 +382,7 @@ export function parseCSVPriceTable(
 
   // Parse data rows
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(delimiter).map((v) => v.trim());
+    const values = lines[i].split(resolvedDelimiter).map((v) => v.trim());
 
     // Skip empty or header-like rows
     if (values.every((v) => !v || v === '')) continue;
@@ -331,7 +427,8 @@ export function parseCSVPriceTable(
       weight_rate_100: wr100Idx !== -1 ? normalizeBrazilianNumber(values[wr100Idx]) : null,
       weight_rate_150: wr150Idx !== -1 ? normalizeBrazilianNumber(values[wr150Idx]) : null,
       weight_rate_200: wr200Idx !== -1 ? normalizeBrazilianNumber(values[wr200Idx]) : null,
-      weight_rate_above_200: wrAbove200Idx !== -1 ? normalizeBrazilianNumber(values[wrAbove200Idx]) : null,
+      weight_rate_above_200:
+        wrAbove200Idx !== -1 ? normalizeBrazilianNumber(values[wrAbove200Idx]) : null,
     };
 
     const validation = validatePriceRow(row, rows.length);
@@ -520,7 +617,8 @@ export async function parseXLSXPriceTable(file: File): Promise<ParseResult<Parse
         weight_rate_100: wr100Idx !== -1 ? normalizeBrazilianNumber(values[wr100Idx]) : null,
         weight_rate_150: wr150Idx !== -1 ? normalizeBrazilianNumber(values[wr150Idx]) : null,
         weight_rate_200: wr200Idx !== -1 ? normalizeBrazilianNumber(values[wr200Idx]) : null,
-        weight_rate_above_200: wrAbove200Idx !== -1 ? normalizeBrazilianNumber(values[wrAbove200Idx]) : null,
+        weight_rate_above_200:
+          wrAbove200Idx !== -1 ? normalizeBrazilianNumber(values[wrAbove200Idx]) : null,
       };
 
       const validation = validatePriceRow(row, rows.length);

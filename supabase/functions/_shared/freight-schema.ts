@@ -27,6 +27,7 @@ export const calculateFreightInputSchema = z
     overhead_percent: z.number().min(0).optional(),
     carreteiro_percent: z.number().min(0).max(100).optional(),
     descarga_value: z.number().min(0).optional(),
+    aluguel_maquinas_value: z.number().min(0).optional(),
   })
   .refine((data) => data.weight_kg > 0 || data.volume_m3 > 0, {
     message: 'weight_kg e volume_m3 não podem ser ambos zero',

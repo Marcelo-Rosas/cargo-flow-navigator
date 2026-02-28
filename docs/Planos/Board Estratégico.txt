@@ -1,0 +1,89 @@
+Board Estratégico
+
+
+# PROJETO 
+“Board Viver de IA” – um app para o ecossistema Viver de IA onde o usuário 
+faz 
+perguntas estratégicas de negócios e recebe pareceres de um Agente de 
+Inteligência Artificial composto por cinco empreendedores de altíssimo 
+nível. 
+O App deve ter um Agente de IA que usa o modelo Claude Sonnet 4, o 
+novo modelo da Anthropic para gerar todas as respostas e interações com 
+Inteligência Artificial 
+Queremos que o app: 
+* Ofereça uma experiência visualmente rica (interface de painel, cards, 
+avatares) e muitos efeitos visuais. 
+* Mostre as respostas individuais de cada conselheiro, lado a lado. 
+* Crie um bloco extra chamado “Consenso do Board” que sintetiza a visão 
+conjunta. Todos os blocos devem ter um alto nível de design e apresentar a 
+visão de uma forma muito bonita esteticamente.   
+* Guarde o histórico completo de interações (pergunta, respostas e 
+consenso) para 
+que possamos, consultar conversas antigas. 
+* Permita ao usuário voltar a qualquer conversa passada e reutilizá-la como 
+base 
+para novas perguntas. 
+# FLUXO DO USUÁRIO 
+1. Usuário entra e vê um campo único para digitar sua dúvida estratégica.   
+2. Clica em “Obter Conselho”.   
+3. A tela se transforma num painel onde aparecem, quase 
+simultaneamente:   
+• Cinco cards — um para cada conselheiro — com foto, nome e resposta.   
+• Um card destacado (“Consensus”) que resume os pontos fortes/fracos e 
+sugere 
+um próximo passo prático.   
+4. Ao lado (ou em um drawer) existe um menu de “Histórico” mostrando as 
+interações anteriores; clicar em qualquer item reabre aquela sessão.   
+5. Tudo é salvo automaticamente, incluindo data/hora e o texto completo 
+de cada 
+resposta, para alimentar um dataset interno de aprendizado contínuo. 
+# QUEM É O BOARD (PERSONAS & ÂNGULOS) 
+1. *Elon Musk* – visão de disrupção e “primeiros princípios”; provoca a 
+quebrar 
+modelos de negócio e pensar 10× maior.   
+2. *Sam Altman* – arquiteto da revolução em IA generativa; traz frameworks 
+de 
+crescimento e ética em inteligência artificial.   
+3. *Patrick Collison* – co-fundador da Stripe; mestre em plataformas 
+developer-first e eficiência operacional escalável.   
+4. *Melanie Perkins* – co-fundadora do Canva; especialista em produto 
+no-code, 
+design simples e growth viral que “vende antes de ensinar”.   
+5. *Alex Hormozi* – Acquisition.com; foco brutal em ofertas irresistíveis, 
+monetização rápida e alavancagem de receita. 
+Traga um conhecimento completo de cada perfil atrelado ao VIVER DE IA. 
+Cada conselheiro deve responder com seu tom característico 
+(ousado, analítico, pragmático, inspirador, direto) e abordar a pergunta a 
+partir de sua zona de genialidade. Isso dá variedade e profundidade ao 
+board. 
+# EXPERIÊNCIA VISUAL DESEJADA 
+* Layout responsivo, limpo, com cores do Viver de IA (azul claro, teal, branco, 
+preto).   
+* Cards com cantos arredondados, sombras leves e avatares nítidos, algo 
+bem tecnológico e moderno. 
+* O design da plataforma deve ser no estilo dark mode. 
+* Animações completas e com excelente design ao gerar uma resposta, 
+quero uma UI e UX bem robusta de efeitos visuais. 
+# ARMAZENAMENTO DE HISTÓRICO 
+Sempre que uma consulta for concluída, registrem-se: ID do usuário, 
+pergunta, 
+texto de cada conselheiro, texto do consenso e timestamp.   
+Isso não precisa ficar visível para o usuário, mas deve existir para fins de 
+melhoria contínua do agente. 
+# GOVERNANÇA & QUALIDADE 
+* Caso as respostas individuais divirjam muito, o card de Consenso deve 
+sinalizar 
+claramente os pontos de conflito antes de sugerir um caminho.   
+* Se alguma resposta vier vazia ou parecer incoerente, exibir alerta 
+elegante e 
+oferecer re-gerar aquela parte.   
+* Todo conteúdo deverá permanecer confidencial dentro do workspace do 
+usuário. 
+# IMPERATIVO TÉCNICO 
+**Todas as etapas de raciocínio, geração de texto e síntese são operadas 
+pelo 
+Claude Sonnet 4.**   
+Não usar outros modelos. Se surgir versão mais nova do Sonnet 4, utilizar 
+automaticamente. 
+te enviei prints com a documentação da Anthropic que destacam o Claude 
+Sonnet 4 para você fazer o código da forma correta

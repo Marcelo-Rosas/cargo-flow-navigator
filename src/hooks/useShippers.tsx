@@ -23,7 +23,7 @@ export function useShippers(searchTerm?: string, options: UseShippersOptions = {
 
       if (searchTerm) {
         query = query.or(
-          `name.ilike.%${searchTerm}%,cnpj.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`
+          `name.ilike.%${searchTerm}%,cnpj.ilike.%${searchTerm}%,cpf.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`
         );
       }
 

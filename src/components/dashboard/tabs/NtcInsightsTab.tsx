@@ -99,7 +99,15 @@ const iconBgMap = {
   purple: 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400',
 };
 
-function InsightCard({ title, value, subtitle, icon: Icon, trend, color, delay = 0 }: InsightCardProps) {
+function InsightCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  trend,
+  color,
+  delay = 0,
+}: InsightCardProps) {
   return (
     <motion.div
       className={`rounded-xl border p-4 ${colorMap[color]}`}
@@ -238,9 +246,7 @@ function InctlLatestTable({ inctlSeries }: { inctlSeries: NtcCostIndex[] }) {
                 <TableCell className="font-medium">
                   {distLabels[row.distance_km || 0] || `${row.distance_km} km`}
                 </TableCell>
-                <TableCell className="text-right">
-                  {fmtCurrency(row.index_value)}
-                </TableCell>
+                <TableCell className="text-right">{fmtCurrency(row.index_value)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">
                   {prev ? fmtCurrency(prev.index_value) : '—'}
                 </TableCell>
@@ -273,8 +279,7 @@ function InctlLatestTable({ inctlSeries }: { inctlSeries: NtcCostIndex[] }) {
 /* ------------------------------------------------------------------ */
 
 export function NtcInsightsTab() {
-  const { inctlSeries, inctfSeries, fuelReference, summary, isLoading, isError } =
-    useNtcInsights();
+  const { inctlSeries, inctfSeries, fuelReference, summary, isLoading, isError } = useNtcInsights();
 
   if (isLoading) {
     return (
@@ -293,6 +298,8 @@ export function NtcInsightsTab() {
       </div>
     );
   }
+
+  const hasNoData = inctlSeries.length === 0 && inctfSeries.length === 0 && !fuelReference;
 
   // Prepare chart data
   const chartData = buildInctlChartData(inctlSeries);
@@ -316,7 +323,11 @@ export function NtcInsightsTab() {
     });
   }
 
-  if (fuelReference && fuelReference.monthly_variation_pct !== null && fuelReference.monthly_variation_pct > 2) {
+  if (
+    fuelReference &&
+    fuelReference.monthly_variation_pct !== null &&
+    fuelReference.monthly_variation_pct > 2
+  ) {
     alerts.push({
       icon: Fuel,
       message: `Diesel subiu ${fuelReference.monthly_variation_pct.toFixed(1)}% no mês — impacto direto no custo do frete`,
@@ -342,15 +353,27 @@ export function NtcInsightsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Empty state banner */}
+      {hasNoData && (
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-border bg-muted/40">
+          <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-foreground">Dados NTC não disponíveis</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Os índices INCTL, INCTF e preço do diesel são importados periodicamente. Aguarde a
+              próxima atualização ou contate o suporte.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <InsightCard
           title="INCTL Lotação"
           value={fmtPct(summary.inctlVar12m)}
           subtitle={
-            summary.latestInctlPeriod
-              ? `Ref. ${fmtPeriod(summary.latestInctlPeriod)}`
-              : undefined
+            summary.latestInctlPeriod ? `Ref. ${fmtPeriod(summary.latestInctlPeriod)}` : undefined
           }
           icon={Truck}
           trend={summary.inctlVar12m}
@@ -361,9 +384,7 @@ export function NtcInsightsTab() {
           title="INCTF Fracionado"
           value={fmtPct(summary.inctfVar12m)}
           subtitle={
-            summary.latestInctfPeriod
-              ? `Ref. ${fmtPeriod(summary.latestInctfPeriod)}`
-              : undefined
+            summary.latestInctfPeriod ? `Ref. ${fmtPeriod(summary.latestInctfPeriod)}` : undefined
           }
           icon={Package}
           trend={summary.inctfVar12m}
@@ -385,8 +406,10 @@ export function NtcInsightsTab() {
         />
         <InsightCard
           title="Faixas de Distância"
-          value={`${new Set(inctlSeries.map((r) => r.distance_km)).size}`}
-          subtitle="Monitoradas no INCTL"
+          value={
+            inctlSeries.length > 0 ? `${new Set(inctlSeries.map((r) => r.distance_km)).size}` : '—'
+          }
+          subtitle={inctlSeries.length > 0 ? 'Monitoradas no INCTL' : 'Sem dados importados'}
           icon={BarChart3}
           color="purple"
           delay={0.15}
@@ -414,9 +437,7 @@ export function NtcInsightsTab() {
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip
-                formatter={(value: number) =>
-                  fmtCurrency(value)
-                }
+                formatter={(value: number) => fmtCurrency(value)}
                 labelFormatter={(label: string) => `Período: ${label}`}
               />
               <Legend />
@@ -461,13 +482,19 @@ export function NtcInsightsTab() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <h3 className="text-lg font-semibold text-foreground mb-1">
-            INCTL — R$/Tonelada Atual
-          </h3>
+          <h3 className="text-lg font-semibold text-foreground mb-1">INCTL — R$/Tonelada Atual</h3>
           <p className="text-xs text-muted-foreground mb-4">
             Referência NTC por faixa de distância
           </p>
-          <InctlLatestTable inctlSeries={inctlSeries} />
+          {inctlSeries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+              <BarChart3 className="w-8 h-8 mb-2 opacity-30" />
+              <p className="text-sm">Nenhum dado INCTL disponível</p>
+              <p className="text-xs mt-1 opacity-70">Os índices são importados periodicamente</p>
+            </div>
+          ) : (
+            <InctlLatestTable inctlSeries={inctlSeries} />
+          )}
         </motion.div>
 
         {/* Smart Alerts */}
@@ -477,9 +504,7 @@ export function NtcInsightsTab() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
         >
-          <h3 className="text-lg font-semibold text-foreground mb-1">
-            Alertas Inteligentes
-          </h3>
+          <h3 className="text-lg font-semibold text-foreground mb-1">Alertas Inteligentes</h3>
           <p className="text-xs text-muted-foreground mb-4">
             Baseado nos dados NTC e suas cotações
           </p>

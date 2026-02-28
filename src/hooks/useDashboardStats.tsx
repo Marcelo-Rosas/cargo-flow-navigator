@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { asDb, filterSupabaseRows } from '@/lib/supabase-utils';
+import { asDb, calcConversionRate, filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
-import { StoredPricingBreakdown, formatRouteUf } from '@/lib/freightCalculator';
+import { StoredPricingBreakdown, formatRouteUf, ufFromCep } from '@/lib/freightCalculator';
 
 export interface TrendData {
   value: number;
@@ -31,6 +31,9 @@ function getMonthRange(monthsAgo: number) {
 export function useDashboardStats() {
   return useQuery({
     queryKey: ['dashboard-stats'],
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const currentMonth = getMonthRange(0);
       const lastMonth = getMonthRange(1);
@@ -50,7 +53,7 @@ export function useDashboardStats() {
 
       const totalQuotes = validAllQuotes.length;
       const wonQuotes = validAllQuotes.filter((q) => q.stage === 'ganho').length;
-      const conversionRate = totalQuotes > 0 ? Math.round((wonQuotes / totalQuotes) * 100) : 0;
+      const conversionRate = calcConversionRate(wonQuotes, totalQuotes);
 
       // Calculate pipeline trend (current month quotes vs last month)
       const { data: currentMonthQuotes } = await supabase
@@ -107,10 +110,13 @@ export function useDashboardStats() {
 
       let conversionTrend: TrendData | null = null;
       if (lastMonthTotal > 0 && currentMonthTotal > 0) {
-        const conversionChange = currentConversionRate - lastConversionRate;
+        const relativeChange =
+          lastConversionRate > 0
+            ? ((currentConversionRate - lastConversionRate) / lastConversionRate) * 100
+            : 0;
         conversionTrend = {
-          value: Math.abs(Math.round(conversionChange)),
-          isPositive: conversionChange >= 0,
+          value: Math.abs(Math.round(relativeChange)),
+          isPositive: relativeChange >= 0,
         };
       }
 
@@ -277,10 +283,15 @@ export interface RouteRsKm {
   count: number; // nº de OS com carreteiro_real nessa rota
 }
 
-/** Agrega R$/KM por rota para exibição no Dashboard e Relatórios. */
-export function useRsKmByRoute() {
+/** Agrega R$/KM por rota para exibição no Dashboard.
+ *  Rotas identificadas por par de UF (SC→MG, SP→RJ…).
+ *  Linhas sem UF identificável são ignoradas (não agrupadas em "Outras"). */
+export function useRsKmByRoute(filter?: { month?: number | null; year?: number | null }) {
+  const year = filter?.year ?? null;
+  const month = filter?.month ?? null;
+
   return useQuery({
-    queryKey: ['rskm-by-route'],
+    queryKey: ['rskm-by-route', year, month],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
@@ -288,8 +299,11 @@ export function useRsKmByRoute() {
           `
           carreteiro_real,
           carreteiro_antt,
+          km_distance,
+          pricing_breakdown,
           origin,
           destination,
+          created_at,
           quote:quotes(km_distance, pricing_breakdown)
         `
         )
@@ -300,28 +314,51 @@ export function useRsKmByRoute() {
       type RawRow = {
         carreteiro_real: number | null;
         carreteiro_antt: number | null;
+        km_distance: number | null;
+        pricing_breakdown: unknown;
         origin: string;
         destination: string;
+        created_at: string;
         quote: {
           km_distance: number | null;
           pricing_breakdown: unknown;
         } | null;
       };
 
-      const rows = filterSupabaseRows<RawRow>(data);
+      const allRows = filterSupabaseRows<RawRow>(data);
+
+      // Aplica filtro de período em JS (evita complexidade de tipo no builder)
+      const rows =
+        year !== null
+          ? allRows.filter((row) => {
+              const d = new Date(row.created_at);
+              if (d.getFullYear() !== year) return false;
+              if (month !== null && d.getMonth() + 1 !== month) return false;
+              return true;
+            })
+          : allRows;
 
       const grouped: Record<string, { sumAntt: number; sumReal: number; count: number }> = {};
 
       for (const row of rows) {
         const carrReal = Number(row.carreteiro_real ?? 0);
         const carrAntt = Number(row.carreteiro_antt ?? 0);
-        const km = Number(row.quote?.km_distance ?? 0);
+        const km = extractDistanceKm({
+          quoteKmDistance: row.quote?.km_distance,
+          orderKmDistance: row.km_distance,
+          quotePricingBreakdown: row.quote?.pricing_breakdown,
+          orderPricingBreakdown: row.pricing_breakdown,
+        });
         if (km <= 0 || carrReal <= 0) continue;
 
-        // Determinar rota: preferência ao routeUfLabel salvo no breakdown
-        const bd = row.quote?.pricing_breakdown as StoredPricingBreakdown | null;
-        const route =
-          bd?.meta?.routeUfLabel || formatRouteUf(row.origin, row.destination) || 'Outras';
+        // Preferência: routeUfLabel salvo no breakdown; fallback: extrai UF de origin/destination
+        const route = extractRouteLabel({
+          origin: row.origin,
+          destination: row.destination,
+          quotePricingBreakdown: row.quote?.pricing_breakdown,
+          orderPricingBreakdown: row.pricing_breakdown,
+        });
+        if (!route) continue; // Ignora linhas sem par UF identificável
 
         if (!grouped[route]) grouped[route] = { sumAntt: 0, sumReal: 0, count: 0 };
         grouped[route].sumReal += carrReal / km;
@@ -343,70 +380,223 @@ export function useRsKmByRoute() {
 }
 
 export interface RouteRsKmDetailed extends RouteRsKm {
+  avgRsKmPrevisto: number; // média R$/km previsto (custosCarreteiro do breakdown)
   quoteCount: number; // nº de cotações com km_distance nessa rota
 }
 
-/** Versão estendida com contagem de cotações por rota — para a página de Relatórios. */
-export function useRsKmDetailedReport() {
+function extractRouteLabel(input: {
+  origin: string;
+  destination: string;
+  origin_cep?: string | null;
+  destination_cep?: string | null;
+  quotePricingBreakdown?: unknown | null;
+  orderPricingBreakdown?: unknown | null;
+}): string | null {
+  const quoteBd = input.quotePricingBreakdown as StoredPricingBreakdown | null;
+  const orderBd = input.orderPricingBreakdown as StoredPricingBreakdown | null;
+
+  const fromBreakdown = quoteBd?.meta?.routeUfLabel || orderBd?.meta?.routeUfLabel;
+  if (fromBreakdown) return fromBreakdown;
+
+  const fromStrings = formatRouteUf(input.origin, input.destination);
+  if (fromStrings) return fromStrings;
+
+  const originUf = ufFromCep(input.origin_cep);
+  const destUf = ufFromCep(input.destination_cep);
+  if (originUf && destUf) return `${originUf}→${destUf}`;
+
+  return null;
+}
+
+function extractDistanceKm(input: {
+  quoteKmDistance?: number | null;
+  orderKmDistance?: number | null;
+  quotePricingBreakdown?: unknown | null;
+  orderPricingBreakdown?: unknown | null;
+}) {
+  const quoteKm = Number(input.quoteKmDistance ?? 0);
+  if (quoteKm > 0) return quoteKm;
+
+  const orderKm = Number(input.orderKmDistance ?? 0);
+  if (orderKm > 0) return orderKm;
+
+  const quoteBd = input.quotePricingBreakdown as StoredPricingBreakdown | null;
+  const orderBd = input.orderPricingBreakdown as StoredPricingBreakdown | null;
+  const breakdownKm = Number(
+    quoteBd?.meta?.antt?.kmDistance ??
+      orderBd?.meta?.antt?.kmDistance ??
+      quoteBd?.meta?.kmBandUsed ??
+      orderBd?.meta?.kmBandUsed ??
+      0
+  );
+  if (breakdownKm > 0) return breakdownKm;
+
+  return 0;
+}
+
+function extractPrevistoCarreteiro(input: {
+  orderPricingBreakdown?: unknown | null;
+  quotePricingBreakdown?: unknown | null;
+  carreteiroAntt?: number | null;
+}) {
+  const orderBd = input.orderPricingBreakdown as StoredPricingBreakdown | null;
+  const quoteBd = input.quotePricingBreakdown as StoredPricingBreakdown | null;
+
+  const breakdownCarreteiro = Number(
+    orderBd?.profitability?.custosCarreteiro ??
+      quoteBd?.profitability?.custosCarreteiro ??
+      (orderBd?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
+      (quoteBd?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
+      0
+  );
+  if (breakdownCarreteiro > 0) return breakdownCarreteiro;
+
+  const antt = Number(input.carreteiroAntt ?? 0);
+  if (antt > 0) return antt;
+
+  return 0;
+}
+
+/** Versão estendida com contagem de cotações por rota — para a página de Relatórios.
+ *  Rotas identificadas por par de UF; linhas sem UF são ignoradas. */
+export function useRsKmDetailedReport(filter?: {
+  month?: number | null;
+  year?: number | null;
+  vehicleTypeId?: string | null;
+}) {
+  const year = filter?.year ?? null;
+  const month = filter?.month ?? null;
+  const vehicleTypeId = filter?.vehicleTypeId ?? null;
+
   return useQuery({
-    queryKey: ['rskm-detailed-report'],
+    queryKey: ['rskm-detailed-report', year, month, vehicleTypeId],
     queryFn: async () => {
-      // Cotações com km_distance — para calcular R$/KM da referência ANTT por rota
-      const { data: quotesData } = await supabase
+      // Cotações com km_distance — para calcular quoteCount por rota
+      let quotesQuery = supabase
         .from('quotes')
-        .select('km_distance, pricing_breakdown, origin, destination')
+        .select(
+          'km_distance, pricing_breakdown, origin, destination, created_at, origin_cep, destination_cep, vehicle_type_id'
+        )
         .not('km_distance', 'is', null);
+      if (vehicleTypeId) {
+        quotesQuery = quotesQuery.eq('vehicle_type_id', vehicleTypeId);
+      }
+      const { data: quotesData } = await quotesQuery;
 
       type QuoteRow = {
         km_distance: number | null;
         pricing_breakdown: unknown;
         origin: string;
         destination: string;
+        created_at: string;
+        origin_cep: string | null;
+        destination_cep: string | null;
+        vehicle_type_id: string | null;
       };
-      const quotes = filterSupabaseRows<QuoteRow>(quotesData);
+      const allQuotes = filterSupabaseRows<QuoteRow>(quotesData);
+      const quotes =
+        year !== null
+          ? allQuotes.filter((q) => {
+              const d = new Date(q.created_at);
+              if (d.getFullYear() !== year) return false;
+              if (month !== null && d.getMonth() + 1 !== month) return false;
+              return true;
+            })
+          : allQuotes;
 
-      // Contagem de cotações por rota
+      // Contagem de cotações por rota (apenas rotas com UF identificável)
       const quoteCountByRoute: Record<string, number> = {};
       for (const q of quotes) {
-        const bd = q.pricing_breakdown as StoredPricingBreakdown | null;
-        const route = bd?.meta?.routeUfLabel || formatRouteUf(q.origin, q.destination) || 'Outras';
+        const route = extractRouteLabel({
+          origin: q.origin,
+          destination: q.destination,
+          origin_cep: q.origin_cep,
+          destination_cep: q.destination_cep,
+          quotePricingBreakdown: q.pricing_breakdown,
+        });
+        if (!route) continue;
         quoteCountByRoute[route] = (quoteCountByRoute[route] || 0) + 1;
       }
 
       // OS com carreteiro_real preenchido
-      const { data: ordersData, error } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select(
-          `carreteiro_real, carreteiro_antt, origin, destination,
-           quote:quotes(km_distance, pricing_breakdown)`
+          `carreteiro_real, carreteiro_antt, km_distance, pricing_breakdown, origin, destination, created_at, origin_cep, destination_cep, vehicle_type_id,
+           quote:quotes(km_distance, pricing_breakdown, origin_cep, destination_cep, vehicle_type_id)`
         )
         .not('carreteiro_real', 'is', null);
+      if (vehicleTypeId) {
+        ordersQuery = ordersQuery.eq('vehicle_type_id', vehicleTypeId);
+      }
+      const { data: ordersData, error } = await ordersQuery;
 
       if (error) throw error;
 
       type OrderRow = {
         carreteiro_real: number | null;
         carreteiro_antt: number | null;
+        km_distance: number | null;
+        pricing_breakdown: unknown;
         origin: string;
         destination: string;
-        quote: { km_distance: number | null; pricing_breakdown: unknown } | null;
+        created_at: string;
+        origin_cep: string | null;
+        destination_cep: string | null;
+        vehicle_type_id: string | null;
+        quote: {
+          km_distance: number | null;
+          pricing_breakdown: unknown;
+          origin_cep: string | null;
+          destination_cep: string | null;
+          vehicle_type_id: string | null;
+        } | null;
       };
-      const orders = filterSupabaseRows<OrderRow>(ordersData);
+      const allOrders = filterSupabaseRows<OrderRow>(ordersData);
+      const orders =
+        year !== null
+          ? allOrders.filter((o) => {
+              const d = new Date(o.created_at);
+              if (d.getFullYear() !== year) return false;
+              if (month !== null && d.getMonth() + 1 !== month) return false;
+              return true;
+            })
+          : allOrders;
 
-      const grouped: Record<string, { sumAntt: number; sumReal: number; count: number }> = {};
+      const grouped: Record<
+        string,
+        { sumAntt: number; sumPrevisto: number; sumReal: number; count: number }
+      > = {};
       for (const row of orders) {
         const carrReal = Number(row.carreteiro_real ?? 0);
         const carrAntt = Number(row.carreteiro_antt ?? 0);
-        const km = Number(row.quote?.km_distance ?? 0);
+        const carrPrevisto = extractPrevistoCarreteiro({
+          orderPricingBreakdown: row.pricing_breakdown,
+          quotePricingBreakdown: row.quote?.pricing_breakdown,
+          carreteiroAntt: row.carreteiro_antt,
+        });
+        const km = extractDistanceKm({
+          quoteKmDistance: row.quote?.km_distance,
+          orderKmDistance: row.km_distance,
+          quotePricingBreakdown: row.quote?.pricing_breakdown,
+          orderPricingBreakdown: row.pricing_breakdown,
+        });
         if (km <= 0 || carrReal <= 0) continue;
 
-        const bd = row.quote?.pricing_breakdown as StoredPricingBreakdown | null;
-        const route =
-          bd?.meta?.routeUfLabel || formatRouteUf(row.origin, row.destination) || 'Outras';
+        const route = extractRouteLabel({
+          origin: row.origin,
+          destination: row.destination,
+          origin_cep: row.origin_cep ?? row.quote?.origin_cep,
+          destination_cep: row.destination_cep ?? row.quote?.destination_cep,
+          quotePricingBreakdown: row.quote?.pricing_breakdown,
+          orderPricingBreakdown: row.pricing_breakdown,
+        });
+        if (!route) continue; // Ignora linhas sem par UF identificável
 
-        if (!grouped[route]) grouped[route] = { sumAntt: 0, sumReal: 0, count: 0 };
+        if (!grouped[route]) grouped[route] = { sumAntt: 0, sumPrevisto: 0, sumReal: 0, count: 0 };
         grouped[route].sumReal += carrReal / km;
         grouped[route].sumAntt += carrAntt > 0 ? carrAntt / km : 0;
+        grouped[route].sumPrevisto += carrPrevisto > 0 ? carrPrevisto / km : 0;
         grouped[route].count += 1;
       }
 
@@ -415,13 +605,15 @@ export function useRsKmDetailedReport() {
 
       return Array.from(allRoutes)
         .map((route): RouteRsKmDetailed => {
-          const g = grouped[route] ?? { sumAntt: 0, sumReal: 0, count: 0 };
+          const g = grouped[route] ?? { sumAntt: 0, sumPrevisto: 0, sumReal: 0, count: 0 };
+          const avgRsKmPrevisto = g.count > 0 ? g.sumPrevisto / g.count : 0;
           const avgRsKmAntt = g.count > 0 ? g.sumAntt / g.count : 0;
           const avgRsKmReal = g.count > 0 ? g.sumReal / g.count : 0;
-          const delta = avgRsKmReal - avgRsKmAntt;
-          const deltaPercent = avgRsKmAntt > 0 ? (delta / avgRsKmAntt) * 100 : 0;
+          const delta = avgRsKmReal - avgRsKmPrevisto;
+          const deltaPercent = avgRsKmPrevisto > 0 ? (delta / avgRsKmPrevisto) * 100 : 0;
           return {
             route,
+            avgRsKmPrevisto,
             avgRsKmAntt,
             avgRsKmReal,
             delta,

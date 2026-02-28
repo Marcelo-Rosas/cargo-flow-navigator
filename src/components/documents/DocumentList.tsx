@@ -5,6 +5,7 @@ import { useDocumentsByOrder, useDocumentsByQuote, useDeleteDocument } from '@/h
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
+import { openDocument, downloadDocument } from '@/lib/storage';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,9 +21,19 @@ import {
 type Document = Database['public']['Tables']['documents']['Row'];
 type DocumentType = Database['public']['Enums']['document_type'];
 
+const DOC_MOT_TYPES: DocumentType[] = [
+  'cnh',
+  'crlv',
+  'comp_residencia',
+  'antt_motorista',
+  'outros',
+];
+
 interface DocumentListProps {
   orderId?: string;
   quoteId?: string;
+  /** Quando true, exibe apenas docs Doc-Mot (CNH, CRLV, etc.) */
+  docMotFilter?: boolean;
 }
 
 const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
@@ -35,13 +46,25 @@ const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
   mdfe: { label: 'MDF-e', color: 'bg-primary/10 text-primary' },
   pod: { label: 'POD', color: 'bg-warning/10 text-warning-foreground' },
   adiantamento: { label: 'Adiantamento', color: 'bg-success/10 text-success' },
+  analise_gr: { label: 'Análise GR', color: 'bg-amber-500/10 text-amber-600' },
+  doc_rota: { label: 'Doc. Rota', color: 'bg-violet-500/10 text-violet-600' },
+  comprovante_vpo: { label: 'VPO', color: 'bg-teal-500/10 text-teal-600' },
+  comprovante_descarga: { label: 'Comp. Descarga', color: 'bg-amber-500/10 text-amber-600' },
+  adiantamento_carreteiro: {
+    label: 'Adiant. Carreteiro',
+    color: 'bg-orange-500/10 text-orange-600',
+  },
+  saldo_carreteiro: { label: 'Saldo Carreteiro', color: 'bg-orange-500/10 text-orange-600' },
   outros: { label: 'Outros', color: 'bg-muted text-muted-foreground' },
 };
 
-export function DocumentList({ orderId, quoteId }: DocumentListProps) {
+export function DocumentList({ orderId, quoteId, docMotFilter }: DocumentListProps) {
   const byOrder = useDocumentsByOrder(orderId || '');
   const byQuote = useDocumentsByQuote(quoteId || '');
-  const { data: documents, isLoading } = quoteId ? byQuote : byOrder;
+  const { data: rawDocuments, isLoading } = quoteId ? byQuote : byOrder;
+  const documents = docMotFilter
+    ? (rawDocuments ?? []).filter((d) => DOC_MOT_TYPES.includes(d.type))
+    : (rawDocuments ?? []);
   const deleteDocumentMutation = useDeleteDocument();
 
   const handleDelete = async (doc: Document) => {
@@ -50,6 +73,22 @@ export function DocumentList({ orderId, quoteId }: DocumentListProps) {
       toast.success('Documento excluído');
     } catch (error) {
       toast.error('Erro ao excluir documento');
+    }
+  };
+
+  const handleOpen = async (doc: Document) => {
+    try {
+      await openDocument(doc.file_url);
+    } catch {
+      toast.error('Erro ao abrir documento. Tente novamente.');
+    }
+  };
+
+  const handleDownload = async (doc: Document) => {
+    try {
+      await downloadDocument(doc.file_url, doc.file_name);
+    } catch {
+      toast.error('Erro ao baixar documento. Tente novamente.');
     }
   };
 
@@ -90,7 +129,10 @@ export function DocumentList({ orderId, quoteId }: DocumentListProps) {
   return (
     <div className="space-y-2">
       {documents.map((doc) => {
-        const typeInfo = TYPE_LABELS[doc.type];
+        const typeInfo = TYPE_LABELS[doc.type] ?? {
+          label: doc.type,
+          color: 'bg-muted text-muted-foreground',
+        };
         return (
           <div
             key={doc.id}
@@ -113,16 +155,24 @@ export function DocumentList({ orderId, quoteId }: DocumentListProps) {
             </div>
 
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleOpen(doc)}
+                title="Visualizar"
+              >
+                <ExternalLink className="w-4 h-4" />
               </Button>
 
-              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                <a href={doc.file_url} download={doc.file_name}>
-                  <Download className="w-4 h-4" />
-                </a>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleDownload(doc)}
+                title="Baixar"
+              >
+                <Download className="w-4 h-4" />
               </Button>
 
               <AlertDialog>

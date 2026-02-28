@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import {
   MapPin,
@@ -12,6 +12,17 @@ import {
   DollarSign,
   Pencil,
   Building2,
+  Clock,
+  Package,
+  Scale,
+  Box,
+  CreditCard,
+  Route,
+  Landmark,
+  RefreshCw,
+  XCircle,
+  AlertCircle,
+  IdCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,14 +34,32 @@ import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { DocumentList } from '@/components/documents/DocumentList';
 import { OccurrenceForm } from '@/components/forms/OccurrenceForm';
 import { OrderForm } from '@/components/forms/OrderForm';
+import { CarreteiroTab } from '@/components/modals/CarreteiroTab';
+import { DriverQualificationPanel } from '@/components/operational/DriverQualificationPanel';
+import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
 import { useVehicleByPlate } from '@/hooks/useVehicles';
 import { useUpdateOrder } from '@/hooks/useOrders';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEnsureFinancialDocument } from '@/hooks/useEnsureFinancialDocument';
+import { useTripsForOrder, useLinkOrderToTrip } from '@/hooks/useTrips';
+import { useOrderReconciliation } from '@/hooks/useReconciliation';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
+import { StoredPricingBreakdown, TollPlaza } from '@/lib/freightCalculator';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -39,6 +68,15 @@ type OrderStage = Database['public']['Enums']['order_stage'];
 
 interface OrderWithOccurrences extends Order {
   occurrences: Occurrence[];
+  price_table?: { name: string } | null;
+  vehicle_type?: { name: string; code: string; axes_count: number | null } | null;
+  payment_term?: {
+    name: string;
+    code: string;
+    adjustment_percent: number;
+    advance_percent: number | null;
+    days: number | null;
+  } | null;
   quote?:
     | (Pick<
         Quote,
@@ -88,6 +126,64 @@ const STAGES_WITH_DOCS_TAB: OrderStage[] = [
   'entregue',
 ];
 
+function OrderReconciliationSummary({ orderId }: { orderId: string }) {
+  const { data: r } = useOrderReconciliation(orderId);
+  if (!r || Number(r.expected_amount) <= 0) return null;
+  const fmt = (v: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+  const isPendingConfirmation =
+    r.proofs_count > 0 && r.paid_amount === 0 && Number(r.expected_amount) > 0;
+  return (
+    <div className="p-4 rounded-lg bg-muted/30 border border-border">
+      <p className="text-sm font-semibold text-foreground mb-3">Conciliação de Pagamento</p>
+      <div className="grid grid-cols-3 gap-4 text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Esperado</p>
+          <p className="font-semibold">{fmt(r.expected_amount)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Pago</p>
+          <p className="font-semibold">{fmt(r.paid_amount)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Delta</p>
+          <p
+            className={cn(
+              'font-semibold',
+              r.is_reconciled ? 'text-success' : 'text-warning-foreground'
+            )}
+          >
+            {fmt(r.delta_amount)}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-3">
+        {r.is_reconciled ? (
+          <span className="inline-flex items-center gap-1 text-xs text-success">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Conciliado
+          </span>
+        ) : isPendingConfirmation ? (
+          <span className="inline-flex items-center gap-1 text-xs text-warning-foreground">
+            <AlertCircle className="w-3.5 h-3.5" />
+            Pendente confirmação
+          </span>
+        ) : r.proofs_count > 0 ? (
+          <span className="inline-flex items-center gap-1 text-xs text-destructive">
+            <XCircle className="w-3.5 h-3.5" />
+            Divergente
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs text-warning-foreground">
+            <AlertCircle className="w-3.5 h-3.5" />
+            Pendente
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const STAGE_LABELS: Record<OrderStage, { label: string; color: string }> = {
   ordem_criada: { label: 'Ordem Criada', color: 'bg-muted text-muted-foreground' },
   busca_motorista: { label: 'Busca Motorista', color: 'bg-accent text-accent-foreground' },
@@ -118,6 +214,8 @@ export function OrderDetailModal({
   );
   const updateOrderMutation = useUpdateOrder();
   const ensureFinancialDocumentMutation = useEnsureFinancialDocument();
+  const { data: tripForOrder } = useTripsForOrder(order?.id);
+  const linkOrderToTripMutation = useLinkOrderToTrip();
 
   useEffect(() => {
     if (order?.vehicle_plate != null) setPlateInput(order.vehicle_plate);
@@ -176,9 +274,14 @@ export function OrderDetailModal({
     }
   };
 
+  // Parse pricing breakdown (cloned to order, fallback to quote)
+  const pricingBreakdown = (order?.pricing_breakdown ??
+    order?.quote?.pricing_breakdown) as unknown as StoredPricingBreakdown | null;
+  const tollPlazas: TollPlaza[] = pricingBreakdown?.meta?.tollPlazas ?? [];
+
   // ANTT piso mínimo (Tabela A / Carga Geral / sem retorno vazio)
   const breakdown =
-    (order?.quote?.pricing_breakdown as unknown as {
+    (pricingBreakdown as unknown as {
       meta?: {
         antt?: {
           total: number;
@@ -192,8 +295,13 @@ export function OrderDetailModal({
     } | null) ?? null;
   const savedAntt = breakdown?.meta?.antt;
 
-  const axesCount = savedAntt?.axesCount ?? order?.quote?.vehicle_type?.axes_count ?? null;
-  const kmDistance = savedAntt?.kmDistance ?? order?.quote?.km_distance ?? null;
+  const axesCount =
+    savedAntt?.axesCount ??
+    order?.vehicle_type?.axes_count ??
+    order?.quote?.vehicle_type?.axes_count ??
+    null;
+  const kmDistance =
+    savedAntt?.kmDistance ?? order?.km_distance ?? order?.quote?.km_distance ?? null;
 
   const { data: anttRate } = useAnttFloorRate({
     operationTable: 'A',
@@ -210,6 +318,215 @@ export function OrderDetailModal({
           cc: Number(anttRate.cc),
         })
       : null);
+
+  const quoteAxes = savedAntt?.axesCount ?? order?.quote?.vehicle_type?.axes_count ?? null;
+  const orderAxes = order?.vehicle_type?.axes_count ?? null;
+  const axesDivergence = quoteAxes != null && orderAxes != null && quoteAxes !== orderAxes;
+  const originCep = (order?.origin_cep || order?.quote?.origin_cep || '').replace(/\D/g, '');
+  const destinationCep = (order?.destination_cep || order?.quote?.destination_cep || '').replace(
+    /\D/g,
+    ''
+  );
+  const hasCeps = originCep.length === 8 && destinationCep.length === 8;
+
+  const queryClient = useQueryClient();
+  const [isRecalculatingToll, setIsRecalculatingToll] = useState(false);
+  const [manualTollValue, setManualTollValue] = useState<string>('');
+  const [isEditingToll, setIsEditingToll] = useState(false);
+
+  const handleRecalculateToll = useCallback(async () => {
+    if (!order || !hasCeps || isRecalculatingToll) return;
+    const axes = orderAxes ?? undefined;
+    setIsRecalculatingToll(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('calculate-distance-webrouter', {
+        body: {
+          origin_cep: originCep,
+          destination_cep: destinationCep,
+          axes_count: axes,
+        },
+      });
+      if (error || !data?.success) {
+        const errMsg = data?.error || (error as Error)?.message || 'Erro ao calcular pedágio';
+        toast.error(errMsg);
+        return;
+      }
+      const toll = Number(data.data?.toll) || 0;
+      const plazas: TollPlaza[] = Array.isArray(data.data?.toll_plazas)
+        ? data.data.toll_plazas
+        : [];
+      const current = (order.pricing_breakdown as unknown as StoredPricingBreakdown | null) ?? null;
+      const baseMeta = current?.meta || {
+        routeUfLabel: null,
+        kmBandLabel: null,
+        kmStatus: 'OK' as const,
+        marginStatus: 'UNKNOWN' as const,
+        marginPercent: 0,
+      };
+      const updated: StoredPricingBreakdown = {
+        calculatedAt: current?.calculatedAt || new Date().toISOString(),
+        version: current?.version || '4.0-fob-lotacao-markup-scope',
+        status: current?.status || 'OK',
+        error: current?.error,
+        meta: {
+          ...baseMeta,
+          tollPlazas: plazas,
+          antt: current?.meta?.antt
+            ? {
+                ...current.meta.antt,
+                axesCount: orderAxes ?? current.meta.antt.axesCount,
+              }
+            : current?.meta?.antt,
+        },
+        weights: current?.weights || {
+          cubageWeight: 0,
+          billableWeight: 0,
+          tonBillable: 0,
+        },
+        components: {
+          ...(current?.components || {}),
+          toll,
+        } as StoredPricingBreakdown['components'],
+        totals: current?.totals || {
+          receitaBruta: 0,
+          das: 0,
+          icms: 0,
+          totalImpostos: 0,
+          totalCliente: 0,
+        },
+        profitability: current?.profitability || {
+          custosCarreteiro: 0,
+          custosDescarga: 0,
+          custosDiretos: 0,
+          margemBruta: 0,
+          overhead: 0,
+          resultadoLiquido: 0,
+          margemPercent: 0,
+        },
+        rates: current?.rates || {
+          dasPercent: 14,
+          icmsPercent: 0,
+          grisPercent: 0,
+          tsoPercent: 0,
+          costValuePercent: 0,
+          markupPercent: 30,
+          overheadPercent: 15,
+          targetMarginPercent: 15,
+        },
+        conditionalFeesBreakdown: current?.conditionalFeesBreakdown,
+      };
+      await updateOrderMutation.mutateAsync({
+        id: order.id,
+        updates: {
+          toll_value: toll,
+          pricing_breakdown: updated as unknown as typeof order.pricing_breakdown,
+        },
+      });
+      toast.success(`Pedágio recalculado: R$ ${toll.toFixed(2)} (${plazas.length} praças)`);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Erro ao recalcular pedágio');
+    } finally {
+      setIsRecalculatingToll(false);
+    }
+  }, [
+    order,
+    hasCeps,
+    isRecalculatingToll,
+    orderAxes,
+    originCep,
+    destinationCep,
+    updateOrderMutation,
+    queryClient,
+  ]);
+
+  const handleSaveManualToll = useCallback(async () => {
+    if (!order) return;
+    const val = parseFloat(manualTollValue);
+    if (!Number.isFinite(val) || val < 0) {
+      toast.error('Informe um valor de pedágio válido');
+      return;
+    }
+    const current = (order.pricing_breakdown as unknown as StoredPricingBreakdown | null) ?? null;
+    const minimalMeta = {
+      routeUfLabel: null as string | null,
+      kmBandLabel: null as string | null,
+      kmStatus: 'OK' as const,
+      marginStatus: 'UNKNOWN' as const,
+      marginPercent: 0,
+    };
+    const minimalBreakdown: StoredPricingBreakdown = {
+      calculatedAt: new Date().toISOString(),
+      version: '4.0-fob-lotacao-markup-scope',
+      status: 'OK',
+      meta: minimalMeta,
+      weights: { cubageWeight: 0, billableWeight: 0, tonBillable: 0 },
+      components: {
+        baseCost: 0,
+        baseFreight: 0,
+        toll: 0,
+        gris: 0,
+        tso: 0,
+        rctrc: 0,
+        adValorem: 0,
+        tde: 0,
+        tear: 0,
+        aluguelMaquinas: 0,
+        dispatchFee: 0,
+        conditionalFeesTotal: 0,
+        waitingTimeCost: 0,
+        dasProvision: 0,
+      },
+      totals: {
+        receitaBruta: 0,
+        das: 0,
+        icms: 0,
+        totalImpostos: 0,
+        totalCliente: 0,
+      },
+      profitability: {
+        custosCarreteiro: 0,
+        custosDescarga: 0,
+        custosDiretos: 0,
+        margemBruta: 0,
+        overhead: 0,
+        resultadoLiquido: 0,
+        margemPercent: 0,
+      },
+      rates: {
+        dasPercent: 14,
+        icmsPercent: 0,
+        grisPercent: 0,
+        tsoPercent: 0,
+        costValuePercent: 0,
+        markupPercent: 30,
+        overheadPercent: 15,
+        targetMarginPercent: 15,
+      },
+    };
+    const updated: StoredPricingBreakdown = {
+      ...(current || minimalBreakdown),
+      components: {
+        ...(current?.components || minimalBreakdown.components),
+        toll: val,
+      },
+    };
+    try {
+      await updateOrderMutation.mutateAsync({
+        id: order.id,
+        updates: {
+          toll_value: val,
+          pricing_breakdown: updated as unknown as typeof order.pricing_breakdown,
+        },
+      });
+      toast.success('Valor do pedágio atualizado');
+      setIsEditingToll(false);
+      setManualTollValue('');
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Erro ao salvar pedágio');
+    }
+  }, [order, manualTollValue, updateOrderMutation, queryClient]);
 
   if (!order) return null;
 
@@ -236,6 +553,17 @@ export function OrderDetailModal({
     }).format(new Date(date));
   };
 
+  const canLinkToTrip =
+    showDriverSection && canManage && order.vehicle_plate && order.driver_id && !tripForOrder;
+  const handleLinkToTrip = async () => {
+    try {
+      await linkOrderToTripMutation.mutateAsync(order.id);
+      toast.success('OS vinculada à viagem');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao vincular viagem');
+    }
+  };
+
   const handleResolveOccurrence = async (occurrenceId: string) => {
     if (!user) return;
     try {
@@ -252,7 +580,7 @@ export function OrderDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-[780px] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <div className="flex items-center justify-between gap-3">
               <DialogTitle className="flex items-center gap-3">
@@ -260,7 +588,30 @@ export function OrderDetailModal({
                 <Badge className={cn(stageInfo.color)}>{stageInfo.label}</Badge>
               </DialogTitle>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {canLinkToTrip && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLinkToTrip}
+                    disabled={linkOrderToTripMutation.isPending}
+                    className="gap-2"
+                  >
+                    {linkOrderToTripMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Truck className="w-4 h-4" />
+                    )}
+                    Criar/Vincular Viagem
+                  </Button>
+                )}
+                {tripForOrder && !Array.isArray(tripForOrder) && 'trip_number' in tripForOrder && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Truck className="w-3 h-3" />
+                    {tripForOrder.trip_number}
+                  </Badge>
+                )}
                 {canConvertToPAG && (
                   <Button
                     type="button"
@@ -294,22 +645,47 @@ export function OrderDetailModal({
           </DialogHeader>
 
           <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="flex-shrink-0">
+            <TabsList className="flex-shrink-0 w-full overflow-x-auto justify-start">
               <TabsTrigger value="details">Detalhes</TabsTrigger>
-              {showDocsTab && (
-                <TabsTrigger value="documents" className="gap-2">
-                  <FileText className="w-4 h-4" />
-                  Documentos
+              <TabsTrigger value="pedagios" className="gap-1.5">
+                <Landmark className="w-3.5 h-3.5" />
+                Pedágios
+                {tollPlazas.length > 0 && (
+                  <Badge variant="secondary" className="text-xs ml-0.5">
+                    {tollPlazas.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              {showDriverSection && (
+                <TabsTrigger value="doc_mot" className="gap-1.5">
+                  <IdCard className="w-3.5 h-3.5" />
+                  Doc-Mot
                 </TabsTrigger>
               )}
-              <TabsTrigger value="occurrences" className="gap-2">
-                <AlertTriangle className="w-4 h-4" />
+              {showDriverSection && (
+                <TabsTrigger value="carreteiro" className="gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5" />
+                  Carreteiro
+                </TabsTrigger>
+              )}
+              {showDocsTab && (
+                <TabsTrigger value="documents" className="gap-1.5">
+                  <FileText className="w-3.5 h-3.5" />
+                  Docs
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="occurrences" className="gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
                 Ocorrências
                 {(occurrences?.length || 0) > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-warning text-warning-foreground">
+                  <span className="ml-0.5 px-1.5 py-0.5 text-xs rounded-full bg-warning text-warning-foreground">
                     {occurrences?.length}
                   </span>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="timeline" className="gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                Timeline
               </TabsTrigger>
             </TabsList>
 
@@ -317,10 +693,12 @@ export function OrderDetailModal({
               <TabsContent value="details" className="m-0 space-y-6">
                 {/* Contexto da OS (para continuidade do fluxo) */}
                 <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
-                  {order.quote?.shipper_name && (
+                  {(order.shipper_name || order.quote?.shipper_name) && (
                     <div>
                       <h4 className="font-semibold text-foreground">Embarcador</h4>
-                      <p className="text-foreground">{order.quote.shipper_name}</p>
+                      <p className="text-foreground">
+                        {order.shipper_name || order.quote?.shipper_name}
+                      </p>
                     </div>
                   )}
 
@@ -338,9 +716,9 @@ export function OrderDetailModal({
                       <span className="text-sm">Origem</span>
                     </div>
                     <p className="font-medium text-foreground">{order.origin}</p>
-                    {order.quote?.origin_cep && (
+                    {(order.origin_cep || order.quote?.origin_cep) && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        CEP: {order.quote.origin_cep}
+                        CEP: {order.origin_cep || order.quote?.origin_cep}
                       </p>
                     )}
                   </div>
@@ -350,13 +728,111 @@ export function OrderDetailModal({
                       <span className="text-sm">Destino</span>
                     </div>
                     <p className="font-medium text-foreground">{order.destination}</p>
-                    {order.quote?.destination_cep && (
+                    {(order.destination_cep || order.quote?.destination_cep) && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        CEP: {order.quote.destination_cep}
+                        CEP: {order.destination_cep || order.quote?.destination_cep}
                       </p>
                     )}
                   </div>
                 </div>
+
+                {/* Dados da Carga */}
+                {(order.cargo_type || order.weight || order.volume) && (
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-3">Dados da Carga</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      {order.cargo_type && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Package className="w-4 h-4" />
+                            <span className="text-xs">Tipo</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">{order.cargo_type}</p>
+                        </div>
+                      )}
+                      {order.weight != null && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Scale className="w-4 h-4" />
+                            <span className="text-xs">Peso</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {Number(order.weight) >= 1000
+                              ? `${(Number(order.weight) / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} t`
+                              : `${Number(order.weight).toLocaleString('pt-BR')} kg`}
+                          </p>
+                        </div>
+                      )}
+                      {order.volume != null && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Box className="w-4 h-4" />
+                            <span className="text-xs">Volume</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {Number(order.volume).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detalhes de Precificação */}
+                {(order.price_table ||
+                  order.vehicle_type ||
+                  order.payment_term ||
+                  order.km_distance) && (
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-3">Detalhes de Precificação</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {order.price_table && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <DollarSign className="w-4 h-4" />
+                            <span className="text-xs">Tabela de Preços</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {order.price_table.name}
+                          </p>
+                        </div>
+                      )}
+                      {order.vehicle_type && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Truck className="w-4 h-4" />
+                            <span className="text-xs">Veículo</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {order.vehicle_type.name} ({order.vehicle_type.code})
+                          </p>
+                        </div>
+                      )}
+                      {order.payment_term && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <CreditCard className="w-4 h-4" />
+                            <span className="text-xs">Prazo Pagamento</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {order.payment_term.name}
+                          </p>
+                        </div>
+                      )}
+                      {order.km_distance != null && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Route className="w-4 h-4" />
+                            <span className="text-xs">Distância</span>
+                          </div>
+                          <p className="font-medium text-foreground text-sm">
+                            {Number(order.km_distance).toLocaleString('pt-BR')} km
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Busca por placa (stage Busca Motorista) - preenche veículo, motorista e proprietário na OS */}
                 {isBuscaMotorista && canManage && (
@@ -509,6 +985,14 @@ export function OrderDetailModal({
                     )}
                   </div>
                 )}
+
+                {/* Qualificação do Motorista (busca_motorista stage) */}
+                {showDriverSection && order.driver_name && (
+                  <DriverQualificationPanel orderId={order.id} canManage={canManage} />
+                )}
+
+                {/* Compliance Widget */}
+                {showDriverSection && <ComplianceWidget orderId={order.id} />}
 
                 {/* Valores */}
                 <div className="grid grid-cols-2 gap-4">
@@ -669,13 +1153,341 @@ export function OrderDetailModal({
                 </div>
               </TabsContent>
 
+              {/* Pedágios Tab */}
+              <TabsContent value="pedagios" className="m-0 space-y-4">
+                {axesDivergence && (
+                  <Alert variant="destructive" className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <AlertDescription>
+                      O veículo da OS tem {orderAxes} eixos; a cotação usou {quoteAxes} eixos. O
+                      pedágio pode estar incorreto.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {canManage && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {hasCeps ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRecalculateToll}
+                        disabled={isRecalculatingToll}
+                      >
+                        {isRecalculatingToll ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                        )}
+                        Recalcular pedágio
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Preencha CEPs de origem e destino para recalcular o pedágio.
+                      </p>
+                    )}
+                    {!isEditingToll ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setIsEditingToll(true);
+                          setManualTollValue(
+                            order.toll_value != null ? String(Number(order.toll_value)) : ''
+                          );
+                        }}
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Editar valor manualmente
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Valor pedágio (R$)"
+                          className="w-36"
+                          value={manualTollValue}
+                          onChange={(e) => setManualTollValue(e.target.value)}
+                        />
+                        <Button size="sm" onClick={handleSaveManualToll}>
+                          Salvar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setIsEditingToll(false);
+                            setManualTollValue('');
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {tollPlazas.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Landmark className="h-4 w-4" />
+                        Praças de Pedágio da Rota
+                      </h4>
+                      <Badge variant="outline" className="text-xs">
+                        {tollPlazas.length} praça{tollPlazas.length !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                    <div className="rounded-md border overflow-auto max-h-[400px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10 text-center">#</TableHead>
+                            <TableHead>Praça</TableHead>
+                            <TableHead>Cidade/UF</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
+                            <TableHead className="text-right">TAG</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tollPlazas.map((plaza, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="text-center text-muted-foreground text-xs">
+                                {plaza.ordemPassagem || idx + 1}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium">{plaza.nome}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {plaza.cidade}
+                                {plaza.uf ? ` - ${plaza.uf}` : ''}
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                {plaza.valor.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </TableCell>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {plaza.valorTag.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                        <TableFooter>
+                          <TableRow className="font-semibold">
+                            <TableCell colSpan={3} className="text-right">
+                              Total ({tollPlazas.length} praça{tollPlazas.length !== 1 ? 's' : ''})
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {tollPlazas
+                                .reduce((sum, p) => sum + p.valor, 0)
+                                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {tollPlazas
+                                .reduce((sum, p) => sum + p.valorTag, 0)
+                                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </TableCell>
+                          </TableRow>
+                        </TableFooter>
+                      </Table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Landmark className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                    <p className="text-sm text-muted-foreground">
+                      Nenhuma praça de pedágio registrada.
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      Dados de pedágio são clonados da cotação ao criar a OS.
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {showDriverSection && (
+                <TabsContent value="carreteiro" className="m-0">
+                  <CarreteiroTab order={order} canManage={canManage} />
+                </TabsContent>
+              )}
+
+              {showDriverSection && (
+                <TabsContent value="doc_mot" className="m-0 space-y-6">
+                  {canManage && (
+                    <>
+                      {order.trip_id &&
+                        order.has_cnh &&
+                        order.has_crlv &&
+                        order.has_comp_residencia &&
+                        order.has_antt_motorista && (
+                          <Alert>
+                            <AlertDescription>
+                              Documentação do motorista incluída na viagem.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      <DocumentUpload
+                        orderId={order.id}
+                        orderStage={order.stage}
+                        docMotContext
+                        driverDocsInherited={
+                          !!(
+                            order.trip_id &&
+                            order.has_cnh &&
+                            order.has_crlv &&
+                            order.has_comp_residencia &&
+                            order.has_antt_motorista
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                  <DocumentList orderId={order.id} docMotFilter />
+                </TabsContent>
+              )}
+
               {showDocsTab && (
                 <TabsContent value="documents" className="m-0 space-y-6">
-                  {canManage && <DocumentUpload orderId={order.id} orderStage={order.stage} />}
+                  {canManage && (
+                    <>
+                      {order.trip_id &&
+                        order.has_cnh &&
+                        order.has_crlv &&
+                        order.has_comp_residencia &&
+                        order.has_antt_motorista && (
+                          <Alert>
+                            <AlertDescription>
+                              Documentação do motorista incluída na viagem.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      <DocumentUpload
+                        orderId={order.id}
+                        orderStage={order.stage}
+                        driverDocsInherited={
+                          !!(
+                            order.trip_id &&
+                            order.has_cnh &&
+                            order.has_crlv &&
+                            order.has_comp_residencia &&
+                            order.has_antt_motorista
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                  {order.carreteiro_real != null && Number(order.carreteiro_real) > 0 && (
+                    <OrderReconciliationSummary orderId={order.id} />
+                  )}
                   <Separator />
                   <DocumentList orderId={order.id} />
                 </TabsContent>
               )}
+
+              {/* Timeline Tab */}
+              <TabsContent value="timeline" className="m-0 space-y-4">
+                <h4 className="font-semibold text-foreground">Linha do Tempo</h4>
+                <div className="relative pl-6 space-y-0">
+                  {(() => {
+                    const STAGE_FLOW: { id: OrderStage; label: string; color: string }[] = [
+                      { id: 'ordem_criada', label: 'Ordem Criada', color: 'bg-slate-500' },
+                      { id: 'busca_motorista', label: 'Busca Motorista', color: 'bg-violet-500' },
+                      { id: 'documentacao', label: 'Documentação', color: 'bg-primary' },
+                      { id: 'coleta_realizada', label: 'Coleta Realizada', color: 'bg-orange-500' },
+                      { id: 'em_transito', label: 'Em Trânsito', color: 'bg-blue-500' },
+                      { id: 'entregue', label: 'Entregue', color: 'bg-emerald-500' },
+                    ];
+                    const currentIdx = STAGE_FLOW.findIndex((s) => s.id === order.stage);
+
+                    return STAGE_FLOW.map((stage, idx) => {
+                      const isCompleted = idx < currentIdx;
+                      const isCurrent = idx === currentIdx;
+                      const isFuture = idx > currentIdx;
+
+                      return (
+                        <div key={stage.id} className="relative flex items-start pb-6 last:pb-0">
+                          {/* Vertical line */}
+                          {idx < STAGE_FLOW.length - 1 && (
+                            <div
+                              className={cn(
+                                'absolute left-[-16px] top-5 w-0.5 h-full',
+                                isCompleted
+                                  ? 'bg-emerald-400'
+                                  : isCurrent
+                                    ? 'bg-primary/30'
+                                    : 'bg-border'
+                              )}
+                            />
+                          )}
+                          {/* Dot */}
+                          <div
+                            className={cn(
+                              'absolute left-[-20px] top-1 w-3 h-3 rounded-full border-2 z-10',
+                              isCompleted
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : isCurrent
+                                  ? `${stage.color} border-primary ring-4 ring-primary/20`
+                                  : 'bg-background border-muted-foreground/30'
+                            )}
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  'text-sm font-medium',
+                                  isFuture ? 'text-muted-foreground/50' : 'text-foreground'
+                                )}
+                              >
+                                {stage.label}
+                              </span>
+                              {isCurrent && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary"
+                                >
+                                  ATUAL
+                                </Badge>
+                              )}
+                              {isCompleted && (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {isCurrent
+                                ? `Desde ${formatDate(order.updated_at)}`
+                                : isCompleted
+                                  ? 'Concluído'
+                                  : 'Pendente'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Timestamps */}
+                <Separator />
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Criada em</span>
+                    <span className="text-foreground">{formatDate(order.created_at)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Última atualização</span>
+                    <span className="text-foreground">{formatDate(order.updated_at)}</span>
+                  </div>
+                  {order.eta && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">ETA</span>
+                      <span className="text-foreground">{formatDate(order.eta)}</span>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
 
               <TabsContent value="occurrences" className="m-0 space-y-4">
                 <div className="flex justify-between items-center">

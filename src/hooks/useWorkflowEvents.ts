@@ -50,7 +50,7 @@ export function useRecentWorkflowEvents(limit = 20) {
       }
       return (data ?? []) as WorkflowEvent[];
     },
-    refetchInterval: 15_000, // Refetch every 15s
+    refetchInterval: 2 * 60_000, // Refetch every 2 min
   });
 }
 
@@ -80,11 +80,7 @@ export function useWorkflowEventCounts() {
   return useQuery({
     queryKey: ['workflow-events', 'counts'],
     queryFn: async () => {
-      const [
-        { count: pending },
-        { count: failed },
-        { count: completed },
-      ] = await Promise.all([
+      const [{ count: pending }, { count: failed }, { count: completed }] = await Promise.all([
         supabase
           .from('workflow_events' as 'documents')
           .select('*', { count: 'exact', head: true })

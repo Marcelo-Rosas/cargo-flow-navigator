@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   TrendingUp,
@@ -22,18 +23,7 @@ import {
   useRecentOrders,
   useConversionChartData,
   useRevenueByClientData,
-  useRsKmByRoute,
 } from '@/hooks/useDashboardStats';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Route } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
@@ -86,8 +76,6 @@ export default function Dashboard() {
     error: revenueError,
     refetch: refetchRevenue,
   } = useRevenueByClientData();
-
-  const { data: rsKmRoutes, isLoading: rsKmLoading } = useRsKmByRoute();
 
   // Enable realtime updates
   useRealtimeSubscription(['quotes', 'orders', 'occurrences']);
@@ -201,7 +189,9 @@ export default function Dashboard() {
       <ApprovalBanner />
 
       {/* KPI Cards */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 ${isOperacional ? 'lg:grid-cols-4' : 'lg:grid-cols-3 xl:grid-cols-6'} gap-4 mb-8 auto-rows-fr`}>
+      <div
+        className={`grid grid-cols-1 md:grid-cols-2 ${isOperacional ? 'lg:grid-cols-4' : 'lg:grid-cols-3 xl:grid-cols-6'} gap-4 mb-8 auto-rows-fr`}
+      >
         {statsLoading ? (
           <div className="col-span-full flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -269,77 +259,10 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* R$/KM por Rota */}
-      <motion.div
-        className="bg-card rounded-xl border border-border shadow-card p-6 mb-8"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <div className="flex items-center gap-2 mb-4">
-          <Route className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">Custo por Rota (R$/km)</h2>
-          <span className="text-xs text-muted-foreground ml-1">
-            — comparativo ANTT vs carreteiro real pago
-          </span>
-        </div>
-
-        {rsKmLoading ? (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="w-5 h-5 animate-spin text-primary" />
-          </div>
-        ) : !rsKmRoutes || rsKmRoutes.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">
-            Nenhuma OS com valor de carreteiro real preenchido.
-            <br />
-            Preencha o campo <strong>Carreteiro Real</strong> nas OS para ver este relatório.
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Rota</TableHead>
-                <TableHead className="text-right">ANTT R$/km</TableHead>
-                <TableHead className="text-right">Real R$/km</TableHead>
-                <TableHead className="text-right">Δ%</TableHead>
-                <TableHead className="text-right">OS</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rsKmRoutes.map((row) => (
-                <TableRow key={row.route}>
-                  <TableCell className="font-medium">{row.route}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {row.avgRsKmAntt > 0 ? `R$ ${row.avgRsKmAntt.toFixed(2)}` : '—'}
-                  </TableCell>
-                  <TableCell className="text-right">R$ {row.avgRsKmReal.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    {row.avgRsKmAntt > 0 ? (
-                      <Badge
-                        variant={row.deltaPercent > 0 ? 'outline' : 'default'}
-                        className={
-                          row.deltaPercent > 0
-                            ? 'text-warning-foreground border-warning/50'
-                            : 'bg-success text-success-foreground'
-                        }
-                      >
-                        {row.deltaPercent > 0 ? '+' : ''}
-                        {row.deltaPercent.toFixed(1)}%
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">{row.count}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </motion.div>
-
       {/* AI Insights + Activity Feed + Usage */}
-      <div className={`grid grid-cols-1 ${(isAdmin || isFinanceiro) ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6 mb-8`}>
+      <div
+        className={`grid grid-cols-1 ${isAdmin || isFinanceiro ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6 mb-8`}
+      >
         <AiInsightsWidget />
         <AutomationActivityFeed />
         {(isAdmin || isFinanceiro) && <AiUsageDashboard />}

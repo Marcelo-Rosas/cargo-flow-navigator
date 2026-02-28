@@ -1,5 +1,29 @@
 project_id = "epgedaiukjippepujuzc"
 
+# ────────────────────────────────────────────────────────────────────
+# [auth] – Referência para dev local (supabase start).
+# A configuração REAL de produção vive no Dashboard do Supabase:
+#   Authentication → URL Configuration
+# Mantenha esta seção sincronizada manualmente como documentação.
+# ────────────────────────────────────────────────────────────────────
+[auth]
+site_url = "https://cargo-flow-navigator.vercel.app"
+additional_redirect_urls = [
+  # Dev local
+  "http://localhost:8080",
+  "http://localhost:8080/auth",
+  "http://localhost:8080/reset-password",
+  # Domínio principal
+  "https://cargo-flow-navigator.vercel.app",
+  "https://cargo-flow-navigator.vercel.app**",
+  # URL canônica Vercel (redirect)
+  "https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app",
+  "https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app**",
+  # Preview deploys – wildcard para branches
+  "https://cargo-*-flow-navigator-marcelo-rosas-projects.vercel.app",
+  "https://cargo-*-flow-navigator-marcelo-rosas-projects.vercel.app/**",
+]
+
 [functions.import-price-table]
 verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente
 
@@ -35,3 +59,12 @@ verify_jwt = false  # Orquestrador de workers; usa service role para chamadas in
 
 [functions.ai-operational-orchestrator]
 verify_jwt = false  # Orquestrador operacional; evita 401 de gateway em chamadas autenticadas
+
+[functions.invite-user]
+verify_jwt = false  # Função valida admin via is_admin() RPC
+
+[functions.process-payment-proof]
+verify_jwt = false  # Chamado pelo workflow-orchestrator com service role
+
+[functions.reconcile-trip]
+verify_jwt = false  # Valida Authorization manualmente

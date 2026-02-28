@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3, Route, TrendingDown, TrendingUp, Loader2, Info } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -11,7 +12,26 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useRsKmDetailedReport } from '@/hooks/useDashboardStats';
+import { useVehicleTypes } from '@/hooks/usePricingRules';
 import { cn } from '@/lib/utils';
+
+const REPORT_MONTHS = [
+  { label: 'Janeiro', value: 1 },
+  { label: 'Fevereiro', value: 2 },
+  { label: 'Março', value: 3 },
+  { label: 'Abril', value: 4 },
+  { label: 'Maio', value: 5 },
+  { label: 'Junho', value: 6 },
+  { label: 'Julho', value: 7 },
+  { label: 'Agosto', value: 8 },
+  { label: 'Setembro', value: 9 },
+  { label: 'Outubro', value: 10 },
+  { label: 'Novembro', value: 11 },
+  { label: 'Dezembro', value: 12 },
+] as const;
+
+const REPORT_THIS_YEAR = new Date().getFullYear();
+const REPORT_YEARS = [REPORT_THIS_YEAR, REPORT_THIS_YEAR - 1, REPORT_THIS_YEAR - 2] as const;
 
 function StatCard({
   title,
@@ -50,7 +70,15 @@ function StatCard({
 }
 
 export default function Reports() {
-  const { data: routes, isLoading } = useRsKmDetailedReport();
+  const [reportYear, setReportYear] = useState<number | null>(REPORT_THIS_YEAR);
+  const [reportMonth, setReportMonth] = useState<number | null>(null);
+  const [vehicleTypeId, setVehicleTypeId] = useState<string | null>(null);
+  const { data: vehicleTypes } = useVehicleTypes();
+  const { data: routes, isLoading } = useRsKmDetailedReport({
+    year: reportYear,
+    month: reportMonth,
+    vehicleTypeId,
+  });
 
   // Resumo geral
   const allWithReal = routes?.filter((r) => r.count > 0) ?? [];
@@ -63,11 +91,11 @@ export default function Reports() {
       : 0;
 
   const bestRoute = allWithReal
-    .filter((r) => r.avgRsKmAntt > 0)
+    .filter((r) => r.avgRsKmPrevisto > 0)
     .sort((a, b) => a.deltaPercent - b.deltaPercent)[0];
 
   const worstRoute = allWithReal
-    .filter((r) => r.avgRsKmAntt > 0)
+    .filter((r) => r.avgRsKmPrevisto > 0)
     .sort((a, b) => b.deltaPercent - a.deltaPercent)[0];
 
   return (
@@ -89,9 +117,52 @@ export default function Reports() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
-            Análise comparativa de custo R$/km — referência ANTT vs carreteiro real pago
+            Análise comparativa de custo R$/km — previsto da cotação vs carreteiro real pago
           </motion.p>
         </div>
+        <motion.div
+          className="flex items-center gap-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.15 }}
+        >
+          <select
+            value={reportMonth ?? ''}
+            onChange={(e) => setReportMonth(e.target.value ? Number(e.target.value) : null)}
+            className="text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground cursor-pointer"
+          >
+            <option value="">Todos os meses</option>
+            {REPORT_MONTHS.map(({ label, value }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={reportYear ?? ''}
+            onChange={(e) => setReportYear(e.target.value ? Number(e.target.value) : null)}
+            className="text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground cursor-pointer"
+          >
+            <option value="">Todos os anos</option>
+            {REPORT_YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+          <select
+            value={vehicleTypeId ?? ''}
+            onChange={(e) => setVehicleTypeId(e.target.value || null)}
+            className="text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground cursor-pointer min-w-[180px]"
+          >
+            <option value="">Todos os tipos</option>
+            {(vehicleTypes ?? []).map((vt) => (
+              <option key={vt.id} value={vt.id}>
+                {vt.name}
+              </option>
+            ))}
+          </select>
+        </motion.div>
       </div>
 
       {isLoading ? (
@@ -114,7 +185,7 @@ export default function Reports() {
               value={bestRoute ? bestRoute.route : '—'}
               subtitle={
                 bestRoute
-                  ? `${bestRoute.deltaPercent.toFixed(1)}% abaixo do ANTT`
+                  ? `${bestRoute.deltaPercent.toFixed(1)}% abaixo do previsto`
                   : 'Sem dados suficientes'
               }
               icon={TrendingDown}
@@ -126,7 +197,7 @@ export default function Reports() {
               value={worstRoute ? worstRoute.route : '—'}
               subtitle={
                 worstRoute
-                  ? `+${worstRoute.deltaPercent.toFixed(1)}% acima do ANTT`
+                  ? `+${worstRoute.deltaPercent.toFixed(1)}% acima do previsto`
                   : 'Sem dados suficientes'
               }
               icon={TrendingUp}
@@ -168,7 +239,8 @@ export default function Reports() {
                     <TableHead>Rota</TableHead>
                     <TableHead className="text-right">Cotações</TableHead>
                     <TableHead className="text-right">OS c/ real</TableHead>
-                    <TableHead className="text-right">ANTT R$/km</TableHead>
+                    <TableHead className="text-right">Previsto R$/km</TableHead>
+                    <TableHead className="text-right">ANTT R$/km (ref)</TableHead>
                     <TableHead className="text-right">Real R$/km</TableHead>
                     <TableHead className="text-right">Δ absoluto</TableHead>
                     <TableHead className="text-right">Δ%</TableHead>
@@ -176,6 +248,7 @@ export default function Reports() {
                 </TableHeader>
                 <TableBody>
                   {routes.map((row) => {
+                    const hasPrevisto = row.avgRsKmPrevisto > 0;
                     const hasAntt = row.avgRsKmAntt > 0;
                     const isAbove = row.deltaPercent > 0;
                     return (
@@ -188,13 +261,16 @@ export default function Reports() {
                           {row.count > 0 ? row.count : '—'}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
+                          {hasPrevisto ? `R$ ${row.avgRsKmPrevisto.toFixed(2)}` : '—'}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
                           {hasAntt ? `R$ ${row.avgRsKmAntt.toFixed(2)}` : '—'}
                         </TableCell>
                         <TableCell className="text-right">
                           {row.count > 0 ? `R$ ${row.avgRsKmReal.toFixed(2)}` : '—'}
                         </TableCell>
                         <TableCell className="text-right">
-                          {hasAntt && row.count > 0 ? (
+                          {hasPrevisto && row.count > 0 ? (
                             <span
                               className={cn(
                                 'text-sm font-medium',
@@ -208,7 +284,7 @@ export default function Reports() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {hasAntt && row.count > 0 ? (
+                          {hasPrevisto && row.count > 0 ? (
                             <Badge
                               variant={isAbove ? 'outline' : 'default'}
                               className={

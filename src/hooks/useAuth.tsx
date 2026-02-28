@@ -2,6 +2,8 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+const SITE_ORIGIN = window.location.origin;
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -46,12 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl,
+        emailRedirectTo: `${SITE_ORIGIN}/auth`,
         data: { full_name: fullName },
       },
     });
@@ -64,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth?type=recovery`,
+      redirectTo: `${SITE_ORIGIN}/reset-password`,
     });
     return { error: error as Error | null };
   };
@@ -75,7 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, resetPassword, updatePassword }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, signIn, signUp, signOut, resetPassword, updatePassword }}
+    >
       {children}
     </AuthContext.Provider>
   );
