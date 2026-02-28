@@ -17,7 +17,7 @@ interface RequestBody {
   entityType: string;
 }
 
-interface ClaudeUsage {
+interface AiUsage {
   input_tokens: number;
   output_tokens: number;
   cache_creation_input_tokens?: number;
@@ -26,8 +26,17 @@ interface ClaudeUsage {
 
 interface ClaudeResponse {
   content: Array<{ type: string; text: string }>;
-  usage: ClaudeUsage;
+  usage: AiUsage;
   model: string;
+}
+
+interface OpenAiResponse {
+  choices?: Array<{ message?: { content?: string } }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+  };
+  model?: string;
 }
 
 interface BudgetCheck {
@@ -63,17 +72,32 @@ const MODEL_PRICING: Record<
 // ─────────────────────────────────────────────────────
 
 function selectModel(analysisType: AnalysisType): string {
+  const explicitOpenAiModel = deno.env.get('OPENAI_MODEL');
+  if (explicitOpenAiModel) return explicitOpenAiModel;
+
   switch (analysisType) {
-    // Complex reasoning → Sonnet
+    // Complex reasoning
+    case 'approval_summary':
+    case 'dashboard_insights':
+      return 'gpt-4.1';
+
+    // Structured / simpler analysis
+    case 'quote_profitability':
+    case 'financial_anomaly':
+      return 'gpt-4.1-mini';
+
+    default:
+      return 'gpt-4.1-mini';
+  }
+}
+
+function selectAnthropicFallbackModel(analysisType: AnalysisType): string {
+  switch (analysisType) {
     case 'approval_summary':
     case 'dashboard_insights':
       return 'claude-sonnet-4-20250514';
-
-    // Structured / simpler analysis → Haiku (80% cheaper)
     case 'quote_profitability':
     case 'financial_anomaly':
-      return 'claude-haiku-4-5-20250514';
-
     default:
       return 'claude-haiku-4-5-20250514';
   }
@@ -83,8 +107,9 @@ function selectModel(analysisType: AnalysisType): string {
 // Cost Estimation
 // ─────────────────────────────────────────────────────
 
-function estimateCost(model: string, usage: ClaudeUsage): number {
-  const pricing = MODEL_PRICING[model] || MODEL_PRICING['claude-haiku-4-5-20250514'];
+function estimateCost(model: string, usage: AiUsage): number {
+  const pricing = MODEL_PRICING[model];
+  if (!pricing) return 0;
   const perMillion = 1_000_000;
 
   const inputCost = (usage.input_tokens / perMillion) * pricing.input;
@@ -225,7 +250,7 @@ async function logUsage(
   params: {
     analysisType: string;
     model: string;
-    usage?: ClaudeUsage;
+    usage?: AiUsage;
     costUsd: number;
     status: string;
     entityType?: string;
@@ -255,7 +280,7 @@ async function logUsage(
 }
 
 // ─────────────────────────────────────────────────────
-// Claude API with Prompt Caching + Retry + Usage Tracking
+// LLM API (OpenAI first, Anthropic fallback)
 // ─────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `Você é um analista financeiro especializado em logística de cargas para a empresa Vectra Cargo, uma transportadora brasileira.
@@ -274,19 +299,17 @@ Formate a resposta em JSON com a estrutura:
   "summary": "resumo de 2-3 linhas para exibição rápida"
 }`;
 
-async function analyzeWithClaude(
+async function analyzeWithOpenAi(
   userPrompt: string,
   model: string,
   analysisType: AnalysisType,
   sb: SupabaseClient,
   entityType?: string,
   entityId?: string
-): Promise<{ text: string; usage: ClaudeUsage; model: string; costUsd: number }> {
-  const apiKey = deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
-
-  // Use AI Gateway URL if configured, otherwise direct to Anthropic
-  const baseUrl = deno.env.get('AI_GATEWAY_URL') || 'https://api.anthropic.com';
+): Promise<{ text: string; usage: AiUsage; model: string; costUsd: number }> {
+  const apiKey = deno.env.get('OPENAI_API_KEY');
+  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
+  const baseUrl = deno.env.get('OPENAI_API_BASE_URL') || 'https://api.openai.com/v1';
 
   const maxRetries = 3;
   let lastError: Error | null = null;
@@ -295,25 +318,26 @@ async function analyzeWithClaude(
     const startTime = Date.now();
 
     try {
-      const res = await fetch(`${baseUrl}/v1/messages`, {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
+          Authorization: `Bearer ${apiKey}`,
           'content-type': 'application/json',
         },
         body: JSON.stringify({
           model,
           max_tokens: 1024,
-          // Prompt caching: cache the system prompt (90% cost reduction on repeated calls)
-          system: [
+          temperature: 0.2,
+          messages: [
             {
-              type: 'text',
-              text: SYSTEM_PROMPT,
-              cache_control: { type: 'ephemeral' },
+              role: 'system',
+              content: SYSTEM_PROMPT,
+            },
+            {
+              role: 'user',
+              content: userPrompt,
             },
           ],
-          messages: [{ role: 'user', content: userPrompt }],
         }),
       });
 
@@ -350,11 +374,14 @@ async function analyzeWithClaude(
 
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`Claude API error (${res.status}): ${errText}`);
+        throw new Error(`OpenAI API error (${res.status}): ${errText}`);
       }
 
-      const data: ClaudeResponse = await res.json();
-      const usage = data.usage;
+      const data: OpenAiResponse = await res.json();
+      const usage: AiUsage = {
+        input_tokens: data.usage?.prompt_tokens || 0,
+        output_tokens: data.usage?.completion_tokens || 0,
+      };
       const costUsd = estimateCost(model, usage);
 
       // Log successful call
@@ -370,7 +397,7 @@ async function analyzeWithClaude(
       });
 
       return {
-        text: data.content?.[0]?.text || 'Sem resposta da análise.',
+        text: data.choices?.[0]?.message?.content || 'Sem resposta da análise.',
         usage,
         model: data.model || model,
         costUsd,
@@ -378,7 +405,7 @@ async function analyzeWithClaude(
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
 
-      if (attempt < maxRetries - 1 && !lastError.message.includes('ANTHROPIC_API_KEY')) {
+      if (attempt < maxRetries - 1 && !lastError.message.includes('OPENAI_API_KEY')) {
         const waitMs = Math.pow(2, attempt) * 1000;
         console.warn(
           `Attempt ${attempt + 1} failed: ${lastError.message}. Retrying in ${waitMs}ms...`
@@ -400,6 +427,98 @@ async function analyzeWithClaude(
   });
 
   throw lastError || new Error('Analysis failed after retries');
+}
+
+async function analyzeWithClaude(
+  userPrompt: string,
+  model: string,
+  analysisType: AnalysisType,
+  sb: SupabaseClient,
+  entityType?: string,
+  entityId?: string
+): Promise<{ text: string; usage: AiUsage; model: string; costUsd: number }> {
+  const apiKey = deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+  const baseUrl = deno.env.get('AI_GATEWAY_URL') || 'https://api.anthropic.com';
+
+  const res = await fetch(`${baseUrl}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      system: [{ type: 'text', text: SYSTEM_PROMPT }],
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Claude API error (${res.status}): ${errText}`);
+  }
+
+  const data: ClaudeResponse = await res.json();
+  const usage = data.usage;
+  const costUsd = estimateCost(model, usage);
+
+  await logUsage(sb, {
+    analysisType,
+    model,
+    usage,
+    costUsd,
+    status: 'success',
+    entityType,
+    entityId,
+  });
+
+  return {
+    text: data.content?.[0]?.text || 'Sem resposta da análise.',
+    usage,
+    model: data.model || model,
+    costUsd,
+  };
+}
+
+async function analyzeWithProvider(
+  userPrompt: string,
+  model: string,
+  analysisType: AnalysisType,
+  sb: SupabaseClient,
+  entityType?: string,
+  entityId?: string
+): Promise<{ text: string; usage: AiUsage; model: string; costUsd: number }> {
+  const hasOpenAi = !!deno.env.get('OPENAI_API_KEY');
+  const hasAnthropic = !!deno.env.get('ANTHROPIC_API_KEY');
+
+  if (hasOpenAi) {
+    try {
+      return await analyzeWithOpenAi(userPrompt, model, analysisType, sb, entityType, entityId);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const recoverable = /insufficient|credit|quota|rate limit|429|5\d{2}/i.test(msg);
+      if (hasAnthropic && recoverable) {
+        return await analyzeWithClaude(
+          userPrompt,
+          selectAnthropicFallbackModel(analysisType),
+          analysisType,
+          sb,
+          entityType,
+          entityId
+        );
+      }
+      throw e;
+    }
+  }
+
+  if (hasAnthropic) {
+    return await analyzeWithClaude(userPrompt, model, analysisType, sb, entityType, entityId);
+  }
+
+  throw new Error('No AI provider configured. Set OPENAI_API_KEY (preferred) or ANTHROPIC_API_KEY');
 }
 
 // ─────────────────────────────────────────────────────
@@ -474,7 +593,7 @@ async function analyzeQuoteProfitability(entityId: string, model: string, sb: Su
 
 Avalie se esta cotação é rentável, se está acima ou abaixo da média, e se o preço está adequado em relação ao piso ANTT.`;
 
-  const result = await analyzeWithClaude(
+  const result = await analyzeWithProvider(
     prompt,
     model,
     'quote_profitability',
@@ -544,7 +663,7 @@ async function analyzeFinancialAnomaly(entityId: string, model: string, sb: Supa
 
 Identifique se este documento apresenta anomalias (valor muito acima/abaixo da média, padrões incomuns).`;
 
-  const result = await analyzeWithClaude(
+  const result = await analyzeWithProvider(
     prompt,
     model,
     'financial_anomaly',
@@ -626,7 +745,7 @@ ${contextInfo}
 
 Forneça um resumo claro e objetivo para que o gerente possa tomar uma decisão rápida de aprovar ou rejeitar. Inclua os principais riscos e a sua recomendação.`;
 
-  const result = await analyzeWithClaude(
+  const result = await analyzeWithProvider(
     prompt,
     model,
     'approval_summary',
@@ -731,7 +850,7 @@ Retorne um JSON com a estrutura:
   "summary": "..."
 }`;
 
-  const result = await analyzeWithClaude(
+  const result = await analyzeWithProvider(
     prompt,
     model,
     'dashboard_insights',
