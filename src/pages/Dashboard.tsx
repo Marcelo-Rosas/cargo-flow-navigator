@@ -23,18 +23,7 @@ import {
   useRecentOrders,
   useConversionChartData,
   useRevenueByClientData,
-  useRsKmByRoute,
 } from '@/hooks/useDashboardStats';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Route } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
@@ -46,25 +35,6 @@ import { AiInsightsWidget } from '@/components/dashboard/AiInsightsWidget';
 import { AutomationActivityFeed } from '@/components/dashboard/AutomationActivityFeed';
 import { AiUsageDashboard } from '@/components/dashboard/AiUsageDashboard';
 import { useUserRole } from '@/hooks/useUserRole';
-
-// ── Filtro R$/km ────────────────────────────────────────────────────
-const RSKM_MONTHS = [
-  { label: 'Janeiro', value: 1 },
-  { label: 'Fevereiro', value: 2 },
-  { label: 'Março', value: 3 },
-  { label: 'Abril', value: 4 },
-  { label: 'Maio', value: 5 },
-  { label: 'Junho', value: 6 },
-  { label: 'Julho', value: 7 },
-  { label: 'Agosto', value: 8 },
-  { label: 'Setembro', value: 9 },
-  { label: 'Outubro', value: 10 },
-  { label: 'Novembro', value: 11 },
-  { label: 'Dezembro', value: 12 },
-] as const;
-
-const THIS_YEAR = new Date().getFullYear();
-const RSKM_YEARS = [THIS_YEAR, THIS_YEAR - 1, THIS_YEAR - 2] as const;
 
 // Fallback data for empty states
 const emptyConversionData = [
@@ -106,13 +76,6 @@ export default function Dashboard() {
     error: revenueError,
     refetch: refetchRevenue,
   } = useRevenueByClientData();
-
-  const [rsKmYear, setRsKmYear] = useState<number | null>(THIS_YEAR);
-  const [rsKmMonth, setRsKmMonth] = useState<number | null>(null);
-  const { data: rsKmRoutes, isLoading: rsKmLoading } = useRsKmByRoute({
-    year: rsKmYear,
-    month: rsKmMonth,
-  });
 
   // Enable realtime updates
   useRealtimeSubscription(['quotes', 'orders', 'occurrences']);
@@ -295,105 +258,6 @@ export default function Dashboard() {
           </>
         )}
       </div>
-
-      {/* R$/KM por Rota */}
-      <motion.div
-        className="bg-card rounded-xl border border-border shadow-card p-6 mb-8"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <Route className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">Custo por Rota (R$/km)</h2>
-          <span className="text-xs text-muted-foreground">— ANTT vs carreteiro real</span>
-          <div className="ml-auto flex items-center gap-2">
-            <select
-              value={rsKmMonth ?? ''}
-              onChange={(e) => setRsKmMonth(e.target.value ? Number(e.target.value) : null)}
-              className="text-xs border border-border rounded px-2 py-1 bg-background text-foreground cursor-pointer"
-            >
-              <option value="">Todos os meses</option>
-              {RSKM_MONTHS.map(({ label, value }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={rsKmYear ?? ''}
-              onChange={(e) => setRsKmYear(e.target.value ? Number(e.target.value) : null)}
-              className="text-xs border border-border rounded px-2 py-1 bg-background text-foreground cursor-pointer"
-            >
-              <option value="">Todos os anos</option>
-              {RSKM_YEARS.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {rsKmLoading ? (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="w-5 h-5 animate-spin text-primary" />
-          </div>
-        ) : !rsKmRoutes || rsKmRoutes.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">
-            {rsKmYear !== null || rsKmMonth !== null ? (
-              'Nenhuma OS com carreteiro real no período selecionado.'
-            ) : (
-              <>
-                Nenhuma OS com valor de carreteiro real preenchido.
-                <br />
-                Preencha o campo <strong>Carreteiro Real</strong> nas OS para ver este relatório.
-              </>
-            )}
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Rota</TableHead>
-                <TableHead className="text-right">ANTT R$/km</TableHead>
-                <TableHead className="text-right">Real R$/km</TableHead>
-                <TableHead className="text-right">Δ%</TableHead>
-                <TableHead className="text-right">OS</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rsKmRoutes.map((row) => (
-                <TableRow key={row.route}>
-                  <TableCell className="font-medium">{row.route}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {row.avgRsKmAntt > 0 ? `R$ ${row.avgRsKmAntt.toFixed(2)}` : '—'}
-                  </TableCell>
-                  <TableCell className="text-right">R$ {row.avgRsKmReal.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    {row.avgRsKmAntt > 0 ? (
-                      <Badge
-                        variant={row.deltaPercent > 0 ? 'outline' : 'default'}
-                        className={
-                          row.deltaPercent > 0
-                            ? 'text-warning-foreground border-warning/50'
-                            : 'bg-success text-success-foreground'
-                        }
-                      >
-                        {row.deltaPercent > 0 ? '+' : ''}
-                        {row.deltaPercent.toFixed(1)}%
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">{row.count}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </motion.div>
 
       {/* AI Insights + Activity Feed + Usage */}
       <div
