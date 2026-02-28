@@ -830,6 +830,7 @@ export type Database = {
           has_nfe: boolean;
           has_pod: boolean;
           has_vpo: boolean | null;
+          has_comprovante_descarga: boolean | null;
           id: string;
           km_distance: number | null;
           notes: string | null;
@@ -896,6 +897,7 @@ export type Database = {
           has_nfe?: boolean;
           has_pod?: boolean;
           has_vpo?: boolean | null;
+          has_comprovante_descarga?: boolean | null;
           id?: string;
           km_distance?: number | null;
           notes?: string | null;
@@ -963,6 +965,7 @@ export type Database = {
           has_nfe?: boolean;
           has_pod?: boolean;
           has_vpo?: boolean | null;
+          has_comprovante_descarga?: boolean | null;
           id?: string;
           km_distance?: number | null;
           notes?: string | null;
@@ -2420,6 +2423,10 @@ export type Database = {
         Returns: boolean;
       };
       is_admin: { Args: never; Returns: boolean };
+      link_order_to_target_trip: {
+        Args: { p_order_id: string; p_trip_id: string };
+        Returns: string;
+      };
       mask_cep: { Args: { input: string }; Returns: string };
       mask_cnpj: { Args: { input: string }; Returns: string };
       mask_cpf: { Args: { input: string }; Returns: string };
@@ -2450,6 +2457,7 @@ export type Database = {
         | 'analise_gr'
         | 'doc_rota'
         | 'comprovante_vpo'
+        | 'comprovante_descarga'
         | 'adiantamento_carreteiro'
         | 'saldo_carreteiro';
       financial_doc_type: 'FAT' | 'PAG';
@@ -2612,6 +2620,7 @@ export const Constants = {
         'analise_gr',
         'doc_rota',
         'comprovante_vpo',
+        'comprovante_descarga',
         'adiantamento_carreteiro',
         'saldo_carreteiro',
       ],

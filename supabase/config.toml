@@ -25,7 +25,7 @@ additional_redirect_urls = [
 ]
 
 [functions.import-price-table]
-verify_jwt = true
+verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente via getUser()
 
 [functions.calculate-freight]
 verify_jwt = true

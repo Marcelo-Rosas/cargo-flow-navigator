@@ -24,11 +24,22 @@ type OrderStage = Order['stage'];
 
 const DRIVER_DOC_TYPES: DocumentType[] = ['cnh', 'crlv', 'comp_residencia', 'antt_motorista'];
 
+/** Tipos da aba Doc-Mot (documentos motorista/veículo) */
+const DOC_MOT_TYPES: { value: DocumentType; label: string }[] = [
+  { value: 'cnh', label: 'CNH (Motorista)' },
+  { value: 'crlv', label: 'CRLV (Veículo)' },
+  { value: 'comp_residencia', label: 'Comprovante de Residência' },
+  { value: 'antt_motorista', label: 'ANTT (Motorista)' },
+  { value: 'outros', label: 'Outros' },
+];
+
 interface DocumentUploadProps {
   orderId?: string;
   quoteId?: string;
   orderStage?: OrderStage;
   financialContext?: 'carrier_payment';
+  /** Quando true, exibe apenas tipos Doc-Mot (CNH, CRLV, comp.res., ANTT) */
+  docMotContext?: boolean;
   /** Quando true, filtra CNH/CRLV/comp.res./ANTT do seletor (docs herdados da viagem) */
   driverDocsInherited?: boolean;
   onSuccess?: () => void;
@@ -110,10 +121,13 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
   ],
 };
 
-// Tipos de documento para pagamento do carreteiro
+// Tipos de documento para pagamento/custos do carreteiro (aba Carreteiro)
 const CARRIER_PAYMENT_DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
   { value: 'adiantamento_carreteiro', label: 'Adiantamento (Carreteiro)' },
   { value: 'saldo_carreteiro', label: 'Saldo (Carreteiro)' },
+  { value: 'doc_rota', label: 'Documento de Rota' },
+  { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
+  { value: 'comprovante_descarga', label: 'Comprovante Descarga' },
   { value: 'outros', label: 'Outros' },
 ];
 
@@ -129,6 +143,7 @@ const DOCUMENT_TYPE_TO_ORDER_FIELD: Record<string, keyof Order | null> = {
   analise_gr: 'has_analise_gr',
   doc_rota: 'has_doc_rota',
   comprovante_vpo: 'has_vpo',
+  comprovante_descarga: 'has_comprovante_descarga',
   pod: 'has_pod',
   outros: null,
 };
@@ -140,6 +155,7 @@ export function DocumentUpload({
   quoteId,
   orderStage,
   financialContext,
+  docMotContext,
   driverDocsInherited,
   onSuccess,
   onCarrierPaymentDocCreated,
@@ -155,18 +171,24 @@ export function DocumentUpload({
     { value: 'outros', label: 'Outros' },
   ];
 
-  // Pega os tipos disponíveis: carrier payment, cotação ou ordem (por estágio)
+  // Pega os tipos disponíveis: doc_mot, carrier payment, cotação ou ordem (por estágio)
   let availableTypes =
-    financialContext === 'carrier_payment'
-      ? CARRIER_PAYMENT_DOCUMENT_TYPES
-      : quoteId && !orderId
-        ? QUOTE_DOCUMENT_TYPES
-        : orderStage
-          ? DOCUMENT_TYPES_BY_STAGE[orderStage]
-          : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
+    docMotContext
+      ? DOC_MOT_TYPES
+      : financialContext === 'carrier_payment'
+        ? CARRIER_PAYMENT_DOCUMENT_TYPES
+        : quoteId && !orderId
+          ? QUOTE_DOCUMENT_TYPES
+          : orderStage
+            ? DOCUMENT_TYPES_BY_STAGE[orderStage]
+            : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
 
+  // Na aba Docs, remover tipos Doc-Mot (CNH, CRLV, etc.) — estão na aba Doc-Mot
+  if (!docMotContext && !financialContext && orderId) {
+    availableTypes = availableTypes.filter((t) => !DRIVER_DOC_TYPES.includes(t.value));
+  }
   // Quando docs do motorista foram herdados da viagem, remove do seletor
-  if (driverDocsInherited && orderId && financialContext !== 'carrier_payment') {
+  if (driverDocsInherited && orderId && financialContext !== 'carrier_payment' && !docMotContext) {
     availableTypes = availableTypes.filter((t) => !DRIVER_DOC_TYPES.includes(t.value));
   }
 

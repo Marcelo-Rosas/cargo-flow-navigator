@@ -21,9 +21,13 @@ import {
 type Document = Database['public']['Tables']['documents']['Row'];
 type DocumentType = Database['public']['Enums']['document_type'];
 
+const DOC_MOT_TYPES: DocumentType[] = ['cnh', 'crlv', 'comp_residencia', 'antt_motorista', 'outros'];
+
 interface DocumentListProps {
   orderId?: string;
   quoteId?: string;
+  /** Quando true, exibe apenas docs Doc-Mot (CNH, CRLV, etc.) */
+  docMotFilter?: boolean;
 }
 
 const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
@@ -39,6 +43,7 @@ const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
   analise_gr: { label: 'Análise GR', color: 'bg-amber-500/10 text-amber-600' },
   doc_rota: { label: 'Doc. Rota', color: 'bg-violet-500/10 text-violet-600' },
   comprovante_vpo: { label: 'VPO', color: 'bg-teal-500/10 text-teal-600' },
+  comprovante_descarga: { label: 'Comp. Descarga', color: 'bg-amber-500/10 text-amber-600' },
   adiantamento_carreteiro: {
     label: 'Adiant. Carreteiro',
     color: 'bg-orange-500/10 text-orange-600',
@@ -47,10 +52,13 @@ const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
   outros: { label: 'Outros', color: 'bg-muted text-muted-foreground' },
 };
 
-export function DocumentList({ orderId, quoteId }: DocumentListProps) {
+export function DocumentList({ orderId, quoteId, docMotFilter }: DocumentListProps) {
   const byOrder = useDocumentsByOrder(orderId || '');
   const byQuote = useDocumentsByQuote(quoteId || '');
-  const { data: documents, isLoading } = quoteId ? byQuote : byOrder;
+  const { data: rawDocuments, isLoading } = quoteId ? byQuote : byOrder;
+  const documents = docMotFilter
+    ? (rawDocuments ?? []).filter((d) => DOC_MOT_TYPES.includes(d.type))
+    : rawDocuments ?? [];
   const deleteDocumentMutation = useDeleteDocument();
 
   const handleDelete = async (doc: Document) => {

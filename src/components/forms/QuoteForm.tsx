@@ -56,6 +56,14 @@ import {
   AdditionalFeesSelection,
   defaultAdditionalFeesSelection,
 } from '@/components/quotes/AdditionalFeesSection';
+import {
+  UnloadingCostSection,
+  type UnloadingCostItem,
+} from '@/components/quotes/UnloadingCostSection';
+import {
+  EquipmentRentalSection,
+  type EquipmentRentalItem,
+} from '@/components/quotes/EquipmentRentalSection';
 import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { useAuth } from '@/hooks/useAuth';
@@ -195,6 +203,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const [additionalFeesSelection, setAdditionalFeesSelection] = useState<AdditionalFeesSelection>(
     defaultAdditionalFeesSelection
   );
+  const [unloadingCostItems, setUnloadingCostItems] = useState<UnloadingCostItem[]>([]);
+  const [equipmentRentalItems, setEquipmentRentalItems] = useState<EquipmentRentalItem[]>([]);
 
   const form = useForm<QuoteFormData>({
     resolver: zodResolver(quoteSchema),
@@ -466,11 +476,18 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
           waitingTimeHours: bd.meta.waitingTimeHours ?? 0,
           waitingTimeCost: bd.components?.waitingTimeCost ?? 0,
         });
-        // Restore toll plazas from saved breakdown
         setTollPlazas(bd.meta.tollPlazas ?? []);
+        const meta = bd.meta as {
+          unloadingCost?: UnloadingCostItem[];
+          equipmentRental?: EquipmentRentalItem[];
+        };
+        setUnloadingCostItems(meta.unloadingCost ?? []);
+        setEquipmentRentalItems(meta.equipmentRental ?? []);
       } else {
         setAdditionalFeesSelection(defaultAdditionalFeesSelection);
         setTollPlazas([]);
+        setUnloadingCostItems([]);
+        setEquipmentRentalItems([]);
       }
 
       const quoteWeightKg = Number(quote.weight) || 0;
@@ -510,6 +527,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     } else {
       setAdditionalFeesSelection(defaultAdditionalFeesSelection);
       setTollPlazas([]);
+      setUnloadingCostItems([]);
+      setEquipmentRentalItems([]);
       form.reset({
         client_id: '',
         client_name: '',
@@ -759,6 +778,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
           waitingTimeCost: additionalFeesSelection.waitingTimeCost,
           waitingTimeHours: additionalFeesSelection.waitingTimeHours,
           waitingTimeEnabled: additionalFeesSelection.waitingTimeEnabled,
+          unloadingCostItems: unloadingCostItems.length > 0 ? unloadingCostItems : undefined,
+          equipmentRentalItems: equipmentRentalItems.length > 0 ? equipmentRentalItems : undefined,
         },
       });
 
@@ -1658,61 +1679,26 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="aluguel_maquinas"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Aluguel de Máquinas</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                            R$
-                          </span>
-                          <MaskedInput
-                            mask="currency"
-                            placeholder="0,00"
-                            className="pl-10"
-                            value={String(Math.round((field.value || 0) * 100))}
-                            onValueChange={(rawValue) =>
-                              field.onChange(parseInt(rawValue || '0', 10) / 100)
-                            }
-                            onBlur={field.onBlur}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="descarga"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Carga e Descarga</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                            R$
-                          </span>
-                          <MaskedInput
-                            mask="currency"
-                            placeholder="0,00"
-                            className="pl-10"
-                            value={String(Math.round((field.value || 0) * 100))}
-                            onValueChange={(rawValue) =>
-                              field.onChange(parseInt(rawValue || '0', 10) / 100)
-                            }
-                            onBlur={field.onBlur}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="col-span-2">
+                  <EquipmentRentalSection
+                    value={watchedAluguelMaquinas ?? 0}
+                    onChange={(total, items) => {
+                      form.setValue('aluguel_maquinas', total);
+                      setEquipmentRentalItems(items);
+                    }}
+                    initialItems={equipmentRentalItems}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <UnloadingCostSection
+                    value={watchedDescarga ?? 0}
+                    onChange={(total, items) => {
+                      form.setValue('descarga', total);
+                      setUnloadingCostItems(items);
+                    }}
+                    initialItems={unloadingCostItems}
+                  />
+                </div>
               </div>
 
               {/* NTC Taxes */}

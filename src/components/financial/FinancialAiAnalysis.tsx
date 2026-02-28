@@ -176,7 +176,11 @@ function InsightCard({ insight }: { insight: AiInsight }) {
           <ul className="space-y-1 pl-5">
             {insights.map((item, i) => (
               <li key={i} className="text-xs text-muted-foreground list-disc">
-                {typeof item === 'string' ? item : (item as any)?.description || JSON.stringify(item)}
+                {typeof item === 'string'
+                  ? item
+                  : typeof item === 'object' && item !== null && 'description' in item
+                    ? String((item as { description?: unknown }).description ?? JSON.stringify(item))
+                    : JSON.stringify(item)}
               </li>
             ))}
           </ul>

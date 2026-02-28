@@ -22,6 +22,7 @@ import {
   RefreshCw,
   XCircle,
   AlertCircle,
+  IdCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -655,6 +656,12 @@ export function OrderDetailModal({
                   </Badge>
                 )}
               </TabsTrigger>
+              {showDriverSection && (
+                <TabsTrigger value="doc_mot" className="gap-1.5">
+                  <IdCard className="w-3.5 h-3.5" />
+                  Doc-Mot
+                </TabsTrigger>
+              )}
               {showDriverSection && (
                 <TabsTrigger value="carreteiro" className="gap-1.5">
                   <DollarSign className="w-3.5 h-3.5" />
@@ -1304,6 +1311,41 @@ export function OrderDetailModal({
               {showDriverSection && (
                 <TabsContent value="carreteiro" className="m-0">
                   <CarreteiroTab order={order} canManage={canManage} />
+                </TabsContent>
+              )}
+
+              {showDriverSection && (
+                <TabsContent value="doc_mot" className="m-0 space-y-6">
+                  {canManage && (
+                    <>
+                      {order.trip_id &&
+                        order.has_cnh &&
+                        order.has_crlv &&
+                        order.has_comp_residencia &&
+                        order.has_antt_motorista && (
+                          <Alert>
+                            <AlertDescription>
+                              Documentação do motorista incluída na viagem.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      <DocumentUpload
+                        orderId={order.id}
+                        orderStage={order.stage}
+                        docMotContext
+                        driverDocsInherited={
+                          !!(
+                            order.trip_id &&
+                            order.has_cnh &&
+                            order.has_crlv &&
+                            order.has_comp_residencia &&
+                            order.has_antt_motorista
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                  <DocumentList orderId={order.id} docMotFilter />
                 </TabsContent>
               )}
 

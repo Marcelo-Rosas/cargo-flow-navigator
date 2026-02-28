@@ -18,6 +18,7 @@ export interface CalculateFreightInput {
   overhead_percent?: number;
   carreteiro_percent?: number;
   descarga_value?: number;
+  aluguel_maquinas_value?: number;
 }
 
 export interface FreightMeta {
@@ -50,6 +51,8 @@ export interface FreightComponents {
   waiting_time_cost: number;
   /** Provisão DAS por frete (colchão) */
   das_provision: number;
+  /** Aluguel de máquinas (empilhadeira, munck, etc.) */
+  aluguel_maquinas?: number;
 }
 
 export interface FreightRates {

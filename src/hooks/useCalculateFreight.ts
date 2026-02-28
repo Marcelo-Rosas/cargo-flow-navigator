@@ -84,6 +84,7 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
       conditionalFeesTotal: response.components.conditional_fees_total,
       waitingTimeCost: response.components.waiting_time_cost,
       dasProvision: response.components.das_provision,
+      aluguelMaquinas: response.components.aluguel_maquinas ?? 0,
     },
     rates: {
       dasPercent: response.rates.das_percent,
@@ -116,5 +117,97 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
     },
     conditionalFeesBreakdown: response.conditional_fees_breakdown,
     fallbacksApplied: response.fallbacks_applied,
+  };
+}
+
+/** Build StoredPricingBreakdown from Edge Function response, preserving meta.antt/tollPlazas from existing */
+export function buildStoredBreakdownFromEdgeResponse(
+  response: CalculateFreightResponse,
+  existingBreakdown: {
+    meta?: {
+      antt?: object;
+      tollPlazas?: unknown[];
+      selectedConditionalFeeIds?: string[];
+      unloadingCost?: unknown[];
+      equipmentRental?: unknown[];
+    };
+    components?: { aluguelMaquinas?: number };
+  } | null
+) {
+  const c = response.components;
+  const wKg = response.meta.billable_weight_kg ?? 0;
+  const cubKg = response.meta.cubage_weight_kg ?? 0;
+  const tonBillable = Math.round((wKg / 1000) * 100) / 100;
+  return {
+    calculatedAt: new Date().toISOString(),
+    version: '4.0-fob-lotacao-markup-scope',
+    status: response.status,
+    error: response.error,
+    meta: {
+      routeUfLabel: response.meta.route_uf_label,
+      kmBandLabel: response.meta.km_band_label,
+      kmStatus: response.meta.km_status,
+      marginStatus: response.meta.margin_status,
+      marginPercent: response.meta.margin_percent,
+      kmBandUsed: response.meta.km_band_used,
+      selectedConditionalFeeIds: existingBreakdown?.meta?.selectedConditionalFeeIds,
+      antt: existingBreakdown?.meta?.antt,
+      tollPlazas: existingBreakdown?.meta?.tollPlazas,
+      unloadingCost: existingBreakdown?.meta?.unloadingCost,
+      equipmentRental: existingBreakdown?.meta?.equipmentRental,
+    },
+    weights: {
+      cubageWeight: cubKg,
+      billableWeight: wKg,
+      tonBillable,
+    },
+    components: {
+      baseCost: c.base_cost,
+      baseFreight: c.base_freight,
+      toll: c.toll,
+      aluguelMaquinas: (c as { aluguel_maquinas?: number }).aluguel_maquinas ?? existingBreakdown?.components?.aluguelMaquinas ?? 0,
+      gris: c.gris,
+      tso: c.tso,
+      rctrc: c.rctrc,
+      adValorem: c.ad_valorem,
+      tde: c.tde,
+      tear: c.tear,
+      dispatchFee: c.dispatch_fee ?? 0,
+      conditionalFeesTotal: c.conditional_fees_total,
+      waitingTimeCost: c.waiting_time_cost,
+      dasProvision: c.das_provision,
+    },
+    totals: {
+      receitaBruta: response.totals.receita_bruta,
+      das: response.totals.das,
+      icms: response.totals.icms,
+      tacAdjustment: response.totals.tac_adjustment,
+      paymentAdjustment: response.totals.payment_adjustment,
+      totalImpostos: response.totals.total_impostos,
+      totalCliente: response.totals.total_cliente,
+    },
+    profitability: {
+      custosCarreteiro: response.profitability.custos_carreteiro,
+      custosDescarga: response.profitability.custos_descarga,
+      custosDiretos: response.profitability.custos_diretos,
+      margemBruta: response.profitability.margem_bruta,
+      overhead: response.profitability.overhead,
+      resultadoLiquido: response.profitability.resultado_liquido,
+      margemPercent: response.profitability.margem_percent,
+    },
+    rates: {
+      dasPercent: response.rates.das_percent,
+      icmsPercent: response.rates.icms_percent,
+      grisPercent: response.rates.gris_percent,
+      tsoPercent: response.rates.tso_percent,
+      costValuePercent: response.rates.cost_value_percent,
+      markupPercent: response.rates.markup_percent,
+      overheadPercent: response.rates.overhead_percent,
+      targetMarginPercent: 15,
+    },
+    conditionalFeesBreakdown:
+      Object.keys(response.conditional_fees_breakdown || {}).length > 0
+        ? response.conditional_fees_breakdown
+        : undefined,
   };
 }

@@ -67,6 +67,7 @@ export interface CalculateFreightInput {
   overhead_percent?: number;
   carreteiro_percent?: number;
   descarga_value?: number;
+  aluguel_maquinas_value?: number;
 }
 
 // ============================================
@@ -105,6 +106,8 @@ export interface FreightComponents {
   waiting_time_cost: number;
   /** Provisão DAS por frete = max(receita × das_provision_percent/100, das_provision_min_value) */
   das_provision: number;
+  /** Aluguel de máquinas (empilhadeira, munck, etc.) */
+  aluguel_maquinas: number;
 }
 
 export interface FreightRates {

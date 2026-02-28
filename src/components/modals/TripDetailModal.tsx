@@ -29,6 +29,12 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+/** Regra única: valor numérico (incl. 0) → R$ X,XX; null/undefined → "—" */
+function formatPivotCell(amount: number | null | undefined): string {
+  if (amount == null) return '—';
+  return formatCurrency(Number(amount));
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   pedagio: 'Pedágio',
   carreteiro: 'Carreteiro',
@@ -220,7 +226,7 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
           )}
 
           {/* Custos TRIP (rateados) */}
-          {tripCosts.length > 0 && (
+          {(tripCosts.length > 0 || (financialDetails && financialDetails.length > 0)) && (
             <div>
               <h4 className="font-semibold text-foreground mb-2">Custos da viagem (rateados)</h4>
               <div className="rounded-lg border overflow-hidden">
@@ -240,6 +246,19 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
                         </TableCell>
                       </TableRow>
                     ))}
+                    {financialDetails && financialDetails.length > 0 && (
+                      <TableRow>
+                        <TableCell>Carreteiro (real)</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(
+                            financialDetails.reduce(
+                              (acc, r) => acc + (r.carreteiro_real ?? 0),
+                              0
+                            )
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -284,34 +303,62 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
             </div>
           )}
 
-          {/* Custos OS (por ordem) */}
-          {osCosts.length > 0 && (
+          {/* Custos por OS (pivot: OS=linhas, Categoria=colunas) */}
+          {tripOrders && tripOrders.length > 0 && (
             <div>
               <h4 className="font-semibold text-foreground mb-2">Custos por OS</h4>
-              <div className="rounded-lg border overflow-hidden">
+              <div className="rounded-lg border overflow-hidden overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Categoria</TableHead>
                       <TableHead>OS</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-right">DAS</TableHead>
+                      <TableHead className="text-right">Descarga</TableHead>
+                      <TableHead className="text-right">GRIS</TableHead>
+                      <TableHead className="text-right">TSO</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {osCosts.map((c) => (
-                      <TableRow key={c.id}>
-                        <TableCell>{CATEGORY_LABELS[c.category] ?? c.category}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {c.order_id ? c.order_id.slice(0, 8) : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatCurrency(Number(c.amount))}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {(() => {
+                      const pivot = new Map<string, Record<string, number>>();
+                      for (const c of osCosts) {
+                        const oid = c.order_id ?? '';
+                        if (!oid) continue;
+                        if (!pivot.has(oid)) pivot.set(oid, {});
+                        const row = pivot.get(oid)!;
+                        const cat = (c.category ?? '').toLowerCase();
+                        row[cat] = Number(c.amount);
+                      }
+                      return tripOrders.map((to) => {
+                        const oid = to.order_id ?? '';
+                        const row = pivot.get(oid) ?? {};
+                        return (
+                          <TableRow key={to.id}>
+                            <TableCell className="font-mono">
+                              {to.order?.os_number ?? oid.slice(0, 8) ?? '—'}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatPivotCell(row['das'])}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatPivotCell(row['descarga'])}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatPivotCell(row['gris'])}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatPivotCell(row['tso'])}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                    })()}
                   </TableBody>
                 </Table>
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Valor numérico → R$ X,XX; sem valor → —
+              </p>
             </div>
           )}
         </div>

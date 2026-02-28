@@ -155,6 +155,7 @@ Deno.serve(async (req) => {
       FREIGHT_CONSTANTS.DEFAULT_OVERHEAD_PERCENT;
     const carreteiroPercent = input.carreteiro_percent ?? paramsMap.get('carreteiro_percent') ?? 0;
     const descargaValue = input.descarga_value ?? 0;
+    const aluguelMaquinasValue = input.aluguel_maquinas_value ?? 0;
 
     const correctionFactor = paramsMap.get('correction_factor_inctf') ?? 1.0;
 
@@ -651,7 +652,8 @@ Deno.serve(async (req) => {
       tear +
       dispatchFee +
       conditionalFeesTotal +
-      waitingTimeCost;
+      waitingTimeCost +
+      aluguelMaquinasValue;
 
     // =====================================================
     // APPLY TAC ADJUSTMENT (NTC 2.6: apenas sobre frete peso)
@@ -686,16 +688,17 @@ Deno.serve(async (req) => {
 
     // =====================================================
     // CALCULATE PROFITABILITY
-    // Margem Bruta = Total Cliente - Piso ANTT - Carga/Descarga - Provisionamento DAS
+    // Margem Bruta = Total Cliente - Custo Carreteiro (real) - Carga/Descarga - Provisionamento DAS
+    // Usa ntc_base (custo da tabela) em vez de Piso ANTT — evita prejuízo em cargas leves
     // Resultado Líquido = Margem Bruta - Overhead
     // Margem % = Resultado Líquido / Total Cliente
     // =====================================================
 
-    const custosCarreteiro = pisoAnttCarreteiro; // Piso ANTT substitui % sobre receita
+    const custosCarreteiro = ntc_base; // Custo real da tabela NTC (frete_peso + frete_valor + gris + tso + dispatch)
     const custosDescarga = descargaValue;
     const custosDiretos = custosCarreteiro + custosDescarga;
 
-    const margemBruta = totalCliente - pisoAnttCarreteiro - custosDescarga - das;
+    const margemBruta = totalCliente - custosCarreteiro - custosDescarga - das;
     const overhead = margemBruta * (overheadPercent / 100);
     const resultadoLiquido = margemBruta - overhead;
 
@@ -737,6 +740,7 @@ Deno.serve(async (req) => {
       conditional_fees_total: roundCurrency(conditionalFeesTotal),
       waiting_time_cost: roundCurrency(waitingTimeCost),
       das_provision: roundCurrency(das),
+      aluguel_maquinas: roundCurrency(aluguelMaquinasValue),
     };
 
     const rates: FreightRates = {

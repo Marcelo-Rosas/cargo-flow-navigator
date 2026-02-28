@@ -299,6 +299,8 @@ export function useRsKmByRoute(filter?: { month?: number | null; year?: number |
           `
           carreteiro_real,
           carreteiro_antt,
+          km_distance,
+          pricing_breakdown,
           origin,
           destination,
           created_at,
@@ -312,6 +314,8 @@ export function useRsKmByRoute(filter?: { month?: number | null; year?: number |
       type RawRow = {
         carreteiro_real: number | null;
         carreteiro_antt: number | null;
+        km_distance: number | null;
+        pricing_breakdown: unknown;
         origin: string;
         destination: string;
         created_at: string;
@@ -339,12 +343,21 @@ export function useRsKmByRoute(filter?: { month?: number | null; year?: number |
       for (const row of rows) {
         const carrReal = Number(row.carreteiro_real ?? 0);
         const carrAntt = Number(row.carreteiro_antt ?? 0);
-        const km = Number(row.quote?.km_distance ?? 0);
+        const km = extractDistanceKm({
+          quoteKmDistance: row.quote?.km_distance,
+          orderKmDistance: row.km_distance,
+          quotePricingBreakdown: row.quote?.pricing_breakdown,
+          orderPricingBreakdown: row.pricing_breakdown,
+        });
         if (km <= 0 || carrReal <= 0) continue;
 
         // Preferência: routeUfLabel salvo no breakdown; fallback: extrai UF de origin/destination
-        const bd = row.quote?.pricing_breakdown as StoredPricingBreakdown | null;
-        const route = bd?.meta?.routeUfLabel || formatRouteUf(row.origin, row.destination);
+        const route = extractRouteLabel({
+          origin: row.origin,
+          destination: row.destination,
+          quotePricingBreakdown: row.quote?.pricing_breakdown,
+          orderPricingBreakdown: row.pricing_breakdown,
+        });
         if (!route) continue; // Ignora linhas sem par UF identificável
 
         if (!grouped[route]) grouped[route] = { sumAntt: 0, sumReal: 0, count: 0 };
@@ -367,7 +380,72 @@ export function useRsKmByRoute(filter?: { month?: number | null; year?: number |
 }
 
 export interface RouteRsKmDetailed extends RouteRsKm {
+  avgRsKmPrevisto: number; // média R$/km previsto (custosCarreteiro do breakdown)
   quoteCount: number; // nº de cotações com km_distance nessa rota
+}
+
+function extractRouteLabel(input: {
+  origin: string;
+  destination: string;
+  quotePricingBreakdown?: unknown | null;
+  orderPricingBreakdown?: unknown | null;
+}) {
+  const quoteBd = input.quotePricingBreakdown as StoredPricingBreakdown | null;
+  const orderBd = input.orderPricingBreakdown as StoredPricingBreakdown | null;
+  return (
+    quoteBd?.meta?.routeUfLabel ||
+    orderBd?.meta?.routeUfLabel ||
+    formatRouteUf(input.origin, input.destination)
+  );
+}
+
+function extractDistanceKm(input: {
+  quoteKmDistance?: number | null;
+  orderKmDistance?: number | null;
+  quotePricingBreakdown?: unknown | null;
+  orderPricingBreakdown?: unknown | null;
+}) {
+  const quoteKm = Number(input.quoteKmDistance ?? 0);
+  if (quoteKm > 0) return quoteKm;
+
+  const orderKm = Number(input.orderKmDistance ?? 0);
+  if (orderKm > 0) return orderKm;
+
+  const quoteBd = input.quotePricingBreakdown as StoredPricingBreakdown | null;
+  const orderBd = input.orderPricingBreakdown as StoredPricingBreakdown | null;
+  const breakdownKm = Number(
+    quoteBd?.meta?.antt?.kmDistance ??
+      orderBd?.meta?.antt?.kmDistance ??
+      quoteBd?.meta?.kmBandUsed ??
+      orderBd?.meta?.kmBandUsed ??
+      0
+  );
+  if (breakdownKm > 0) return breakdownKm;
+
+  return 0;
+}
+
+function extractPrevistoCarreteiro(input: {
+  orderPricingBreakdown?: unknown | null;
+  quotePricingBreakdown?: unknown | null;
+  carreteiroAntt?: number | null;
+}) {
+  const orderBd = input.orderPricingBreakdown as StoredPricingBreakdown | null;
+  const quoteBd = input.quotePricingBreakdown as StoredPricingBreakdown | null;
+
+  const breakdownCarreteiro = Number(
+    orderBd?.profitability?.custosCarreteiro ??
+      quoteBd?.profitability?.custosCarreteiro ??
+      (orderBd?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
+      (quoteBd?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
+      0
+  );
+  if (breakdownCarreteiro > 0) return breakdownCarreteiro;
+
+  const antt = Number(input.carreteiroAntt ?? 0);
+  if (antt > 0) return antt;
+
+  return 0;
 }
 
 /** Versão estendida com contagem de cotações por rota — para a página de Relatórios.
@@ -416,7 +494,7 @@ export function useRsKmDetailedReport(filter?: { month?: number | null; year?: n
       const { data: ordersData, error } = await supabase
         .from('orders')
         .select(
-          `carreteiro_real, carreteiro_antt, origin, destination, created_at,
+          `carreteiro_real, carreteiro_antt, km_distance, pricing_breakdown, origin, destination, created_at,
            quote:quotes(km_distance, pricing_breakdown)`
         )
         .not('carreteiro_real', 'is', null);
@@ -426,6 +504,8 @@ export function useRsKmDetailedReport(filter?: { month?: number | null; year?: n
       type OrderRow = {
         carreteiro_real: number | null;
         carreteiro_antt: number | null;
+        km_distance: number | null;
+        pricing_breakdown: unknown;
         origin: string;
         destination: string;
         created_at: string;
@@ -442,20 +522,35 @@ export function useRsKmDetailedReport(filter?: { month?: number | null; year?: n
             })
           : allOrders;
 
-      const grouped: Record<string, { sumAntt: number; sumReal: number; count: number }> = {};
+      const grouped: Record<string, { sumAntt: number; sumPrevisto: number; sumReal: number; count: number }> = {};
       for (const row of orders) {
         const carrReal = Number(row.carreteiro_real ?? 0);
         const carrAntt = Number(row.carreteiro_antt ?? 0);
-        const km = Number(row.quote?.km_distance ?? 0);
+        const carrPrevisto = extractPrevistoCarreteiro({
+          orderPricingBreakdown: row.pricing_breakdown,
+          quotePricingBreakdown: row.quote?.pricing_breakdown,
+          carreteiroAntt: row.carreteiro_antt,
+        });
+        const km = extractDistanceKm({
+          quoteKmDistance: row.quote?.km_distance,
+          orderKmDistance: row.km_distance,
+          quotePricingBreakdown: row.quote?.pricing_breakdown,
+          orderPricingBreakdown: row.pricing_breakdown,
+        });
         if (km <= 0 || carrReal <= 0) continue;
 
-        const bd = row.quote?.pricing_breakdown as StoredPricingBreakdown | null;
-        const route = bd?.meta?.routeUfLabel || formatRouteUf(row.origin, row.destination);
+        const route = extractRouteLabel({
+          origin: row.origin,
+          destination: row.destination,
+          quotePricingBreakdown: row.quote?.pricing_breakdown,
+          orderPricingBreakdown: row.pricing_breakdown,
+        });
         if (!route) continue; // Ignora linhas sem par UF identificável
 
-        if (!grouped[route]) grouped[route] = { sumAntt: 0, sumReal: 0, count: 0 };
+        if (!grouped[route]) grouped[route] = { sumAntt: 0, sumPrevisto: 0, sumReal: 0, count: 0 };
         grouped[route].sumReal += carrReal / km;
         grouped[route].sumAntt += carrAntt > 0 ? carrAntt / km : 0;
+        grouped[route].sumPrevisto += carrPrevisto > 0 ? carrPrevisto / km : 0;
         grouped[route].count += 1;
       }
 
@@ -464,13 +559,15 @@ export function useRsKmDetailedReport(filter?: { month?: number | null; year?: n
 
       return Array.from(allRoutes)
         .map((route): RouteRsKmDetailed => {
-          const g = grouped[route] ?? { sumAntt: 0, sumReal: 0, count: 0 };
+          const g = grouped[route] ?? { sumAntt: 0, sumPrevisto: 0, sumReal: 0, count: 0 };
+          const avgRsKmPrevisto = g.count > 0 ? g.sumPrevisto / g.count : 0;
           const avgRsKmAntt = g.count > 0 ? g.sumAntt / g.count : 0;
           const avgRsKmReal = g.count > 0 ? g.sumReal / g.count : 0;
-          const delta = avgRsKmReal - avgRsKmAntt;
-          const deltaPercent = avgRsKmAntt > 0 ? (delta / avgRsKmAntt) * 100 : 0;
+          const delta = avgRsKmReal - avgRsKmPrevisto;
+          const deltaPercent = avgRsKmPrevisto > 0 ? (delta / avgRsKmPrevisto) * 100 : 0;
           return {
             route,
+            avgRsKmPrevisto,
             avgRsKmAntt,
             avgRsKmReal,
             delta,

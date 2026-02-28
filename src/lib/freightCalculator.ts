@@ -124,6 +124,10 @@ export interface FreightCalculationInput {
       total: number;
       breakdown?: Record<string, number>;
     };
+    /** Itens de carga/descarga (tabela unloading_cost_rates) para persistir em meta */
+    unloadingCostItems?: Array<{ id: string; name: string; code: string; quantity: number; unitValue: number; total: number }>;
+    /** Itens de aluguel de máquinas (tabela equipment_rental_rates) para persistir em meta */
+    equipmentRentalItems?: Array<{ id: string; name: string; code: string; selected: boolean; quantity: number; unitValue: number; total: number }>;
   };
 
   // Legacy overrides (backwards compat, pricingParams takes precedence)
@@ -240,6 +244,10 @@ export interface StoredPricingBreakdown {
     // Praças de pedágio retornadas pelo WebRouter
     tollPlazas?: TollPlaza[];
 
+    /** Itens de carga/descarga (tabela) para herança na OS */
+    unloadingCost?: Array<{ id: string; name: string; code: string; quantity: number; unitValue: number; total: number }>;
+    /** Itens de aluguel de máquinas (tabela) para herança na OS */
+    equipmentRental?: Array<{ id: string; name: string; code: string; selected: boolean; quantity: number; unitValue: number; total: number }>;
     // ANTT piso mínimo (memória de cálculo) - opcional
     antt?: {
       operationTable: 'A' | 'B' | 'C' | 'D';
@@ -691,6 +699,8 @@ export function buildStoredBreakdown(
       waitingTimeEnabled: input.extras?.waitingTimeEnabled,
       waitingTimeHours: input.extras?.waitingTimeHours,
       markupScope: output.rates.markupScope,
+      unloadingCost: input.extras?.unloadingCostItems,
+      equipmentRental: input.extras?.equipmentRentalItems,
     },
 
     weights: {

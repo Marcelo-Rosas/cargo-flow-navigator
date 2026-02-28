@@ -1,0 +1,136 @@
+ Análise de Lógica — ai-operational-agent
+
+  Visão Geral da Arquitetura
+
+  O ai-operational-agent é um orquestrador monolítico in-process (mesma estrutura do ai-financial-agent antes da
+  Priority 3). Ele gerencia 6 tipos de análise, chamando os workers diretamente como funções TypeScript — não via HTTP.
+
+  ---
+  Fluxo de Execução
+
+  POST /ai-operational-agent
+    │
+    ├─ 1. Budget check
+    │     └─ Exceção: regulatory_update sem body.analyzeContent → SKIP budget
+    │
+    ├─ 2. Cache check (apenas 3 tipos)
+    │     └─ Cacheable: driver_qualification, compliance_check, operational_insights
+    │     └─ stage_gate_validation, operational_report, regulatory_update → sem cache
+    │
+    ├─ 3. selectModel() + fetchPreviousInsights()
+    │
+    └─ 4. Route para worker:
+          ├─ driver_qualification      → driverQualificationWorker
+          ├─ stage_gate_validation     → stageGateWorker          (sem LLM)
+          ├─ compliance_check          → complianceCheckWorker
+          ├─ operational_report        → operationalReportWorker
+          ├─ regulatory_update         → regulatoryUpdateWorker    (scraper + LLM por artigo)
+          └─ operational_insights      → operationalInsightsWorker
+
+  ---
+  Cada Worker em Detalhe
+
+  1. driver_qualification → driverQualificationWorker
+
+  - Entrada: orderId (obrigatório)
+  - LLM: OpenAI gpt-4.1-mini
+  - Dados buscados: campos do motorista, veículo, proprietário, booleans de documentos (has_cnh, has_crlv,
+  has_comp_residencia, has_antt_motorista)
+  - Saída: risk_score (0–100), risk_flags, checklist, qualification_status
+  - Escrita no banco: upsert em driver_qualifications, insert em ai_insights (TTL 30 dias)
+  - Notificação: se risk_score < 70 → insere em notification_logs canal WhatsApp (motorista)
+
+  2. stage_gate_validation → stageGateWorker
+
+  - Entrada: orderId + targetStage
+  - LLM: Nenhum — 100% lógica de regras
+  - Fluxo de transições: ordem_criada → busca_motorista → documentacao → coleta_realizada → em_transito → entregue
+  (apenas sequencial, +1)
+  - Regras por estágio:
+    - documentacao: carreteiro_real > 0, CNH, CRLV, comp. residência, ANTT
+    - coleta_realizada: NF-e, CT-e, análise GR, doc. rota, VPO
+    - em_transito: warning se ETA ausente
+    - entregue: POD obrigatório
+  - Provider retornado: 'rules' (não LLM)
+  - Notificação: se bloqueado → notification_logs
+
+  3. compliance_check → complianceCheckWorker
+
+  - Entrada: orderId + checkType (pre_contratacao | pre_coleta | pre_entrega | auditoria_periodica)
+  - LLM: Anthropic (claude-sonnet-4) — único worker com Anthropic neste agente
+  - Fluxo híbrido: avaliação programática das regras primeiro → resultado enviado ao LLM para classificação e
+  contextualização
+  - Check types:
+    - pre_contratacao: CNH, CRLV, comp. residência, ANTT, TAG pedágio
+    - pre_coleta: NF-e, CT-e, MDF-e, GR, doc. rota, VPO + comparação carreteiro_real >= piso_antt
+    - pre_entrega: POD
+    - auditoria_periodica: todos combinados
+  - Escrita: compliance_checks, ai_insights (TTL 30 dias)
+  - Notificação: se há violations → notification_logs
+
+  4. operational_report → operationalReportWorker
+
+  - Entrada: reportType (daily | weekly)
+  - LLM: OpenAI gpt-4.1
+  - Janela de tempo: 24h (daily) ou 7 dias (weekly)
+  - Dados (paralelo): orders por estágio, criadas/concluídas no período, ocorrências, compliance_checks, order_documents
+   pendentes
+  - Escrita: operational_reports, notification_queue (canal 'both' = WhatsApp + email)
+
+  5. regulatory_update → regulatoryUpdateWorker
+
+  - LLM Budget: bypass quando body.analyzeContent é falsy
+  - Fontes: scrape de portalntc.org.br/noticias/ e /categoria/artigos-tecnicos/
+  - Deduplicação: verifica regulatory_updates.source_url antes de processar
+  - LLM: OpenAI por artigo (máx 10), sequencial (for loop, não paralelo)
+  - Escrita: regulatory_updates, notification_queue (WhatsApp se relevance_score >= 7)
+
+  6. operational_insights → operationalInsightsWorker
+
+  - LLM: OpenAI gpt-4.1-mini
+  - Dados (30 dias, paralelo): orders, occurrences, compliance_checks, driver_qualifications
+  - Métricas pré-calculadas: gargalos por estágio, tempo médio resolução ocorrências, top 5 rotas problemáticas, desvio
+  carreteiro real vs ANTT
+  - Cache: expires 24h
+  - Escrita: ai_insights
+
+  ---
+  Pontos de Atenção
+
+  ┌─────┬───────────────────────────────────────────────────────────────────────────────────┬───────────────────────┐
+  │  #  │                                     Problema                                      │        Impacto        │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────┤
+  │     │ Import errado — linha 1 usa @supabase/supabase-js (npm) em vez de                 │ Causa lockfile        │
+  │ 1   │ jsr:@supabase/supabase-js@2. Foi isso que gerou o deno.lock v5                    │ incompatível com      │
+  │     │                                                                                   │ Supabase CLI          │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────┤
+  │     │ Monolito in-process — igual ao ai-financial-agent pré-Priority 3. Todos os 6      │ Sem isolamento de     │
+  │ 2   │ workers rodam dentro de uma única Edge Function                                   │ falha; uma exceção    │
+  │     │                                                                                   │ derruba tudo          │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────┤
+  │ 3   │ Budget check para stage_gate_validation — esse worker nunca chama LLM, mas ainda  │ Latência adicional    │
+  │     │ passa pelo checkBudget() (DB call desnecessária)                                  │ (~50ms) sem benefício │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────┤
+  │     │ operationalInsightsWorker usa SYSTEM_PROMPT_DASHBOARD — reutiliza o mesmo prompt  │ Contexto do prompt é  │
+  │ 4   │ do dashboardInsightsWorker financeiro                                             │ financeiro, não       │
+  │     │                                                                                   │ operacional           │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────┤
+  │ 5   │ regulatoryUpdateWorker é sequencial — processa até 10 artigos em série com 1 LLM  │ Lentidão: 10x a       │
+  │     │ call cada                                                                         │ latência de 1 chamada │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────┤
+  │     │ model do orquestrador ignorado pelos workers — selectModel() retorna 'gpt-4.1'    │ Model routing         │
+  │ 6   │ para compliance_check, mas callLLM é chamado com modelHint: 'anthropic'. O        │ inoperante para os    │
+  │     │ parâmetro model é escrito no analysis._model mas não controla qual LLM é chamado  │ workers               │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────┤
+  │     │ Duas tabelas de notificação — driver_qualification e compliance_check escrevem em │ Fragmentação de       │
+  │ 7   │  notification_logs; operational_report e regulatory_update escrevem em            │ pipeline de           │
+  │     │ notification_queue                                                                │ notificações          │
+  ├─────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────┤
+  │     │ previousInsights buscado mas não passado — fetchPreviousInsights() é chamado para │ Contexto histórico    │
+  │ 8   │  todos, mas stageGateWorker e operationalReportWorker não aceitam esse parâmetro  │ perdido para 2        │
+  │     │ em seu WorkerContext                                                              │ workers               │
+  └─────┴───────────────────────────────────────────────────────────────────────────────────┴───────────────────────┘
+
+  ---
+  Qual é o foco que você quer trabalhar? Posso propor melhorias similares ao que foi feito no ai-financial-agent
+  (Priorities 1–3), ou atacar pontos específicos.

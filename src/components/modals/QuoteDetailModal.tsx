@@ -20,6 +20,7 @@ import {
   FileText,
   Loader2,
   Landmark,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,11 +35,16 @@ import {
   AdditionalFeesSelection,
   defaultAdditionalFeesSelection,
 } from '@/components/quotes/AdditionalFeesSection';
-import type { Database } from '@/integrations/supabase/types';
+import type { Database, Json } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
 import { usePricingParameter, useConditionalFees, usePaymentTerms } from '@/hooks/usePricingRules';
 import { useUpdateQuote } from '@/hooks/useQuotes';
+import {
+  useCalculateFreight,
+  buildStoredBreakdownFromEdgeResponse,
+} from '@/hooks/useCalculateFreight';
+import type { CalculateFreightInput } from '@/types/freight';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { supabase } from '@/integrations/supabase/client';
@@ -108,6 +114,7 @@ export function QuoteDetailModal({
   }, [quote?.id, quote?.payment_term_id]);
   const queryClient = useQueryClient();
   const updateQuoteMutation = useUpdateQuote();
+  const calculateFreightMutation = useCalculateFreight();
 
   // Initialize additional fees selection from breakdown
   const getInitialFeesSelection = useCallback((): AdditionalFeesSelection => {
@@ -437,6 +444,55 @@ export function QuoteDetailModal({
     }
   };
 
+  const handleRecalcular = async () => {
+    if (!quote) return;
+    const bd = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+    const weightKg = Number(quote.weight) || 0;
+    const volumeM3 = Number(quote.volume) || 0;
+    if (weightKg <= 0 && volumeM3 <= 0) {
+      toast.error('Peso ou volume obrigatório para recalcular');
+      return;
+    }
+    const payload: CalculateFreightInput = {
+      origin: quote.origin,
+      destination: quote.destination,
+      km_distance: Number(quote.km_distance) || 0,
+      weight_kg: weightKg > 0 ? weightKg : 1,
+      volume_m3: volumeM3,
+      cargo_value: Number(quote.cargo_value) || 0,
+      toll_value: Number(quote.toll_value ?? bd?.components?.toll ?? 0),
+      price_table_id: quote.price_table_id ?? undefined,
+      vehicle_type_code: (vehicleType as { code?: string } | null)?.code,
+      payment_term_code: (paymentTerm as { code?: string } | null)?.code ?? 'D30',
+      descarga_value: bd?.profitability?.custosDescarga ?? 0,
+      aluguel_maquinas_value: bd?.components?.aluguelMaquinas ?? 0,
+      conditional_fees:
+        conditionalFeesData && bd?.meta?.selectedConditionalFeeIds?.length
+          ? (bd.meta.selectedConditionalFeeIds as string[])
+              .map((id) => conditionalFeesData.find((f) => f.id === id)?.code)
+              .filter((c): c is string => !!c)
+          : undefined,
+      waiting_hours: bd?.meta?.waitingTimeHours ?? undefined,
+    };
+    try {
+      const response = await calculateFreightMutation.mutateAsync(payload);
+      const newBreakdown = buildStoredBreakdownFromEdgeResponse(response, bd);
+      await updateQuoteMutation.mutateAsync({
+        id: quote.id,
+        updates: {
+          pricing_breakdown: newBreakdown as unknown as Json,
+          value: response.totals.total_cliente,
+        },
+      });
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      toast.success('Memória de cálculo recalculada com sucesso');
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : 'Erro ao recalcular. Verifique os dados da cotação.'
+      );
+    }
+  };
+
   const handleConvertToFAT = async () => {
     if (!quote) return;
     setIsConvertingToFat(true);
@@ -519,9 +575,30 @@ export function QuoteDetailModal({
                   </>
                 )}
                 {canManage && (
-                  <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)}>
-                    <Pencil className="w-4 h-4" />
-                  </Button>
+                  <>
+                    {breakdown && quote?.price_table_id && quote?.km_distance && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRecalcular}
+                        disabled={
+                          calculateFreightMutation.isPending || updateQuoteMutation.isPending
+                        }
+                        className="gap-1.5"
+                        title="Recalcular memória de cálculo (usa custo real da tabela)"
+                      >
+                        {calculateFreightMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        )}
+                        Recalcular
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

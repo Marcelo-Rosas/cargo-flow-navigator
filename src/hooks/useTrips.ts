@@ -223,6 +223,35 @@ export function useLinkOrderToTrip() {
       queryClient.invalidateQueries({ queryKey: ['trips'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+    },
+  });
+}
+
+export function useLinkOrderToTargetTrip() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      orderId,
+      tripId,
+    }: {
+      orderId: string;
+      tripId: string;
+    }) => {
+      const { data, error } = await supabase.rpc('link_order_to_target_trip', {
+        p_order_id: orderId,
+        p_trip_id: tripId,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['trip_cost_items'] });
     },
   });
 }

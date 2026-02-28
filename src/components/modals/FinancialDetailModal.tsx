@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   MapPin,
   DollarSign,
@@ -9,12 +10,24 @@ import {
   Route,
   Landmark,
   Building2,
+  Link2,
+  Loader2,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { FinancialKanbanRow } from '@/types/financial';
 import { FinancialAiAnalysis } from '@/components/financial/FinancialAiAnalysis';
+import { useTrips, useLinkOrderToTargetTrip } from '@/hooks/useTrips';
+import { toast } from 'sonner';
 
 interface FinancialDetailModalProps {
   open: boolean;
@@ -39,7 +52,38 @@ function formatDate(dateStr: string | null | undefined) {
 }
 
 export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModalProps) {
+  const { data: trips } = useTrips();
+  const linkOrderToTargetTripMutation = useLinkOrderToTargetTrip();
+  const [selectedTripId, setSelectedTripId] = useState<string>('');
+
   if (!doc) return null;
+
+  const orderId =
+    doc.type === 'PAG' && doc.source_type === 'order' && doc.source_id
+      ? (doc.source_id as string)
+      : null;
+  const canLinkToTrip = !!orderId;
+  const linkableTrips =
+    trips?.filter((t) =>
+      ['aberta', 'em_transito'].includes(t.status_operational ?? '')
+    ) ?? [];
+
+  const handleLinkToTrip = () => {
+    if (!orderId || !selectedTripId) return;
+    linkOrderToTargetTripMutation.mutate(
+      { orderId, tripId: selectedTripId },
+      {
+        onSuccess: () => {
+          toast.success('OS vinculada à Trip');
+          setSelectedTripId('');
+          onClose();
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : 'Erro ao vincular');
+        },
+      }
+    );
+  };
 
   const rawAmount =
     doc.type === 'PAG'
@@ -360,6 +404,51 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
                 <p className="font-semibold text-sm">
                   {doc.carreteiro_real != null ? formatCurrency(Number(doc.carreteiro_real)) : '—'}
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* PAG: Vincular à Trip */}
+          {canLinkToTrip && (
+            <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+              <h4 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                <Link2 className="w-4 h-4" />
+                Vincular à Trip
+              </h4>
+              {doc.trip_number && (
+                <p className="text-xs text-muted-foreground">
+                  Trip atual: <span className="font-mono font-medium">{doc.trip_number}</span>
+                </p>
+              )}
+              <div className="flex gap-2">
+                <Select
+                  value={selectedTripId}
+                  onValueChange={setSelectedTripId}
+                  disabled={linkOrderToTargetTripMutation.isPending}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Selecionar Trip (VG-xxx)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {linkableTrips.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.trip_number ?? t.id.slice(0, 8)}
+                        {t.driver?.name && ` — ${t.driver.name}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  onClick={handleLinkToTrip}
+                  disabled={!selectedTripId || linkOrderToTargetTripMutation.isPending}
+                >
+                  {linkOrderToTargetTripMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Vincular'
+                  )}
+                </Button>
               </div>
             </div>
           )}

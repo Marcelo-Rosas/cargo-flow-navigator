@@ -1,0 +1,10 @@
+Pontos de Atenção 
+
+Pontos de atenção
+
+  1. desvio_da_media_pct é calculado pelo LLM — o worker entrega avg e stdDev, mas não pré-calcula (margem_atual - avg)
+  / stdDev. Isso pode gerar inconsistência se o modelo interpretar diferente.
+  2. avgClientMargin é calculado localmente mas não é enviado como campo estruturado — vai embutido no texto do prompt
+  como string formatada, perdendo precisão numérica.
+  3. Sem normalização de rota — o benchmark de 30 cotações mistura todas as rotas. Uma cotação SP→AM vai comparar contra
+   a média de SP→SP, distorcendo o margem_vs_media.

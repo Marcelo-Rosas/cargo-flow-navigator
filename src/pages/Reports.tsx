@@ -87,11 +87,11 @@ export default function Reports() {
       : 0;
 
   const bestRoute = allWithReal
-    .filter((r) => r.avgRsKmAntt > 0)
+    .filter((r) => r.avgRsKmPrevisto > 0)
     .sort((a, b) => a.deltaPercent - b.deltaPercent)[0];
 
   const worstRoute = allWithReal
-    .filter((r) => r.avgRsKmAntt > 0)
+    .filter((r) => r.avgRsKmPrevisto > 0)
     .sort((a, b) => b.deltaPercent - a.deltaPercent)[0];
 
   return (
@@ -113,7 +113,7 @@ export default function Reports() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
-            Análise comparativa de custo R$/km — referência ANTT vs carreteiro real pago
+            Análise comparativa de custo R$/km — previsto da cotação vs carreteiro real pago
           </motion.p>
         </div>
         <motion.div
@@ -169,7 +169,7 @@ export default function Reports() {
               value={bestRoute ? bestRoute.route : '—'}
               subtitle={
                 bestRoute
-                  ? `${bestRoute.deltaPercent.toFixed(1)}% abaixo do ANTT`
+                  ? `${bestRoute.deltaPercent.toFixed(1)}% abaixo do previsto`
                   : 'Sem dados suficientes'
               }
               icon={TrendingDown}
@@ -181,7 +181,7 @@ export default function Reports() {
               value={worstRoute ? worstRoute.route : '—'}
               subtitle={
                 worstRoute
-                  ? `+${worstRoute.deltaPercent.toFixed(1)}% acima do ANTT`
+                  ? `+${worstRoute.deltaPercent.toFixed(1)}% acima do previsto`
                   : 'Sem dados suficientes'
               }
               icon={TrendingUp}
@@ -223,7 +223,8 @@ export default function Reports() {
                     <TableHead>Rota</TableHead>
                     <TableHead className="text-right">Cotações</TableHead>
                     <TableHead className="text-right">OS c/ real</TableHead>
-                    <TableHead className="text-right">ANTT R$/km</TableHead>
+                    <TableHead className="text-right">Previsto R$/km</TableHead>
+                    <TableHead className="text-right">ANTT R$/km (ref)</TableHead>
                     <TableHead className="text-right">Real R$/km</TableHead>
                     <TableHead className="text-right">Δ absoluto</TableHead>
                     <TableHead className="text-right">Δ%</TableHead>
@@ -231,6 +232,7 @@ export default function Reports() {
                 </TableHeader>
                 <TableBody>
                   {routes.map((row) => {
+                    const hasPrevisto = row.avgRsKmPrevisto > 0;
                     const hasAntt = row.avgRsKmAntt > 0;
                     const isAbove = row.deltaPercent > 0;
                     return (
@@ -243,13 +245,16 @@ export default function Reports() {
                           {row.count > 0 ? row.count : '—'}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
+                          {hasPrevisto ? `R$ ${row.avgRsKmPrevisto.toFixed(2)}` : '—'}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
                           {hasAntt ? `R$ ${row.avgRsKmAntt.toFixed(2)}` : '—'}
                         </TableCell>
                         <TableCell className="text-right">
                           {row.count > 0 ? `R$ ${row.avgRsKmReal.toFixed(2)}` : '—'}
                         </TableCell>
                         <TableCell className="text-right">
-                          {hasAntt && row.count > 0 ? (
+                          {hasPrevisto && row.count > 0 ? (
                             <span
                               className={cn(
                                 'text-sm font-medium',
@@ -263,7 +268,7 @@ export default function Reports() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {hasAntt && row.count > 0 ? (
+                          {hasPrevisto && row.count > 0 ? (
                             <Badge
                               variant={isAbove ? 'outline' : 'default'}
                               className={
