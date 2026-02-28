@@ -48,7 +48,10 @@ export function FinancialCard({ row, onEdit, canManageActions = true }: Financia
     transition,
   };
 
-  const rawAmount = row.total_amount ?? row.quote_value ?? row.order_value ?? 0;
+  const rawAmount =
+    row.type === 'PAG'
+      ? (row.carreteiro_real ?? row.total_amount ?? row.order_value ?? 0)
+      : (row.total_amount ?? row.quote_value ?? row.order_value ?? 0);
   const amount = Number(rawAmount);
   const name = (row.client_name ?? row.supplier_name ?? '—') as string;
   const dueDate = (row.next_due_date ?? row.due_date) as string | null | undefined;

@@ -25,6 +25,8 @@ interface OrderData {
   id: string;
   value: number | null;
   carreteiro_real: number | null;
+  pedagio_real: number | null;
+  descarga_real: number | null;
   stage: string;
 }
 
@@ -60,7 +62,7 @@ async function fetchQuoteData(sb: any, entityId: string): Promise<FetchQuoteResu
 
   const { data: order } = await sb
     .from('orders')
-    .select('id, value, carreteiro_real, stage')
+    .select('id, value, carreteiro_real, pedagio_real, descarga_real, stage')
     .eq('quote_id', entityId)
     .maybeSingle();
 
@@ -207,7 +209,10 @@ function calcRealProfitability(
 
   if (custoCarreteiro == null) return null;
 
-  const resultadoLiquidoReal = receitaBruta - custoCarreteiro;
+  const custosAdicionais =
+    (orderData.pedagio_real != null ? Number(orderData.pedagio_real) : 0) +
+    (orderData.descarga_real != null ? Number(orderData.descarga_real) : 0);
+  const resultadoLiquidoReal = receitaBruta - custoCarreteiro - custosAdicionais;
   const margemPercentReal = (resultadoLiquidoReal / receitaBruta) * 100;
 
   const predictedMargin =
@@ -219,6 +224,8 @@ function calcRealProfitability(
     resultado_liquido_real: resultadoLiquidoReal,
     margem_percent_real: margemPercentReal,
     is_reconciled: reconciliation?.is_reconciled ?? false,
+    pedagio_real: orderData.pedagio_real != null ? Number(orderData.pedagio_real) : undefined,
+    descarga_real: orderData.descarga_real != null ? Number(orderData.descarga_real) : undefined,
     ocorrencias: occurrences.length > 0 ? occurrences : undefined,
   };
 
@@ -299,6 +306,13 @@ function buildPrompt(
   if (realProfitability) {
     prompt += `\n\n--- Ordem de Servico Finalizada (Dados Reais) ---`;
     prompt += `\n**Custo Carreteiro (Real)**: R$ ${realProfitability.custo_carreteiro_real.toFixed(2)}`;
+    if (realProfitability.pedagio_real != null || realProfitability.descarga_real != null) {
+      prompt += `\n**Custos adicionais (previsto vs real)**:`;
+      if (realProfitability.pedagio_real != null)
+        prompt += `\n- Pedagogio real: R$ ${realProfitability.pedagio_real.toFixed(2)}`;
+      if (realProfitability.descarga_real != null)
+        prompt += `\n- Descarga real: R$ ${realProfitability.descarga_real.toFixed(2)}`;
+    }
     prompt += `\n**Resultado Liquido (Real)**: R$ ${realProfitability.resultado_liquido_real.toFixed(2)}`;
     prompt += `\n**Margem % Real**: ${realProfitability.margem_percent_real.toFixed(1)}%`;
     prompt += `\n**Status Conciliacao**: ${realProfitability.is_reconciled ? 'CONCILIADO (custo final confirmado por comprovante)' : 'PENDENTE (custo negociado, sem comprovante)'}`;

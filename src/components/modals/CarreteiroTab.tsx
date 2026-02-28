@@ -71,6 +71,40 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
     carreteiroRealCents.length > 0 ? Number(carreteiroRealCents) / 100 : null;
 
   const anttValue = order.carreteiro_antt != null ? Number(order.carreteiro_antt) : null;
+
+  // Custos reais (pedagio, descarga)
+  const pedagioPrevisto =
+    order.pricing_breakdown &&
+    typeof order.pricing_breakdown === 'object' &&
+    'components' in order.pricing_breakdown
+      ? Number(
+          (order.pricing_breakdown as { components?: { toll?: unknown } }).components?.toll ?? 0
+        )
+      : 0;
+  const descargaPrevisto =
+    order.pricing_breakdown &&
+    typeof order.pricing_breakdown === 'object' &&
+    'profitability' in order.pricing_breakdown
+      ? Number(
+          (order.pricing_breakdown as { profitability?: { custosDescarga?: unknown } })
+            .profitability?.custosDescarga ?? 0
+        )
+      : 0;
+  const [pedagioRealCents, setPedagioRealCents] = useState(
+    order.pedagio_real != null ? String(Math.round(Number(order.pedagio_real) * 100)) : ''
+  );
+  const [descargaRealCents, setDescargaRealCents] = useState(
+    order.descarga_real != null ? String(Math.round(Number(order.descarga_real) * 100)) : ''
+  );
+
+  useEffect(() => {
+    setPedagioRealCents(
+      order.pedagio_real != null ? String(Math.round(Number(order.pedagio_real) * 100)) : ''
+    );
+    setDescargaRealCents(
+      order.descarga_real != null ? String(Math.round(Number(order.descarga_real) * 100)) : ''
+    );
+  }, [order.pedagio_real, order.descarga_real]);
   const kmDistance = Number(order.km_distance ?? 0);
 
   const diff =
@@ -89,6 +123,20 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
       toast.success('Valor do carreteiro salvo');
     } catch {
       toast.error('Erro ao salvar valor do carreteiro');
+    }
+  };
+
+  const handleSaveCustosReais = async () => {
+    const pedagioReal = pedagioRealCents.length > 0 ? Number(pedagioRealCents) / 100 : null;
+    const descargaReal = descargaRealCents.length > 0 ? Number(descargaRealCents) / 100 : null;
+    try {
+      await updateOrderMutation.mutateAsync({
+        id: order.id,
+        updates: { pedagio_real: pedagioReal, descarga_real: descargaReal },
+      });
+      toast.success('Custos reais salvos');
+    } catch {
+      toast.error('Erro ao salvar custos reais');
     }
   };
 
@@ -353,6 +401,94 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
               Salvar
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* ── Custos reais (pedágio, descarga) ── */}
+      {(pedagioPrevisto > 0 || descargaPrevisto > 0 || canManage) && (
+        <div className="p-4 rounded-lg border border-border bg-muted/20">
+          <p className="text-sm font-semibold text-foreground mb-3">
+            Custos reais (previsto vs real)
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {pedagioPrevisto > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Pedágio</p>
+                <p className="text-sm">
+                  Previsto: {formatCurrency(pedagioPrevisto)}
+                  {order.pedagio_real != null && (
+                    <span className="ml-2 font-medium">
+                      Real: {formatCurrency(Number(order.pedagio_real))}
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+            {descargaPrevisto > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Descarga</p>
+                <p className="text-sm">
+                  Previsto: {formatCurrency(descargaPrevisto)}
+                  {order.descarga_real != null && (
+                    <span className="ml-2 font-medium">
+                      Real: {formatCurrency(Number(order.descarga_real))}
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
+          {canManage && (
+            <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-end gap-3">
+              <div className="min-w-[140px]">
+                <label className="text-xs text-muted-foreground block mb-1">
+                  Pedágio real (R$)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                    R$
+                  </span>
+                  <MaskedInput
+                    mask="currency"
+                    value={pedagioRealCents}
+                    onValueChange={(v) => setPedagioRealCents(v)}
+                    placeholder="0,00"
+                    className="h-9 pl-9"
+                  />
+                </div>
+              </div>
+              <div className="min-w-[140px]">
+                <label className="text-xs text-muted-foreground block mb-1">
+                  Descarga real (R$)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                    R$
+                  </span>
+                  <MaskedInput
+                    mask="currency"
+                    value={descargaRealCents}
+                    onValueChange={(v) => setDescargaRealCents(v)}
+                    placeholder="0,00"
+                    className="h-9 pl-9"
+                  />
+                </div>
+              </div>
+              <Button
+                size="default"
+                onClick={handleSaveCustosReais}
+                disabled={updateOrderMutation.isPending}
+                className="gap-2 h-9"
+              >
+                {updateOrderMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                Salvar
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

@@ -17,6 +17,8 @@ export interface RealProfitabilityMetrics {
   margem_percent_real: number;
   desvio_margem_prevista_real?: number;
   is_reconciled: boolean;
+  pedagio_real?: number;
+  descarga_real?: number;
   ocorrencias?: OccurrenceDetail[];
 }
 

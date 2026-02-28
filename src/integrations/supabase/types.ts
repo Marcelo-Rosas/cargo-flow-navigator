@@ -400,6 +400,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      equipment_rental_rates: {
+        Row: {
+          active: boolean;
+          code: string;
+          created_at: string;
+          id: string;
+          name: string;
+          unit: string;
+          updated_at: string;
+          valid_from: string | null;
+          valid_until: string | null;
+          value: number;
+        };
+        Insert: {
+          active?: boolean;
+          code: string;
+          created_at?: string;
+          id?: string;
+          name: string;
+          unit?: string;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          value?: number;
+        };
+        Update: {
+          active?: boolean;
+          code?: string;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          unit?: string;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          value?: number;
+        };
+        Relationships: [];
+      };
       financial_documents: {
         Row: {
           code: string | null;
@@ -762,6 +801,8 @@ export type Database = {
           carrier_payment_term_id: string | null;
           carreteiro_antt: number | null;
           carreteiro_real: number | null;
+          descarga_real: number | null;
+          pedagio_real: number | null;
           client_id: string | null;
           client_name: string;
           created_at: string;
@@ -826,6 +867,8 @@ export type Database = {
           carrier_payment_term_id?: string | null;
           carreteiro_antt?: number | null;
           carreteiro_real?: number | null;
+          descarga_real?: number | null;
+          pedagio_real?: number | null;
           client_id?: string | null;
           client_name: string;
           created_at?: string;
@@ -890,6 +933,8 @@ export type Database = {
           carrier_payment_term_id?: string | null;
           carreteiro_antt?: number | null;
           carreteiro_real?: number | null;
+          descarga_real?: number | null;
+          pedagio_real?: number | null;
           client_id?: string | null;
           client_name?: string;
           created_at?: string;
@@ -1919,6 +1964,45 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      unloading_cost_rates: {
+        Row: {
+          active: boolean;
+          code: string;
+          created_at: string;
+          id: string;
+          name: string;
+          unit: string;
+          updated_at: string;
+          valid_from: string | null;
+          valid_until: string | null;
+          value: number;
+        };
+        Insert: {
+          active?: boolean;
+          code: string;
+          created_at?: string;
+          id?: string;
+          name: string;
+          unit?: string;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          value?: number;
+        };
+        Update: {
+          active?: boolean;
+          code?: string;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          unit?: string;
+          updated_at?: string;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          value?: number;
+        };
+        Relationships: [];
       };
       user_roles: {
         Row: {

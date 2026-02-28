@@ -41,7 +41,10 @@ function formatDate(dateStr: string | null | undefined) {
 export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModalProps) {
   if (!doc) return null;
 
-  const rawAmount = doc.total_amount ?? doc.quote_value ?? doc.order_value ?? 0;
+  const rawAmount =
+    doc.type === 'PAG'
+      ? (doc.carreteiro_real ?? doc.total_amount ?? doc.order_value ?? 0)
+      : (doc.total_amount ?? doc.quote_value ?? doc.order_value ?? 0);
   const amount = Number(rawAmount);
   const name = (doc.client_name ?? doc.supplier_name ?? '—') as string;
   const dueDate = (doc.next_due_date ?? doc.due_date) as string | null | undefined;

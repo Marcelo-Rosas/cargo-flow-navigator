@@ -13,6 +13,7 @@ import {
 import { useTrip, useTripCostItems, useTripOrdersWithOrders } from '@/hooks/useTrips';
 import { useTripReconciliation } from '@/hooks/useReconciliation';
 import { useTripFinancialSummary } from '@/hooks/useTripFinancialSummary';
+import { useTripFinancialDetails } from '@/hooks/useTripFinancialDetails';
 import { cn } from '@/lib/utils';
 
 interface TripDetailModalProps {
@@ -50,6 +51,7 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
   const { data: tripOrders } = useTripOrdersWithOrders(tripId);
   const { data: reconciliation } = useTripReconciliation(tripId);
   const { data: summary } = useTripFinancialSummary(tripId);
+  const { data: financialDetails } = useTripFinancialDetails(tripId);
 
   if (!tripId) return null;
 
@@ -123,6 +125,67 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
                   </p>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Previsto vs Real por OS */}
+          {financialDetails && financialDetails.length > 0 && (
+            <div>
+              <h4 className="font-semibold text-foreground mb-2">Previsto vs Real por OS</h4>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>OS</TableHead>
+                      <TableHead className="text-right">Receita</TableHead>
+                      <TableHead className="text-right">Pedágio</TableHead>
+                      <TableHead className="text-right">Descarga</TableHead>
+                      <TableHead className="text-right">Carreteiro</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {financialDetails.map((row) => (
+                      <TableRow key={row.order_id}>
+                        <TableCell className="font-mono">{row.os_number ?? '—'}</TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(row.receita_real)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="text-muted-foreground">
+                            {formatCurrency(row.pedagio_previsto)}
+                          </span>
+                          {row.pedagio_real > 0 && (
+                            <span className="ml-1 font-medium">
+                              / {formatCurrency(row.pedagio_real)}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="text-muted-foreground">
+                            {formatCurrency(row.descarga_previsto)}
+                          </span>
+                          {row.descarga_real > 0 && (
+                            <span className="ml-1 font-medium">
+                              / {formatCurrency(row.descarga_real)}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="text-muted-foreground">
+                            {formatCurrency(row.carreteiro_previsto)}
+                          </span>
+                          {row.carreteiro_real > 0 && (
+                            <span className="ml-1 font-medium">
+                              / {formatCurrency(row.carreteiro_real)}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Formato: previsto / real</p>
             </div>
           )}
 

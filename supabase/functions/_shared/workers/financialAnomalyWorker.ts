@@ -48,11 +48,14 @@ interface SourceContext {
   shipperName?: string;
   carreteiroAntt?: number;
   carreteiroReal?: number;
+  pedagioReal?: number;
+  descargaReal?: number;
   breakdownTotalCliente?: number;
   breakdownReceitaBruta?: number;
   breakdownDas?: number;
   breakdownMargemPercent?: number;
   breakdownToll?: number;
+  breakdownCustosDescarga?: number;
 }
 
 function buildPrompt(
@@ -122,6 +125,20 @@ function buildPrompt(
     if (source.carreteiroAntt != null && source.carreteiroReal != null) {
       const diff = source.carreteiroReal - source.carreteiroAntt;
       prompt += `\n- Diferenca: R$ ${diff.toFixed(2)} (${diff > 0 ? 'ACIMA do piso' : 'dentro do piso'})`;
+    }
+  }
+
+  if (source.pedagioReal != null || source.descargaReal != null) {
+    prompt += `\n\n**Custos reais (previsto vs real)**:`;
+    if (source.breakdownToll != null || source.pedagioReal != null) {
+      const prev = source.breakdownToll ?? 0;
+      const real = source.pedagioReal ?? 0;
+      prompt += `\n- Pedagogio: Previsto R$ ${prev.toFixed(2)} / Real R$ ${real.toFixed(2)}`;
+    }
+    if (source.descargaReal != null || source.breakdownCustosDescarga != null) {
+      const prev = source.breakdownCustosDescarga ?? 0;
+      const real = source.descargaReal ?? 0;
+      prompt += `\n- Descarga: Previsto R$ ${prev.toFixed(2)} / Real R$ ${real.toFixed(2)}`;
     }
   }
 
@@ -197,14 +214,17 @@ async function fetchSourceContext(sb: any, doc: any): Promise<SourceContext> {
         ctx.breakdownReceitaBruta = bd.totals.receitaBruta;
         ctx.breakdownDas = bd.totals.das;
       }
-      if (bd?.profitability) ctx.breakdownMargemPercent = bd.profitability.margemPercent;
+      if (bd?.profitability) {
+        ctx.breakdownMargemPercent = bd.profitability.margemPercent;
+        ctx.breakdownCustosDescarga = bd.profitability.custosDescarga;
+      }
       if (bd?.components?.toll) ctx.breakdownToll = bd.components.toll;
     }
   } else if (doc.source_type === 'order' && doc.source_id) {
     const { data: o } = await sb
       .from('orders')
       .select(
-        'client_name, shipper_name, origin, destination, cargo_type, weight, km_distance, toll_value, freight_type, freight_modality, vehicle_type_id, payment_term_id, pricing_breakdown, carreteiro_antt, carreteiro_real'
+        'client_name, shipper_name, origin, destination, cargo_type, weight, km_distance, toll_value, freight_type, freight_modality, vehicle_type_id, payment_term_id, pricing_breakdown, carreteiro_antt, carreteiro_real, pedagio_real, descarga_real'
       )
       .eq('id', doc.source_id)
       .maybeSingle();
@@ -221,6 +241,8 @@ async function fetchSourceContext(sb: any, doc: any): Promise<SourceContext> {
       ctx.freightModality = o.freight_modality;
       ctx.carreteiroAntt = o.carreteiro_antt ? Number(o.carreteiro_antt) : undefined;
       ctx.carreteiroReal = o.carreteiro_real ? Number(o.carreteiro_real) : undefined;
+      ctx.pedagioReal = o.pedagio_real != null ? Number(o.pedagio_real) : undefined;
+      ctx.descargaReal = o.descarga_real != null ? Number(o.descarga_real) : undefined;
 
       if (o.vehicle_type_id) {
         const { data: vt } = await sb
@@ -249,7 +271,10 @@ async function fetchSourceContext(sb: any, doc: any): Promise<SourceContext> {
         ctx.breakdownReceitaBruta = bd.totals.receitaBruta;
         ctx.breakdownDas = bd.totals.das;
       }
-      if (bd?.profitability) ctx.breakdownMargemPercent = bd.profitability.margemPercent;
+      if (bd?.profitability) {
+        ctx.breakdownMargemPercent = bd.profitability.margemPercent;
+        ctx.breakdownCustosDescarga = bd.profitability.custosDescarga;
+      }
       if (bd?.components?.toll) ctx.breakdownToll = bd.components.toll;
     }
   }

@@ -40,7 +40,9 @@ Status margem: ${meta?.marginStatus || 'N/A'}`;
     if (data?.source_type === 'order') {
       const { data: order } = await sb
         .from('orders')
-        .select('os_number, client_name, origin, destination, value, driver_name')
+        .select(
+          'os_number, client_name, origin, destination, value, driver_name, carreteiro_real, pedagio_real, descarga_real, pricing_breakdown'
+        )
         .eq('id', data.source_id)
         .maybeSingle();
       if (order) {
@@ -50,6 +52,25 @@ Cliente: ${order.client_name}
 Rota: ${order.origin} -> ${order.destination}
 Valor: R$ ${Number(order.value || 0).toFixed(2)}
 Motorista: ${order.driver_name || 'Nao atribuido'}`;
+        if (order.carreteiro_real != null) {
+          contextInfo += `
+Carreteiro real: R$ ${Number(order.carreteiro_real).toFixed(2)}`;
+        }
+        const pb = order.pricing_breakdown as {
+          components?: { toll?: number };
+          profitability?: { custosDescarga?: number };
+        } | null;
+        if (order.pedagio_real != null || order.descarga_real != null) {
+          contextInfo += `\nPrevisto vs Real:`;
+          if (order.pedagio_real != null) {
+            const prevToll = pb?.components?.toll ?? 0;
+            contextInfo += `\n- Pedagogio: previsto R$ ${prevToll.toFixed(2)} / real R$ ${Number(order.pedagio_real).toFixed(2)}`;
+          }
+          if (order.descarga_real != null) {
+            const prevDesc = pb?.profitability?.custosDescarga ?? 0;
+            contextInfo += `\n- Descarga: previsto R$ ${prevDesc.toFixed(2)} / real R$ ${Number(order.descarga_real).toFixed(2)}`;
+          }
+        }
       }
     }
   }
