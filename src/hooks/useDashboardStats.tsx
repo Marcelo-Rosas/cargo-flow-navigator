@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { asDb, calcConversionRate, filterSupabaseRows } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
-import { StoredPricingBreakdown, formatRouteUf } from '@/lib/freightCalculator';
+import { StoredPricingBreakdown, formatRouteUf, ufFromCep } from '@/lib/freightCalculator';
 
 export interface TrendData {
   value: number;
@@ -387,17 +387,25 @@ export interface RouteRsKmDetailed extends RouteRsKm {
 function extractRouteLabel(input: {
   origin: string;
   destination: string;
+  origin_cep?: string | null;
+  destination_cep?: string | null;
   quotePricingBreakdown?: unknown | null;
   orderPricingBreakdown?: unknown | null;
-}) {
+}): string | null {
   const quoteBd = input.quotePricingBreakdown as StoredPricingBreakdown | null;
   const orderBd = input.orderPricingBreakdown as StoredPricingBreakdown | null;
-  return (
-    quoteBd?.meta?.routeUfLabel ||
-    orderBd?.meta?.routeUfLabel ||
-    formatRouteUf(input.origin, input.destination) ||
-    'Sem UF definida'
-  );
+
+  const fromBreakdown = quoteBd?.meta?.routeUfLabel || orderBd?.meta?.routeUfLabel;
+  if (fromBreakdown) return fromBreakdown;
+
+  const fromStrings = formatRouteUf(input.origin, input.destination);
+  if (fromStrings) return fromStrings;
+
+  const originUf = ufFromCep(input.origin_cep);
+  const destUf = ufFromCep(input.destination_cep);
+  if (originUf && destUf) return `${originUf}→${destUf}`;
+
+  return null;
 }
 
 function extractDistanceKm(input: {
@@ -466,7 +474,9 @@ export function useRsKmDetailedReport(filter?: {
       // Cotações com km_distance — para calcular quoteCount por rota
       let quotesQuery = supabase
         .from('quotes')
-        .select('km_distance, pricing_breakdown, origin, destination, created_at, vehicle_type_id')
+        .select(
+          'km_distance, pricing_breakdown, origin, destination, created_at, origin_cep, destination_cep, vehicle_type_id'
+        )
         .not('km_distance', 'is', null);
       if (vehicleTypeId) {
         quotesQuery = quotesQuery.eq('vehicle_type_id', vehicleTypeId);
@@ -479,6 +489,8 @@ export function useRsKmDetailedReport(filter?: {
         origin: string;
         destination: string;
         created_at: string;
+        origin_cep: string | null;
+        destination_cep: string | null;
         vehicle_type_id: string | null;
       };
       const allQuotes = filterSupabaseRows<QuoteRow>(quotesData);
@@ -495,8 +507,13 @@ export function useRsKmDetailedReport(filter?: {
       // Contagem de cotações por rota (apenas rotas com UF identificável)
       const quoteCountByRoute: Record<string, number> = {};
       for (const q of quotes) {
-        const bd = q.pricing_breakdown as StoredPricingBreakdown | null;
-        const route = bd?.meta?.routeUfLabel || formatRouteUf(q.origin, q.destination);
+        const route = extractRouteLabel({
+          origin: q.origin,
+          destination: q.destination,
+          origin_cep: q.origin_cep,
+          destination_cep: q.destination_cep,
+          quotePricingBreakdown: q.pricing_breakdown,
+        });
         if (!route) continue;
         quoteCountByRoute[route] = (quoteCountByRoute[route] || 0) + 1;
       }
@@ -505,8 +522,8 @@ export function useRsKmDetailedReport(filter?: {
       let ordersQuery = supabase
         .from('orders')
         .select(
-          `carreteiro_real, carreteiro_antt, km_distance, pricing_breakdown, origin, destination, created_at, vehicle_type_id,
-           quote:quotes(km_distance, pricing_breakdown, vehicle_type_id)`
+          `carreteiro_real, carreteiro_antt, km_distance, pricing_breakdown, origin, destination, created_at, origin_cep, destination_cep, vehicle_type_id,
+           quote:quotes(km_distance, pricing_breakdown, origin_cep, destination_cep, vehicle_type_id)`
         )
         .not('carreteiro_real', 'is', null);
       if (vehicleTypeId) {
@@ -524,10 +541,14 @@ export function useRsKmDetailedReport(filter?: {
         origin: string;
         destination: string;
         created_at: string;
+        origin_cep: string | null;
+        destination_cep: string | null;
         vehicle_type_id: string | null;
         quote: {
           km_distance: number | null;
           pricing_breakdown: unknown;
+          origin_cep: string | null;
+          destination_cep: string | null;
           vehicle_type_id: string | null;
         } | null;
       };
@@ -542,7 +563,10 @@ export function useRsKmDetailedReport(filter?: {
             })
           : allOrders;
 
-      const grouped: Record<string, { sumAntt: number; sumPrevisto: number; sumReal: number; count: number }> = {};
+      const grouped: Record<
+        string,
+        { sumAntt: number; sumPrevisto: number; sumReal: number; count: number }
+      > = {};
       for (const row of orders) {
         const carrReal = Number(row.carreteiro_real ?? 0);
         const carrAntt = Number(row.carreteiro_antt ?? 0);
@@ -562,6 +586,8 @@ export function useRsKmDetailedReport(filter?: {
         const route = extractRouteLabel({
           origin: row.origin,
           destination: row.destination,
+          origin_cep: row.origin_cep ?? row.quote?.origin_cep,
+          destination_cep: row.destination_cep ?? row.quote?.destination_cep,
           quotePricingBreakdown: row.quote?.pricing_breakdown,
           orderPricingBreakdown: row.pricing_breakdown,
         });

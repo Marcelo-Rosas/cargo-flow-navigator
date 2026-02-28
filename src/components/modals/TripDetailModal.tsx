@@ -59,6 +59,21 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
   const { data: summary } = useTripFinancialSummary(tripId);
   const { data: financialDetails } = useTripFinancialDetails(tripId);
 
+  const hasRealDetails = (financialDetails?.length ?? 0) > 0;
+  const receitaRealTotal =
+    financialDetails?.reduce((acc, row) => acc + Number(row.receita_real ?? 0), 0) ?? 0;
+  const custosDiretosRealTotal =
+    financialDetails?.reduce(
+      (acc, row) =>
+        acc +
+        Number(row.carreteiro_real ?? 0) +
+        Number(row.pedagio_real ?? 0) +
+        Number(row.descarga_real ?? 0),
+      0
+    ) ?? 0;
+  const margemReal = receitaRealTotal - custosDiretosRealTotal;
+  const margemRealPercent = receitaRealTotal > 0 ? (margemReal / receitaRealTotal) * 100 : null;
+
   if (!tripId) return null;
 
   const tripCosts = (costItems ?? []).filter((c) => c.scope === 'TRIP');
@@ -103,29 +118,47 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
               <h4 className="font-semibold text-foreground">Resumo financeiro</h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground text-xs">Receita</p>
-                  <p className="font-semibold">{formatCurrency(summary.receita_bruta)}</p>
+                  <p className="text-muted-foreground text-xs">
+                    Receita {hasRealDetails ? '(real)' : '(prevista)'}
+                  </p>
+                  <p className="font-semibold">
+                    {formatCurrency(hasRealDetails ? receitaRealTotal : summary.receita_bruta)}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Custos TRIP</p>
-                  <p className="font-semibold">{formatCurrency(summary.custos_trip)}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {hasRealDetails ? 'Custos diretos (real)' : 'Custos TRIP'}
+                  </p>
+                  <p className="font-semibold">
+                    {formatCurrency(hasRealDetails ? custosDiretosRealTotal : summary.custos_trip)}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Custos OS</p>
+                  <p className="text-muted-foreground text-xs">
+                    {hasRealDetails ? 'Custos previstos' : 'Custos OS'}
+                  </p>
                   <p className="font-semibold">{formatCurrency(summary.custos_os)}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Margem</p>
+                  <p className="text-muted-foreground text-xs">
+                    Margem {hasRealDetails ? '(real)' : '(prevista)'}
+                  </p>
                   <p
                     className={cn(
                       'font-semibold',
-                      summary.margem_bruta >= 0 ? 'text-success' : 'text-destructive'
+                      (hasRealDetails ? margemReal : summary.margem_bruta) >= 0
+                        ? 'text-success'
+                        : 'text-destructive'
                     )}
                   >
-                    {formatCurrency(summary.margem_bruta)}
-                    {summary.margem_percent != null && (
+                    {formatCurrency(hasRealDetails ? margemReal : summary.margem_bruta)}
+                    {(hasRealDetails ? margemRealPercent : summary.margem_percent) != null && (
                       <span className="text-muted-foreground text-xs ml-1">
-                        ({summary.margem_percent}%)
+                        (
+                        {Number(
+                          hasRealDetails ? margemRealPercent : summary.margem_percent
+                        ).toFixed(2)}
+                        %)
                       </span>
                     )}
                   </p>
@@ -251,10 +284,7 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
                         <TableCell>Carreteiro (real)</TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(
-                            financialDetails.reduce(
-                              (acc, r) => acc + (r.carreteiro_real ?? 0),
-                              0
-                            )
+                            financialDetails.reduce((acc, r) => acc + (r.carreteiro_real ?? 0), 0)
                           )}
                         </TableCell>
                       </TableRow>

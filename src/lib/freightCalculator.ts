@@ -125,9 +125,24 @@ export interface FreightCalculationInput {
       breakdown?: Record<string, number>;
     };
     /** Itens de carga/descarga (tabela unloading_cost_rates) para persistir em meta */
-    unloadingCostItems?: Array<{ id: string; name: string; code: string; quantity: number; unitValue: number; total: number }>;
+    unloadingCostItems?: Array<{
+      id: string;
+      name: string;
+      code: string;
+      quantity: number;
+      unitValue: number;
+      total: number;
+    }>;
     /** Itens de aluguel de máquinas (tabela equipment_rental_rates) para persistir em meta */
-    equipmentRentalItems?: Array<{ id: string; name: string; code: string; selected: boolean; quantity: number; unitValue: number; total: number }>;
+    equipmentRentalItems?: Array<{
+      id: string;
+      name: string;
+      code: string;
+      selected: boolean;
+      quantity: number;
+      unitValue: number;
+      total: number;
+    }>;
   };
 
   // Legacy overrides (backwards compat, pricingParams takes precedence)
@@ -245,9 +260,24 @@ export interface StoredPricingBreakdown {
     tollPlazas?: TollPlaza[];
 
     /** Itens de carga/descarga (tabela) para herança na OS */
-    unloadingCost?: Array<{ id: string; name: string; code: string; quantity: number; unitValue: number; total: number }>;
+    unloadingCost?: Array<{
+      id: string;
+      name: string;
+      code: string;
+      quantity: number;
+      unitValue: number;
+      total: number;
+    }>;
     /** Itens de aluguel de máquinas (tabela) para herança na OS */
-    equipmentRental?: Array<{ id: string; name: string; code: string; selected: boolean; quantity: number; unitValue: number; total: number }>;
+    equipmentRental?: Array<{
+      id: string;
+      name: string;
+      code: string;
+      selected: boolean;
+      quantity: number;
+      unitValue: number;
+      total: number;
+    }>;
     // ANTT piso mínimo (memória de cálculo) - opcional
     antt?: {
       operationTable: 'A' | 'B' | 'C' | 'D';
@@ -321,6 +351,47 @@ export interface StoredPricingBreakdown {
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
+
+const CEP_UF_RANGES = [
+  { uf: 'SP', min: 1000000, max: 19999999 },
+  { uf: 'RJ', min: 20000000, max: 28999999 },
+  { uf: 'ES', min: 29000000, max: 29999999 },
+  { uf: 'MG', min: 30000000, max: 39999999 },
+  { uf: 'BA', min: 40000000, max: 48999999 },
+  { uf: 'SE', min: 49000000, max: 49999999 },
+  { uf: 'PE', min: 50000000, max: 56999999 },
+  { uf: 'AL', min: 57000000, max: 57999999 },
+  { uf: 'PB', min: 58000000, max: 58999999 },
+  { uf: 'RN', min: 59000000, max: 59999999 },
+  { uf: 'CE', min: 60000000, max: 63999999 },
+  { uf: 'PI', min: 64000000, max: 64999999 },
+  { uf: 'MA', min: 65000000, max: 65999999 },
+  { uf: 'PA', min: 66000000, max: 68899999 },
+  { uf: 'AP', min: 68900000, max: 68999999 },
+  { uf: 'AM', min: 69000000, max: 69299999 },
+  { uf: 'RR', min: 69300000, max: 69399999 },
+  { uf: 'AM', min: 69400000, max: 69899999 },
+  { uf: 'AC', min: 69900000, max: 69999999 },
+  { uf: 'DF', min: 70000000, max: 72799999 },
+  { uf: 'GO', min: 72800000, max: 76799999 },
+  { uf: 'RO', min: 76800000, max: 76999999 },
+  { uf: 'TO', min: 77000000, max: 77999999 },
+  { uf: 'MT', min: 78000000, max: 78899999 },
+  { uf: 'MS', min: 79000000, max: 79999999 },
+  { uf: 'PR', min: 80000000, max: 87999999 },
+  { uf: 'SC', min: 88000000, max: 89999999 },
+  { uf: 'RS', min: 90000000, max: 99999999 },
+] as const;
+
+/** Extrai UF a partir de CEP de 8 digitos usando faixas dos Correios. */
+export function ufFromCep(cep: string | number | null | undefined): string | null {
+  if (!cep) return null;
+  const clean = String(cep).replace(/\D/g, '');
+  if (clean.length !== 8) return null;
+  const num = Number.parseInt(clean, 10);
+  const found = CEP_UF_RANGES.find((range) => num >= range.min && num <= range.max);
+  return found ? found.uf : null;
+}
 
 export function extractUf(location: string): string | null {
   if (!location) return null;
