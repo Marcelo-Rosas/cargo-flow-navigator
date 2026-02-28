@@ -7,10 +7,10 @@ type InvokeOptions = {
 };
 
 function getPublishableKey(): string | undefined {
-  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const key =
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
   return typeof key === 'string' && key.length > 0 ? key : undefined;
 }
-
 
 async function buildAuthHeaders(requireAuth: boolean): Promise<Record<string, string>> {
   const baseHeaders: Record<string, string> = {};
@@ -74,9 +74,9 @@ export async function invokeEdgeFunction<T>(
   if (error) {
     const parsedMessage = await (async () => {
       const context = (error as { context?: Response })?.context;
-      if (!context || typeof context.json !== 'function') return null;
+      if (!context) return null;
       try {
-        const payload = (await context.json()) as {
+        const payload = (await context.clone().json()) as {
           error?: string;
           message?: string;
           errors?: string[];
@@ -86,7 +86,12 @@ export async function invokeEdgeFunction<T>(
         }
         return payload?.error || payload?.message || null;
       } catch {
-        return null;
+        try {
+          const text = await context.clone().text();
+          return text || null;
+        } catch {
+          return null;
+        }
       }
     })();
 

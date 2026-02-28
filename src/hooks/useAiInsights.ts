@@ -73,6 +73,14 @@ export function useDashboardInsights() {
 /** Trigger AI analysis on demand */
 export function useRequestAiAnalysis() {
   const queryClient = useQueryClient();
+  const OPERATIONAL_TYPES = new Set([
+    'operational_insights',
+    'driver_qualification',
+    'stage_gate_validation',
+    'compliance_check',
+    'operational_report',
+    'regulatory_update',
+  ]);
 
   return useMutation({
     mutationFn: async ({
@@ -84,10 +92,31 @@ export function useRequestAiAnalysis() {
       entityId: string;
       entityType: string;
     }) => {
-      const data = await invokeEdgeFunction<{ error?: string }>('ai-financial-agent', {
-        body: { analysisType, entityId, entityType },
-      });
+      const primaryFnName = OPERATIONAL_TYPES.has(analysisType)
+        ? 'ai-operational-agent'
+        : 'ai-financial-agent';
 
+      let data: { error?: string; success?: boolean };
+      try {
+        data = await invokeEdgeFunction<{ error?: string; success?: boolean }>(primaryFnName, {
+          body: { analysisType, entityId, entityType },
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        const missingFn = /404|not found|function/i.test(message);
+        if (primaryFnName !== 'ai-financial-agent' && missingFn) {
+          data = await invokeEdgeFunction<{ error?: string; success?: boolean }>(
+            'ai-financial-agent',
+            {
+              body: { analysisType, entityId, entityType },
+            }
+          );
+        } else {
+          throw e;
+        }
+      }
+
+      if (data?.success === false && data?.error) throw new Error(data.error);
       if (data?.error) throw new Error(data.error);
       return data;
     },

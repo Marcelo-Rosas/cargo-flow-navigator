@@ -5,7 +5,11 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 // Types
 // ─────────────────────────────────────────────────────
 
-type AnalysisType = 'quote_profitability' | 'financial_anomaly' | 'approval_summary' | 'dashboard_insights';
+type AnalysisType =
+  | 'quote_profitability'
+  | 'financial_anomaly'
+  | 'approval_summary'
+  | 'dashboard_insights';
 
 interface RequestBody {
   analysisType: AnalysisType;
@@ -35,13 +39,23 @@ interface BudgetCheck {
   alert: boolean;
 }
 
+type DenoLike = {
+  env: { get(key: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
+const deno = (globalThis as unknown as { Deno: DenoLike }).Deno;
+
 // ─────────────────────────────────────────────────────
 // Pricing Constants (USD per 1M tokens)
 // ─────────────────────────────────────────────────────
 
-const MODEL_PRICING: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
-  'claude-sonnet-4-20250514': { input: 3, output: 15, cacheRead: 0.30, cacheWrite: 3.75 },
-  'claude-haiku-4-5-20250514': { input: 1, output: 5, cacheRead: 0.10, cacheWrite: 1.25 },
+const MODEL_PRICING: Record<
+  string,
+  { input: number; output: number; cacheRead: number; cacheWrite: number }
+> = {
+  'claude-sonnet-4-20250514': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+  'claude-haiku-4-5-20250514': { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
 };
 
 // ─────────────────────────────────────────────────────
@@ -76,7 +90,8 @@ function estimateCost(model: string, usage: ClaudeUsage): number {
   const inputCost = (usage.input_tokens / perMillion) * pricing.input;
   const outputCost = (usage.output_tokens / perMillion) * pricing.output;
   const cacheReadCost = ((usage.cache_read_input_tokens || 0) / perMillion) * pricing.cacheRead;
-  const cacheWriteCost = ((usage.cache_creation_input_tokens || 0) / perMillion) * pricing.cacheWrite;
+  const cacheWriteCost =
+    ((usage.cache_creation_input_tokens || 0) / perMillion) * pricing.cacheWrite;
 
   return inputCost + outputCost + cacheReadCost + cacheWriteCost;
 }
@@ -90,11 +105,25 @@ async function checkBudget(sb: SupabaseClient): Promise<BudgetCheck> {
     const { data, error } = await sb.rpc('check_ai_budget');
     if (error) {
       console.warn('Budget check failed, allowing by default:', error.message);
-      return { allowed: true, daily_remaining: 999, monthly_remaining: 999, daily_pct: 0, monthly_pct: 0, alert: false };
+      return {
+        allowed: true,
+        daily_remaining: 999,
+        monthly_remaining: 999,
+        daily_pct: 0,
+        monthly_pct: 0,
+        alert: false,
+      };
     }
     return data as BudgetCheck;
   } catch {
-    return { allowed: true, daily_remaining: 999, monthly_remaining: 999, daily_pct: 0, monthly_pct: 0, alert: false };
+    return {
+      allowed: true,
+      daily_remaining: 999,
+      monthly_remaining: 999,
+      daily_pct: 0,
+      monthly_pct: 0,
+      alert: false,
+    };
   }
 }
 
@@ -105,7 +134,7 @@ async function checkBudget(sb: SupabaseClient): Promise<BudgetCheck> {
 async function shouldSkipAi(
   sb: SupabaseClient,
   analysisType: AnalysisType,
-  entityId: string,
+  entityId: string
 ): Promise<{ skip: boolean; reason?: string }> {
   try {
     // Get threshold configs
@@ -127,7 +156,10 @@ async function shouldSkipAi(
         .eq('id', entityId)
         .maybeSingle();
       if (quote && Number(quote.value) < minValue) {
-        return { skip: true, reason: `Quote value R$ ${quote.value} below threshold R$ ${minValue}` };
+        return {
+          skip: true,
+          reason: `Quote value R$ ${quote.value} below threshold R$ ${minValue}`,
+        };
       }
     }
 
@@ -139,7 +171,10 @@ async function shouldSkipAi(
         .eq('id', entityId)
         .maybeSingle();
       if (doc && Number(doc.total_amount) < minValue) {
-        return { skip: true, reason: `Document value R$ ${doc.total_amount} below threshold R$ ${minValue}` };
+        return {
+          skip: true,
+          reason: `Document value R$ ${doc.total_amount} below threshold R$ ${minValue}`,
+        };
       }
     }
   } catch (e) {
@@ -157,7 +192,7 @@ async function getCachedInsight(
   sb: SupabaseClient,
   insightType: string,
   entityType: string | null,
-  entityId: string | null,
+  entityId: string | null
 ): Promise<Record<string, unknown> | null> {
   try {
     let query = sb
@@ -197,7 +232,7 @@ async function logUsage(
     entityId?: string;
     durationMs?: number;
     errorMessage?: string;
-  },
+  }
 ) {
   try {
     await sb.from('ai_usage_tracking').insert({
@@ -245,13 +280,13 @@ async function analyzeWithClaude(
   analysisType: AnalysisType,
   sb: SupabaseClient,
   entityType?: string,
-  entityId?: string,
+  entityId?: string
 ): Promise<{ text: string; usage: ClaudeUsage; model: string; costUsd: number }> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
   // Use AI Gateway URL if configured, otherwise direct to Anthropic
-  const baseUrl = Deno.env.get('AI_GATEWAY_URL') || 'https://api.anthropic.com';
+  const baseUrl = deno.env.get('AI_GATEWAY_URL') || 'https://api.anthropic.com';
 
   const maxRetries = 3;
   let lastError: Error | null = null;
@@ -287,11 +322,11 @@ async function analyzeWithClaude(
       // Handle rate limiting (429) with exponential backoff
       if (res.status === 429) {
         const retryAfter = res.headers.get('retry-after');
-        const waitMs = retryAfter
-          ? parseInt(retryAfter) * 1000
-          : Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+        const waitMs = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
 
-        console.warn(`Rate limited (429). Attempt ${attempt + 1}/${maxRetries}. Waiting ${waitMs}ms...`);
+        console.warn(
+          `Rate limited (429). Attempt ${attempt + 1}/${maxRetries}. Waiting ${waitMs}ms...`
+        );
 
         // Log rate limit event
         await logUsage(sb, {
@@ -345,7 +380,9 @@ async function analyzeWithClaude(
 
       if (attempt < maxRetries - 1 && !lastError.message.includes('ANTHROPIC_API_KEY')) {
         const waitMs = Math.pow(2, attempt) * 1000;
-        console.warn(`Attempt ${attempt + 1} failed: ${lastError.message}. Retrying in ${waitMs}ms...`);
+        console.warn(
+          `Attempt ${attempt + 1} failed: ${lastError.message}. Retrying in ${waitMs}ms...`
+        );
         await new Promise((resolve) => setTimeout(resolve, waitMs));
       }
     }
@@ -384,11 +421,7 @@ function parseAnalysisJson(text: string): Record<string, unknown> {
 
 async function analyzeQuoteProfitability(entityId: string, model: string, sb: SupabaseClient) {
   // Fetch quote with all pricing data
-  const { data: quote, error } = await sb
-    .from('quotes')
-    .select('*')
-    .eq('id', entityId)
-    .single();
+  const { data: quote, error } = await sb.from('quotes').select('*').eq('id', entityId).single();
 
   if (error || !quote) throw new Error(`Quote not found: ${entityId}`);
 
@@ -412,9 +445,10 @@ async function analyzeQuoteProfitability(entityId: string, model: string, sb: Su
     })
     .filter((m): m is number => m != null);
 
-  const avgMargin = historicalMargins.length > 0
-    ? historicalMargins.reduce((a, b) => a + b, 0) / historicalMargins.length
-    : null;
+  const avgMargin =
+    historicalMargins.length > 0
+      ? historicalMargins.reduce((a, b) => a + b, 0) / historicalMargins.length
+      : null;
 
   const prompt = `Analise a rentabilidade desta cotação de frete:
 
@@ -440,7 +474,14 @@ async function analyzeQuoteProfitability(entityId: string, model: string, sb: Su
 
 Avalie se esta cotação é rentável, se está acima ou abaixo da média, e se o preço está adequado em relação ao piso ANTT.`;
 
-  const result = await analyzeWithClaude(prompt, model, 'quote_profitability', sb, 'quote', entityId);
+  const result = await analyzeWithClaude(
+    prompt,
+    model,
+    'quote_profitability',
+    sb,
+    'quote',
+    entityId
+  );
   const analysisJson = parseAnalysisJson(result.text);
 
   // Enrich with model/cost metadata
@@ -479,9 +520,10 @@ async function analyzeFinancialAnomaly(entityId: string, model: string, sb: Supa
     .map((d: Record<string, unknown>) => Number(d.total_amount) || 0)
     .filter((a) => a > 0);
 
-  const avgAmount = historicalAmounts.length > 0
-    ? historicalAmounts.reduce((a, b) => a + b, 0) / historicalAmounts.length
-    : 0;
+  const avgAmount =
+    historicalAmounts.length > 0
+      ? historicalAmounts.reduce((a, b) => a + b, 0) / historicalAmounts.length
+      : 0;
   const maxAmount = historicalAmounts.length > 0 ? Math.max(...historicalAmounts) : 0;
   const minAmount = historicalAmounts.length > 0 ? Math.min(...historicalAmounts) : 0;
 
@@ -498,11 +540,18 @@ async function analyzeFinancialAnomaly(entityId: string, model: string, sb: Supa
 - Valor médio: R$ ${avgAmount.toFixed(2)}
 - Valor mínimo: R$ ${minAmount.toFixed(2)}
 - Valor máximo: R$ ${maxAmount.toFixed(2)}
-- Desvio do valor atual: ${avgAmount > 0 ? ((Number(doc.total_amount) - avgAmount) / avgAmount * 100).toFixed(1) : 'N/A'}%
+- Desvio do valor atual: ${avgAmount > 0 ? (((Number(doc.total_amount) - avgAmount) / avgAmount) * 100).toFixed(1) : 'N/A'}%
 
 Identifique se este documento apresenta anomalias (valor muito acima/abaixo da média, padrões incomuns).`;
 
-  const result = await analyzeWithClaude(prompt, model, 'financial_anomaly', sb, 'financial_document', entityId);
+  const result = await analyzeWithClaude(
+    prompt,
+    model,
+    'financial_anomaly',
+    sb,
+    'financial_document',
+    entityId
+  );
   const analysisJson = parseAnalysisJson(result.text);
   analysisJson._model = result.model;
   analysisJson._cost_usd = result.costUsd;
@@ -519,16 +568,17 @@ Identifique se este documento apresenta anomalias (valor muito acima/abaixo da m
   return analysisJson;
 }
 
-async function generateApprovalSummary(entityId: string, entityType: string, model: string, sb: SupabaseClient) {
+async function generateApprovalSummary(
+  entityId: string,
+  entityType: string,
+  model: string,
+  sb: SupabaseClient
+) {
   let entityData: Record<string, unknown> | null = null;
   let contextInfo = '';
 
   if (entityType === 'financial_document') {
-    const { data } = await sb
-      .from('financial_documents')
-      .select('*')
-      .eq('id', entityId)
-      .single();
+    const { data } = await sb.from('financial_documents').select('*').eq('id', entityId).single();
     entityData = data;
 
     if (data) {
@@ -576,7 +626,14 @@ ${contextInfo}
 
 Forneça um resumo claro e objetivo para que o gerente possa tomar uma decisão rápida de aprovar ou rejeitar. Inclua os principais riscos e a sua recomendação.`;
 
-  const result = await analyzeWithClaude(prompt, model, 'approval_summary', sb, entityType, entityId);
+  const result = await analyzeWithClaude(
+    prompt,
+    model,
+    'approval_summary',
+    sb,
+    entityType,
+    entityId
+  );
   const analysisJson = parseAnalysisJson(result.text);
   analysisJson._model = result.model;
   analysisJson._cost_usd = result.costUsd;
@@ -604,17 +661,19 @@ Forneça um resumo claro e objetivo para que o gerente possa tomar uma decisão 
 async function generateDashboardInsights(model: string, sb: SupabaseClient) {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [
-    { data: quotes },
-    { data: orders },
-    { data: financialDocs },
-    { count: pendingApprovals },
-  ] = await Promise.all([
-    sb.from('quotes').select('stage, value, created_at').gte('created_at', thirtyDaysAgo),
-    sb.from('orders').select('stage, value, created_at').gte('created_at', thirtyDaysAgo),
-    sb.from('financial_documents').select('type, status, total_amount, created_at').gte('created_at', thirtyDaysAgo),
-    sb.from('approval_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-  ]);
+  const [{ data: quotes }, { data: orders }, { data: financialDocs }, { count: pendingApprovals }] =
+    await Promise.all([
+      sb.from('quotes').select('stage, value, created_at').gte('created_at', thirtyDaysAgo),
+      sb.from('orders').select('stage, value, created_at').gte('created_at', thirtyDaysAgo),
+      sb
+        .from('financial_documents')
+        .select('type, status, total_amount, created_at')
+        .gte('created_at', thirtyDaysAgo),
+      sb
+        .from('approval_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending'),
+    ]);
 
   const quotesByStage: Record<string, number> = {};
   let totalQuoteValue = 0;
@@ -630,7 +689,7 @@ async function generateDashboardInsights(model: string, sb: SupabaseClient) {
 
   const totalQuotes = (quotes || []).length;
   const wonQuotes = quotesByStage['ganho'] || 0;
-  const conversionRate = totalQuotes > 0 ? (wonQuotes / totalQuotes * 100).toFixed(1) : '0';
+  const conversionRate = totalQuotes > 0 ? ((wonQuotes / totalQuotes) * 100).toFixed(1) : '0';
 
   let totalReceivable = 0;
   let totalPayable = 0;
@@ -672,7 +731,14 @@ Retorne um JSON com a estrutura:
   "summary": "..."
 }`;
 
-  const result = await analyzeWithClaude(prompt, model, 'dashboard_insights', sb, undefined, undefined);
+  const result = await analyzeWithClaude(
+    prompt,
+    model,
+    'dashboard_insights',
+    sb,
+    undefined,
+    undefined
+  );
   const analysisJson = parseAnalysisJson(result.text);
   analysisJson._model = result.model;
   analysisJson._cost_usd = result.costUsd;
@@ -693,17 +759,50 @@ Retorne um JSON com a estrutura:
 // HTTP Handler
 // ─────────────────────────────────────────────────────
 
-Deno.serve(async (req) => {
+deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  const sb = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  );
+  const supabaseUrl = deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const anonKey = deno.env.get('SUPABASE_ANON_KEY');
+  const authHeader = req.headers.get('authorization');
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return new Response(JSON.stringify({ error: 'Supabase env vars are not configured' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'content-type': 'application/json' },
+    });
+  }
+
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'content-type': 'application/json' },
+    });
+  }
+
+  const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+  const trustedServiceCall = bearerToken.length > 0 && bearerToken === serviceRoleKey;
+
+  if (!trustedServiceCall && anonKey) {
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { error: authError } = await authClient.auth.getUser();
+    if (authError) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'content-type': 'application/json' },
+      });
+    }
+  }
+
+  const sb = createClient(supabaseUrl, serviceRoleKey);
 
   try {
     if (req.method !== 'POST') {
@@ -743,23 +842,26 @@ Deno.serve(async (req) => {
         errorMessage: `Daily remaining: $${budget.daily_remaining.toFixed(4)}, Monthly remaining: $${budget.monthly_remaining.toFixed(4)}`,
       });
 
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'AI budget exceeded',
-        budget: {
-          daily_pct: budget.daily_pct,
-          monthly_pct: budget.monthly_pct,
-          alert: budget.alert,
-        },
-        fallback: {
-          risk: 'medio',
-          summary: 'Análise AI indisponível — budget excedido. Revisão manual recomendada.',
-          recommendation: 'Revisar manualmente',
-        },
-      }), {
-        status: 200, // Return 200 with fallback so callers don't break
-        headers: { ...corsHeaders, 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'AI budget exceeded',
+          budget: {
+            daily_pct: budget.daily_pct,
+            monthly_pct: budget.monthly_pct,
+            alert: budget.alert,
+          },
+          fallback: {
+            risk: 'medio',
+            summary: 'Análise AI indisponível — budget excedido. Revisão manual recomendada.',
+            recommendation: 'Revisar manualmente',
+          },
+        }),
+        {
+          status: 200, // Return 200 with fallback so callers don't break
+          headers: { ...corsHeaders, 'content-type': 'application/json' },
+        }
+      );
     }
 
     // 2. Smart triggering — skip AI for low-value entities
@@ -776,19 +878,22 @@ Deno.serve(async (req) => {
           errorMessage: skipCheck.reason,
         });
 
-        return new Response(JSON.stringify({
-          success: true,
-          skipped: true,
-          reason: skipCheck.reason,
-          analysis: {
-            risk: 'baixo',
-            summary: `Análise AI não necessária: ${skipCheck.reason}`,
-            recommendation: 'Valor dentro da faixa normal — aprovação automática sugerida.',
-          },
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'content-type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({
+            success: true,
+            skipped: true,
+            reason: skipCheck.reason,
+            analysis: {
+              risk: 'baixo',
+              summary: `Análise AI não necessária: ${skipCheck.reason}`,
+              recommendation: 'Valor dentro da faixa normal — aprovação automática sugerida.',
+            },
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'content-type': 'application/json' },
+          }
+        );
       }
     }
 
@@ -804,7 +909,7 @@ Deno.serve(async (req) => {
       sb,
       insightTypeMap[body.analysisType],
       body.entityType || null,
-      body.entityId || null,
+      body.entityId || null
     );
 
     if (cachedInsight) {
@@ -817,14 +922,17 @@ Deno.serve(async (req) => {
         entityId: body.entityId,
       });
 
-      return new Response(JSON.stringify({
-        success: true,
-        cached: true,
-        analysis: cachedInsight,
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          cached: true,
+          analysis: cachedInsight,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'content-type': 'application/json' },
+        }
+      );
     }
 
     // 4. Select model based on analysis type
@@ -847,20 +955,28 @@ Deno.serve(async (req) => {
         result = await generateDashboardInsights(model, sb);
         break;
       default:
-        return new Response(JSON.stringify({ error: `Unknown analysisType: ${body.analysisType}` }), {
-          status: 400,
-          headers: { ...corsHeaders, 'content-type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({ error: `Unknown analysisType: ${body.analysisType}` }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'content-type': 'application/json' },
+          }
+        );
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      analysis: result,
-      budget: budget.alert ? { alert: true, daily_pct: budget.daily_pct, monthly_pct: budget.monthly_pct } : undefined,
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'content-type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        analysis: result,
+        budget: budget.alert
+          ? { alert: true, daily_pct: budget.daily_pct, monthly_pct: budget.monthly_pct }
+          : undefined,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'content-type': 'application/json' },
+      }
+    );
   } catch (e) {
     console.error('ai-financial-agent error:', e);
 
