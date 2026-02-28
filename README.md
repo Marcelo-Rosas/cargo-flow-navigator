@@ -108,7 +108,7 @@ Acesse `http://localhost:5173`.
 
 - **Frontend**: conecte o repositório à Vercel e configure as variáveis de ambiente (`VITE_SUPABASE_*`).
 - **Backend**: Supabase Cloud; migrations via `supabase db push`.
-- **Edge Functions**: em produção, configure `ALLOWED_ORIGIN` (ou `ALLOWED_ORIGINS` para múltiplos) no Supabase Dashboard (Edge Functions → Secrets) com o domínio do app.
+- **Edge Functions**: em produção, configure `ALLOWED_ORIGIN` (ou `ALLOWED_ORIGINS` para múltiplos) no Supabase Dashboard (Edge Functions → Secrets) com o domínio do app. Suporta padrões com `*` (ex.: `https://*.vercel.app` para previews do Vercel).
 - **CI (GitHub Actions)**: para validar migrations no CI, configure o secret `SUPABASE_DB_URL` com o **Session pooler** (Supabase Dashboard → Connect → Session mode, porta 5432). Use o pooler para compatibilidade IPv4 no GitHub Actions.
 
 ## Contribuição

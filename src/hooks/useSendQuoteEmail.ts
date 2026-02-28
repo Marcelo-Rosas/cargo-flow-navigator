@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import { asDb, asInsert } from '@/lib/supabase-utils';
 import { toast } from 'sonner';
 
@@ -24,12 +25,11 @@ export function useSendQuoteEmail() {
       if (!token) throw new Error('Sessão expirada. Faça login novamente.');
 
       // 1. Send the email via Edge Function
-      const { data, error } = await supabase.functions.invoke('send-quote-email', {
+      const data = await invokeEdgeFunction<{ error?: string }>('send-quote-email', {
         body: { quoteId, recipientEmail, cc, bcc },
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
       // 2. After successful email, update quote: mark as sent + move to negociação

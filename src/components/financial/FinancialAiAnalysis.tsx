@@ -26,19 +26,22 @@ const RISK_CONFIG = {
     icon: ShieldCheck,
     label: 'Risco Baixo',
     variant: 'default' as const,
-    className: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800',
+    className:
+      'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800',
   },
   medio: {
     icon: ShieldQuestion,
     label: 'Risco Médio',
     variant: 'default' as const,
-    className: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+    className:
+      'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
   },
   alto: {
     icon: ShieldAlert,
     label: 'Risco Alto',
     variant: 'default' as const,
-    className: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+    className:
+      'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
   },
 } as const;
 
@@ -82,7 +85,7 @@ function InsightCard({ insight }: { insight: AiInsight }) {
   const recommendationDetail = analysis?.recommendation_detail || '';
   const summary = insight.summary_text || analysis?.summary || '';
   const details = analysis?.details || '';
-  const margin = analysis?.metrics?.margem_percent as number | undefined ?? analysis?.margin;
+  const margin = (analysis?.metrics?.margem_percent as number | undefined) ?? analysis?.margin;
   const confidenceScore = analysis?.confidence_score;
   const anomalyType = analysis?.anomaly_type;
   const urgencyLevel = analysis?.urgency_level;
@@ -103,7 +106,9 @@ function InsightCard({ insight }: { insight: AiInsight }) {
           {margin !== undefined && margin !== null && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <TrendingUp className="w-3 h-3" />
-              <span>Margem: <strong className="text-foreground">{Number(margin).toFixed(1)}%</strong></span>
+              <span>
+                Margem: <strong className="text-foreground">{Number(margin).toFixed(1)}%</strong>
+              </span>
             </div>
           )}
           {confidenceScore !== undefined && (
@@ -124,10 +129,16 @@ function InsightCard({ insight }: { insight: AiInsight }) {
             </Badge>
           )}
           {urgencyLevel && (
-            <Badge variant="outline" className={`text-[10px] ${
-              urgencyLevel === 'critica' || urgencyLevel === 'alta' ? 'border-red-300 text-red-600' :
-              urgencyLevel === 'media' ? 'border-amber-300 text-amber-600' : 'border-gray-300 text-gray-500'
-            }`}>
+            <Badge
+              variant="outline"
+              className={`text-[10px] ${
+                urgencyLevel === 'critica' || urgencyLevel === 'alta'
+                  ? 'border-red-300 text-red-600'
+                  : urgencyLevel === 'media'
+                    ? 'border-amber-300 text-amber-600'
+                    : 'border-gray-300 text-gray-500'
+              }`}
+            >
               Urgencia: {urgencyLevel}
             </Badge>
           )}
@@ -140,14 +151,10 @@ function InsightCard({ insight }: { insight: AiInsight }) {
       )}
 
       {/* Summary */}
-      {summary && (
-        <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>
-      )}
+      {summary && <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>}
 
       {/* Details */}
-      {details && (
-        <p className="text-xs text-muted-foreground/80 leading-relaxed">{details}</p>
-      )}
+      {details && <p className="text-xs text-muted-foreground/80 leading-relaxed">{details}</p>}
 
       {/* Checklist (for approvals) */}
       {checklist && checklist.length > 0 && (
@@ -156,9 +163,15 @@ function InsightCard({ insight }: { insight: AiInsight }) {
           <div className="space-y-1">
             {checklist.map((c, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${
-                  c.status === 'ok' ? 'bg-green-500' : c.status === 'alerta' ? 'bg-amber-500' : 'bg-red-500'
-                }`} />
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    c.status === 'ok'
+                      ? 'bg-green-500'
+                      : c.status === 'alerta'
+                        ? 'bg-amber-500'
+                        : 'bg-red-500'
+                  }`}
+                />
                 <span className="text-muted-foreground">{c.item}</span>
               </div>
             ))}
@@ -179,7 +192,9 @@ function InsightCard({ insight }: { insight: AiInsight }) {
                 {typeof item === 'string'
                   ? item
                   : typeof item === 'object' && item !== null && 'description' in item
-                    ? String((item as { description?: unknown }).description ?? JSON.stringify(item))
+                    ? String(
+                        (item as { description?: unknown }).description ?? JSON.stringify(item)
+                      )
                     : JSON.stringify(item)}
               </li>
             ))}
@@ -191,8 +206,14 @@ function InsightCard({ insight }: { insight: AiInsight }) {
       {(recommendation || recommendationDetail) && (
         <div className="p-2.5 rounded-lg bg-muted/50 border border-border/50">
           <p className="text-xs font-medium mb-1">Recomendacao</p>
-          {recommendation && <p className="text-xs font-semibold text-foreground">{recommendation}</p>}
-          {recommendationDetail && <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{recommendationDetail}</p>}
+          {recommendation && (
+            <p className="text-xs font-semibold text-foreground">{recommendation}</p>
+          )}
+          {recommendationDetail && (
+            <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+              {recommendationDetail}
+            </p>
+          )}
         </div>
       )}
 
@@ -200,7 +221,8 @@ function InsightCard({ insight }: { insight: AiInsight }) {
       <div className="flex items-center justify-between pt-1">
         <InsightFeedback insightId={insight.id} currentRating={insight.user_rating} />
         <p className="text-[10px] text-muted-foreground/60">
-          Analise em {new Date(insight.created_at).toLocaleString('pt-BR', {
+          Analise em{' '}
+          {new Date(insight.created_at).toLocaleString('pt-BR', {
             day: '2-digit',
             month: 'short',
             year: 'numeric',
@@ -217,7 +239,13 @@ function InsightCard({ insight }: { insight: AiInsight }) {
 // Insight Feedback (thumbs up/down)
 // ─────────────────────────────────────────────────────
 
-function InsightFeedback({ insightId, currentRating }: { insightId: string; currentRating: number | null }) {
+function InsightFeedback({
+  insightId,
+  currentRating,
+}: {
+  insightId: string;
+  currentRating: number | null;
+}) {
   const rateInsight = useRateInsight();
 
   const handleRate = (rating: number) => {
@@ -368,9 +396,7 @@ export function FinancialAiAnalysis({ entityId, entityType }: FinancialAiAnalysi
             className="text-center py-4"
           >
             <Brain className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-            <p className="text-xs text-muted-foreground">
-              Nenhuma análise disponível.
-            </p>
+            <p className="text-xs text-muted-foreground">Nenhuma análise disponível.</p>
             <p className="text-[10px] text-muted-foreground/60 mt-1">
               Clique em "Analisar com AI" para gerar insights.
             </p>

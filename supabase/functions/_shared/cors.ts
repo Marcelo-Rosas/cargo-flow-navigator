@@ -1,8 +1,17 @@
 /**
- * Returns CORS headers with origin restricted to ALLOWED_ORIGIN.
+ * Returns CORS headers with origin restricted to ALLOWED_ORIGIN / ALLOWED_ORIGINS.
+ * Accepts exact origins or patterns with * (e.g. https://*.vercel.app for Vercel previews).
  * In production, set ALLOWED_ORIGIN (e.g. https://app.vectracargo.com).
  * For multiple origins, use comma-separated ALLOWED_ORIGINS.
  */
+function matchesOrigin(origin: string, pattern: string): boolean {
+  if (pattern === origin) return true;
+  if (!pattern.includes('*')) return false;
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*');
+  const regex = new RegExp(`^${escaped}$`);
+  return regex.test(origin);
+}
+
 export function getCorsHeaders(req: Request): Record<string, string> {
   const getEnv = (key: string) => {
     try {
@@ -25,11 +34,12 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   const allowed =
     getEnv('ALLOWED_ORIGINS') ||
     getEnv('ALLOWED_ORIGIN') ||
-    'http://localhost:8080,https://cargo-flow-navigator.vercel.app';
+    'http://localhost:5173,http://localhost:8080,https://cargo-flow-navigator.vercel.app,https://*.vercel.app';
   const origins = allowed.split(',').map((o) => o.trim());
   const requestOrigin = req.headers.get('Origin');
 
-  const inAllowlist = requestOrigin && origins.includes(requestOrigin);
+  const inAllowlist =
+    !!requestOrigin && origins.some((pattern) => matchesOrigin(requestOrigin, pattern));
 
   const headers: Record<string, string> = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',

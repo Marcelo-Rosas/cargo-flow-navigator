@@ -19,7 +19,7 @@ function cellVal(cell) {
     if ('result' in v) return v.result;
     if ('sharedFormula' in v) return v.result ?? null;
     // Rich text
-    if ('richText' in v) return v.richText.map(r => r.text).join('');
+    if ('richText' in v) return v.richText.map((r) => r.text).join('');
     // Hyperlink
     if ('text' in v) return v.text;
     return null;
@@ -36,10 +36,19 @@ function numVal(cell) {
 
 // ── Month parser ─────────────────────────────────────────────────────────
 const MONTH_MAP = {
-  'JANEIRO': '01', 'FEVEREIRO': '02', 'MARÇO': '03', 'MARCO': '03',
-  'ABRIL': '04', 'MAIO': '05', 'JUNHO': '06',
-  'JULHO': '07', 'AGOSTO': '08', 'SETEMBRO': '09',
-  'OUTUBRO': '10', 'NOVEMBRO': '11', 'DEZEMBRO': '12',
+  JANEIRO: '01',
+  FEVEREIRO: '02',
+  MARÇO: '03',
+  MARCO: '03',
+  ABRIL: '04',
+  MAIO: '05',
+  JUNHO: '06',
+  JULHO: '07',
+  AGOSTO: '08',
+  SETEMBRO: '09',
+  OUTUBRO: '10',
+  NOVEMBRO: '11',
+  DEZEMBRO: '12',
 };
 
 function parsePeriod(periodStr) {
@@ -63,10 +72,10 @@ const CARGO_TYPE_MAP = {
   'Granel líquido': 'granel_liquido',
   'Granel Líquido': 'granel_liquido',
   'Frigorificada ou Aquecida': 'frigorificada',
-  'Frigorificada': 'frigorificada',
-  'Conteinerizada': 'conteinerizada',
+  Frigorificada: 'frigorificada',
+  Conteinerizada: 'conteinerizada',
   'Carga Geral': 'carga_geral',
-  'Neogranel': 'neogranel',
+  Neogranel: 'neogranel',
   'Perigosa (Granel Sólido)': 'perigosa_granel_solido',
   'Perigosa (Granel sólido)': 'perigosa_granel_solido',
   'Perigosa (granel sólido)': 'perigosa_granel_solido',
@@ -80,7 +89,7 @@ const CARGO_TYPE_MAP = {
   'Perigosa (Carga Geral)': 'perigosa_carga_geral',
   'Perigosa (carga geral)': 'perigosa_carga_geral',
   'Perigosa (Neogranel)': 'perigosa_neogranel',
-  'Pressurizada': 'pressurizada',
+  Pressurizada: 'pressurizada',
   'Carga Granel Pressurizada': 'pressurizada',
 };
 
@@ -97,7 +106,6 @@ async function extractAnttFloorRates() {
   //   Row 4+: data rows
 
   const AXES_CCD_COLS = { 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 9 };
-  const AXES_CC_COLS = { 11: 2, 12: 3, 13: 4, 14: 5, 15: 6, 16: 7, 17: 9 };
 
   for (const tableName of tables) {
     const ws = wb.getWorksheet(tableName);
@@ -154,8 +162,8 @@ async function extractAnttFloorRates() {
     '',
     'INSERT INTO public.antt_floor_rates (operation_table, cargo_type, axes_count, ccd, cc) VALUES',
   ];
-  const valueLines = allRows.map(r =>
-    `  ('${r.operation_table}', '${r.cargo_type}', ${r.axes_count}, ${r.ccd}, ${r.cc})`
+  const valueLines = allRows.map(
+    (r) => `  ('${r.operation_table}', '${r.cargo_type}', ${r.axes_count}, ${r.ccd}, ${r.cc})`
   );
   sqlLines.push(valueLines.join(',\n') + ';');
   fs.writeFileSync(path.join(OUT_DIR, 'antt_floor_rates_all.sql'), sqlLines.join('\n') + '\n');
@@ -172,7 +180,10 @@ async function extractINCTL() {
 
   // Sheet "INCTL": col 2=period, cols 3-7=R$/Ton by distance (50, 400, 800, 2400, 6000 km)
   const ws = wb.getWorksheet('INCTL');
-  if (!ws) { console.error('INCTL sheet not found'); return []; }
+  if (!ws) {
+    console.error('INCTL sheet not found');
+    return [];
+  }
 
   const distances = [50, 400, 800, 2400, 6000];
   const allRows = [];
@@ -227,7 +238,6 @@ async function extractINCTL() {
   const resumoRows = [];
   if (wsRes) {
     // Row 5 = header, Rows 6-10 = 5 distance bands
-    const distLabels = ['Muito curto', 'Curto', 'Médio', 'Longo', 'Muito longo'];
     for (let r = 6; r <= 10; r++) {
       const row = wsRes.getRow(r);
       const distKm = numVal(row.getCell(3));
@@ -261,10 +271,14 @@ async function extractINCTL() {
   // Write CSV for main R$/Ton series
   const csvLines = ['index_type,period,distance_km,pickup_km,index_value'];
   for (const r of allRows) {
-    csvLines.push(`${r.index_type},${r.period},${r.distance_km},${r.pickup_km ?? ''},${r.index_value}`);
+    csvLines.push(
+      `${r.index_type},${r.period},${r.distance_km},${r.pickup_km ?? ''},${r.index_value}`
+    );
   }
   for (const r of shRows) {
-    csvLines.push(`${r.index_type},${r.period},${r.distance_km},${r.pickup_km ?? ''},${r.index_value}`);
+    csvLines.push(
+      `${r.index_type},${r.period},${r.distance_km},${r.pickup_km ?? ''},${r.index_value}`
+    );
   }
   fs.writeFileSync(path.join(OUT_DIR, 'ntc_inctl_series.csv'), csvLines.join('\n') + '\n');
   console.log(`  CSV written to data/ntc_inctl_series.csv`);
@@ -280,7 +294,10 @@ async function extractINCTF() {
 
   // Sheet "INCTFR": col 2=period, col 3=general index (all distances)
   const ws = wb.getWorksheet('INCTFR');
-  if (!ws) { console.error('INCTFR sheet not found'); return []; }
+  if (!ws) {
+    console.error('INCTFR sheet not found');
+    return [];
+  }
 
   const generalRows = [];
   for (let r = 2; r <= ws.rowCount; r++) {
@@ -382,7 +399,9 @@ async function extractINCTF() {
   // Write CSV
   const csvLines = ['index_type,period,distance_km,pickup_km,index_value'];
   for (const r of generalRows) {
-    csvLines.push(`${r.index_type},${r.period},${r.distance_km ?? ''},${r.pickup_km ?? ''},${r.index_value}`);
+    csvLines.push(
+      `${r.index_type},${r.period},${r.distance_km ?? ''},${r.pickup_km ?? ''},${r.index_value}`
+    );
   }
   for (const r of detailRows) {
     csvLines.push(`${r.index_type},${r.period},${r.distance_km},${r.pickup_km},${r.index_value}`);

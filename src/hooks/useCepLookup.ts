@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 export interface CepData {
   cep: string;
@@ -33,11 +33,14 @@ export function useCepLookup(): UseCepLookupReturn {
     setError(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('lookup-cep', {
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        data?: CepData;
+        error?: string;
+      }>('lookup-cep', {
         body: { cep: clean },
+        requireAuth: false,
       });
-
-      if (fnError) throw fnError;
       if (!data.success) {
         setError(data.error);
         return null;

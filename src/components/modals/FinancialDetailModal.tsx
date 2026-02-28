@@ -64,9 +64,7 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
       : null;
   const canLinkToTrip = !!orderId;
   const linkableTrips =
-    trips?.filter((t) =>
-      ['aberta', 'em_transito'].includes(t.status_operational ?? '')
-    ) ?? [];
+    trips?.filter((t) => ['aberta', 'em_transito'].includes(t.status_operational ?? '')) ?? [];
 
   const handleLinkToTrip = () => {
     if (!orderId || !selectedTripId) return;

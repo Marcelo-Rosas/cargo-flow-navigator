@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import { Database } from '@/integrations/supabase/types';
 
 type PriceTableRow = Database['public']['Tables']['price_table_rows']['Row'];
@@ -60,32 +61,16 @@ export function usePriceTableRowByKmFromEdgeFn(
   return useQuery({
     queryKey: ['price_table_rows', 'edgefn', priceTableId, kmDistance, rounding, isAuthenticated],
     queryFn: async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      let token = sessionData?.session?.access_token;
-      if (!token) {
-        const { data: refreshData } = await supabase.auth.refreshSession();
-        token = refreshData?.session?.access_token ?? undefined;
-      }
-      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
-
-      const { data, error } = await supabase.functions.invoke('price-row', {
-        body: {
-          p_price_table_id: asDb(priceTableId),
-          p_km_numeric: Number(kmDistance),
-          p_rounding: rounding,
-        },
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (error) {
-        const ctx = (error as { name?: string; context?: Response }).context;
-        if (ctx && typeof (ctx as Response).json === 'function') {
-          const body = (await (ctx as Response).json().catch(() => ({}))) as { error?: string };
-          const msg = body?.error ?? (error as Error).message;
-          throw new Error(msg);
+      const data = await invokeEdgeFunction<{ row?: PriceTableRow; rows?: PriceTableRow[] }>(
+        'price-row',
+        {
+          body: {
+            p_price_table_id: asDb(priceTableId),
+            p_km_numeric: Number(kmDistance),
+            p_rounding: rounding,
+          },
         }
-        throw error;
-      }
+      );
       const row = data?.row ?? data?.rows?.[0] ?? null;
       return row ? filterSupabaseSingle<PriceTableRow>(row) : null;
     },

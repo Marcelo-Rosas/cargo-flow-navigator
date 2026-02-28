@@ -21,7 +21,13 @@ import {
 type Document = Database['public']['Tables']['documents']['Row'];
 type DocumentType = Database['public']['Enums']['document_type'];
 
-const DOC_MOT_TYPES: DocumentType[] = ['cnh', 'crlv', 'comp_residencia', 'antt_motorista', 'outros'];
+const DOC_MOT_TYPES: DocumentType[] = [
+  'cnh',
+  'crlv',
+  'comp_residencia',
+  'antt_motorista',
+  'outros',
+];
 
 interface DocumentListProps {
   orderId?: string;
@@ -58,7 +64,7 @@ export function DocumentList({ orderId, quoteId, docMotFilter }: DocumentListPro
   const { data: rawDocuments, isLoading } = quoteId ? byQuote : byOrder;
   const documents = docMotFilter
     ? (rawDocuments ?? []).filter((d) => DOC_MOT_TYPES.includes(d.type))
-    : rawDocuments ?? [];
+    : (rawDocuments ?? []);
   const deleteDocumentMutation = useDeleteDocument();
 
   const handleDelete = async (doc: Document) => {

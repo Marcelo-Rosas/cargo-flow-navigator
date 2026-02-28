@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 // ─────────────────────────────────────────────────────
 // Types
@@ -96,6 +97,14 @@ export function useOperationalInsights() {
 /** Trigger AI analysis on demand */
 export function useRequestAiAnalysis() {
   const queryClient = useQueryClient();
+  const OPERATIONAL_TYPES = new Set([
+    'operational_insights',
+    'driver_qualification',
+    'stage_gate_validation',
+    'compliance_check',
+    'operational_report',
+    'regulatory_update',
+  ]);
 
   return useMutation({
     mutationFn: async ({
@@ -107,34 +116,31 @@ export function useRequestAiAnalysis() {
       entityId: string;
       entityType: string;
     }) => {
-      // Get a fresh session; refresh if expired
-      const { data: sessionData } = await supabase.auth.getSession();
-      let token = sessionData?.session?.access_token;
-      if (!token) {
-        const { data: refreshData } = await supabase.auth.refreshSession();
-        token = refreshData?.session?.access_token ?? undefined;
-      }
-      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
-
-      const OPERATIONAL_TYPES = new Set([
-        'operational_insights',
-        'driver_qualification',
-        'stage_gate_validation',
-        'compliance_check',
-        'operational_report',
-        'regulatory_update',
-      ]);
-      const fnName = OPERATIONAL_TYPES.has(analysisType)
+      const primaryFnName = OPERATIONAL_TYPES.has(analysisType)
         ? 'ai-operational-orchestrator'
         : 'ai-orchestrator-agent';
-      const { data, error } = await supabase.functions.invoke(fnName, {
-        body: { analysisType, entityId, entityType },
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
 
-      if (error) throw error;
+      let data: { error?: string; success?: boolean };
+      try {
+        data = await invokeEdgeFunction<{ error?: string; success?: boolean }>(primaryFnName, {
+          body: { analysisType, entityId, entityType },
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        const missingFn = /404|not found|function/i.test(message);
+        if (primaryFnName !== 'ai-financial-agent' && missingFn) {
+          data = await invokeEdgeFunction<{ error?: string; success?: boolean }>(
+            'ai-financial-agent',
+            {
+              body: { analysisType, entityId, entityType },
+            }
+          );
+        } else {
+          throw e;
+        }
+      }
+
+      if (data?.success === false && data?.error) throw new Error(data.error);
       if (data?.error) throw new Error(data.error);
       return data;
     },

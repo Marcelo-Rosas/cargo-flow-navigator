@@ -10,25 +10,25 @@ project_id = "epgedaiukjippepujuzc"
 site_url = "https://cargo-flow-navigator.vercel.app"
 additional_redirect_urls = [
   # Dev local
-  "http://localhost:8080/",
+  "http://localhost:8080",
   "http://localhost:8080/auth",
   "http://localhost:8080/reset-password",
   # Domínio principal
-  "https://cargo-flow-navigator.vercel.app/",
-  "https://cargo-flow-navigator.vercel.app/**",
+  "https://cargo-flow-navigator.vercel.app",
+  "https://cargo-flow-navigator.vercel.app**",
   # URL canônica Vercel (redirect)
-  "https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app/",
-  "https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app/**",
+  "https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app",
+  "https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app**",
   # Preview deploys – wildcard para branches
   "https://cargo-*-flow-navigator-marcelo-rosas-projects.vercel.app",
   "https://cargo-*-flow-navigator-marcelo-rosas-projects.vercel.app/**",
 ]
 
 [functions.import-price-table]
-verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente via getUser()
+verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente
 
 [functions.calculate-freight]
-verify_jwt = true
+verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente
 
 [functions.lookup-cep]
 verify_jwt = false  # utilitário público (consulta ViaCEP/BrasilAPI/OpenCEP), sem dados sensíveis
@@ -49,10 +49,16 @@ verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization man
 verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente
 
 [functions.ai-financial-agent]
-verify_jwt = false  # Função usa SERVICE_ROLE_KEY internamente
+verify_jwt = false  # Auth validada manualmente; aceita JWT de usuário e service role interno
 
 [functions.ai-operational-agent]
-verify_jwt = false  # Função usa SERVICE_ROLE_KEY internamente
+verify_jwt = false  # Chamadas de front/workflow com header Authorization
+
+[functions.ai-orchestrator-agent]
+verify_jwt = false  # Orquestrador de workers; usa service role para chamadas internas
+
+[functions.ai-operational-orchestrator]
+verify_jwt = false  # Orquestrador operacional; evita 401 de gateway em chamadas autenticadas
 
 [functions.invite-user]
 verify_jwt = false  # Função valida admin via is_admin() RPC

@@ -195,8 +195,8 @@ export default function ResetPassword() {
               </div>
               <h2 className="text-2xl font-bold text-foreground">Link inválido ou expirado</h2>
               <p className="text-muted-foreground">
-                O link de recuperação expirou ou já foi utilizado. Solicite um novo link na página de
-                login.
+                O link de recuperação expirou ou já foi utilizado. Solicite um novo link na página
+                de login.
               </p>
               <Button onClick={handleGoToLogin} className="gap-2">
                 Voltar ao Login
@@ -256,11 +256,7 @@ export default function ResetPassword() {
                       className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
                   </div>
                 </div>
@@ -293,9 +289,7 @@ export default function ResetPassword() {
                         : ''
                     }
                   >
-                    {newPassword && confirmPassword && newPassword === confirmPassword
-                      ? '✓'
-                      : '○'}{' '}
+                    {newPassword && confirmPassword && newPassword === confirmPassword ? '✓' : '○'}{' '}
                     Senhas coincidem
                   </p>
                 </div>
@@ -303,7 +297,9 @@ export default function ResetPassword() {
                 <Button
                   type="submit"
                   className="w-full gap-2"
-                  disabled={isSubmitting || newPassword.length < 6 || newPassword !== confirmPassword}
+                  disabled={
+                    isSubmitting || newPassword.length < 6 || newPassword !== confirmPassword
+                  }
                 >
                   {isSubmitting ? 'Atualizando...' : 'Atualizar Senha'}
                   {!isSubmitting && <ArrowRight className="w-4 h-4" />}

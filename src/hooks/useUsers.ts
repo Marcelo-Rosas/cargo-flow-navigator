@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import type { Database } from '@/integrations/supabase/types';
 
 export type UserProfile = Database['public']['Enums']['user_profile'];
@@ -36,27 +36,30 @@ export function useProfiles() {
  */
 export function useInviteUser() {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
 
   return useMutation({
     mutationFn: async (payload: { email: string; fullName: string; perfil: UserProfile }) => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      let token = sessionData?.session?.access_token ?? session?.access_token;
-      if (!token) {
-        const { data: refreshData } = await supabase.auth.refreshSession();
-        token = refreshData?.session?.access_token ?? undefined;
-      }
-      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
-
-      const { data, error } = await supabase.functions.invoke('invite-user', {
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        userId?: string | null;
+        message: string;
+        error?: string;
+        alreadyExists?: boolean;
+      }>('invite-user', {
         body: payload,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
-      if (error) throw error;
+
       if (data?.error) throw new Error(data.error);
-      return data as { success: boolean; userId: string; message: string };
+      if (!data?.success) {
+        throw new Error('Falha ao convidar usuário. Tente novamente.');
+      }
+
+      return {
+        success: data.success,
+        userId: data.userId ?? null,
+        message: data.message,
+        alreadyExists: data.alreadyExists ?? false,
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles-list'] });

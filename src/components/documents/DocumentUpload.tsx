@@ -172,16 +172,15 @@ export function DocumentUpload({
   ];
 
   // Pega os tipos disponíveis: doc_mot, carrier payment, cotação ou ordem (por estágio)
-  let availableTypes =
-    docMotContext
-      ? DOC_MOT_TYPES
-      : financialContext === 'carrier_payment'
-        ? CARRIER_PAYMENT_DOCUMENT_TYPES
-        : quoteId && !orderId
-          ? QUOTE_DOCUMENT_TYPES
-          : orderStage
-            ? DOCUMENT_TYPES_BY_STAGE[orderStage]
-            : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
+  let availableTypes = docMotContext
+    ? DOC_MOT_TYPES
+    : financialContext === 'carrier_payment'
+      ? CARRIER_PAYMENT_DOCUMENT_TYPES
+      : quoteId && !orderId
+        ? QUOTE_DOCUMENT_TYPES
+        : orderStage
+          ? DOCUMENT_TYPES_BY_STAGE[orderStage]
+          : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
 
   // Na aba Docs, remover tipos Doc-Mot (CNH, CRLV, etc.) — estão na aba Doc-Mot
   if (!docMotContext && !financialContext && orderId) {

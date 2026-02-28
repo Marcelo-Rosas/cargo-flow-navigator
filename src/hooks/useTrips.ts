@@ -232,13 +232,7 @@ export function useLinkOrderToTargetTrip() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      orderId,
-      tripId,
-    }: {
-      orderId: string;
-      tripId: string;
-    }) => {
+    mutationFn: async ({ orderId, tripId }: { orderId: string; tripId: string }) => {
       const { data, error } = await supabase.rpc('link_order_to_target_trip', {
         p_order_id: orderId,
         p_trip_id: tripId,

@@ -71,7 +71,10 @@ export function EquipmentRentalSection({
         };
       });
       const total = items.reduce((s, i) => s + i.total, 0);
-      onChange(total, items.filter((i) => i.selected && i.quantity > 0));
+      onChange(
+        total,
+        items.filter((i) => i.selected && i.quantity > 0)
+      );
       return next;
     });
   };

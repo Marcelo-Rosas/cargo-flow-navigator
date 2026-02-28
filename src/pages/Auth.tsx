@@ -205,92 +205,92 @@ export default function Auth() {
           </div>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-              <h2 className="text-2xl font-bold text-foreground mb-2">Bem-vindo de volta</h2>
-              <p className="text-muted-foreground mb-8">
-                Entre com suas credenciais para acessar o sistema
-              </p>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Bem-vindo de volta</h2>
+            <p className="text-muted-foreground mb-8">
+              Entre com suas credenciais para acessar o sistema
+            </p>
 
-              <form onSubmit={handleLogin} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="seu@vectracargo.com.br"
-                      className={`pl-10 ${loginErrors.email ? 'border-destructive' : ''}`}
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  {loginErrors.email && (
-                    <p className="text-sm text-destructive">{loginErrors.email}</p>
-                  )}
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="email">E-mail</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu@vectracargo.com.br"
+                    className={`pl-10 ${loginErrors.email ? 'border-destructive' : ''}`}
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    required
+                  />
                 </div>
+                {loginErrors.email && (
+                  <p className="text-sm text-destructive">{loginErrors.email}</p>
+                )}
+              </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Senha</Label>
-                    <Button
-                      variant="link"
-                      className="p-0 h-auto text-sm"
-                      type="button"
-                      onClick={() => {
-                        setResetDialogOpen(true);
-                        setResetSent(false);
-                        setResetEmail(loginEmail);
-                      }}
-                    >
-                      Esqueceu a senha?
-                    </Button>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      className={`pl-10 pr-10 ${loginErrors.password ? 'border-destructive' : ''}`}
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      required
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                  {loginErrors.password && (
-                    <p className="text-sm text-destructive">{loginErrors.password}</p>
-                  )}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Senha</Label>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto text-sm"
+                    type="button"
+                    onClick={() => {
+                      setResetDialogOpen(true);
+                      setResetSent(false);
+                      setResetEmail(loginEmail);
+                    }}
+                  >
+                    Esqueceu a senha?
+                  </Button>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <Checkbox id="remember" />
-                  <Label htmlFor="remember" className="text-sm font-normal">
-                    Manter conectado
-                  </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    className={`pl-10 pr-10 ${loginErrors.password ? 'border-destructive' : ''}`}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </Button>
                 </div>
+                {loginErrors.password && (
+                  <p className="text-sm text-destructive">{loginErrors.password}</p>
+                )}
+              </div>
 
-                <Button type="submit" className="w-full gap-2" disabled={isLoading}>
-                  {isLoading ? 'Entrando...' : 'Entrar'}
-                  {!isLoading && <ArrowRight className="w-4 h-4" />}
-                </Button>
-              </form>
+              <div className="flex items-center gap-2">
+                <Checkbox id="remember" />
+                <Label htmlFor="remember" className="text-sm font-normal">
+                  Manter conectado
+                </Label>
+              </div>
 
-              <p className="text-center text-sm text-muted-foreground mt-6">
-                Acesso restrito a colaboradores Vectra Cargo.
-                <br />
-                Solicite seu acesso ao administrador do sistema.
-              </p>
-            </motion.div>
+              <Button type="submit" className="w-full gap-2" disabled={isLoading}>
+                {isLoading ? 'Entrando...' : 'Entrar'}
+                {!isLoading && <ArrowRight className="w-4 h-4" />}
+              </Button>
+            </form>
+
+            <p className="text-center text-sm text-muted-foreground mt-6">
+              Acesso restrito a colaboradores Vectra Cargo.
+              <br />
+              Solicite seu acesso ao administrador do sistema.
+            </p>
+          </motion.div>
         </div>
       </motion.div>
 
