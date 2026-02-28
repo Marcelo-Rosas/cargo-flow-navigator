@@ -67,12 +67,21 @@ export function useImportPriceTable() {
         };
       }
 
+      const { data: sessionData } = await supabase.auth.getSession();
+      let token = sessionData?.session?.access_token;
+      if (!token) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        token = refreshData?.session?.access_token ?? undefined;
+      }
+      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
       const { data, error } = await supabase.functions.invoke('import-price-table', {
         body: {
           priceTable: params.priceTable,
           rows: validRows,
           importMode: params.importMode,
         },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (error) {

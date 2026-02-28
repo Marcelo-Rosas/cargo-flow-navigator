@@ -18,9 +18,17 @@ export function useEnsureFinancialDocument() {
   return useMutation({
     mutationKey: ['ensure-financial-document'],
     mutationFn: async (input: EnsureFinancialDocumentInput) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      let token = sessionData?.session?.access_token;
+      if (!token) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        token = refreshData?.session?.access_token ?? undefined;
+      }
+      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
       const { data, error } = await supabase.functions.invoke<EnsureFinancialDocumentResponse>(
         'ensure-financial-document',
-        { body: input }
+        { body: input, headers: { Authorization: `Bearer ${token}` } }
       );
 
       if (error) throw error;

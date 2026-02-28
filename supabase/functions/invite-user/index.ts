@@ -1,7 +1,20 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
+
+interface InviteBody {
+  email: string;
+  fullName: string;
+  perfil: 'admin' | 'operacional' | 'financeiro';
+}
+
+type DenoLike = {
+  env: { get(key: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
+const deno = (globalThis as unknown as { Deno: DenoLike }).Deno;
 const VALID_PROFILES = ['admin', 'operacional', 'financeiro'];
-Deno.serve(async (req) => {
+deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -41,9 +54,9 @@ Deno.serve(async (req) => {
       );
     }
     // Parse body
-    let body;
+    let body: InviteBody;
     try {
-      body = await req.json();
+      body = (await req.json()) as InviteBody;
     } catch {
       return new Response(
         JSON.stringify({
@@ -59,7 +72,10 @@ Deno.serve(async (req) => {
       );
     }
     // Validate fields
-    if (!body.email || !body.email.includes('@')) {
+    const normalizedEmail = body.email?.trim().toLowerCase();
+    const normalizedFullName = body.fullName?.trim();
+
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
       return new Response(
         JSON.stringify({
           error: 'E-mail inválido',
@@ -73,7 +89,7 @@ Deno.serve(async (req) => {
         }
       );
     }
-    if (!body.email.toLowerCase().endsWith('@vectracargo.com.br')) {
+    if (!normalizedEmail.endsWith('@vectracargo.com.br')) {
       return new Response(
         JSON.stringify({
           error: 'Somente e-mails @vectracargo.com.br são permitidos',
@@ -87,7 +103,7 @@ Deno.serve(async (req) => {
         }
       );
     }
-    if (!body.fullName || body.fullName.trim().length < 2) {
+    if (!normalizedFullName || normalizedFullName.length < 2) {
       return new Response(
         JSON.stringify({
           error: 'Nome completo obrigatório',
@@ -116,17 +132,32 @@ Deno.serve(async (req) => {
       );
     }
     // Check caller is admin using their JWT
-    const callerClient = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_ANON_KEY'),
-      {
-        global: {
+    const supabaseUrl = deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = deno.env.get('SUPABASE_ANON_KEY');
+    const supabaseServiceRoleKey = deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+      return new Response(
+        JSON.stringify({
+          error: 'Variáveis de ambiente do Supabase não configuradas',
+        }),
+        {
+          status: 500,
           headers: {
-            authorization: authHeader,
+            ...corsHeaders,
+            'content-type': 'application/json',
           },
+        }
+      );
+    }
+
+    const callerClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          authorization: authHeader,
         },
-      }
-    );
+      },
+    });
     const { data: isAdmin, error: adminCheckError } = await callerClient.rpc('is_admin');
     if (adminCheckError || !isAdmin) {
       return new Response(
@@ -143,22 +174,18 @@ Deno.serve(async (req) => {
       );
     }
     // Use service role to invite user
-    const serviceClient = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
-    const base = Deno.env.get('SITE_URL') ?? 'https://cargo-flow-navigator.vercel.app';
+    const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+    const base = deno.env.get('SITE_URL') ?? 'https://cargo-flow-navigator.vercel.app';
     const redirectTo = `${base}/auth`;
     const { data: inviteData, error: inviteError } =
-      await serviceClient.auth.admin.inviteUserByEmail(body.email, {
+      await serviceClient.auth.admin.inviteUserByEmail(normalizedEmail, {
         data: {
-          full_name: body.fullName,
+          full_name: normalizedFullName,
         },
         redirectTo,
       });
@@ -182,7 +209,7 @@ Deno.serve(async (req) => {
         .from('profiles')
         .update({
           perfil: body.perfil,
-          full_name: body.fullName,
+          full_name: normalizedFullName,
         })
         .or(`id.eq.${inviteData.user.id},user_id.eq.${inviteData.user.id}`);
     }
@@ -190,7 +217,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         userId: inviteData?.user?.id,
-        message: `Convite enviado para ${body.email}`,
+        message: `Convite enviado para ${normalizedEmail}`,
       }),
       {
         status: 200,

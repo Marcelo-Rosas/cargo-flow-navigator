@@ -10,8 +10,17 @@ export type { CalculateFreightInput, CalculateFreightResponse } from '@/types/fr
 export function useCalculateFreight() {
   return useMutation({
     mutationFn: async (input: CalculateFreightInput): Promise<CalculateFreightResponse> => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      let token = sessionData?.session?.access_token;
+      if (!token) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        token = refreshData?.session?.access_token ?? undefined;
+      }
+      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
       const { data, error } = await supabase.functions.invoke('calculate-freight', {
         body: input,
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (error) {
@@ -75,16 +84,17 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
       baseCost: response.components.base_cost,
       baseFreight: response.components.base_freight,
       toll: response.components.toll,
+      aluguelMaquinas: response.components.aluguel_maquinas ?? 0,
       gris: response.components.gris,
       tso: response.components.tso,
       rctrc: response.components.rctrc,
       adValorem: response.components.ad_valorem,
       tde: response.components.tde,
       tear: response.components.tear,
+      dispatchFee: response.components.dispatch_fee ?? 0,
       conditionalFeesTotal: response.components.conditional_fees_total,
       waitingTimeCost: response.components.waiting_time_cost,
       dasProvision: response.components.das_provision,
-      aluguelMaquinas: response.components.aluguel_maquinas ?? 0,
     },
     rates: {
       dasPercent: response.rates.das_percent,
@@ -165,7 +175,10 @@ export function buildStoredBreakdownFromEdgeResponse(
       baseCost: c.base_cost,
       baseFreight: c.base_freight,
       toll: c.toll,
-      aluguelMaquinas: (c as { aluguel_maquinas?: number }).aluguel_maquinas ?? existingBreakdown?.components?.aluguelMaquinas ?? 0,
+      aluguelMaquinas:
+        (c as { aluguel_maquinas?: number }).aluguel_maquinas ??
+        existingBreakdown?.components?.aluguelMaquinas ??
+        0,
       gris: c.gris,
       tso: c.tso,
       rctrc: c.rctrc,

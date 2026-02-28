@@ -52,7 +52,7 @@ export function useDriverQualification(orderId: string) {
 // Mutations
 // ─────────────────────────────────────────────────────
 
-/** Trigger AI-based driver qualification via the ai-operational-agent edge function */
+/** Trigger AI-based driver qualification via the ai-operational-orchestrator */
 export function useRequestDriverQualification() {
   const queryClient = useQueryClient();
   const { session } = useAuth();
@@ -64,8 +64,14 @@ export function useRequestDriverQualification() {
 
       if (!token) throw new Error('Sessão expirada. Faça login novamente.');
 
-      const { data, error } = await supabase.functions.invoke('ai-operational-agent', {
-        body: { analysisType: 'driver_qualification', orderId, driverCpf },
+      const { data, error } = await supabase.functions.invoke('ai-operational-orchestrator', {
+        body: {
+          analysisType: 'driver_qualification',
+          orderId,
+          entityId: orderId,
+          entityType: 'order',
+          driverCpf,
+        },
         headers: {
           Authorization: `Bearer ${token}`,
         },

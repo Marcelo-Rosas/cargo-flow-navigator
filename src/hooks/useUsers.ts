@@ -24,10 +24,7 @@ export function useProfiles() {
   return useQuery({
     queryKey: ['profiles-list'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('full_name');
+      const { data, error } = await supabase.from('profiles').select('*').order('full_name');
       if (error) throw error;
       return (data ?? []) as ProfileRow[];
     },
@@ -43,10 +40,12 @@ export function useInviteUser() {
 
   return useMutation({
     mutationFn: async (payload: { email: string; fullName: string; perfil: UserProfile }) => {
-      // Get a fresh session to avoid stale/expired JWTs
       const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token ?? session?.access_token;
-
+      let token = sessionData?.session?.access_token ?? session?.access_token;
+      if (!token) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        token = refreshData?.session?.access_token ?? undefined;
+      }
       if (!token) throw new Error('Sessão expirada. Faça login novamente.');
 
       const { data, error } = await supabase.functions.invoke('invite-user', {

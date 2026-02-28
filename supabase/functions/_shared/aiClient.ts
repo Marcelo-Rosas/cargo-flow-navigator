@@ -2,6 +2,16 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 type LLMProvider = 'anthropic' | 'openai';
 
+const getEnv = (key: string): string | undefined => {
+  try {
+    const deno = globalThis as { Deno?: { env?: { get?: (k: string) => string | undefined } } };
+    if (typeof deno.Deno?.env?.get === 'function') return deno.Deno.env.get(key);
+  } catch {
+    // ignore
+  }
+  return undefined;
+};
+
 interface CallLLMParams {
   prompt: string;
   system?: string;
@@ -22,8 +32,8 @@ interface CallLLMResult {
 
 // Basic Supabase client for optional logging into ai_usage_tracking (reuse existing schema)
 const supabaseAdmin = (() => {
-  const url = Deno.env.get('SUPABASE_URL');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const url = getEnv('SUPABASE_URL');
+  const serviceKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !serviceKey) return null;
   return createClient(url, serviceKey);
 })();
@@ -58,11 +68,11 @@ async function logProviderFallback(params: {
 }
 
 async function callAnthropic(params: CallLLMParams): Promise<CallLLMResult> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = getEnv('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
-  const baseUrl = Deno.env.get('AI_GATEWAY_URL') || 'https://api.anthropic.com';
-  const model = Deno.env.get('ANTHROPIC_MODEL') || 'claude-sonnet-4-20250514';
+  const baseUrl = getEnv('AI_GATEWAY_URL') || 'https://api.anthropic.com';
+  const model = getEnv('ANTHROPIC_MODEL') || 'claude-sonnet-4-20250514';
   const maxTokens = params.maxTokens ?? 1024;
 
   const body = {
@@ -132,11 +142,11 @@ async function callAnthropic(params: CallLLMParams): Promise<CallLLMResult> {
 }
 
 async function callOpenAI(params: CallLLMParams): Promise<CallLLMResult> {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  const apiKey = getEnv('OPENAI_API_KEY');
   if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const baseUrl = Deno.env.get('OPENAI_API_BASE_URL') || 'https://api.openai.com/v1';
-  const model = Deno.env.get('OPENAI_MODEL') || 'gpt-4.1-mini';
+  const baseUrl = getEnv('OPENAI_API_BASE_URL') || 'https://api.openai.com/v1';
+  const model = getEnv('OPENAI_MODEL') || 'gpt-4.1-mini';
   const maxTokens = params.maxTokens ?? 1024;
   const temperature = params.temperature ?? 0.2;
 
@@ -206,8 +216,8 @@ async function callOpenAI(params: CallLLMParams): Promise<CallLLMResult> {
 }
 
 export async function callLLM(params: CallLLMParams): Promise<CallLLMResult> {
-  const hasAnthropicKey = !!Deno.env.get('ANTHROPIC_API_KEY');
-  const hasOpenAIKey = !!Deno.env.get('OPENAI_API_KEY');
+  const hasAnthropicKey = !!getEnv('ANTHROPIC_API_KEY');
+  const hasOpenAIKey = !!getEnv('OPENAI_API_KEY');
 
   // Resolve preferred provider: honour modelHint first, then fall back to
   // whichever key is actually available so we never fail with "not configured"

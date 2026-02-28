@@ -126,7 +126,7 @@ export function useRequestAiAnalysis() {
       ]);
       const fnName = OPERATIONAL_TYPES.has(analysisType)
         ? 'ai-operational-orchestrator'
-        : 'ai-financial-agent';
+        : 'ai-orchestrator-agent';
       const { data, error } = await supabase.functions.invoke(fnName, {
         body: { analysisType, entityId, entityType },
         headers: {

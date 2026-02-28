@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { callEdgeFunction } from '../_shared/edgeFunctionClient.ts';
 
 // ─────────────────────────────────────────────────────
 // Model Routing
@@ -174,24 +175,9 @@ async function logUsage(sb: any, params: Record<string, any>) {
   }
 }
 
-// ─────────────────────────────────────────────────────
-// Worker HTTP Caller
-// ─────────────────────────────────────────────────────
-async function callWorker(workerName: string, body: Record<string, unknown>) {
-  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${workerName}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Worker ${workerName} failed (${res.status}): ${text}`);
-  }
-  return res.json();
+// callWorker delegates to shared callEdgeFunction (workers are edge functions)
+function callWorker(workerName: string, body: Record<string, unknown>) {
+  return callEdgeFunction(workerName, body);
 }
 
 // ─────────────────────────────────────────────────────

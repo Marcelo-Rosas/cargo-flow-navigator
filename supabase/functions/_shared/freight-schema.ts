@@ -1,7 +1,7 @@
 /**
  * Zod schema for calculate-freight payload validation
  */
-import { z } from 'https://esm.sh/zod@3.23.8';
+import { z } from 'zod';
 
 export const calculateFreightInputSchema = z
   .object({
@@ -15,7 +15,7 @@ export const calculateFreightInputSchema = z
     price_table_id: z
       .string()
       .optional()
-      .transform((v) => (v === '' ? undefined : v)),
+      .transform((v: string | undefined) => (v === '' ? undefined : v)),
     vehicle_type_code: z.string().optional(),
     payment_term_code: z.string().optional(),
     tde_enabled: z.boolean().optional(),
@@ -29,7 +29,10 @@ export const calculateFreightInputSchema = z
     descarga_value: z.number().min(0).optional(),
     aluguel_maquinas_value: z.number().min(0).optional(),
   })
-  .refine((data) => data.weight_kg > 0 || data.volume_m3 > 0, {
-    message: 'weight_kg e volume_m3 não podem ser ambos zero',
-    path: ['weight_kg'],
-  });
+  .refine(
+    (data: { weight_kg: number; volume_m3: number }) => data.weight_kg > 0 || data.volume_m3 > 0,
+    {
+      message: 'weight_kg e volume_m3 não podem ser ambos zero',
+      path: ['weight_kg'],
+    }
+  );

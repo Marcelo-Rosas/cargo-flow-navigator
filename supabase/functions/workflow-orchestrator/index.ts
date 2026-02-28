@@ -1,5 +1,6 @@
-import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { callEdgeFunction } from '../_shared/edgeFunctionClient.ts';
 
 // ─────────────────────────────────────────────────────
 // Types
@@ -23,12 +24,19 @@ interface EventResult {
   error?: string;
 }
 
+type DenoLike = {
+  env: { get(key: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
+const deno = (globalThis as unknown as { Deno: DenoLike }).Deno;
+
 // ─────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────
 
 function serviceClient(): SupabaseClient {
-  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  return createClient(deno.env.get('SUPABASE_URL')!, deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 }
 
 async function logAction(
@@ -47,29 +55,12 @@ async function logAction(
 }
 
 /** Fire-and-forget: trigger notification-hub to process a pending notification */
-async function triggerNotificationHub(sb: SupabaseClient, logId: string) {
+async function triggerNotificationHub(logId: string) {
   try {
     await callEdgeFunction('notification-hub', { logId });
   } catch {
     // Non-critical — notification stays 'pending' and can be processed in batch later
   }
-}
-
-async function callEdgeFunction(fnName: string, body: Record<string, unknown>) {
-  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${fnName}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Edge function ${fnName} failed (${res.status}): ${text}`);
-  }
-  return res.json();
 }
 
 // ─────────────────────────────────────────────────────
@@ -80,7 +71,7 @@ async function handleQuoteStageChanged(
   sb: SupabaseClient,
   event: WorkflowEvent
 ): Promise<EventResult> {
-  const { new_stage, old_stage, client_name, client_email, quote_code } = event.payload;
+  const { new_stage, old_stage, client_email } = event.payload;
   const actions: string[] = [];
 
   // Quote won → auto-create order + financial documents
@@ -120,7 +111,7 @@ async function handleQuoteStageChanged(
         })
         .select('id')
         .single();
-      if (quoteWonLog) await triggerNotificationHub(sb, quoteWonLog.id);
+      if (quoteWonLog) await triggerNotificationHub(quoteWonLog.id);
       actions.push('notification_queued:quote_won');
     }
   }
@@ -152,7 +143,7 @@ async function handleQuoteStageChanged(
 }
 
 async function handleOrderCreated(sb: SupabaseClient, event: WorkflowEvent): Promise<EventResult> {
-  const { quote_id, carreteiro_antt, os_number } = event.payload;
+  const { carreteiro_antt } = event.payload;
   const actions: string[] = [];
 
   // Auto-create PAG document if order has carreteiro value
@@ -178,7 +169,7 @@ async function handleOrderCreated(sb: SupabaseClient, event: WorkflowEvent): Pro
     })
     .select('id')
     .single();
-  if (orderCreatedLog) await triggerNotificationHub(sb, orderCreatedLog.id);
+  if (orderCreatedLog) await triggerNotificationHub(orderCreatedLog.id);
   actions.push('notification_queued:order_created');
 
   return { success: true, actions };
@@ -188,7 +179,7 @@ async function handleOrderStageChanged(
   sb: SupabaseClient,
   event: WorkflowEvent
 ): Promise<EventResult> {
-  const { new_stage, driver_name, driver_phone, os_number, quote_id } = event.payload;
+  const { new_stage, driver_phone, quote_id } = event.payload;
   const actions: string[] = [];
 
   // Driver assigned (moved to busca_motorista with driver info)
@@ -205,7 +196,7 @@ async function handleOrderStageChanged(
       })
       .select('id')
       .single();
-    if (driverLog) await triggerNotificationHub(sb, driverLog.id);
+    if (driverLog) await triggerNotificationHub(driverLog.id);
     actions.push('notification_queued:driver_assigned_whatsapp');
 
     // Trigger AI driver qualification
@@ -279,7 +270,7 @@ async function handleOrderStageChanged(
       })
       .select('id')
       .single();
-    if (deliveryLog) await triggerNotificationHub(sb, deliveryLog.id);
+    if (deliveryLog) await triggerNotificationHub(deliveryLog.id);
     actions.push('notification_queued:delivery_confirmed');
   }
 
@@ -369,7 +360,7 @@ async function handleFinancialStatusChanged(
               })
               .select('id')
               .single();
-            if (approvalReqLog1) await triggerNotificationHub(sb, approvalReqLog1.id);
+            if (approvalReqLog1) await triggerNotificationHub(approvalReqLog1.id);
             actions.push('notification_queued:approval_requested');
             break;
           }
@@ -401,7 +392,7 @@ async function handleFinancialStatusChanged(
             })
             .select('id')
             .single();
-          if (approvalReqLog2) await triggerNotificationHub(sb, approvalReqLog2.id);
+          if (approvalReqLog2) await triggerNotificationHub(approvalReqLog2.id);
           actions.push('notification_queued:approval_requested');
           break;
         }
@@ -429,7 +420,7 @@ async function handleApprovalDecided(
   sb: SupabaseClient,
   event: WorkflowEvent
 ): Promise<EventResult> {
-  const { decision, entity_type, entity_id, approval_id, decision_notes } = event.payload;
+  const { decision, entity_type, entity_id } = event.payload;
   const actions: string[] = [];
 
   if (decision === 'approved') {
@@ -462,7 +453,7 @@ async function handleApprovalDecided(
       })
       .select('id')
       .single();
-    if (approvedLog) await triggerNotificationHub(sb, approvedLog.id);
+    if (approvedLog) await triggerNotificationHub(approvedLog.id);
     actions.push('notification_queued:approval_approved');
   }
 
@@ -478,7 +469,7 @@ async function handleApprovalDecided(
       })
       .select('id')
       .single();
-    if (rejectedLog) await triggerNotificationHub(sb, rejectedLog.id);
+    if (rejectedLog) await triggerNotificationHub(rejectedLog.id);
     actions.push('notification_queued:approval_rejected');
   }
 
@@ -575,7 +566,7 @@ async function handleDriverQualified(
   sb: SupabaseClient,
   event: WorkflowEvent
 ): Promise<EventResult> {
-  const { status, driver_name, risk_score, risk_flags, os_number } = event.payload;
+  const { status } = event.payload;
   const actions: string[] = [];
 
   if (status === 'aprovado') {
@@ -590,7 +581,7 @@ async function handleDriverQualified(
       })
       .select('id')
       .single();
-    if (approvedLog) await triggerNotificationHub(sb, approvedLog.id);
+    if (approvedLog) await triggerNotificationHub(approvedLog.id);
     actions.push('notification_queued:driver_qualification_approved');
   } else if (status === 'bloqueado') {
     const { data: blockedLog } = await sb
@@ -604,7 +595,7 @@ async function handleDriverQualified(
       })
       .select('id')
       .single();
-    if (blockedLog) await triggerNotificationHub(sb, blockedLog.id);
+    if (blockedLog) await triggerNotificationHub(blockedLog.id);
     actions.push('notification_queued:driver_qualification_blocked');
   } else if (status === 'em_analise') {
     const { data: reviewLog } = await sb
@@ -618,7 +609,7 @@ async function handleDriverQualified(
       })
       .select('id')
       .single();
-    if (reviewLog) await triggerNotificationHub(sb, reviewLog.id);
+    if (reviewLog) await triggerNotificationHub(reviewLog.id);
     actions.push('notification_queued:driver_qualification_review');
   }
 
@@ -637,7 +628,7 @@ async function handleComplianceViolation(
   sb: SupabaseClient,
   event: WorkflowEvent
 ): Promise<EventResult> {
-  const { check_type, violations, os_number } = event.payload;
+  const { check_type, os_number } = event.payload;
   const actions: string[] = [];
 
   // Create approval request for operational manager
@@ -664,7 +655,7 @@ async function handleComplianceViolation(
     })
     .select('id')
     .single();
-  if (violationLog) await triggerNotificationHub(sb, violationLog.id);
+  if (violationLog) await triggerNotificationHub(violationLog.id);
   actions.push('notification_queued:compliance_violation');
 
   return { success: true, actions };
@@ -780,7 +771,7 @@ async function processEvents(
 // HTTP Handler
 // ─────────────────────────────────────────────────────
 
-Deno.serve(async (req) => {
+deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {

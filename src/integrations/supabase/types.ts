@@ -2404,6 +2404,7 @@ export type Database = {
       };
       generate_os_number: { Args: never; Returns: string };
       generate_quote_code: { Args: never; Returns: string };
+      generate_trip_number: { Args: never; Returns: string };
       get_user_role: {
         Args: { _user_id: string };
         Returns: Database['public']['Enums']['app_role'];
@@ -2423,6 +2424,10 @@ export type Database = {
         Returns: boolean;
       };
       is_admin: { Args: never; Returns: boolean };
+      link_order_to_trip: {
+        Args: { p_order_id: string };
+        Returns: string;
+      };
       link_order_to_target_trip: {
         Args: { p_order_id: string; p_trip_id: string };
         Returns: string;
@@ -2438,6 +2443,10 @@ export type Database = {
           new_profile: Database['public']['Enums']['user_profile'];
           target_user_id: string;
         };
+        Returns: undefined;
+      };
+      sync_cost_items_from_breakdown: {
+        Args: { p_trip_id: string };
         Returns: undefined;
       };
     };

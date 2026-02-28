@@ -1,28 +1,14 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { callEdgeFunction } from '../_shared/edgeFunctionClient.ts';
 import { type DriverQualificationWorkerResult } from '../_shared/workers/driverQualificationWorker.ts';
 import { type OperationalReportData } from '../_shared/workers/operationalReportWorker.ts';
 import { type ParsedArticle } from '../_shared/workers/regulatoryUpdateWorker.ts';
 import { type OperationalInsightsData } from '../_shared/workers/operationalInsightsWorker.ts';
 
-// ─────────────────────────────────────────────────────
-// HTTP Worker Dispatch
-// ─────────────────────────────────────────────────────
-async function callWorker(workerName: string, body: Record<string, unknown>) {
-  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${workerName}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Worker ${workerName} failed (${res.status}): ${text}`);
-  }
-  return res.json();
+// callWorker delegates to shared callEdgeFunction (workers are edge functions)
+function callWorker(workerName: string, body: Record<string, unknown>) {
+  return callEdgeFunction(workerName, body);
 }
 
 // ─────────────────────────────────────────────────────
@@ -31,11 +17,11 @@ async function callWorker(workerName: string, body: Record<string, unknown>) {
 function selectModel(analysisType: string): string {
   switch (analysisType) {
     case 'compliance_check':
-    case 'operational_report':
       return 'gpt-4.1';
     case 'driver_qualification':
     case 'stage_gate_validation':
     case 'operational_insights':
+    case 'operational_report':
     case 'regulatory_update':
     default:
       return 'gpt-4.1-mini';

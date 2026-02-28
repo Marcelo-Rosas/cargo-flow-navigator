@@ -131,55 +131,129 @@ function evaluatePreEntrega(order: any): RuleEvaluation[] {
   ];
 }
 
-function evaluatePaymentReconciliation(order: any): RuleEvaluation[] {
+// Tolerância: R$ 1,00 (arredondamento/centavos) — alinhada com views
+const RECONCILIATION_TOLERANCE = 1;
+
+type ProofClassification =
+  | 'SEM_COMPROVANTES'
+  | 'PENDENTE'
+  | 'DIVERGENTE'
+  | 'RECONCILIADO'
+  | 'INDETERMINADO';
+
+interface ProofWithRecon {
+  amount: number | null;
+  expected_amount: number | null;
+  proof_type?: string;
+}
+
+function classifyPaymentReconciliation(
+  expectedAmount: number,
+  paidAmount: number,
+  deltaAmount: number,
+  proofs: ProofWithRecon[]
+): { classification: ProofClassification; detail: string } {
+  const hasProofWithUnreconciled = proofs.some((p) => {
+    if (p.expected_amount == null) return false;
+    const delta = (p.amount ?? 0) - Number(p.expected_amount);
+    return Math.abs(delta) > RECONCILIATION_TOLERANCE;
+  });
+
+  // proofs_count = 0 e expected_amount > 0 → SEM_COMPROVANTES
+  if (proofs.length === 0 && expectedAmount > 0) {
+    return {
+      classification: 'SEM_COMPROVANTES',
+      detail: 'Comprovante de pagamento ausente',
+    };
+  }
+
+  // paid_amount < expected_amount (delta negativo)
+  if (paidAmount < expectedAmount) {
+    if (hasProofWithUnreconciled) {
+      return {
+        classification: 'DIVERGENTE',
+        detail: `Divergência: R$ ${paidAmount.toFixed(2)} pago vs R$ ${expectedAmount.toFixed(2)} esperado; algum comprovante com valor incorreto`,
+      };
+    }
+    return {
+      classification: 'PENDENTE',
+      detail: `Saldo pendente: R$ ${paidAmount.toFixed(2)} pago vs R$ ${expectedAmount.toFixed(2)} esperado`,
+    };
+  }
+
+  // paid_amount >= expected_amount (delta zero ou positivo)
+  if (deltaAmount > RECONCILIATION_TOLERANCE) {
+    return {
+      classification: 'DIVERGENTE',
+      detail: `Possível duplicidade/erro: overpayment de R$ ${deltaAmount.toFixed(2)}`,
+    };
+  }
+  if (hasProofWithUnreconciled) {
+    return {
+      classification: 'DIVERGENTE',
+      detail: `Algum comprovante com valor divergente do esperado`,
+    };
+  }
+  return {
+    classification: 'RECONCILIADO',
+    detail: `Conciliado: R$ ${paidAmount.toFixed(2)} pago vs R$ ${expectedAmount.toFixed(2)} esperado`,
+  };
+}
+
+function evaluatePaymentReconciliation(order: {
+  carreteiro_real?: number | null;
+  payment_proofs?: Array<{
+    amount?: number | null;
+    expected_amount?: number | null;
+    proof_type?: string;
+  }>;
+  reconciliation?: {
+    expected_amount?: number | null;
+    paid_amount?: number | null;
+    delta_amount?: number | null;
+    is_reconciled?: boolean | null;
+  } | null;
+}): RuleEvaluation[] {
   const carreteiroReal = Number(order.carreteiro_real ?? 0);
-  const proofs = order.payment_proofs || [];
+  const proofs: ProofWithRecon[] = (order.payment_proofs || []).map((p) => ({
+    amount: p.amount != null ? Number(p.amount) : null,
+    expected_amount: p.expected_amount != null ? Number(p.expected_amount) : null,
+    proof_type: p.proof_type,
+  }));
   const recon = order.reconciliation;
 
   if (carreteiroReal <= 0) {
     return [];
   }
 
-  if (proofs.length === 0) {
+  const expectedAmount = Number(recon?.expected_amount ?? order.carreteiro_real ?? 0);
+  const paidAmount = Number(recon?.paid_amount ?? 0);
+  const deltaAmount = Number(recon?.delta_amount ?? paidAmount - expectedAmount);
+
+  // Backfill parcial: proof sem expected_amount → INDETERMINADO
+  const hasProofWithoutExpected = proofs.some((p) => p.expected_amount == null);
+  if (hasProofWithoutExpected) {
     return [
       {
         rule: 'Comprovante de pagamento ao carreteiro',
         passed: false,
-        detail: 'Comprovante de pagamento ausente',
+        detail: 'Proof sem expected_amount; verificar backfill',
       },
     ];
   }
 
-  if (recon?.is_reconciled) {
-    return [
-      {
-        rule: 'Comprovante de pagamento ao carreteiro',
-        passed: true,
-        detail: `Conciliado: R$ ${Number(recon.paid_amount ?? 0).toFixed(2)} pago vs R$ ${Number(recon.expected_amount ?? 0).toFixed(2)} esperado`,
-      },
-    ];
-  }
-
-  const hasAnyAmount = proofs.some((p: any) => p.amount != null && Number(p.amount) > 0);
-  if (hasAnyAmount) {
-    const delta = Math.abs(Number(recon?.delta_amount ?? 0));
-    const tolerance = 1;
-    if (delta > tolerance) {
-      return [
-        {
-          rule: 'Comprovante de pagamento ao carreteiro',
-          passed: false,
-          detail: `Divergência entre valor esperado (R$ ${Number(recon?.expected_amount ?? 0).toFixed(2)}) e valor do comprovante (R$ ${Number(recon?.paid_amount ?? 0).toFixed(2)})`,
-        },
-      ];
-    }
-  }
+  const { classification, detail } = classifyPaymentReconciliation(
+    expectedAmount,
+    paidAmount,
+    deltaAmount,
+    proofs
+  );
 
   return [
     {
       rule: 'Comprovante de pagamento ao carreteiro',
-      passed: false,
-      detail: 'Comprovante anexado, valor a confirmar',
+      passed: classification === 'RECONCILIADO',
+      detail,
     },
   ];
 }

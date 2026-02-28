@@ -82,7 +82,7 @@ export function useComplianceChecks(orderId: string) {
 // Mutations
 // ─────────────────────────────────────────────────────
 
-/** Trigger a compliance check via the ai-operational-agent edge function */
+/** Trigger a compliance check via the ai-operational-orchestrator */
 export function useRequestComplianceCheck() {
   const queryClient = useQueryClient();
   const { session } = useAuth();
@@ -100,8 +100,14 @@ export function useRequestComplianceCheck() {
 
       if (!token) throw new Error('Sessão expirada. Faça login novamente.');
 
-      const { data, error } = await supabase.functions.invoke('ai-operational-agent', {
-        body: { analysisType: 'compliance_check', orderId, checkType },
+      const { data, error } = await supabase.functions.invoke('ai-operational-orchestrator', {
+        body: {
+          analysisType: 'compliance_check',
+          orderId,
+          entityId: orderId,
+          entityType: 'order',
+          checkType,
+        },
         headers: {
           Authorization: `Bearer ${token}`,
         },

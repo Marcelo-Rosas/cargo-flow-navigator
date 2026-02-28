@@ -1,6 +1,7 @@
 /**
  * ai-operational-agent — backward-compat proxy
  *
+ * @deprecated Use ai-operational-orchestrator directly. Frontend has been migrated.
  * Forwards all requests to ai-operational-orchestrator so existing
  * callers continue to work without changes.
  */

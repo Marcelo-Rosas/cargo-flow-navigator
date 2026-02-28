@@ -85,9 +85,17 @@ export function useProcessPaymentProof() {
 
   return useMutation({
     mutationFn: async (documentId: string): Promise<ProcessPaymentProofResponse> => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      let token = sessionData?.session?.access_token;
+      if (!token) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        token = refreshData?.session?.access_token ?? undefined;
+      }
+      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
       const { data, error } = await supabase.functions.invoke<ProcessPaymentProofResponse>(
         'process-payment-proof',
-        { body: { documentId } }
+        { body: { documentId }, headers: { Authorization: `Bearer ${token}` } }
       );
 
       if (error) throw error;

@@ -511,6 +511,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       baseCost: 0,
       baseFreight: 0,
       toll: 0,
+      aluguelMaquinas: 0,
       gris: 0,
       tso: 0,
       rctrc: 0,

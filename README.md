@@ -90,16 +90,19 @@ Acesse `http://localhost:5173`.
 │   └── config.toml    # Configuração do projeto
 ├── .env.example       # Template de variáveis de ambiente
 └── docs/
-    └── api.md         # Documentação das Edge Functions
+    ├── api.md         # Edge Functions
+    ├── edge-functions-auth.md
+    ├── ai-models-config.md
+    ├── cursor-prompts-cookbook.md  # Prompts do Cursor
+    └── referencia/    # Planos, análises e guias (não executados)
 ```
 
-## Documentação da API
+## Documentação
 
-As Edge Functions estão documentadas em [docs/api.md](docs/api.md):
-
-- `calculate-freight` — Cálculo de frete (peso, volume, tabela de preço, GRIS, TSO, TAC, NTC)
-- `lookup-cep` — Consulta de CEP (ViaCEP, BrasilAPI, OpenCEP)
-- `import-price-table` — Importação de tabelas de preço (Excel/CSV)
+- **[docs/api.md](docs/api.md)** — Edge Functions (`calculate-freight`, `lookup-cep`, `import-price-table`, etc.)
+- **[docs/edge-functions-auth.md](docs/edge-functions-auth.md)** — Autenticação e autorização nas Edge Functions
+- **[docs/ai-models-config.md](docs/ai-models-config.md)** — Configuração de modelos de IA e monitoramento de custos
+- **[docs/cursor-prompts-cookbook.md](docs/cursor-prompts-cookbook.md)** — Livro de receitas: prompts do Cursor (@enhance-code, @manage-prompts, @ai-system-prompts, @workflow, etc.)
 
 ## Deploy
 

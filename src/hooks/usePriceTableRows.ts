@@ -60,12 +60,21 @@ export function usePriceTableRowByKmFromEdgeFn(
   return useQuery({
     queryKey: ['price_table_rows', 'edgefn', priceTableId, kmDistance, rounding, isAuthenticated],
     queryFn: async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      let token = sessionData?.session?.access_token;
+      if (!token) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        token = refreshData?.session?.access_token ?? undefined;
+      }
+      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
       const { data, error } = await supabase.functions.invoke('price-row', {
         body: {
           p_price_table_id: asDb(priceTableId),
           p_km_numeric: Number(kmDistance),
           p_rounding: rounding,
         },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (error) {
