@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useRsKmDetailedReport } from '@/hooks/useDashboardStats';
+import { useVehicleTypes } from '@/hooks/usePricingRules';
 import { cn } from '@/lib/utils';
 
 const REPORT_MONTHS = [
@@ -71,9 +72,12 @@ function StatCard({
 export default function Reports() {
   const [reportYear, setReportYear] = useState<number | null>(REPORT_THIS_YEAR);
   const [reportMonth, setReportMonth] = useState<number | null>(null);
+  const [vehicleTypeId, setVehicleTypeId] = useState<string | null>(null);
+  const { data: vehicleTypes } = useVehicleTypes();
   const { data: routes, isLoading } = useRsKmDetailedReport({
     year: reportYear,
     month: reportMonth,
+    vehicleTypeId,
   });
 
   // Resumo geral
@@ -143,6 +147,18 @@ export default function Reports() {
             {REPORT_YEARS.map((y) => (
               <option key={y} value={y}>
                 {y}
+              </option>
+            ))}
+          </select>
+          <select
+            value={vehicleTypeId ?? ''}
+            onChange={(e) => setVehicleTypeId(e.target.value || null)}
+            className="text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground cursor-pointer min-w-[180px]"
+          >
+            <option value="">Todos os tipos</option>
+            {(vehicleTypes ?? []).map((vt) => (
+              <option key={vt.id} value={vt.id}>
+                {vt.name}
               </option>
             ))}
           </select>

@@ -395,7 +395,8 @@ function extractRouteLabel(input: {
   return (
     quoteBd?.meta?.routeUfLabel ||
     orderBd?.meta?.routeUfLabel ||
-    formatRouteUf(input.origin, input.destination)
+    formatRouteUf(input.origin, input.destination) ||
+    'Sem UF definida'
   );
 }
 
@@ -450,18 +451,27 @@ function extractPrevistoCarreteiro(input: {
 
 /** Versão estendida com contagem de cotações por rota — para a página de Relatórios.
  *  Rotas identificadas por par de UF; linhas sem UF são ignoradas. */
-export function useRsKmDetailedReport(filter?: { month?: number | null; year?: number | null }) {
+export function useRsKmDetailedReport(filter?: {
+  month?: number | null;
+  year?: number | null;
+  vehicleTypeId?: string | null;
+}) {
   const year = filter?.year ?? null;
   const month = filter?.month ?? null;
+  const vehicleTypeId = filter?.vehicleTypeId ?? null;
 
   return useQuery({
-    queryKey: ['rskm-detailed-report', year, month],
+    queryKey: ['rskm-detailed-report', year, month, vehicleTypeId],
     queryFn: async () => {
       // Cotações com km_distance — para calcular quoteCount por rota
-      const { data: quotesData } = await supabase
+      let quotesQuery = supabase
         .from('quotes')
-        .select('km_distance, pricing_breakdown, origin, destination, created_at')
+        .select('km_distance, pricing_breakdown, origin, destination, created_at, vehicle_type_id')
         .not('km_distance', 'is', null);
+      if (vehicleTypeId) {
+        quotesQuery = quotesQuery.eq('vehicle_type_id', vehicleTypeId);
+      }
+      const { data: quotesData } = await quotesQuery;
 
       type QuoteRow = {
         km_distance: number | null;
@@ -469,6 +479,7 @@ export function useRsKmDetailedReport(filter?: { month?: number | null; year?: n
         origin: string;
         destination: string;
         created_at: string;
+        vehicle_type_id: string | null;
       };
       const allQuotes = filterSupabaseRows<QuoteRow>(quotesData);
       const quotes =
@@ -491,13 +502,17 @@ export function useRsKmDetailedReport(filter?: { month?: number | null; year?: n
       }
 
       // OS com carreteiro_real preenchido
-      const { data: ordersData, error } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select(
-          `carreteiro_real, carreteiro_antt, km_distance, pricing_breakdown, origin, destination, created_at,
-           quote:quotes(km_distance, pricing_breakdown)`
+          `carreteiro_real, carreteiro_antt, km_distance, pricing_breakdown, origin, destination, created_at, vehicle_type_id,
+           quote:quotes(km_distance, pricing_breakdown, vehicle_type_id)`
         )
         .not('carreteiro_real', 'is', null);
+      if (vehicleTypeId) {
+        ordersQuery = ordersQuery.eq('vehicle_type_id', vehicleTypeId);
+      }
+      const { data: ordersData, error } = await ordersQuery;
 
       if (error) throw error;
 
@@ -509,7 +524,12 @@ export function useRsKmDetailedReport(filter?: { month?: number | null; year?: n
         origin: string;
         destination: string;
         created_at: string;
-        quote: { km_distance: number | null; pricing_breakdown: unknown } | null;
+        vehicle_type_id: string | null;
+        quote: {
+          km_distance: number | null;
+          pricing_breakdown: unknown;
+          vehicle_type_id: string | null;
+        } | null;
       };
       const allOrders = filterSupabaseRows<OrderRow>(ordersData);
       const orders =
