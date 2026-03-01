@@ -12,7 +12,14 @@
     "preview": "vite preview",
     "prepare": "husky",
     "lint:types": "tsc --noEmit",
-    "lint:eslint": "eslint ."
+    "lint:eslint": "eslint .",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:local": "cross-env PW_BASE_URL=http://localhost:4173 playwright test",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:codegen": "playwright codegen https://cargo-flow-navigator.vercel.app"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -84,12 +91,15 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^4.2.3",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^10.1.0",
+    "dotenv": "^17.3.1",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^5.2.0",

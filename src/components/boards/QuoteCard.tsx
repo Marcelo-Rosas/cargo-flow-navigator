@@ -15,7 +15,6 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
 import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
@@ -93,6 +93,7 @@ export function QuoteCard({
   return (
     <motion.div
       ref={setNodeRef}
+      data-testid={`quote-card-${quote.id}`}
       style={style}
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -112,6 +113,7 @@ export function QuoteCard({
             <button
               {...attributes}
               {...listeners}
+              data-testid={`quote-card-drag-handle-${quote.id}`}
               className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => e.stopPropagation()}
             >
@@ -204,115 +206,69 @@ export function QuoteCard({
         )}
       </div>
 
-      {/* Route */}
-      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-        <span className="truncate">{quote.origin}</span>
-        <span>→</span>
-        <span className="truncate">{quote.destination}</span>
-      </div>
-
-      {/* Route UF Badge + Km Band Badge */}
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        {routeUfLabel && (
-          <Badge variant="secondary" className="text-xs uppercase bg-primary/10 text-primary">
-            <Route className="w-3 h-3 mr-1" />
-            {routeUfLabel}
-          </Badge>
-        )}
-
-        {kmBandLabel && kmStatus === 'OK' && (
-          <Badge variant="secondary" className="text-xs uppercase bg-muted">
-            {kmBandLabel} km
-          </Badge>
-        )}
-
-        {quote.email_sent && (
-          <Badge variant="secondary" className="text-xs uppercase bg-emerald-100 text-emerald-700 border-emerald-300">
-            <Mail className="w-3 h-3 mr-1" />
-            E-mail
-          </Badge>
-        )}
-
-        {kmStatus === 'OUT_OF_RANGE' && (
-          <Badge
-            variant="secondary"
-            className="text-xs uppercase bg-destructive/10 text-destructive"
-          >
-            <AlertTriangle className="w-3 h-3 mr-1" />
-            Fora da faixa
-          </Badge>
-        )}
-
-        {marginStatus === 'BELOW_TARGET' && marginPercent !== undefined && (
-          <Badge
-            variant="secondary"
-            className="text-xs uppercase bg-warning/10 text-warning-foreground"
-          >
-            <AlertTriangle className="w-3 h-3 mr-1" />
-            {marginPercent.toFixed(1)}%
-          </Badge>
-        )}
-      </div>
-
-      {/* Shipper & Freight Type */}
-      {(quote.shipper_name || quote.freight_type) && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+      {/* Rota visível, detalhes secundários no tooltip */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3 cursor-help min-h-[20px]">
+            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{quote.origin}</span>
+            <span>→</span>
+            <span className="truncate">{quote.destination}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs space-y-2 text-xs">
+          {routeUfLabel && (
+            <p>
+              <Route className="inline w-3 h-3 mr-1" />
+              {routeUfLabel}
+              {kmBandLabel && ` • ${kmBandLabel} km`}
+            </p>
+          )}
           {quote.shipper_name && (
-            <div className="flex items-center gap-1 truncate">
-              <Building2 className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate max-w-[100px]">{quote.shipper_name}</span>
-            </div>
+            <p>
+              <Building2 className="inline w-3 h-3 mr-1" />
+              Embarcador: {quote.shipper_name}
+            </p>
           )}
-          {quote.freight_type && (
-            <Badge variant="outline" className="text-[10px] uppercase px-1.5 py-0">
-              {quote.freight_type}
-            </Badge>
+          {(quote.freight_type || quote.freight_modality) && (
+            <p>
+              Tipo: {quote.freight_type || '—'}{' '}
+              {quote.freight_modality &&
+                `• ${quote.freight_modality === 'lotacao' ? 'Lot' : 'Frac'}`}
+            </p>
           )}
-          {quote.freight_modality && (
-            <Badge variant="outline" className="text-[10px] uppercase px-1.5 py-0">
-              {quote.freight_modality === 'lotacao' ? 'Lot' : 'Frac'}
-            </Badge>
+          {anttTotal != null && <p>Piso ANTT: {formatCurrency(Number(anttTotal))}</p>}
+          {tags.length > 0 && <p>Tags: {tags.join(', ')}</p>}
+          {quote.email_sent && (
+            <p>
+              <Mail className="inline w-3 h-3 mr-1" />
+              E-mail enviado
+            </p>
           )}
-        </div>
-      )}
+          {kmStatus === 'OUT_OF_RANGE' && (
+            <p className="text-destructive">
+              <AlertTriangle className="inline w-3 h-3 mr-1" />
+              Fora da faixa
+            </p>
+          )}
+          {marginStatus === 'BELOW_TARGET' && marginPercent !== undefined && (
+            <p className="text-warning-foreground">
+              <AlertTriangle className="inline w-3 h-3 mr-1" />
+              Margem: {marginPercent.toFixed(1)}%
+            </p>
+          )}
+        </TooltipContent>
+      </Tooltip>
 
-      {/* Tags */}
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-3">
-          {tags.map((tag) => (
-            <Badge
-              key={tag}
-              variant="secondary"
-              className={cn(
-                'text-xs uppercase',
-                tag === 'urgente' && 'bg-destructive/10 text-destructive',
-                tag === 'contrato' && 'bg-primary/10 text-primary',
-                tag === 'refrigerado' && 'bg-accent text-accent-foreground'
-              )}
-            >
-              {tag}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-3 border-t border-border">
-        <div className="flex flex-col">
-          <span className="text-lg font-bold text-foreground">
-            {formatCurrency(Number(quote.value))}
-          </span>
-          {anttTotal != null && (
-            <span className="text-[11px] text-muted-foreground">
-              Piso ANTT: {formatCurrency(Number(anttTotal))}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+      {/* Footer: Valor e Data */}
+      <div className="flex items-center justify-between pt-2 border-t border-border">
+        <span className="text-lg font-bold text-foreground">
+          {formatCurrency(Number(quote.value))}
+        </span>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
           <Calendar className="w-3 h-3" />
           {formatDate(quote.created_at)}
-        </div>
+        </span>
       </div>
     </motion.div>
   );

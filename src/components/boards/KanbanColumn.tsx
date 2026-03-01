@@ -37,6 +37,7 @@ export function KanbanColumn({ id, title, count, color, children, items }: Kanba
       {/* Column Content */}
       <div
         ref={setNodeRef}
+        data-testid={`kanban-column-${id}`}
         className={cn(
           'flex-1 p-2 rounded-lg bg-muted/30 min-h-[200px] transition-colors',
           isOver && 'bg-primary/5 ring-2 ring-primary/20 ring-dashed'

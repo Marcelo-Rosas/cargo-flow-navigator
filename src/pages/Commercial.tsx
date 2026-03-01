@@ -2,9 +2,10 @@ import { useState, useMemo, useEffect } from 'react';
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   DragStartEvent,
-  closestCenter,
+  pointerWithin,
   PointerSensor,
   useSensor,
   useSensors,
@@ -51,6 +52,7 @@ export default function Commercial() {
   const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
   const [emailingQuote, setEmailingQuote] = useState<Quote | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [overStage, setOverStage] = useState<QuoteStage | null>(null);
   const canManageCommercial = canWrite;
 
   // Sincroniza selectedQuote com o cache quando quotes atualiza (após save/edit)
@@ -103,20 +105,50 @@ export default function Commercial() {
     return grouped;
   }, [filteredQuotes]);
 
+  const displayQuotesByStage = useMemo(() => {
+    if (!activeQuote || !overStage || overStage === activeQuote.stage) {
+      return quotesByStage;
+    }
+    const result = { ...quotesByStage };
+    result[activeQuote.stage] = result[activeQuote.stage].filter((q) => q.id !== activeQuote.id);
+    result[overStage] = [...result[overStage], activeQuote];
+    return result;
+  }, [quotesByStage, activeQuote, overStage]);
+
   const handleDragStart = (event: DragStartEvent) => {
     const quote = quotes?.find((q) => q.id === event.active.id);
     if (quote) setActiveQuote(quote);
+    setOverStage(null);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over || !quotes) {
+      setOverStage(null);
+      return;
+    }
+    const activeQuote = quotes.find((q) => q.id === active.id);
+    if (!activeQuote) return;
+
+    const targetStage =
+      (QUOTE_STAGES.find((s) => s.id === over.id)?.id as QuoteStage) ??
+      (quotes.find((q) => q.id === over.id)?.stage as QuoteStage | undefined);
+    if (targetStage && targetStage !== activeQuote.stage) {
+      setOverStage(targetStage);
+    } else {
+      setOverStage(null);
+    }
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    if (!canManageCommercial) {
-      toast.error('Seu perfil é somente leitura para alterações');
-      setActiveQuote(null);
-      return;
-    }
-
     const { active, over } = event;
     setActiveQuote(null);
+    setOverStage(null);
+
+    if (!canManageCommercial) {
+      toast.error('Seu perfil é somente leitura para alterações');
+      return;
+    }
 
     if (!over || !quotes) return;
 
@@ -260,8 +292,9 @@ export default function Commercial() {
         /* Kanban Board */
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={pointerWithin}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
@@ -270,11 +303,11 @@ export default function Commercial() {
                 key={stage.id}
                 id={stage.id}
                 title={stage.label}
-                count={quotesByStage[stage.id].length}
+                count={displayQuotesByStage[stage.id].length}
                 color={stage.color}
-                items={quotesByStage[stage.id].map((q) => q.id)}
+                items={displayQuotesByStage[stage.id].map((q) => q.id)}
               >
-                {quotesByStage[stage.id].map((quote) => (
+                {displayQuotesByStage[stage.id].map((quote) => (
                   <QuoteCard
                     key={quote.id}
                     quote={quote}
