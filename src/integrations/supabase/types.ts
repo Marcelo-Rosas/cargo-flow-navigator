@@ -2468,7 +2468,10 @@ export type Database = {
         | 'comprovante_vpo'
         | 'comprovante_descarga'
         | 'adiantamento_carreteiro'
-        | 'saldo_carreteiro';
+        | 'saldo_carreteiro'
+        | 'a_vista_fat'
+        | 'saldo_fat'
+        | 'a_prazo_fat';
       financial_doc_type: 'FAT' | 'PAG';
       financial_installment_status: 'pendente' | 'baixado';
       financial_source_type: 'quote' | 'order';
@@ -2632,6 +2635,9 @@ export const Constants = {
         'comprovante_descarga',
         'adiantamento_carreteiro',
         'saldo_carreteiro',
+        'a_vista_fat',
+        'saldo_fat',
+        'a_prazo_fat',
       ],
       financial_doc_type: ['FAT', 'PAG'],
       financial_installment_status: ['pendente', 'baixado'],

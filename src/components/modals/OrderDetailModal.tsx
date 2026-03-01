@@ -119,7 +119,12 @@ const STAGES_WITH_DRIVER: OrderStage[] = [
   'entregue',
 ];
 const STAGES_WITH_DOCS_TAB: OrderStage[] = [
-  'busca_motorista',
+  'documentacao',
+  'coleta_realizada',
+  'em_transito',
+  'entregue',
+];
+const STAGES_WITH_CARRETEIRO_TAB: OrderStage[] = [
   'documentacao',
   'coleta_realizada',
   'em_transito',
@@ -534,6 +539,7 @@ export function OrderDetailModal({
 
   // Stage-based visibility flags
   const showDriverSection = STAGES_WITH_DRIVER.includes(order.stage);
+  const showCarreteiroTab = STAGES_WITH_CARRETEIRO_TAB.includes(order.stage);
   const showDocsTab = STAGES_WITH_DOCS_TAB.includes(order.stage);
 
   const formatCurrency = (value: number) => {
@@ -662,7 +668,7 @@ export function OrderDetailModal({
                   Doc-Mot
                 </TabsTrigger>
               )}
-              {showDriverSection && (
+              {showCarreteiroTab && (
                 <TabsTrigger value="carreteiro" className="gap-1.5">
                   <DollarSign className="w-3.5 h-3.5" />
                   Carreteiro
@@ -1308,7 +1314,7 @@ export function OrderDetailModal({
                 )}
               </TabsContent>
 
-              {showDriverSection && (
+              {showCarreteiroTab && (
                 <TabsContent value="carreteiro" className="m-0">
                   <CarreteiroTab order={order} canManage={canManage} />
                 </TabsContent>
@@ -1383,7 +1389,10 @@ export function OrderDetailModal({
                     <OrderReconciliationSummary orderId={order.id} />
                   )}
                   <Separator />
-                  <DocumentList orderId={order.id} />
+                  <DocumentList
+                    orderId={order.id}
+                    dedupeByType={order.stage === 'em_transito' || order.stage === 'entregue'}
+                  />
                 </TabsContent>
               )}
 

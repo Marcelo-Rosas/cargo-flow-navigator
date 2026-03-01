@@ -689,6 +689,7 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
           orderId={order.id}
           orderStage={order.stage}
           financialContext="carrier_payment"
+          allowComprovanteDescarga={Number(order.descarga_real ?? 0) > 0}
           onCarrierPaymentDocCreated={handleCarrierPaymentDocCreated}
         />
         <div className="mt-4">

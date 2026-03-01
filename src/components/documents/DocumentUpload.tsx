@@ -37,14 +37,17 @@ interface DocumentUploadProps {
   orderId?: string;
   quoteId?: string;
   orderStage?: OrderStage;
-  financialContext?: 'carrier_payment';
+  financialContext?: 'carrier_payment' | 'quote_receivable';
   /** Quando true, exibe apenas tipos Doc-Mot (CNH, CRLV, comp.res., ANTT) */
   docMotContext?: boolean;
   /** Quando true, filtra CNH/CRLV/comp.res./ANTT do seletor (docs herdados da viagem) */
   driverDocsInherited?: boolean;
+  allowComprovanteDescarga?: boolean;
   onSuccess?: () => void;
   /** Called after upload when type is adiantamento_carreteiro or saldo_carreteiro (to trigger process-payment-proof) */
   onCarrierPaymentDocCreated?: (documentId: string, type: DocumentType) => void;
+  /** Called after upload when in Doc FAT context */
+  onQuotePaymentDocCreated?: (documentId: string, type: DocumentType) => void;
 }
 
 interface UploadingFile {
@@ -88,7 +91,6 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'analise_gr', label: 'Análise GR (Gerenciamento de Risco)' },
     { value: 'doc_rota', label: 'Documento de Rota' },
     { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
-    { value: 'pod', label: 'Canhoto (POD - Comprovante de Entrega)' },
     { value: 'outros', label: 'Outros' },
   ],
   em_transito: [
@@ -102,7 +104,6 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'analise_gr', label: 'Análise GR (Gerenciamento de Risco)' },
     { value: 'doc_rota', label: 'Documento de Rota' },
     { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
-    { value: 'pod', label: 'Canhoto (POD - Comprovante de Entrega)' },
     { value: 'outros', label: 'Outros' },
   ],
   entregue: [
@@ -116,19 +117,27 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'analise_gr', label: 'Análise GR (Gerenciamento de Risco)' },
     { value: 'doc_rota', label: 'Documento de Rota' },
     { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
-    { value: 'pod', label: 'Canhoto (POD - Comprovante de Entrega)' },
     { value: 'outros', label: 'Outros' },
   ],
 };
 
 // Tipos de documento para pagamento/custos do carreteiro (aba Carreteiro)
-const CARRIER_PAYMENT_DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
+const CARRIER_PAYMENT_BASE_DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
   { value: 'adiantamento_carreteiro', label: 'Adiantamento (Carreteiro)' },
   { value: 'saldo_carreteiro', label: 'Saldo (Carreteiro)' },
-  { value: 'doc_rota', label: 'Documento de Rota' },
-  { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
-  { value: 'comprovante_descarga', label: 'Comprovante Descarga' },
   { value: 'outros', label: 'Outros' },
+];
+
+const CARRIER_PAYMENT_DESCARGA_DOCUMENT_TYPE: { value: DocumentType; label: string } = {
+  value: 'comprovante_descarga',
+  label: 'Comprovante Descarga',
+};
+
+const QUOTE_RECEIVABLE_DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
+  { value: 'a_vista_fat' as DocumentType, label: 'À vista' },
+  { value: 'adiantamento', label: 'Adiantamento' },
+  { value: 'saldo_fat' as DocumentType, label: 'Saldo' },
+  { value: 'a_prazo_fat' as DocumentType, label: 'A prazo' },
 ];
 
 // Mapeamento de tipo de documento para campo booleano da ordem
@@ -149,6 +158,12 @@ const DOCUMENT_TYPE_TO_ORDER_FIELD: Record<string, keyof Order | null> = {
 };
 
 const CARRIER_PAYMENT_TYPES: DocumentType[] = ['adiantamento_carreteiro', 'saldo_carreteiro'];
+const QUOTE_RECEIVABLE_TYPES: DocumentType[] = [
+  'a_vista_fat' as DocumentType,
+  'adiantamento',
+  'saldo_fat' as DocumentType,
+  'a_prazo_fat' as DocumentType,
+];
 
 export function DocumentUpload({
   orderId,
@@ -157,8 +172,10 @@ export function DocumentUpload({
   financialContext,
   docMotContext,
   driverDocsInherited,
+  allowComprovanteDescarga = false,
   onSuccess,
   onCarrierPaymentDocCreated,
+  onQuotePaymentDocCreated,
 }: DocumentUploadProps) {
   const { user } = useAuth();
   const createDocumentMutation = useCreateDocument();
@@ -172,15 +189,25 @@ export function DocumentUpload({
   ];
 
   // Pega os tipos disponíveis: doc_mot, carrier payment, cotação ou ordem (por estágio)
+  const carrierPaymentTypes = allowComprovanteDescarga
+    ? [
+        ...CARRIER_PAYMENT_BASE_DOCUMENT_TYPES.slice(0, 2),
+        CARRIER_PAYMENT_DESCARGA_DOCUMENT_TYPE,
+        ...CARRIER_PAYMENT_BASE_DOCUMENT_TYPES.slice(2),
+      ]
+    : CARRIER_PAYMENT_BASE_DOCUMENT_TYPES;
+
   let availableTypes = docMotContext
     ? DOC_MOT_TYPES
     : financialContext === 'carrier_payment'
-      ? CARRIER_PAYMENT_DOCUMENT_TYPES
-      : quoteId && !orderId
-        ? QUOTE_DOCUMENT_TYPES
-        : orderStage
-          ? DOCUMENT_TYPES_BY_STAGE[orderStage]
-          : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
+      ? carrierPaymentTypes
+      : financialContext === 'quote_receivable'
+        ? QUOTE_RECEIVABLE_DOCUMENT_TYPES
+        : quoteId && !orderId
+          ? QUOTE_DOCUMENT_TYPES
+          : orderStage
+            ? DOCUMENT_TYPES_BY_STAGE[orderStage]
+            : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
 
   // Na aba Docs, remover tipos Doc-Mot (CNH, CRLV, etc.) — estão na aba Doc-Mot
   if (!docMotContext && !financialContext && orderId) {
@@ -248,6 +275,10 @@ export function DocumentUpload({
         onCarrierPaymentDocCreated(created.id, type);
       }
 
+      if (QUOTE_RECEIVABLE_TYPES.includes(type) && created?.id && onQuotePaymentDocCreated) {
+        onQuotePaymentDocCreated(created.id, type);
+      }
+
       // Update order document flags baseado no tipo
       if (orderId) {
         const orderField = DOCUMENT_TYPE_TO_ORDER_FIELD[type];
@@ -263,7 +294,15 @@ export function DocumentUpload({
         prev.map((f) => (f.file === file ? { ...f, progress: 100, status: 'success' } : f))
       );
     },
-    [user, orderId, quoteId, createDocumentMutation, updateOrderMutation]
+    [
+      user,
+      orderId,
+      quoteId,
+      createDocumentMutation,
+      updateOrderMutation,
+      onCarrierPaymentDocCreated,
+      onQuotePaymentDocCreated,
+    ]
   );
 
   const onDrop = useCallback(

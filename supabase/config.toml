@@ -21,7 +21,7 @@ additional_redirect_urls = [
   "https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app**",
   # Preview deploys – wildcard para branches
   "https://cargo-*-flow-navigator-marcelo-rosas-projects.vercel.app",
-  "https://cargo-*-flow-navigator-marcelo-rosas-projects.vercel.app/**",
+  "https://cargo-*-flow-navigator-marcelo-rosas-projects.vercel.app**",
 ]
 
 [functions.import-price-table]
@@ -68,12 +68,6 @@ verify_jwt = false  # Chamado pelo workflow-orchestrator com service role
 
 [functions.reconcile-trip]
 verify_jwt = false  # Valida Authorization manualmente
-
-[functions.ai-orchestrator-agent]
-verify_jwt = false  # Chamado por ai-financial-agent com service role
-
-[functions.ai-operational-orchestrator]
-verify_jwt = false  # Chamado por frontend com user token; validação manual se necessário
 
 [functions.workflow-orchestrator]
 verify_jwt = false  # Chamado por cron/pg_cron com service role

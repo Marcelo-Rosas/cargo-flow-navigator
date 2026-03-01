@@ -64,6 +64,8 @@ import {
 } from '@/components/ui/select';
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { DocumentList } from '@/components/documents/DocumentList';
+import { QuotePaymentProofList } from '@/components/documents/QuotePaymentProofList';
+import { useProcessQuotePaymentProof } from '@/hooks/useQuotePaymentProofs';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -108,6 +110,7 @@ export function QuoteDetailModal({
   const queryClient = useQueryClient();
   const updateQuoteMutation = useUpdateQuote();
   const calculateFreightMutation = useCalculateFreight();
+  const processQuotePaymentProofMutation = useProcessQuotePaymentProof();
 
   // All hooks MUST be called before any conditional returns
   const { data: priceTable } = usePriceTable(quote?.price_table_id || '');
@@ -199,6 +202,7 @@ export function QuoteDetailModal({
 
   // REGRA: Converter para OS só quando stage === 'ganho'
   const canConvert = quote.stage === 'ganho';
+  const showDocFatTab = quote.stage === 'ganho';
 
   // Parse pricing breakdown - using new StoredPricingBreakdown type
   const breakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
@@ -402,6 +406,15 @@ export function QuoteDetailModal({
     }
   };
 
+  const handleQuotePaymentDocCreated = async (documentId: string) => {
+    try {
+      await processQuotePaymentProofMutation.mutateAsync(documentId);
+    } catch (e) {
+      console.error('Erro ao processar comprovante Doc Fat:', e);
+      toast.error('Arquivo enviado, mas erro ao processar conciliação Doc Fat');
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
@@ -512,7 +525,7 @@ export function QuoteDetailModal({
           )}
 
           <Tabs defaultValue="resumo" className="mt-4">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className={cn('grid w-full', showDocFatTab ? 'grid-cols-3' : 'grid-cols-2')}>
               <TabsTrigger value="resumo">Resumo</TabsTrigger>
               <TabsTrigger value="pedagios" className="gap-2">
                 <Landmark className="w-4 h-4" />
@@ -523,10 +536,12 @@ export function QuoteDetailModal({
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="documentos" className="gap-2">
-                <FileText className="w-4 h-4" />
-                Documento em Edição
-              </TabsTrigger>
+              {showDocFatTab && (
+                <TabsTrigger value="doc_fat" className="gap-2">
+                  <FileText className="w-4 h-4" />
+                  Doc Fat
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="resumo" className="space-y-6 mt-4 m-0">
@@ -1297,39 +1312,44 @@ export function QuoteDetailModal({
               )}
             </TabsContent>
 
-            <TabsContent value="documentos" className="space-y-6 mt-4 m-0">
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">
-                    Adiantamento
-                  </label>
-                  <Select
-                    value={selectedAdvancePercent}
-                    onValueChange={handleAdvancePercentChange}
-                    disabled={!canManage || updateQuoteMutation.isPending}
-                  >
-                    <SelectTrigger className="w-full max-w-[200px]">
-                      <SelectValue placeholder="Selecionar..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {advanceOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            {showDocFatTab && (
+              <TabsContent value="doc_fat" className="space-y-6 mt-4 m-0">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">
+                      Condição de recebimento
+                    </label>
+                    <Select
+                      value={selectedAdvancePercent}
+                      onValueChange={handleAdvancePercentChange}
+                      disabled={!canManage || updateQuoteMutation.isPending}
+                    >
+                      <SelectTrigger className="w-full max-w-[260px]">
+                        <SelectValue placeholder="Selecionar..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {advanceOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {canManage && (
-                  <DocumentUpload
-                    quoteId={quote.id}
-                    onSuccess={() => queryClient.invalidateQueries({ queryKey: ['documents'] })}
-                  />
-                )}
-                <DocumentList quoteId={quote.id} />
-              </div>
-            </TabsContent>
+                  {canManage && (
+                    <DocumentUpload
+                      quoteId={quote.id}
+                      financialContext="quote_receivable"
+                      onQuotePaymentDocCreated={handleQuotePaymentDocCreated}
+                      onSuccess={() => queryClient.invalidateQueries({ queryKey: ['documents'] })}
+                    />
+                  )}
+                  <QuotePaymentProofList quoteId={quote.id} />
+                  <DocumentList quoteId={quote.id} dedupeByType />
+                </div>
+              </TabsContent>
+            )}
           </Tabs>
         </DialogContent>
       </Dialog>

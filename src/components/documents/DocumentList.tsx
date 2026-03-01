@@ -34,6 +34,7 @@ interface DocumentListProps {
   quoteId?: string;
   /** Quando true, exibe apenas docs Doc-Mot (CNH, CRLV, etc.) */
   docMotFilter?: boolean;
+  dedupeByType?: boolean;
 }
 
 const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
@@ -55,16 +56,30 @@ const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
     color: 'bg-orange-500/10 text-orange-600',
   },
   saldo_carreteiro: { label: 'Saldo Carreteiro', color: 'bg-orange-500/10 text-orange-600' },
+  a_vista_fat: { label: 'À Vista FAT', color: 'bg-emerald-500/10 text-emerald-600' },
+  saldo_fat: { label: 'Saldo FAT', color: 'bg-amber-500/10 text-amber-600' },
+  a_prazo_fat: { label: 'A Prazo FAT', color: 'bg-blue-500/10 text-blue-600' },
   outros: { label: 'Outros', color: 'bg-muted text-muted-foreground' },
 };
 
-export function DocumentList({ orderId, quoteId, docMotFilter }: DocumentListProps) {
+export function DocumentList({
+  orderId,
+  quoteId,
+  docMotFilter,
+  dedupeByType = false,
+}: DocumentListProps) {
   const byOrder = useDocumentsByOrder(orderId || '');
   const byQuote = useDocumentsByQuote(quoteId || '');
   const { data: rawDocuments, isLoading } = quoteId ? byQuote : byOrder;
-  const documents = docMotFilter
+  const filteredDocuments = docMotFilter
     ? (rawDocuments ?? []).filter((d) => DOC_MOT_TYPES.includes(d.type))
     : (rawDocuments ?? []);
+
+  const documents = dedupeByType
+    ? filteredDocuments.filter(
+        (doc, index, arr) => arr.findIndex((d) => d.type === doc.type) === index
+      )
+    : filteredDocuments;
   const deleteDocumentMutation = useDeleteDocument();
 
   const handleDelete = async (doc: Document) => {
