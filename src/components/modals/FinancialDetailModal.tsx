@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import type { FinancialKanbanRow } from '@/types/financial';
 import { FinancialAiAnalysis } from '@/components/financial/FinancialAiAnalysis';
+import { QuotePaymentProofList } from '@/components/documents/QuotePaymentProofList';
 import { useTrips, useLinkOrderToTargetTrip } from '@/hooks/useTrips';
 import { toast } from 'sonner';
 
@@ -448,6 +449,14 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
                   )}
                 </Button>
               </div>
+            </div>
+          )}
+
+          {/* FAT: Conciliação de Recebimento */}
+          {doc.type === 'FAT' && doc.source_type === 'quote' && doc.source_id && (
+            <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+              <h4 className="font-semibold text-foreground text-sm">Conciliação de Recebimento</h4>
+              <QuotePaymentProofList quoteId={doc.source_id as string} />
             </div>
           )}
 

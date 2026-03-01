@@ -19,6 +19,8 @@ async function buildAuthHeaders(requireAuth: boolean): Promise<Record<string, st
     baseHeaders.apikey = publishableKey;
   }
 
+  // getUser() forces refresh if token expired; getSession() alone can return stale token
+  await supabase.auth.getUser();
   const {
     data: { session },
   } = await supabase.auth.getSession();

@@ -14,6 +14,7 @@ import { Loader2, FileText, Truck } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { KanbanColumn } from '@/components/boards/KanbanColumn';
 import { FinancialCard } from '@/components/financial/FinancialCard';
+import { CashFlowReport } from '@/components/financial/CashFlowReport';
 import { TripReconciliationCard } from '@/components/financial/TripReconciliationCard';
 import { TripDetailModal } from '@/components/modals/TripDetailModal';
 import { FinancialDetailModal } from '@/components/modals/FinancialDetailModal';
@@ -27,7 +28,7 @@ import type { FinancialDocType } from '@/types/financial';
 import type { FinancialKanbanRow } from '@/types/financial';
 import { toast } from 'sonner';
 
-type TabKey = 'receber' | 'pagar';
+type TabKey = 'receber' | 'pagar' | 'fluxo';
 type PagViewMode = 'os' | 'trip';
 
 export default function Financial() {
@@ -37,13 +38,16 @@ export default function Financial() {
   const [selectedDoc, setSelectedDoc] = useState<FinancialKanbanRow | null>(null);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
 
-  const activeType = useMemo(() => (tab === 'receber' ? 'FAT' : 'PAG') as FinancialDocType, [tab]);
+  const activeType = useMemo(
+    () => (tab === 'receber' ? 'FAT' : tab === 'pagar' ? 'PAG' : null) as FinancialDocType | null,
+    [tab]
+  );
   const receber = useFinancialBoardData('FAT', { enabled: tab === 'receber' });
   const pagar = useFinancialBoardData('PAG', { enabled: tab === 'pagar' });
   const showTripsMode = tab === 'pagar' && pagViewMode === 'trip';
   const tripsReconciliation = useTripsReconciliation({ enabled: showTripsMode });
 
-  const boardData = tab === 'receber' ? receber : pagar;
+  const boardData = tab === 'receber' ? receber : tab === 'pagar' ? pagar : receber;
   const columnsConfig = activeType === 'FAT' ? FAT_COLUMNS : PAG_COLUMNS;
   const updateStatusMutation = useUpdateFinancialDocumentStatus();
 
@@ -144,6 +148,12 @@ export default function Financial() {
               count={totalPagar}
               overdueCount={pagar.overdueCount}
             />
+            <TabButton
+              active={tab === 'fluxo'}
+              onClick={() => setTab('fluxo')}
+              label="Fluxo de Caixa"
+              count={0}
+            />
           </div>
           {tab === 'pagar' && (
             <ToggleGroup
@@ -164,7 +174,9 @@ export default function Financial() {
           )}
         </div>
 
-        {tab === 'pagar' && pagViewMode === 'trip' ? (
+        {tab === 'fluxo' ? (
+          <CashFlowReport />
+        ) : tab === 'pagar' && pagViewMode === 'trip' ? (
           tripsReconciliation.isLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
