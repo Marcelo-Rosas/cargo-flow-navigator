@@ -106,3 +106,38 @@ export function useUpdateQuotePaymentProofAmount() {
     },
   });
 }
+
+export function useUpsertQuotePaymentProofAmount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      quoteId,
+      documentId,
+      proofType,
+      amount,
+    }: {
+      quoteId: string;
+      documentId: string;
+      proofType: 'a_vista' | 'adiantamento' | 'saldo' | 'a_prazo';
+      amount: number;
+    }) => {
+      const { error } = await supabase.from('quote_payment_proofs' as never).upsert(
+        {
+          quote_id: quoteId,
+          document_id: documentId,
+          proof_type: proofType,
+          amount,
+          status: 'pending',
+          updated_at: new Date().toISOString(),
+        } as never,
+        { onConflict: 'document_id', ignoreDuplicates: false } as never
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quote_payment_proofs'] });
+      queryClient.invalidateQueries({ queryKey: ['quote_reconciliation'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+  });
+}

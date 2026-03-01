@@ -63,7 +63,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
-import { DocumentList } from '@/components/documents/DocumentList';
 import { QuotePaymentProofList } from '@/components/documents/QuotePaymentProofList';
 import { useProcessQuotePaymentProof } from '@/hooks/useQuotePaymentProofs';
 
@@ -1346,7 +1345,6 @@ export function QuoteDetailModal({
                     />
                   )}
                   <QuotePaymentProofList quoteId={quote.id} />
-                  <DocumentList quoteId={quote.id} dedupeByType />
                 </div>
               </TabsContent>
             )}
