@@ -32,8 +32,7 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
   const { data: proofs, isLoading } = useQuotePaymentProofsByQuote(quoteId);
   const { data: reconciliation } = useQuoteReconciliation(quoteId);
   const updateMutation = useUpdateQuotePaymentProofAmount();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [amountByProofId, setAmountByProofId] = useState<Record<string, string>>({});
 
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -45,15 +44,24 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
     reconciliation.paid_amount === 0 &&
     Number(reconciliation.expected_amount) > 0;
 
-  const handleSave = async (id: string) => {
-    const cents = editValue.replace(/\D/g, '');
+  const getInputValue = (proofId: string, currentAmount: number | null) => {
+    if (proofId in amountByProofId) return amountByProofId[proofId];
+    return currentAmount != null ? String(Math.round(Number(currentAmount) * 100)) : '';
+  };
+
+  const handleSave = async (id: string, currentAmount: number | null) => {
+    const raw = getInputValue(id, currentAmount);
+    const cents = raw.replace(/\D/g, '');
     const num = cents ? Number(cents) / 100 : NaN;
     if (isNaN(num) || num < 0) return toast.error('Informe um valor válido');
     try {
       await updateMutation.mutateAsync({ id, amount: num });
       toast.success('Valor salvo');
-      setEditingId(null);
-      setEditValue('');
+      setAmountByProofId((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     } catch {
       toast.error('Erro ao salvar valor');
     }
@@ -131,64 +139,60 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
           label: proof.proof_type,
           color: 'bg-muted text-muted-foreground',
         };
-        const isEditing = editingId === proof.id;
+        const amount = proof.amount != null ? Number(proof.amount) : null;
+        const expectedAmount = proof.expected_amount != null ? Number(proof.expected_amount) : null;
+        const lineDelta = amount != null && expectedAmount != null ? amount - expectedAmount : null;
         return (
           <div
             key={proof.id}
             className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border"
           >
-            <div className="flex-1 min-w-0 flex items-center gap-3">
-              <FileText className="w-4 h-4 text-primary" />
-              <p className="text-sm truncate">{proof.document?.file_name ?? 'Documento'}</p>
-              <Badge variant="secondary" className={cn('text-xs', info.color)}>
-                {info.label}
-              </Badge>
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 text-primary" />
+                <p className="text-sm truncate">{proof.document?.file_name ?? 'Documento'}</p>
+                <Badge variant="secondary" className={cn('text-xs', info.color)}>
+                  {info.label}
+                </Badge>
+              </div>
+              {lineDelta != null && (
+                <p
+                  className={cn(
+                    'text-xs',
+                    Math.abs(lineDelta) <= 1 ? 'text-success' : 'text-destructive'
+                  )}
+                >
+                  Delta comprovante: {formatCurrency(lineDelta)}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
-              {isEditing ? (
-                <>
-                  <MaskedInput
-                    mask="currency"
-                    value={editValue}
-                    onValueChange={(raw) => setEditValue(raw)}
-                    className="w-28 h-8 text-sm"
-                  />
-                  <Button size="sm" className="h-8" onClick={() => handleSave(proof.id)}>
-                    <Save className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8"
-                    onClick={() => setEditingId(null)}
-                  >
-                    Cancelar
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <span className="text-sm font-medium">
-                    {proof.amount != null ? formatCurrency(Number(proof.amount)) : '—'}
-                    {proof.expected_amount != null && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        (esp. {formatCurrency(Number(proof.expected_amount))})
-                      </span>
-                    )}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8"
-                    onClick={() => {
-                      setEditingId(proof.id);
-                      setEditValue(
-                        proof.amount != null ? String(Math.round(Number(proof.amount) * 100)) : ''
-                      );
-                    }}
-                  >
-                    {proof.amount != null ? 'Editar' : 'Informar valor'}
-                  </Button>
-                </>
+              <MaskedInput
+                mask="currency"
+                value={getInputValue(proof.id, amount)}
+                onValueChange={(raw) =>
+                  setAmountByProofId((prev) => ({ ...prev, [proof.id]: raw }))
+                }
+                className="w-28 h-8 text-sm"
+                placeholder="0,00"
+              />
+              <Button
+                size="sm"
+                className="h-8 gap-1"
+                onClick={() => handleSave(proof.id, amount)}
+                disabled={updateMutation.isPending}
+              >
+                {updateMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Save className="w-3 h-3" />
+                )}
+                Salvar
+              </Button>
+              {expectedAmount != null && (
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  Esp. {formatCurrency(expectedAmount)}
+                </span>
               )}
               {proof.document?.file_url && (
                 <>
