@@ -1,41 +1,19 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import {
-  GripVertical,
-  CreditCard,
-  Package,
-  Route,
-  Landmark,
-  Truck,
-  CheckCircle2,
-  AlertCircle,
-  XCircle,
-} from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { KanbanReconciliationBadge } from '@/components/financial/kanban/KanbanReconciliationBadge';
+import { KanbanTripChip } from '@/components/financial/kanban/KanbanTripChip';
+import { KanbanEnrichedChips } from '@/components/financial/kanban/KanbanEnrichedChips';
 import { cn } from '@/lib/utils';
 import type { FinancialKanbanRow } from '@/types/financial';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 
 interface FinancialCardProps {
   row: FinancialKanbanRow;
   onEdit?: () => void;
   canManageActions?: boolean;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
-}
-
-function formatDate(dateStr: string | null | undefined) {
-  if (!dateStr) return '—';
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(dateStr));
 }
 
 export function FinancialCard({ row, onEdit, canManageActions = true }: FinancialCardProps) {
@@ -102,85 +80,26 @@ export function FinancialCard({ row, onEdit, canManageActions = true }: Financia
             <p className="text-lg font-semibold text-foreground">{formatCurrency(amount)}</p>
 
             {/* Trip chip (PAG only) */}
-            {(row.trip_id ?? row.trip_number) && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
-                  <Truck className="w-3 h-3" />
-                  {row.trip_number ?? `Trip`}
-                </span>
-              </div>
-            )}
+            <KanbanTripChip
+              tripId={row.trip_id as string | null}
+              tripNumber={row.trip_number as string | null}
+            />
 
             {/* Reconciliation badges (PAG and FAT) */}
-            {row.expected_amount != null && Number(row.expected_amount) > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                {row.is_reconciled === true && (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-success bg-success/10 rounded px-1.5 py-0.5">
-                    <CheckCircle2 className="w-3 h-3" />
-                    OK
-                  </span>
-                )}
-                {row.is_reconciled === false &&
-                  row.proofs_count != null &&
-                  row.proofs_count > 0 &&
-                  (row.paid_amount ?? 0) === 0 &&
-                  Number(row.expected_amount) > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-warning-foreground bg-warning/10 rounded px-1.5 py-0.5">
-                      <AlertCircle className="w-3 h-3" />
-                      Pendente confirmação
-                    </span>
-                  )}
-                {row.is_reconciled === false &&
-                  row.proofs_count != null &&
-                  row.proofs_count > 0 &&
-                  !(
-                    (row.paid_amount ?? 0) === 0 &&
-                    row.expected_amount != null &&
-                    Number(row.expected_amount) > 0
-                  ) && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5">
-                      <XCircle className="w-3 h-3" />
-                      Divergente
-                    </span>
-                  )}
-                {row.is_reconciled === false &&
-                  (row.proofs_count ?? 0) === 0 &&
-                  Number(row.expected_amount) > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-warning-foreground bg-warning/10 rounded px-1.5 py-0.5">
-                      <AlertCircle className="w-3 h-3" />
-                      Pendente
-                    </span>
-                  )}
-              </div>
-            )}
+            <KanbanReconciliationBadge
+              expectedAmount={row.expected_amount as number | null}
+              paidAmount={row.paid_amount as number | null}
+              isReconciled={row.is_reconciled as boolean | null}
+              proofsCount={row.proofs_count as number | null}
+            />
 
             {/* Enriched info chips */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-              {row.payment_term_name && (
-                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
-                  <CreditCard className="w-3 h-3" />
-                  {row.payment_term_name}
-                </span>
-              )}
-              {row.cargo_type && (
-                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
-                  <Package className="w-3 h-3" />
-                  {row.cargo_type}
-                </span>
-              )}
-              {row.km_distance != null && (
-                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
-                  <Route className="w-3 h-3" />
-                  {Number(row.km_distance).toLocaleString('pt-BR')} km
-                </span>
-              )}
-              {row.toll_value != null && Number(row.toll_value) > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
-                  <Landmark className="w-3 h-3" />
-                  {formatCurrency(Number(row.toll_value))}
-                </span>
-              )}
-            </div>
+            <KanbanEnrichedChips
+              paymentTermName={row.payment_term_name as string | null}
+              cargoType={row.cargo_type as string | null}
+              kmDistance={row.km_distance as number | null}
+              tollValue={row.toll_value as number | null}
+            />
 
             {dueDate && (
               <p className="text-xs text-muted-foreground">Venc: {formatDate(dueDate)}</p>
