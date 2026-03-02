@@ -11,7 +11,8 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
-import { Plus, Filter, Search, Loader2 } from 'lucide-react';
+import { Plus, Filter, Search } from 'lucide-react';
+import { KanbanSkeleton } from '@/components/skeletons/KanbanSkeleton';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { KanbanColumn } from '@/components/boards/KanbanColumn';
 import { QuoteCard } from '@/components/boards/QuoteCard';
@@ -285,9 +286,7 @@ export default function Commercial() {
 
       {/* Loading State */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
+        <KanbanSkeleton columnCount={7} columnLabels={QUOTE_STAGES} />
       ) : (
         /* Kanban Board */
         <DndContext

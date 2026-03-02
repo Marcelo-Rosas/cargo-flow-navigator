@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -8,23 +8,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useCashFlowSummary } from '@/hooks/useCashFlowSummary';
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
-}
+import { formatCurrency } from '@/lib/formatters';
+import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 
 export function CashFlowReport() {
   const { data: rows, isLoading, isError, error } = useCashFlowSummary();
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <TableSkeleton rows={6} columns={4} title />;
   }
 
   if (isError) {

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, FileText, Truck } from 'lucide-react';
+import { FileText, Truck } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { FinancialKanbanBoard } from '@/components/financial/kanban/FinancialKanbanBoard';
 import { CashFlowReport } from '@/components/financial/CashFlowReport';
@@ -12,6 +12,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useFinancialBoardData } from '@/hooks/useFinancialBoardData';
 import { useTripsReconciliation } from '@/hooks/useReconciliation';
 import { useUpdateFinancialDocumentStatus } from '@/hooks/useUpdateFinancialDocumentStatus';
+import { KanbanSkeleton } from '@/components/skeletons/KanbanSkeleton';
+import { TripsGridSkeleton } from '@/components/skeletons/TripsGridSkeleton';
 import { FAT_COLUMNS, PAG_COLUMNS } from '@/lib/financial-kanban';
 import type { FinancialDocType } from '@/types/financial';
 import type { FinancialKanbanRow } from '@/types/financial';
@@ -108,9 +110,7 @@ export default function Financial() {
           <CashFlowReport />
         ) : tab === 'pagar' && pagViewMode === 'trip' ? (
           tripsReconciliation.isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
+            <TripsGridSkeleton />
           ) : tripsReconciliation.isError ? (
             <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 text-destructive">
               Erro ao carregar trips
@@ -127,9 +127,7 @@ export default function Financial() {
             </div>
           )
         ) : boardData.isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
+          <KanbanSkeleton columnLabels={columnsConfig} />
         ) : boardData.isError ? (
           <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 text-destructive">
             Erro ao carregar:{' '}
