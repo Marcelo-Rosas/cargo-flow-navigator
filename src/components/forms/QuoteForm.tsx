@@ -1063,6 +1063,20 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 paymentTerms={paymentTerms ?? []}
                 weightUnit={weightUnit}
                 setWeightUnit={setWeightUnit}
+                isCalculationStale={isCalculationStale}
+                formatCurrency={formatCurrency}
+                additionalFeesSelection={additionalFeesSelection}
+                setAdditionalFeesSelection={setAdditionalFeesSelection}
+                equipmentRentalItems={equipmentRentalItems}
+                onEquipmentRentalChange={(total, items) => {
+                  form.setValue('aluguel_maquinas', total);
+                  setEquipmentRentalItems(items);
+                }}
+                unloadingCostItems={unloadingCostItems}
+                onUnloadingCostChange={(total, items) => {
+                  form.setValue('descarga', total);
+                  setUnloadingCostItems(items);
+                }}
                 calculationResult={calculationResult}
                 vehicleTypeName={
                   vehicleTypes?.find((v) => v.id === form.watch('vehicle_type_id'))?.name ?? '—'

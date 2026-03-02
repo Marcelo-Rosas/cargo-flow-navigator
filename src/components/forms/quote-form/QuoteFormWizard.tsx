@@ -17,8 +17,12 @@ import { cn } from '@/lib/utils';
 import type { QuoteFormData } from './types';
 import { IdentificationStep } from './steps/IdentificationStep';
 import { CargoLogisticsStep } from './steps/CargoLogisticsStep';
+import { PricingStep } from './steps/PricingStep';
 import { ReviewStep } from './steps/ReviewStep';
 import type { FreightCalculationOutput } from '@/lib/freightCalculator';
+import type { AdditionalFeesSelection } from '@/components/quotes/AdditionalFeesSection';
+import type { EquipmentRentalItem } from '@/components/quotes/EquipmentRentalSection';
+import type { UnloadingCostItem } from '@/components/quotes/UnloadingCostSection';
 
 const STEPS = [
   { id: 'identification', label: 'Identificação' },
@@ -69,6 +73,15 @@ interface QuoteFormWizardProps {
   paymentTerms: { id: string; name: string; adjustment_percent?: number | null }[];
   weightUnit: 'kg' | 'ton';
   setWeightUnit: (unit: 'kg' | 'ton') => void;
+  // Pricing step
+  isCalculationStale: boolean;
+  formatCurrency: (v: number) => string;
+  additionalFeesSelection: AdditionalFeesSelection;
+  setAdditionalFeesSelection: (s: AdditionalFeesSelection) => void;
+  equipmentRentalItems: EquipmentRentalItem[];
+  onEquipmentRentalChange: (total: number, items: EquipmentRentalItem[]) => void;
+  unloadingCostItems: UnloadingCostItem[];
+  onUnloadingCostChange: (total: number, items: UnloadingCostItem[]) => void;
   // Review step
   calculationResult: FreightCalculationOutput | null;
   vehicleTypeName: string;
@@ -100,6 +113,14 @@ export function QuoteFormWizard({
   paymentTerms,
   weightUnit,
   setWeightUnit,
+  isCalculationStale,
+  formatCurrency,
+  additionalFeesSelection,
+  setAdditionalFeesSelection,
+  equipmentRentalItems,
+  onEquipmentRentalChange,
+  unloadingCostItems,
+  onUnloadingCostChange,
   calculationResult,
   vehicleTypeName,
   clientName,
@@ -186,9 +207,18 @@ export function QuoteFormWizard({
         />
       )}
       {step === 2 && (
-        <div className="rounded-lg border border-dashed bg-muted/20 p-8 text-center text-muted-foreground">
-          Passo 3: Composição Financeira (em breve)
-        </div>
+        <PricingStep
+          form={form}
+          calculationResult={calculationResult}
+          isCalculationStale={isCalculationStale}
+          formatCurrency={formatCurrency}
+          additionalFeesSelection={additionalFeesSelection}
+          setAdditionalFeesSelection={setAdditionalFeesSelection}
+          equipmentRentalItems={equipmentRentalItems}
+          onEquipmentRentalChange={onEquipmentRentalChange}
+          unloadingCostItems={unloadingCostItems}
+          onUnloadingCostChange={onUnloadingCostChange}
+        />
       )}
       {step === 3 && (
         <ReviewStep
