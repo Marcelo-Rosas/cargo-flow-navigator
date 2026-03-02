@@ -80,8 +80,11 @@ import {
   TollPlaza,
 } from '@/lib/freightCalculator';
 import { zodPhone } from '@/lib/validators';
+import { QuoteFormWizard } from '@/components/forms/quote-form/QuoteFormWizard';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
+
+const USE_WIZARD = true;
 
 // Select/Combobox podem passar number; coerce para string
 const idString = z
@@ -157,7 +160,7 @@ const quoteSchema = z
     }
   });
 
-type QuoteFormData = z.infer<typeof quoteSchema>;
+export type QuoteFormData = z.infer<typeof quoteSchema>;
 
 interface QuoteFormProps {
   open: boolean;
@@ -921,7 +924,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
             {/* OUT_OF_RANGE Alert */}
             {calculationResult.status === 'OUT_OF_RANGE' && (
               <Alert variant="destructive">
@@ -965,531 +968,613 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               </Alert>
             )}
 
-            {/* Cliente Section */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-foreground">Dados do Cliente</h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="client_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cliente Existente</FormLabel>
-                      <Select
-                        onValueChange={(value) => handleClientSelect(value)}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar cliente..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {clients?.map((client) => (
-                            <SelectItem key={client.id} value={client.id}>
-                              {client.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="client_email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>E-mail</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="cliente@email.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="client_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome do Cliente *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nome ou razão social" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            {USE_WIZARD ? (
+              <QuoteFormWizard
+                form={form}
+                onSubmit={onSubmit}
+                onClose={onClose}
+                onDelete={isEditing ? handleDelete : undefined}
+                isEditing={isEditing}
+                isLoading={isLoading}
+                clients={clients ?? []}
+                shippers={shippers ?? []}
+                onClientSelect={handleClientSelect}
+                onShipperSelect={handleShipperSelect}
+                onOriginCepBlur={handleOriginCepBlur}
+                onDestinationCepBlur={handleDestinationCepBlur}
+                onCalculateKm={handleCalculateKm}
+                onOriginManualEdit={() => {
+                  userEditedOrigin.current = true;
+                }}
+                onDestinationManualEdit={() => {
+                  userEditedDestination.current = true;
+                }}
+                isLoadingOriginCep={isLoadingOriginCep}
+                isLoadingDestinationCep={isLoadingDestinationCep}
+                isCalculatingKm={isCalculatingKm}
               />
-            </div>
+            ) : (
+              <>
+                {/* Cliente Section */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-foreground">Dados do Cliente</h3>
 
-            <Separator />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="client_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cliente Existente</FormLabel>
+                          <Select
+                            onValueChange={(value) => handleClientSelect(value)}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar cliente..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {clients?.map((client) => (
+                                <SelectItem key={client.id} value={client.id}>
+                                  {client.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-            {/* Embarcador Section */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-foreground">Embarcador</h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="shipper_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Embarcador Existente</FormLabel>
-                      <Select
-                        onValueChange={(value) => handleShipperSelect(value)}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar embarcador..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {shippers?.map((shipper) => (
-                            <SelectItem key={shipper.id} value={shipper.id}>
-                              {shipper.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="shipper_email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>E-mail Embarcador</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="embarcador@email.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="shipper_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome do Embarcador</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Nome ou razão social" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="freight_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo de Frete *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="FOB">FOB (Frete por conta do destinatário)</SelectItem>
-                          <SelectItem value="CIF">CIF (Frete por conta do remetente)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Rota e Carga Section */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-foreground">Rota e Carga</h3>
-
-              {/* CEP Fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="origin_cep"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CEP Origem</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <MaskedInput
-                            mask="cep"
-                            placeholder="00000-000"
-                            value={field.value || ''}
-                            onValueChange={(rawValue) => field.onChange(String(rawValue ?? ''))}
-                            onBlur={() => {
-                              field.onBlur();
-                              handleOriginCepBlur();
-                            }}
-                            disabled={isLoadingOriginCep}
-                          />
-                          {isLoadingOriginCep && (
-                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
-                          )}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="destination_cep"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CEP Destino</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <MaskedInput
-                            mask="cep"
-                            placeholder="00000-000"
-                            value={field.value || ''}
-                            onValueChange={(rawValue) => field.onChange(String(rawValue ?? ''))}
-                            onBlur={() => {
-                              field.onBlur();
-                              handleDestinationCepBlur();
-                            }}
-                            disabled={isLoadingDestinationCep}
-                          />
-                          {isLoadingDestinationCep && (
-                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
-                          )}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCalculateKm}
-                  disabled={isCalculatingKm || isLoadingOriginCep || isLoadingDestinationCep}
-                >
-                  {isCalculatingKm && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Calcular KM
-                </Button>
-              </div>
-
-              {/* City/State Fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="origin"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Origem *</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Cidade - UF"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            userEditedOrigin.current = true;
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="destination"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Destino *</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Cidade - UF"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            userEditedDestination.current = true;
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="cargo_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo de Carga</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Eletrônicos" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="weight"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Peso ({weightUnit})</FormLabel>
-                      <div className="flex gap-2">
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            min={0}
-                            max={weightUnit === 'ton' ? 99_999 : 99_999_999}
-                            step={weightUnit === 'ton' ? 0.001 : 1}
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                          />
-                        </FormControl>
-                        <ToggleGroup
-                          type="single"
-                          value={weightUnit}
-                          onValueChange={(v) => {
-                            if (!v) return;
-                            const nextUnit = v as 'kg' | 'ton';
-                            const currentUnit = weightUnit;
-                            const currentValue = Number(form.getValues('weight') || 0);
-                            const kg = unitToKg(currentValue, currentUnit);
-                            const nextValue = kgToUnit(kg, nextUnit);
-                            setWeightUnit(nextUnit);
-                            form.setValue('weight', Number.isFinite(nextValue) ? nextValue : 0, {
-                              shouldDirty: true,
-                            });
-                          }}
-                          size="sm"
-                          className="shrink-0"
-                        >
-                          <ToggleGroupItem value="kg" className="text-xs px-2">
-                            kg
-                          </ToggleGroupItem>
-                          <ToggleGroupItem value="ton" className="text-xs px-2">
-                            ton
-                          </ToggleGroupItem>
-                        </ToggleGroup>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="volume"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Volume (m³)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Peso Faturável Info */}
-              {(watchedWeight > 0 || watchedVolume > 0) && (
-                <div className="p-3 rounded-lg bg-muted/50 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Peso Cubado (x 300 kg/m³)</span>
-                    <span>{calculationResult.meta.cubageWeightKg.toLocaleString('pt-BR')} kg</span>
+                    <FormField
+                      control={form.control}
+                      name="client_email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>E-mail</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="cliente@email.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                  <div className="flex justify-between font-medium">
-                    <span>Peso Faturável</span>
-                    <span>
-                      {calculationResult.meta.billableWeightKg.toLocaleString('pt-BR')} kg
-                    </span>
+
+                  <FormField
+                    control={form.control}
+                    name="client_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome do Cliente *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nome ou razão social" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <Separator />
+
+                {/* Embarcador Section */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-foreground">Embarcador</h3>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="shipper_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Embarcador Existente</FormLabel>
+                          <Select
+                            onValueChange={(value) => handleShipperSelect(value)}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar embarcador..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {shippers?.map((shipper) => (
+                                <SelectItem key={shipper.id} value={shipper.id}>
+                                  {shipper.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="shipper_email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>E-mail Embarcador</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="embarcador@email.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="shipper_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome do Embarcador</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nome ou razão social" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="freight_type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo de Frete *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="FOB">
+                                FOB (Frete por conta do destinatário)
+                              </SelectItem>
+                              <SelectItem value="CIF">
+                                CIF (Frete por conta do remetente)
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </div>
-              )}
-            </div>
 
-            <Separator />
+                <Separator />
 
-            {/* Precificação Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold text-foreground">Precificação</h3>
-              </div>
+                {/* Rota e Carga Section */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-foreground">Rota e Carga</h3>
 
-              {/* Pricing Selectors Row */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="freight_modality"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Modalidade de Frete</FormLabel>
-                      <Select
-                        onValueChange={(v) => {
-                          field.onChange(v);
-                          // Limpar tabela ao mudar modalidade (tabela pode ser de outra modalidade)
-                          form.setValue('price_table_id', '');
-                        }}
-                        value={field.value || ''}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar modalidade..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="lotacao">Lotação</SelectItem>
-                          <SelectItem value="fracionado">Fracionado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
+                  {/* CEP Fields */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="origin_cep"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CEP Origem</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <MaskedInput
+                                mask="cep"
+                                placeholder="00000-000"
+                                value={field.value || ''}
+                                onValueChange={(rawValue) => field.onChange(String(rawValue ?? ''))}
+                                onBlur={() => {
+                                  field.onBlur();
+                                  handleOriginCepBlur();
+                                }}
+                                disabled={isLoadingOriginCep}
+                              />
+                              {isLoadingOriginCep && (
+                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="destination_cep"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CEP Destino</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <MaskedInput
+                                mask="cep"
+                                placeholder="00000-000"
+                                value={field.value || ''}
+                                onValueChange={(rawValue) => field.onChange(String(rawValue ?? ''))}
+                                onBlur={() => {
+                                  field.onBlur();
+                                  handleDestinationCepBlur();
+                                }}
+                                disabled={isLoadingDestinationCep}
+                              />
+                              {isLoadingDestinationCep && (
+                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCalculateKm}
+                      disabled={isCalculatingKm || isLoadingOriginCep || isLoadingDestinationCep}
+                    >
+                      {isCalculatingKm && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Calcular KM
+                    </Button>
+                  </div>
+
+                  {/* City/State Fields */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="origin"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Origem *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Cidade - UF"
+                              {...field}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                userEditedOrigin.current = true;
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="destination"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Destino *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Cidade - UF"
+                              {...field}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                userEditedDestination.current = true;
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="cargo_type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo de Carga</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ex: Eletrônicos" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="weight"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Peso ({weightUnit})</FormLabel>
+                          <div className="flex gap-2">
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                min={0}
+                                max={weightUnit === 'ton' ? 99_999 : 99_999_999}
+                                step={weightUnit === 'ton' ? 0.001 : 1}
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <ToggleGroup
+                              type="single"
+                              value={weightUnit}
+                              onValueChange={(v) => {
+                                if (!v) return;
+                                const nextUnit = v as 'kg' | 'ton';
+                                const currentUnit = weightUnit;
+                                const currentValue = Number(form.getValues('weight') || 0);
+                                const kg = unitToKg(currentValue, currentUnit);
+                                const nextValue = kgToUnit(kg, nextUnit);
+                                setWeightUnit(nextUnit);
+                                form.setValue(
+                                  'weight',
+                                  Number.isFinite(nextValue) ? nextValue : 0,
+                                  {
+                                    shouldDirty: true,
+                                  }
+                                );
+                              }}
+                              size="sm"
+                              className="shrink-0"
+                            >
+                              <ToggleGroupItem value="kg" className="text-xs px-2">
+                                kg
+                              </ToggleGroupItem>
+                              <ToggleGroupItem value="ton" className="text-xs px-2">
+                                ton
+                              </ToggleGroupItem>
+                            </ToggleGroup>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="volume"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Volume (m³)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Peso Faturável Info */}
+                  {(watchedWeight > 0 || watchedVolume > 0) && (
+                    <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Peso Cubado (x 300 kg/m³)</span>
+                        <span>
+                          {calculationResult.meta.cubageWeightKg.toLocaleString('pt-BR')} kg
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>Peso Faturável</span>
+                        <span>
+                          {calculationResult.meta.billableWeightKg.toLocaleString('pt-BR')} kg
+                        </span>
+                      </div>
+                    </div>
                   )}
-                />
+                </div>
 
-                <FormField
-                  control={form.control}
-                  name="price_table_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tabela de Preços</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar tabela..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {priceTablesFiltered.map((table) => (
-                            <SelectItem key={table.id} value={table.id}>
-                              {table.name} (
-                              {table.modality === 'lotacao' ? 'Lotação' : 'Fracionado'})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                <Separator />
 
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="vehicle_type_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo de Veículo</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar veículo..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {vehicleTypes?.map((vehicle) => (
-                            <SelectItem key={vehicle.id} value={vehicle.id}>
-                              {vehicle.name} ({vehicle.code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Precificação Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Calculator className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold text-foreground">Precificação</h3>
+                  </div>
 
-                <FormField
-                  control={form.control}
-                  name="payment_term_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Prazo de Pagamento</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar prazo..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {paymentTerms?.map((term) => (
-                            <SelectItem key={term.id} value={term.id}>
-                              {term.name}{' '}
-                              {term.adjustment_percent !== 0 &&
-                                `(${term.adjustment_percent > 0 ? '+' : ''}${term.adjustment_percent}%)`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  {/* Pricing Selectors Row */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="freight_modality"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Modalidade de Frete</FormLabel>
+                          <Select
+                            onValueChange={(v) => {
+                              field.onChange(v);
+                              // Limpar tabela ao mudar modalidade (tabela pode ser de outra modalidade)
+                              form.setValue('price_table_id', '');
+                            }}
+                            value={field.value || ''}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar modalidade..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="lotacao">Lotação</SelectItem>
+                              <SelectItem value="fracionado">Fracionado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                {/* Condição Financeira: datas manuais para adiantamento e saldo */}
-                {selectedPaymentTerm && (
-                  <div className="col-span-3 space-y-3 rounded-lg border border-dashed p-3">
-                    <h4 className="text-sm font-medium">Condição Financeira</h4>
-                    {(() => {
-                      const adv = selectedPaymentTerm.advance_percent ?? 0;
-                      const days = selectedPaymentTerm.days ?? 0;
-                      const total =
-                        calculationResult.status === 'OK'
-                          ? calculationResult.totals.totalCliente
-                          : 0;
-                      if (adv > 0) {
-                        const advanceValue = (total * adv) / 100;
-                        const balanceValue = total - advanceValue;
-                        return (
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="space-y-1.5">
-                              <span className="text-xs text-muted-foreground">
-                                Adiantamento {adv}% = {formatCurrency(advanceValue)}
-                              </span>
+                    <FormField
+                      control={form.control}
+                      name="price_table_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tabela de Preços</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar tabela..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {priceTablesFiltered.map((table) => (
+                                <SelectItem key={table.id} value={table.id}>
+                                  {table.name} (
+                                  {table.modality === 'lotacao' ? 'Lotação' : 'Fracionado'})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="vehicle_type_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo de Veículo</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar veículo..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {vehicleTypes?.map((vehicle) => (
+                                <SelectItem key={vehicle.id} value={vehicle.id}>
+                                  {vehicle.name} ({vehicle.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="payment_term_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Prazo de Pagamento</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar prazo..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {paymentTerms?.map((term) => (
+                                <SelectItem key={term.id} value={term.id}>
+                                  {term.name}{' '}
+                                  {term.adjustment_percent !== 0 &&
+                                    `(${term.adjustment_percent > 0 ? '+' : ''}${term.adjustment_percent}%)`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Condição Financeira: datas manuais para adiantamento e saldo */}
+                    {selectedPaymentTerm && (
+                      <div className="col-span-3 space-y-3 rounded-lg border border-dashed p-3">
+                        <h4 className="text-sm font-medium">Condição Financeira</h4>
+                        {(() => {
+                          const adv = selectedPaymentTerm.advance_percent ?? 0;
+                          const days = selectedPaymentTerm.days ?? 0;
+                          const total =
+                            calculationResult.status === 'OK'
+                              ? calculationResult.totals.totalCliente
+                              : 0;
+                          if (adv > 0) {
+                            const advanceValue = (total * adv) / 100;
+                            const balanceValue = total - advanceValue;
+                            return (
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                  <span className="text-xs text-muted-foreground">
+                                    Adiantamento {adv}% = {formatCurrency(advanceValue)}
+                                  </span>
+                                  <FormField
+                                    control={form.control}
+                                    name="advance_due_date"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-xs">Data adiantamento</FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            type="date"
+                                            value={field.value || ''}
+                                            onChange={(e) => field.onChange(e.target.value)}
+                                          />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <span className="text-xs text-muted-foreground">
+                                    Saldo {100 - adv}% = {formatCurrency(balanceValue)}
+                                  </span>
+                                  <FormField
+                                    control={form.control}
+                                    name="balance_due_date"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-xs">Data saldo</FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            type="date"
+                                            value={field.value || ''}
+                                            onChange={(e) => field.onChange(e.target.value)}
+                                          />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          }
+                          if (adv === 0 && days === 0) {
+                            return (
                               <FormField
                                 control={form.control}
                                 name="advance_due_date"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel className="text-xs">Data adiantamento</FormLabel>
+                                    <FormLabel className="text-xs">
+                                      Data do pagamento (à vista)
+                                    </FormLabel>
                                     <FormControl>
                                       <Input
                                         type="date"
@@ -1500,537 +1585,497 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                                   </FormItem>
                                 )}
                               />
-                            </div>
-                            <div className="space-y-1.5">
-                              <span className="text-xs text-muted-foreground">
-                                Saldo {100 - adv}% = {formatCurrency(balanceValue)}
-                              </span>
-                              <FormField
-                                control={form.control}
-                                name="balance_due_date"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-xs">Data saldo</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="date"
-                                        value={field.value || ''}
-                                        onChange={(e) => field.onChange(e.target.value)}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (adv === 0 && days === 0) {
-                        return (
-                          <FormField
-                            control={form.control}
-                            name="advance_due_date"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">
-                                  Data do pagamento (à vista)
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="date"
-                                    value={field.value || ''}
-                                    onChange={(e) => field.onChange(e.target.value)}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                        );
-                      }
-                      // adv === 0 && days > 0: prazo normal (D15, D30, etc.)
-                      return (
-                        <FormField
-                          control={form.control}
-                          name="balance_due_date"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Data de vencimento</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="date"
-                                  value={field.value || ''}
-                                  onChange={(e) => field.onChange(e.target.value)}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      );
-                    })()}
-                  </div>
-                )}
-
-                <FormField
-                  control={form.control}
-                  name="km_distance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Distância (km) *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          value={field.value ?? ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === '' ? undefined : parseFloat(val));
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Km Band Info: faixa derivada do km_distance (WebRouter/manual) + price_table_rows */}
-              {isLoadingPriceRow && kmBand > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  Buscando faixa...
-                </Badge>
-              )}
-              {!isLoadingPriceRow && faixaLabel && (
-                <Badge variant="outline" className="text-xs">
-                  Faixa: {faixaLabel} km
-                </Badge>
-              )}
-
-              {/* Mini card R$/KM — Custo ANTT por km */}
-              {anttRsKm !== null && (
-                <div className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/20 px-3 py-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-semibold text-primary">Custo ANTT/km</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      (referência carreteiro)
-                    </span>
-                  </div>
-                  <span className="font-bold text-primary text-sm">
-                    R$ {anttRsKm.toFixed(2)}/km
-                  </span>
-                </div>
-              )}
-
-              <Separator className="my-2" />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="cargo_value"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Valor da Mercadoria</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                            R$
-                          </span>
-                          <MaskedInput
-                            mask="currency"
-                            placeholder="0,00"
-                            className="pl-10"
-                            value={String(Math.round((field.value || 0) * 100))}
-                            onValueChange={(rawValue) =>
-                              field.onChange(parseInt(rawValue || '0', 10) / 100)
-                            }
-                            onBlur={field.onBlur}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="toll"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Pedágio</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                            R$
-                          </span>
-                          <MaskedInput
-                            mask="currency"
-                            placeholder="0,00"
-                            className="pl-10"
-                            value={String(Math.round((field.value || 0) * 100))}
-                            onValueChange={(rawValue) =>
-                              field.onChange(parseInt(rawValue || '0', 10) / 100)
-                            }
-                            onBlur={field.onBlur}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="col-span-2">
-                  <EquipmentRentalSection
-                    value={watchedAluguelMaquinas ?? 0}
-                    onChange={(total, items) => {
-                      form.setValue('aluguel_maquinas', total);
-                      setEquipmentRentalItems(items);
-                    }}
-                    initialItems={equipmentRentalItems}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <UnloadingCostSection
-                    value={watchedDescarga ?? 0}
-                    onChange={(total, items) => {
-                      form.setValue('descarga', total);
-                      setUnloadingCostItems(items);
-                    }}
-                    initialItems={unloadingCostItems}
-                  />
-                </div>
-              </div>
-
-              {/* NTC Taxes */}
-              <div className="flex gap-6">
-                <FormField
-                  control={form.control}
-                  name="tde_enabled"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center gap-2">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <FormLabel className="!mt-0 text-sm font-normal">TDE (20%)</FormLabel>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="tear_enabled"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center gap-2">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <FormLabel className="!mt-0 text-sm font-normal">TEAR (20%)</FormLabel>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Calculated Values */}
-              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-                <Tabs defaultValue="memoria" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 h-8">
-                    <TabsTrigger value="memoria" className="text-xs">
-                      Memória
-                    </TabsTrigger>
-                    <TabsTrigger value="rentabilidade" className="text-xs">
-                      Rentabilidade
-                    </TabsTrigger>
-                  </TabsList>
-
-                  {/* ── Aba Memória ── */}
-                  <TabsContent value="memoria" className="mt-2 space-y-1.5 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Frete Base</span>
-                      <span className="text-foreground">
-                        {formatCurrency(calculationResult.components.baseFreight)}
-                      </span>
-                    </div>
-                    {calculationResult.components.toll > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Pedágio</span>
-                        <span className="text-foreground">
-                          {formatCurrency(calculationResult.components.toll)}
-                        </span>
-                      </div>
-                    )}
-                    {calculationResult.components.aluguelMaquinas > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Aluguel de Máquinas</span>
-                        <span className="text-foreground">
-                          {formatCurrency(calculationResult.components.aluguelMaquinas)}
-                        </span>
-                      </div>
-                    )}
-                    {calculationResult.components.gris > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          GRIS ({calculationResult.rates.grisPercent.toFixed(2)}%)
-                        </span>
-                        <span className="text-foreground">
-                          {formatCurrency(calculationResult.components.gris)}
-                        </span>
-                      </div>
-                    )}
-                    {calculationResult.components.tso > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          TSO ({calculationResult.rates.tsoPercent.toFixed(2)}%)
-                        </span>
-                        <span className="text-foreground">
-                          {formatCurrency(calculationResult.components.tso)}
-                        </span>
-                      </div>
-                    )}
-                    {calculationResult.components.rctrc > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          RCTR-C ({calculationResult.rates.costValuePercent.toFixed(2)}%)
-                        </span>
-                        <span className="text-foreground">
-                          {formatCurrency(calculationResult.components.rctrc)}
-                        </span>
-                      </div>
-                    )}
-                    {calculationResult.components.tde > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">TDE (NTC)</span>
-                        <span className="text-foreground">
-                          {formatCurrency(calculationResult.components.tde)}
-                        </span>
-                      </div>
-                    )}
-                    {calculationResult.components.tear > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">TEAR (NTC)</span>
-                        <span className="text-foreground">
-                          {formatCurrency(calculationResult.components.tear)}
-                        </span>
-                      </div>
-                    )}
-                    {/* Taxas Condicionais */}
-                    {computedConditionalFees.ids.length > 0 &&
-                      computedConditionalFees.ids.map((feeId) => {
-                        const fee = conditionalFeesData?.find((f) => f.id === feeId);
-                        const val = computedConditionalFees.breakdown[feeId] ?? 0;
-                        if (val === 0) return null;
-                        return (
-                          <div key={feeId} className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              {fee ? fee.name : feeId}
-                              {fee && (
-                                <Badge variant="outline" className="ml-1 text-[10px] py-0">
-                                  {fee.code}
-                                </Badge>
+                            );
+                          }
+                          // adv === 0 && days > 0: prazo normal (D15, D30, etc.)
+                          return (
+                            <FormField
+                              control={form.control}
+                              name="balance_due_date"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Data de vencimento</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="date"
+                                      value={field.value || ''}
+                                      onChange={(e) => field.onChange(e.target.value)}
+                                    />
+                                  </FormControl>
+                                </FormItem>
                               )}
-                            </span>
-                            <span className="text-foreground">{formatCurrency(val)}</span>
-                          </div>
-                        );
-                      })}
-                    {additionalFeesSelection.waitingTimeCost > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Estadia / Hora Parada</span>
-                        <span className="text-foreground">
-                          {formatCurrency(additionalFeesSelection.waitingTimeCost)}
-                        </span>
+                            />
+                          );
+                        })()}
                       </div>
                     )}
 
-                    <Separator className="my-1" />
-
-                    <div className="flex justify-between font-medium">
-                      <span className="text-foreground">Receita Bruta</span>
-                      <span className="text-foreground">
-                        {formatCurrency(calculationResult.totals.receitaBruta)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
-                      </span>
-                      <span className="text-foreground">
-                        {formatCurrency(calculationResult.totals.das)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        ICMS (
-                        {taxRegimeSimples === 1
-                          ? '0.00'
-                          : calculationResult.rates.icmsPercent.toFixed(2)}
-                        %)
-                      </span>
-                      <span className="text-foreground">
-                        {formatCurrency(taxRegimeSimples === 1 ? 0 : calculationResult.totals.icms)}
-                      </span>
-                    </div>
-
-                    <Separator className="my-1" />
-
-                    <div className="flex justify-between font-semibold">
-                      <span className="text-foreground">Total Cliente</span>
-                      <span className="text-primary text-base">
-                        {formatCurrency(
-                          taxRegimeSimples === 1
-                            ? calculationResult.totals.receitaBruta + calculationResult.totals.das
-                            : calculationResult.totals.totalCliente
-                        )}
-                      </span>
-                    </div>
-                  </TabsContent>
-
-                  {/* ── Aba Rentabilidade ── */}
-                  <TabsContent value="rentabilidade" className="mt-2">
-                    <div
-                      className={cn(
-                        'rounded-lg p-3 border space-y-2 text-sm',
-                        calculationResult.meta.marginStatus === 'BELOW_TARGET'
-                          ? 'bg-destructive/5 border-destructive/20'
-                          : 'bg-success/5 border-success/20'
+                    <FormField
+                      control={form.control}
+                      name="km_distance"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Distância (km) *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="0"
+                              value={field.value ?? ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                field.onChange(val === '' ? undefined : parseFloat(val));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                    >
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Margem Bruta</span>
-                        <span className="text-foreground">
-                          {formatCurrency(calculationResult.profitability.margemBruta)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Overhead</span>
-                        <span className="text-foreground">
-                          {formatCurrency(calculationResult.profitability.overhead)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between font-medium items-center gap-2">
-                        <span className="text-foreground">Resultado Líquido</span>
-                        <Badge
-                          variant={
-                            calculationResult.profitability.resultadoLiquido >= 0
-                              ? 'default'
-                              : 'destructive'
-                          }
-                          className={
-                            calculationResult.profitability.resultadoLiquido >= 0
-                              ? 'bg-success text-success-foreground'
-                              : ''
-                          }
-                        >
-                          {formatCurrency(calculationResult.profitability.resultadoLiquido)}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between font-semibold items-center gap-2">
-                        <span className="text-foreground">Margem %</span>
-                        <Badge
-                          variant={
-                            calculationResult.meta.marginStatus === 'BELOW_TARGET'
-                              ? 'destructive'
-                              : 'default'
-                          }
-                          className={
-                            calculationResult.meta.marginStatus !== 'BELOW_TARGET'
-                              ? 'bg-success text-success-foreground'
-                              : ''
-                          }
-                        >
-                          {calculationResult.profitability.margemPercent.toFixed(1)}%
-                        </Badge>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Taxas Adicionais */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-foreground">Taxas Adicionais</h3>
-              <AdditionalFeesSection
-                selection={additionalFeesSelection}
-                onChange={setAdditionalFeesSelection}
-                baseFreight={calculationResult.components.baseFreight}
-                cargoValue={watchedCargoValue ?? 0}
-                vehicleTypeId={watchedVehicleTypeId || undefined}
-              />
-            </div>
-
-            <Separator />
-
-            {/* Observações */}
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observações</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Condições especiais, requisitos do cliente..."
-                      className="resize-none"
-                      rows={3}
-                      {...field}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  </div>
 
-            <div className="flex justify-between pt-4">
-              {/* Delete Button - only when editing */}
-              {isEditing && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button type="button" variant="destructive" size="sm">
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Excluir
+                  {/* Km Band Info: faixa derivada do km_distance (WebRouter/manual) + price_table_rows */}
+                  {isLoadingPriceRow && kmBand > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      Buscando faixa...
+                    </Badge>
+                  )}
+                  {!isLoadingPriceRow && faixaLabel && (
+                    <Badge variant="outline" className="text-xs">
+                      Faixa: {faixaLabel} km
+                    </Badge>
+                  )}
+
+                  {/* Mini card R$/KM — Custo ANTT por km */}
+                  {anttRsKm !== null && (
+                    <div className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/20 px-3 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-primary">Custo ANTT/km</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          (referência carreteiro)
+                        </span>
+                      </div>
+                      <span className="font-bold text-primary text-sm">
+                        R$ {anttRsKm.toFixed(2)}/km
+                      </span>
+                    </div>
+                  )}
+
+                  <Separator className="my-2" />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="cargo_value"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Valor da Mercadoria</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                R$
+                              </span>
+                              <MaskedInput
+                                mask="currency"
+                                placeholder="0,00"
+                                className="pl-10"
+                                value={String(Math.round((field.value || 0) * 100))}
+                                onValueChange={(rawValue) =>
+                                  field.onChange(parseInt(rawValue || '0', 10) / 100)
+                                }
+                                onBlur={field.onBlur}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="toll"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pedágio</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                R$
+                              </span>
+                              <MaskedInput
+                                mask="currency"
+                                placeholder="0,00"
+                                className="pl-10"
+                                value={String(Math.round((field.value || 0) * 100))}
+                                onValueChange={(rawValue) =>
+                                  field.onChange(parseInt(rawValue || '0', 10) / 100)
+                                }
+                                onBlur={field.onBlur}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="col-span-2">
+                      <EquipmentRentalSection
+                        value={watchedAluguelMaquinas ?? 0}
+                        onChange={(total, items) => {
+                          form.setValue('aluguel_maquinas', total);
+                          setEquipmentRentalItems(items);
+                        }}
+                        initialItems={equipmentRentalItems}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <UnloadingCostSection
+                        value={watchedDescarga ?? 0}
+                        onChange={(total, items) => {
+                          form.setValue('descarga', total);
+                          setUnloadingCostItems(items);
+                        }}
+                        initialItems={unloadingCostItems}
+                      />
+                    </div>
+                  </div>
+
+                  {/* NTC Taxes */}
+                  <div className="flex gap-6">
+                    <FormField
+                      control={form.control}
+                      name="tde_enabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2">
+                          <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                          <FormLabel className="!mt-0 text-sm font-normal">TDE (20%)</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="tear_enabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2">
+                          <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                          <FormLabel className="!mt-0 text-sm font-normal">TEAR (20%)</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Calculated Values */}
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                    <Tabs defaultValue="memoria" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2 h-8">
+                        <TabsTrigger value="memoria" className="text-xs">
+                          Memória
+                        </TabsTrigger>
+                        <TabsTrigger value="rentabilidade" className="text-xs">
+                          Rentabilidade
+                        </TabsTrigger>
+                      </TabsList>
+
+                      {/* ── Aba Memória ── */}
+                      <TabsContent value="memoria" className="mt-2 space-y-1.5 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Frete Base</span>
+                          <span className="text-foreground">
+                            {formatCurrency(calculationResult.components.baseFreight)}
+                          </span>
+                        </div>
+                        {calculationResult.components.toll > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Pedágio</span>
+                            <span className="text-foreground">
+                              {formatCurrency(calculationResult.components.toll)}
+                            </span>
+                          </div>
+                        )}
+                        {calculationResult.components.aluguelMaquinas > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Aluguel de Máquinas</span>
+                            <span className="text-foreground">
+                              {formatCurrency(calculationResult.components.aluguelMaquinas)}
+                            </span>
+                          </div>
+                        )}
+                        {calculationResult.components.gris > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              GRIS ({calculationResult.rates.grisPercent.toFixed(2)}%)
+                            </span>
+                            <span className="text-foreground">
+                              {formatCurrency(calculationResult.components.gris)}
+                            </span>
+                          </div>
+                        )}
+                        {calculationResult.components.tso > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              TSO ({calculationResult.rates.tsoPercent.toFixed(2)}%)
+                            </span>
+                            <span className="text-foreground">
+                              {formatCurrency(calculationResult.components.tso)}
+                            </span>
+                          </div>
+                        )}
+                        {calculationResult.components.rctrc > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              RCTR-C ({calculationResult.rates.costValuePercent.toFixed(2)}%)
+                            </span>
+                            <span className="text-foreground">
+                              {formatCurrency(calculationResult.components.rctrc)}
+                            </span>
+                          </div>
+                        )}
+                        {calculationResult.components.tde > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">TDE (NTC)</span>
+                            <span className="text-foreground">
+                              {formatCurrency(calculationResult.components.tde)}
+                            </span>
+                          </div>
+                        )}
+                        {calculationResult.components.tear > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">TEAR (NTC)</span>
+                            <span className="text-foreground">
+                              {formatCurrency(calculationResult.components.tear)}
+                            </span>
+                          </div>
+                        )}
+                        {/* Taxas Condicionais */}
+                        {computedConditionalFees.ids.length > 0 &&
+                          computedConditionalFees.ids.map((feeId) => {
+                            const fee = conditionalFeesData?.find((f) => f.id === feeId);
+                            const val = computedConditionalFees.breakdown[feeId] ?? 0;
+                            if (val === 0) return null;
+                            return (
+                              <div key={feeId} className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                  {fee ? fee.name : feeId}
+                                  {fee && (
+                                    <Badge variant="outline" className="ml-1 text-[10px] py-0">
+                                      {fee.code}
+                                    </Badge>
+                                  )}
+                                </span>
+                                <span className="text-foreground">{formatCurrency(val)}</span>
+                              </div>
+                            );
+                          })}
+                        {additionalFeesSelection.waitingTimeCost > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Estadia / Hora Parada</span>
+                            <span className="text-foreground">
+                              {formatCurrency(additionalFeesSelection.waitingTimeCost)}
+                            </span>
+                          </div>
+                        )}
+
+                        <Separator className="my-1" />
+
+                        <div className="flex justify-between font-medium">
+                          <span className="text-foreground">Receita Bruta</span>
+                          <span className="text-foreground">
+                            {formatCurrency(calculationResult.totals.receitaBruta)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            DAS ({calculationResult.rates.dasPercent.toFixed(2)}%)
+                          </span>
+                          <span className="text-foreground">
+                            {formatCurrency(calculationResult.totals.das)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            ICMS (
+                            {taxRegimeSimples === 1
+                              ? '0.00'
+                              : calculationResult.rates.icmsPercent.toFixed(2)}
+                            %)
+                          </span>
+                          <span className="text-foreground">
+                            {formatCurrency(
+                              taxRegimeSimples === 1 ? 0 : calculationResult.totals.icms
+                            )}
+                          </span>
+                        </div>
+
+                        <Separator className="my-1" />
+
+                        <div className="flex justify-between font-semibold">
+                          <span className="text-foreground">Total Cliente</span>
+                          <span className="text-primary text-base">
+                            {formatCurrency(
+                              taxRegimeSimples === 1
+                                ? calculationResult.totals.receitaBruta +
+                                    calculationResult.totals.das
+                                : calculationResult.totals.totalCliente
+                            )}
+                          </span>
+                        </div>
+                      </TabsContent>
+
+                      {/* ── Aba Rentabilidade ── */}
+                      <TabsContent value="rentabilidade" className="mt-2">
+                        <div
+                          className={cn(
+                            'rounded-lg p-3 border space-y-2 text-sm',
+                            calculationResult.meta.marginStatus === 'BELOW_TARGET'
+                              ? 'bg-destructive/5 border-destructive/20'
+                              : 'bg-success/5 border-success/20'
+                          )}
+                        >
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Margem Bruta</span>
+                            <span className="text-foreground">
+                              {formatCurrency(calculationResult.profitability.margemBruta)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Overhead</span>
+                            <span className="text-foreground">
+                              {formatCurrency(calculationResult.profitability.overhead)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between font-medium items-center gap-2">
+                            <span className="text-foreground">Resultado Líquido</span>
+                            <Badge
+                              variant={
+                                calculationResult.profitability.resultadoLiquido >= 0
+                                  ? 'default'
+                                  : 'destructive'
+                              }
+                              className={
+                                calculationResult.profitability.resultadoLiquido >= 0
+                                  ? 'bg-success text-success-foreground'
+                                  : ''
+                              }
+                            >
+                              {formatCurrency(calculationResult.profitability.resultadoLiquido)}
+                            </Badge>
+                          </div>
+                          <div className="flex justify-between font-semibold items-center gap-2">
+                            <span className="text-foreground">Margem %</span>
+                            <Badge
+                              variant={
+                                calculationResult.meta.marginStatus === 'BELOW_TARGET'
+                                  ? 'destructive'
+                                  : 'default'
+                              }
+                              className={
+                                calculationResult.meta.marginStatus !== 'BELOW_TARGET'
+                                  ? 'bg-success text-success-foreground'
+                                  : ''
+                              }
+                            >
+                              {calculationResult.profitability.margemPercent.toFixed(1)}%
+                            </Badge>
+                          </div>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Taxas Adicionais */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-foreground">Taxas Adicionais</h3>
+                  <AdditionalFeesSection
+                    selection={additionalFeesSelection}
+                    onChange={setAdditionalFeesSelection}
+                    baseFreight={calculationResult.components.baseFreight}
+                    cargoValue={watchedCargoValue ?? 0}
+                    vehicleTypeId={watchedVehicleTypeId || undefined}
+                  />
+                </div>
+
+                <Separator />
+
+                {/* Observações */}
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Observações</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Condições especiais, requisitos do cliente..."
+                          className="resize-none"
+                          rows={3}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-between pt-4">
+                  {/* Delete Button - only when editing */}
+                  {isEditing && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button type="button" variant="destructive" size="sm">
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Excluir
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Excluir cotação?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tem certeza que deseja excluir esta cotação? Esta ação não pode ser
+                            desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleDelete}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+
+                  <div className="flex gap-3 ml-auto">
+                    <Button type="button" variant="outline" onClick={onClose}>
+                      Cancelar
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Excluir cotação?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Tem certeza que deseja excluir esta cotação? Esta ação não pode ser
-                        desfeita.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleDelete}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Excluir
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-
-              <div className="flex gap-3 ml-auto">
-                <Button type="button" variant="outline" onClick={onClose}>
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={
-                    isLoading ||
-                    isLoadingPriceRow ||
-                    calculationResult.status === 'OUT_OF_RANGE' ||
-                    calculationResult.status === 'MISSING_DATA'
-                  }
-                >
-                  {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {isEditing ? 'Salvar' : 'Criar Cotação'}
-                </Button>
-              </div>
-            </div>
+                    <Button
+                      type="submit"
+                      disabled={
+                        isLoading ||
+                        isLoadingPriceRow ||
+                        calculationResult.status === 'OUT_OF_RANGE' ||
+                        calculationResult.status === 'MISSING_DATA'
+                      }
+                    >
+                      {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      {isEditing ? 'Salvar' : 'Criar Cotação'}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </form>
         </Form>
       </DialogContent>
