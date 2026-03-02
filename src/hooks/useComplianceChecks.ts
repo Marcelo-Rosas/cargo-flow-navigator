@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { invokeEdgeFunction } from '@/lib/supabase-invoke';
 
 // ─────────────────────────────────────────────────────
 // Types
@@ -85,7 +85,6 @@ export function useComplianceChecks(orderId: string) {
 /** Trigger a compliance check via the ai-operational-orchestrator */
 export function useRequestComplianceCheck() {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
 
   return useMutation({
     mutationFn: async ({
@@ -95,27 +94,13 @@ export function useRequestComplianceCheck() {
       orderId: string;
       checkType: ComplianceCheck['check_type'];
     }) => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token ?? session?.access_token;
-
-      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
-
-      const { data, error } = await supabase.functions.invoke('ai-operational-orchestrator', {
-        body: {
-          analysisType: 'compliance_check',
-          orderId,
-          entityId: orderId,
-          entityType: 'order',
-          checkType,
-        },
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      return invokeEdgeFunction('ai-operational-orchestrator', {
+        analysisType: 'compliance_check',
+        orderId,
+        entityId: orderId,
+        entityType: 'order',
+        checkType,
       });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/supabase-invoke';
 import type { FinancialDocType } from '@/types/financial';
 
 type EnsureFinancialDocumentInput = {
@@ -18,21 +18,10 @@ export function useEnsureFinancialDocument() {
   return useMutation({
     mutationKey: ['ensure-financial-document'],
     mutationFn: async (input: EnsureFinancialDocumentInput) => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      let token = sessionData?.session?.access_token;
-      if (!token) {
-        const { data: refreshData } = await supabase.auth.refreshSession();
-        token = refreshData?.session?.access_token ?? undefined;
-      }
-      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
-
-      const { data, error } = await supabase.functions.invoke<EnsureFinancialDocumentResponse>(
+      return invokeEdgeFunction<EnsureFinancialDocumentResponse>(
         'ensure-financial-document',
-        { body: input, headers: { Authorization: `Bearer ${token}` } }
+        input
       );
-
-      if (error) throw error;
-      return data;
     },
     onSuccess: async () => {
       await Promise.all([

@@ -67,7 +67,7 @@ import {
 import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/supabase-invoke';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
@@ -80,6 +80,7 @@ import {
   TollPlaza,
 } from '@/lib/freightCalculator';
 import { zodPhone } from '@/lib/validators';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { QuoteFormWizard } from '@/components/forms/quote-form/QuoteFormWizard';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
@@ -262,22 +263,75 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedDescarga = form.watch('descarga');
   const watchedTdeEnabled = form.watch('tde_enabled');
   const watchedTearEnabled = form.watch('tear_enabled');
+
+  // Serialização estável para debounce (evita reexecução a cada tecla)
+  const calcSnapshot = JSON.stringify([
+    watchedOrigin,
+    watchedDestination,
+    watchedWeight,
+    watchedVolume,
+    watchedCargoValue,
+    watchedToll,
+    watchedAluguelMaquinas,
+    watchedDescarga,
+    watchedKmDistance,
+    watchedPriceTableId,
+    watchedTdeEnabled,
+    watchedTearEnabled,
+  ]);
+  const debouncedSnapshot = useDebouncedValue(calcSnapshot, 400);
+  const debounced = useMemo(() => {
+    try {
+      const arr = JSON.parse(debouncedSnapshot || '[]') as unknown[];
+      return {
+        origin: (arr[0] as string) ?? '',
+        destination: (arr[1] as string) ?? '',
+        weight: (arr[2] as number) ?? 0,
+        volume: (arr[3] as number) ?? 0,
+        cargoValue: (arr[4] as number) ?? 0,
+        toll: (arr[5] as number) ?? 0,
+        aluguelMaquinas: (arr[6] as number) ?? 0,
+        descarga: (arr[7] as number) ?? 0,
+        kmDistance: (arr[8] as number | undefined) ?? undefined,
+        priceTableId: (arr[9] as string) ?? '',
+        tdeEnabled: (arr[10] as boolean) ?? false,
+        tearEnabled: (arr[11] as boolean) ?? false,
+      };
+    } catch {
+      return {
+        origin: '',
+        destination: '',
+        weight: 0,
+        volume: 0,
+        cargoValue: 0,
+        toll: 0,
+        aluguelMaquinas: 0,
+        descarga: 0,
+        kmDistance: undefined as number | undefined,
+        priceTableId: '',
+        tdeEnabled: false,
+        tearEnabled: false,
+      };
+    }
+  }, [debouncedSnapshot]);
+  const isCalculationStale = calcSnapshot !== debouncedSnapshot;
   const watchedPaymentTermId = form.watch('payment_term_id');
   const selectedPaymentTerm = paymentTerms?.find((t) => t.id === watchedPaymentTermId);
 
   // Busca faixas via REST (price_table_rows) e seleciona a faixa do km via query (lte/gte)
   const kmForBand = Number(watchedKmDistance || 0);
   const kmBand = Math.ceil(kmForBand);
+  const debouncedKmBand = Math.ceil(Number(debounced.kmDistance || 0));
 
   // Lista de faixas (usada só para exibir no alerta de OUT_OF_RANGE)
   const { data: priceTableRows } = usePriceTableRows(watchedPriceTableId || '');
 
-  // Busca a faixa correta (1 row) via REST (mais confiável do que find local)
+  // Busca a faixa correta (1 row) via REST; usa valores debounced para alinhar aos cálculos
   const {
     data: priceTableRow,
     isLoading: isLoadingPriceRow,
     error: priceRowError,
-  } = usePriceTableRowByKmRange(watchedPriceTableId || '', kmBand);
+  } = usePriceTableRowByKmRange(debounced.priceTableId || '', debouncedKmBand);
 
   const kmRounded = kmBand;
 
@@ -319,6 +373,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   // Normalize weight to kg; clamp to DECIMAL(10,2) max (99.999.999,99)
   const effectiveWeightKg = Math.min(unitToKg(watchedWeight || 0, weightUnit), 99_999_999.99);
+  const debouncedEffectiveWeightKg = Math.min(
+    unitToKg(debounced.weight || 0, weightUnit),
+    99_999_999.99
+  );
 
   // R$/KM — custo ANTT por km (referência ao vivo)
   // Prioridade: 1) rate do banco (mais atualizado) 2) coeficientes salvos no breakdown
@@ -339,47 +397,48 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     return null;
   }, [anttRate, watchedKmDistance, savedAnttMeta]);
 
-  // Passo 1: calcular frete sem taxas condicionais para obter o baseFreight intermediário
+  // Passo 1: calcular frete sem taxas condicionais (usa valores debounced)
   const baseCalculationResult = useMemo(() => {
     return calculateFreight({
-      originCity: watchedOrigin || '',
-      destinationCity: watchedDestination || '',
-      weightKg: effectiveWeightKg,
-      volumeM3: watchedVolume || 0,
-      cargoValue: watchedCargoValue || 0,
-      tollValue: watchedToll || 0,
-      aluguelMaquinasValue: watchedAluguelMaquinas || 0,
-      descargaValue: watchedDescarga ?? 0,
-      kmDistance: kmBand,
+      originCity: debounced.origin || '',
+      destinationCity: debounced.destination || '',
+      weightKg: debouncedEffectiveWeightKg,
+      volumeM3: debounced.volume || 0,
+      cargoValue: debounced.cargoValue || 0,
+      tollValue: debounced.toll || 0,
+      aluguelMaquinasValue: debounced.aluguelMaquinas || 0,
+      descargaValue: debounced.descarga ?? 0,
+      kmDistance: debouncedKmBand,
       priceTableRow: priceTableRow || null,
-      priceTableId: watchedPriceTableId || undefined,
+      priceTableId: debounced.priceTableId || undefined,
       icmsRatePercent: icmsRate,
-      tdeEnabled: watchedTdeEnabled || false,
-      tearEnabled: watchedTearEnabled || false,
+      tdeEnabled: debounced.tdeEnabled || false,
+      tearEnabled: debounced.tearEnabled || false,
       pricingParams: { taxRegimeSimples },
     });
   }, [
-    watchedOrigin,
-    watchedDestination,
-    effectiveWeightKg,
-    watchedVolume,
-    watchedCargoValue,
-    watchedToll,
-    watchedAluguelMaquinas,
-    watchedDescarga,
-    watchedKmDistance,
-    watchedPriceTableId,
+    debounced.origin,
+    debounced.destination,
+    debouncedEffectiveWeightKg,
+    debounced.volume,
+    debounced.cargoValue,
+    debounced.toll,
+    debounced.aluguelMaquinas,
+    debounced.descarga,
+    debounced.kmDistance,
+    debounced.priceTableId,
+    debounced.tdeEnabled,
+    debounced.tearEnabled,
+    debouncedKmBand,
     priceTableRow,
     icmsRate,
-    watchedTdeEnabled,
-    watchedTearEnabled,
     taxRegimeSimples,
   ]);
 
   // Passo 2: calcular o total das taxas condicionais usando o baseFreight intermediário
   const computedConditionalFees = useMemo(() => {
     const baseFreight = baseCalculationResult.components.baseFreight;
-    const cargoValue = watchedCargoValue || 0;
+    const cargoValue = debounced.cargoValue || 0;
     const selectedIds = additionalFeesSelection.conditionalFees;
 
     if (!conditionalFeesData || selectedIds.length === 0) {
@@ -414,26 +473,26 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     conditionalFeesData,
     additionalFeesSelection,
     baseCalculationResult.components.baseFreight,
-    watchedCargoValue,
+    debounced.cargoValue,
   ]);
 
-  // Passo 3: calcular frete final com as taxas condicionais
+  // Passo 3: calcular frete final com as taxas condicionais (valores debounced)
   const calculationResult = useMemo(() => {
     return calculateFreight({
-      originCity: watchedOrigin || '',
-      destinationCity: watchedDestination || '',
-      weightKg: effectiveWeightKg,
-      volumeM3: watchedVolume || 0,
-      cargoValue: watchedCargoValue || 0,
-      tollValue: watchedToll || 0,
-      aluguelMaquinasValue: watchedAluguelMaquinas || 0,
-      descargaValue: watchedDescarga ?? 0,
-      kmDistance: kmBand,
+      originCity: debounced.origin || '',
+      destinationCity: debounced.destination || '',
+      weightKg: debouncedEffectiveWeightKg,
+      volumeM3: debounced.volume || 0,
+      cargoValue: debounced.cargoValue || 0,
+      tollValue: debounced.toll || 0,
+      aluguelMaquinasValue: debounced.aluguelMaquinas || 0,
+      descargaValue: debounced.descarga ?? 0,
+      kmDistance: debouncedKmBand,
       priceTableRow: priceTableRow || null,
-      priceTableId: watchedPriceTableId || undefined,
+      priceTableId: debounced.priceTableId || undefined,
       icmsRatePercent: icmsRate,
-      tdeEnabled: watchedTdeEnabled || false,
-      tearEnabled: watchedTearEnabled || false,
+      tdeEnabled: debounced.tdeEnabled || false,
+      tearEnabled: debounced.tearEnabled || false,
       pricingParams: { taxRegimeSimples },
       extras: {
         conditionalFees: computedConditionalFees,
@@ -443,20 +502,21 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       },
     });
   }, [
-    watchedOrigin,
-    watchedDestination,
-    effectiveWeightKg,
-    watchedVolume,
-    watchedCargoValue,
-    watchedToll,
-    watchedAluguelMaquinas,
-    watchedDescarga,
-    watchedKmDistance,
-    watchedPriceTableId,
+    debounced.origin,
+    debounced.destination,
+    debouncedEffectiveWeightKg,
+    debounced.volume,
+    debounced.cargoValue,
+    debounced.toll,
+    debounced.aluguelMaquinas,
+    debounced.descarga,
+    debounced.kmDistance,
+    debounced.priceTableId,
+    debounced.tdeEnabled,
+    debounced.tearEnabled,
+    debouncedKmBand,
     priceTableRow,
     icmsRate,
-    watchedTdeEnabled,
-    watchedTearEnabled,
     taxRegimeSimples,
     computedConditionalFees,
     additionalFeesSelection.waitingTimeCost,
@@ -606,17 +666,19 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
     setIsLoadingOriginCep(true);
     try {
-      const { data, error } = await supabase.functions.invoke('lookup-cep', {
-        body: { cep },
-      });
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        data?: { formatted: string };
+        error?: string;
+      }>('lookup-cep', { cep });
 
-      if (error || !data?.success) {
+      if (!data?.success) {
         toast.error('CEP de origem não encontrado');
         return;
       }
 
       // SafeSet: only update if user hasn't manually edited
-      if (!userEditedOrigin.current) {
+      if (!userEditedOrigin.current && data.data?.formatted) {
         form.setValue('origin', data.data.formatted);
       }
     } catch {
@@ -632,17 +694,19 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
     setIsLoadingDestinationCep(true);
     try {
-      const { data, error } = await supabase.functions.invoke('lookup-cep', {
-        body: { cep },
-      });
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        data?: { formatted: string };
+        error?: string;
+      }>('lookup-cep', { cep });
 
-      if (error || !data?.success) {
+      if (!data?.success) {
         toast.error('CEP de destino não encontrado');
         return;
       }
 
       // SafeSet: only update if user hasn't manually edited
-      if (!userEditedDestination.current) {
+      if (!userEditedDestination.current && data.data?.formatted) {
         form.setValue('destination', data.data.formatted);
       }
     } catch {
@@ -663,16 +727,18 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
     setIsCalculatingKm(true);
     try {
-      const { data, error } = await supabase.functions.invoke('calculate-distance-webrouter', {
-        body: {
-          origin_cep: originCep,
-          destination_cep: destinationCep,
-          axes_count: selectedVehicle?.axes_count ?? undefined,
-        },
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        data?: { km_distance: number; toll?: number; toll_plazas?: TollPlaza[] };
+        error?: string;
+      }>('calculate-distance-webrouter', {
+        origin_cep: originCep,
+        destination_cep: destinationCep,
+        axes_count: selectedVehicle?.axes_count ?? undefined,
       });
 
-      if (error || !data?.success) {
-        const errMsg = data?.error || (error as Error)?.message || 'Erro ao calcular distância';
+      if (!data?.success) {
+        const errMsg = data?.error || 'Erro ao calcular distância';
         const isFetchError = /failed to send|fetch error|network/i.test(String(errMsg));
         toast.error(
           isFetchError
@@ -682,7 +748,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         return;
       }
 
-      const km = Number(data.data.km_distance);
+      const km = Number(data.data?.km_distance);
       if (!Number.isFinite(km) || km <= 0) {
         toast.error('Distância inválida retornada pela API');
         return;
@@ -992,6 +1058,25 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 isLoadingOriginCep={isLoadingOriginCep}
                 isLoadingDestinationCep={isLoadingDestinationCep}
                 isCalculatingKm={isCalculatingKm}
+                priceTablesFiltered={priceTablesFiltered}
+                vehicleTypes={vehicleTypes ?? []}
+                paymentTerms={paymentTerms ?? []}
+                weightUnit={weightUnit}
+                setWeightUnit={setWeightUnit}
+                calculationResult={calculationResult}
+                vehicleTypeName={
+                  vehicleTypes?.find((v) => v.id === form.watch('vehicle_type_id'))?.name ?? '—'
+                }
+                clientName={
+                  form.watch('client_name') ||
+                  clients?.find((c) => c.id === form.watch('client_id'))?.name ||
+                  '—'
+                }
+                shipperName={
+                  form.watch('shipper_name') ||
+                  shippers?.find((s) => s.id === form.watch('shipper_id'))?.name ||
+                  '—'
+                }
               />
             ) : (
               <>

@@ -28,6 +28,9 @@ dist-ssr
 supabase/.temp/
 supabase/functions/**/deno.lock
 
+# Playwright auth state
+.auth/
+
 # Sensitive / local-only
 APIs/
 *.env

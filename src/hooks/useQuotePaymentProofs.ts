@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/supabase-invoke';
 import { asDb, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 
 interface QuotePaymentProof {
@@ -67,20 +68,7 @@ export function useProcessQuotePaymentProof() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (documentId: string) => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      let token = sessionData?.session?.access_token;
-      if (!token) {
-        const { data: refreshData } = await supabase.auth.refreshSession();
-        token = refreshData?.session?.access_token ?? undefined;
-      }
-      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
-
-      const { data, error } = await supabase.functions.invoke('process-quote-payment-proof', {
-        body: { documentId },
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (error) throw error;
-      return data;
+      return invokeEdgeFunction('process-quote-payment-proof', { documentId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quote_payment_proofs'] });

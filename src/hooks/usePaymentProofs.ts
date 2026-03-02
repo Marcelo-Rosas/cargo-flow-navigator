@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { asDb, filterSupabaseRows } from '@/lib/supabase-utils';
+import { invokeEdgeFunction } from '@/lib/supabase-invoke';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -85,21 +86,9 @@ export function useProcessPaymentProof() {
 
   return useMutation({
     mutationFn: async (documentId: string): Promise<ProcessPaymentProofResponse> => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      let token = sessionData?.session?.access_token;
-      if (!token) {
-        const { data: refreshData } = await supabase.auth.refreshSession();
-        token = refreshData?.session?.access_token ?? undefined;
-      }
-      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
-
-      const { data, error } = await supabase.functions.invoke<ProcessPaymentProofResponse>(
-        'process-payment-proof',
-        { body: { documentId }, headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const data = await invokeEdgeFunction<ProcessPaymentProofResponse>('process-payment-proof', {
+        documentId,
+      });
       return data ?? { success: false };
     },
     onSuccess: () => {

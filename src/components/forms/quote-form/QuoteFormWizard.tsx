@@ -16,6 +16,9 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { QuoteFormData } from './types';
 import { IdentificationStep } from './steps/IdentificationStep';
+import { CargoLogisticsStep } from './steps/CargoLogisticsStep';
+import { ReviewStep } from './steps/ReviewStep';
+import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 
 const STEPS = [
   { id: 'identification', label: 'Identificação' },
@@ -60,6 +63,17 @@ interface QuoteFormWizardProps {
   isLoadingOriginCep: boolean;
   isLoadingDestinationCep: boolean;
   isCalculatingKm: boolean;
+  // Cargo & Logistics step
+  priceTablesFiltered: { id: string; name: string; modality: string | null }[];
+  vehicleTypes: { id: string; name: string; code: string }[];
+  paymentTerms: { id: string; name: string; adjustment_percent?: number | null }[];
+  weightUnit: 'kg' | 'ton';
+  setWeightUnit: (unit: 'kg' | 'ton') => void;
+  // Review step
+  calculationResult: FreightCalculationOutput | null;
+  vehicleTypeName: string;
+  clientName: string;
+  shipperName: string;
 }
 
 export function QuoteFormWizard({
@@ -81,6 +95,15 @@ export function QuoteFormWizard({
   isLoadingOriginCep,
   isLoadingDestinationCep,
   isCalculatingKm,
+  priceTablesFiltered,
+  vehicleTypes,
+  paymentTerms,
+  weightUnit,
+  setWeightUnit,
+  calculationResult,
+  vehicleTypeName,
+  clientName,
+  shipperName,
 }: QuoteFormWizardProps) {
   const [step, setStep] = useState(0);
   const canNext = step < STEPS.length - 1;
@@ -153,9 +176,14 @@ export function QuoteFormWizard({
         />
       )}
       {step === 1 && (
-        <div className="rounded-lg border border-dashed bg-muted/20 p-8 text-center text-muted-foreground">
-          Passo 2: Carga e Logística (em breve)
-        </div>
+        <CargoLogisticsStep
+          form={form}
+          priceTablesFiltered={priceTablesFiltered}
+          vehicleTypes={vehicleTypes}
+          paymentTerms={paymentTerms}
+          weightUnit={weightUnit}
+          setWeightUnit={setWeightUnit}
+        />
       )}
       {step === 2 && (
         <div className="rounded-lg border border-dashed bg-muted/20 p-8 text-center text-muted-foreground">
@@ -163,9 +191,14 @@ export function QuoteFormWizard({
         </div>
       )}
       {step === 3 && (
-        <div className="rounded-lg border border-dashed bg-muted/20 p-8 text-center text-muted-foreground">
-          Passo 4: Revisão e Envio (em breve)
-        </div>
+        <ReviewStep
+          form={form}
+          calculationResult={calculationResult}
+          weightUnit={weightUnit}
+          vehicleTypeName={vehicleTypeName}
+          clientName={clientName}
+          shipperName={shipperName}
+        />
       )}
 
       {/* Footer */}

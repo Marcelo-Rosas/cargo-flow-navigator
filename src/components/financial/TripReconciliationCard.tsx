@@ -2,17 +2,11 @@ import { Truck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { TripPaymentReconciliation } from '@/hooks/useReconciliation';
+import { formatCurrency } from '@/lib/formatters';
 
 interface TripReconciliationCardProps {
   trip: TripPaymentReconciliation;
   onClick?: () => void;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
 }
 
 export function TripReconciliationCard({ trip, onClick }: TripReconciliationCardProps) {
