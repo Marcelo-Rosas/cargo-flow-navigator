@@ -1,19 +1,8 @@
 import { useState, useMemo } from 'react';
-import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { Loader2, FileText, Truck } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { KanbanColumn } from '@/components/boards/KanbanColumn';
-import { FinancialCard } from '@/components/financial/FinancialCard';
+import { FinancialKanbanBoard } from '@/components/financial/kanban/FinancialKanbanBoard';
 import { CashFlowReport } from '@/components/financial/CashFlowReport';
 import { TripReconciliationCard } from '@/components/financial/TripReconciliationCard';
 import { TripDetailModal } from '@/components/modals/TripDetailModal';
@@ -26,7 +15,6 @@ import { useUpdateFinancialDocumentStatus } from '@/hooks/useUpdateFinancialDocu
 import { FAT_COLUMNS, PAG_COLUMNS } from '@/lib/financial-kanban';
 import type { FinancialDocType } from '@/types/financial';
 import type { FinancialKanbanRow } from '@/types/financial';
-import { toast } from 'sonner';
 
 type TabKey = 'receber' | 'pagar' | 'fluxo';
 type PagViewMode = 'os' | 'trip';
@@ -34,7 +22,6 @@ type PagViewMode = 'os' | 'trip';
 export default function Financial() {
   const [tab, setTab] = useState<TabKey>('receber');
   const [pagViewMode, setPagViewMode] = useState<PagViewMode>('os');
-  const [activeDoc, setActiveDoc] = useState<FinancialKanbanRow | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<FinancialKanbanRow | null>(null);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
 
@@ -50,63 +37,6 @@ export default function Financial() {
   const boardData = tab === 'receber' ? receber : tab === 'pagar' ? pagar : receber;
   const columnsConfig = activeType === 'FAT' ? FAT_COLUMNS : PAG_COLUMNS;
   const updateStatusMutation = useUpdateFinancialDocumentStatus();
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    })
-  );
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const row = boardData.rows.find((r) => r.id === event.active.id);
-    if (row) setActiveDoc(row);
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveDoc(null);
-
-    if (!over || !boardData.rows) return;
-
-    const doc = boardData.rows.find((r) => r.id === active.id);
-    if (!doc) return;
-
-    const targetStatus = columnsConfig.find((c) => c.id === over.id);
-    if (targetStatus && targetStatus.id !== doc.status) {
-      try {
-        await updateStatusMutation.mutateAsync({ id: doc.id, status: targetStatus.id });
-        toast.success(`Movido para ${targetStatus.label}`);
-      } catch (err: unknown) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : typeof err === 'object' && err && 'message' in err
-              ? String((err as { message: unknown }).message)
-              : 'Erro ao mover';
-        toast.error(msg);
-      }
-      return;
-    }
-
-    const overDoc = boardData.rows.find((r) => r.id === over.id);
-    if (overDoc && overDoc.status !== doc.status) {
-      const target = columnsConfig.find((c) => c.id === overDoc.status);
-      if (target) {
-        try {
-          await updateStatusMutation.mutateAsync({ id: doc.id, status: target.id });
-          toast.success(`Movido para ${target.label}`);
-        } catch (err: unknown) {
-          const msg =
-            err instanceof Error
-              ? err.message
-              : typeof err === 'object' && err && 'message' in err
-                ? String((err as { message: unknown }).message)
-                : 'Erro ao mover';
-          toast.error(msg);
-        }
-      }
-    }
-  };
 
   const totalReceber = receber.rows.length;
   const totalPagar = pagar.rows.length;
@@ -206,38 +136,13 @@ export default function Financial() {
             {boardData.error instanceof Error ? boardData.error.message : 'Erro desconhecido'}
           </div>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
-              {boardData.columns.map((col) => (
-                <KanbanColumn
-                  key={col.status}
-                  id={col.status}
-                  title={col.label}
-                  count={col.items.length}
-                  color={columnsConfig.find((c) => c.id === col.status)?.color}
-                  items={col.items.map((r) => r.id)}
-                >
-                  {col.items.map((row) => (
-                    <FinancialCard
-                      key={row.id}
-                      row={row}
-                      onEdit={() => setSelectedDoc(row)}
-                      canManageActions
-                    />
-                  ))}
-                </KanbanColumn>
-              ))}
-            </div>
-
-            <DragOverlay>
-              {activeDoc && <FinancialCard row={activeDoc} canManageActions />}
-            </DragOverlay>
-          </DndContext>
+          <FinancialKanbanBoard
+            initialRows={boardData.rows}
+            type={activeType!}
+            columnsConfig={columnsConfig}
+            updateStatusMutation={updateStatusMutation}
+            onCardClick={setSelectedDoc}
+          />
         )}
 
         {((showTripsMode && (tripsReconciliation.data ?? []).length === 0) ||
