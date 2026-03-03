@@ -9,6 +9,8 @@ import {
   Gauge,
   Building2,
   AlertCircle,
+  Package,
+  Wrench,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -36,6 +38,8 @@ const CATEGORIES = [
   { id: 'imposto', label: 'Impostos', icon: Percent },
   { id: 'markup', label: 'Markup & Overhead', icon: Wallet },
   { id: 'taxa', label: 'Taxas (TDE/TEAR)', icon: Receipt },
+  { id: 'carga_descarga', label: 'Carga e Descarga', icon: Package },
+  { id: 'aluguel', label: 'Aluguel', icon: Wrench },
   { id: 'veiculo', label: 'Por Veículo', icon: Truck },
   { id: 'estadia', label: 'Estadia', icon: Gauge },
   { id: 'prazo', label: 'Prazo', icon: Calendar },
@@ -270,7 +274,7 @@ export function PricingRulesManager() {
           veículo têm precedência sobre regras globais.
         </p>
         <Tabs defaultValue="imposto" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 overflow-x-auto">
             {CATEGORIES.map(({ id, label, icon: Icon }) => (
               <TabsTrigger key={id} value={id} className="flex items-center gap-2 text-xs">
                 <Icon className="h-4 w-4" />

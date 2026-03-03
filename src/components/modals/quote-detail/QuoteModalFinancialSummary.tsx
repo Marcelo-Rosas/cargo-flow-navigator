@@ -70,13 +70,11 @@ export function QuoteModalFinancialSummary({
         </div>
       </div>
       {isBelowTarget && (marginPercentForAlert !== undefined || margemPercent !== undefined) && (
-        <Alert
-          variant="destructive"
-          className="bg-warning/10 border-warning text-warning-foreground"
-        >
+        <Alert variant="destructive" className="bg-destructive/10 border-destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Margem de {(marginPercentForAlert ?? margemPercent).toFixed(1)}% está abaixo da meta de{' '}
+            <strong>Abaixo do Mínimo Viável.</strong> Margem de{' '}
+            {(marginPercentForAlert ?? margemPercent).toFixed(1)}% está abaixo da meta de{' '}
             {targetMarginPercent}%
           </AlertDescription>
         </Alert>

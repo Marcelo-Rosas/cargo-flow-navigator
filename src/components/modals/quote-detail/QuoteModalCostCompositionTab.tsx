@@ -81,7 +81,7 @@ export function QuoteModalCostCompositionTab({
       regimeFiscal?: 'simples_nacional' | 'excesso_sublimite' | 'normal';
     }
   )?.regimeFiscal;
-  const custoEfetivoMotorista = breakdown.components?.baseCost ?? 0;
+  const custoEfetivoMotorista = breakdown.components?.baseFreight ?? 0;
   const pedagio = breakdown.components?.toll ?? 0;
   const grisValue = breakdown.components?.gris ?? 0;
   const tsoValue = breakdown.components?.tso ?? 0;
@@ -91,12 +91,12 @@ export function QuoteModalCostCompositionTab({
   const dispatchFeeValue = breakdown.components?.dispatchFee ?? 0;
   const aluguelMaquinasValue = breakdown.components?.aluguelMaquinas ?? 0;
 
+  const baseFreight = breakdown.components?.baseFreight ?? 0;
+  const pedagioMemoria = breakdown.components?.toll ?? 0;
+  const subtotalMotorista = baseFreight + pedagioMemoria;
+
   const composicaoRows: { label: string; value: number }[] = [];
   if (breakdown.components) {
-    if ((breakdown.components.baseFreight ?? 0) > 0)
-      composicaoRows.push({ label: 'Frete Base', value: breakdown.components.baseFreight ?? 0 });
-    if ((breakdown.components.toll ?? 0) > 0)
-      composicaoRows.push({ label: 'Pedágio', value: breakdown.components.toll ?? 0 });
     if ((breakdown.components.aluguelMaquinas ?? 0) > 0)
       composicaoRows.push({
         label: 'Aluguel de Máquinas',
@@ -145,6 +145,29 @@ export function QuoteModalCostCompositionTab({
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* Grupo: Subtotal Motorista (Base de Negociação) */}
+                <TableRow>
+                  <TableCell className="text-muted-foreground">Frete Base</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {formatCurrency(baseFreight)}
+                  </TableCell>
+                </TableRow>
+                {pedagioMemoria > 0 && (
+                  <TableRow>
+                    <TableCell className="text-muted-foreground">(+) Pedágio</TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatCurrency(pedagioMemoria)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                <TableRow className="border-t bg-primary/5">
+                  <TableCell className="font-semibold text-primary">
+                    Subtotal Motorista (Base de Negociação)
+                  </TableCell>
+                  <TableCell className="text-right font-bold tabular-nums text-primary">
+                    {formatCurrency(subtotalMotorista)}
+                  </TableCell>
+                </TableRow>
                 {composicaoRows.map((r) => (
                   <TableRow key={r.label}>
                     <TableCell className="text-muted-foreground">{r.label}</TableCell>
@@ -351,15 +374,15 @@ export function QuoteModalCostCompositionTab({
                 <TableRow
                   className={cn(
                     'border-t-2',
-                    resultadoLiquido >= 0
-                      ? 'bg-green-500/10 dark:bg-green-500/5'
-                      : 'bg-destructive/10'
+                    isBelowTarget || resultadoLiquido < 0
+                      ? 'bg-destructive/10'
+                      : 'bg-green-500/10 dark:bg-green-500/5'
                   )}
                 >
                   <TableCell className="text-lg font-bold">(=) Resultado Líquido</TableCell>
                   <TableCell className="text-right">
                     <Badge
-                      variant={resultadoLiquido >= 0 ? 'default' : 'destructive'}
+                      variant={isBelowTarget || resultadoLiquido < 0 ? 'destructive' : 'default'}
                       className="text-base px-3 py-1"
                     >
                       {formatCurrency(resultadoLiquido)}
@@ -379,6 +402,16 @@ export function QuoteModalCostCompositionTab({
               </TableBody>
             </Table>
           </div>
+          {isBelowTarget && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Abaixo do Mínimo Viável</AlertTitle>
+              <AlertDescription>
+                Margem de {margemPercent.toFixed(1)}% está abaixo do mínimo de {targetMarginPercent}
+                %. Considere renegociar valor ou reduzir custos para viabilidade operacional.
+              </AlertDescription>
+            </Alert>
+          )}
           {/* Nota de Auditoria Financeira */}
           <div className="mt-6 p-4 rounded-md bg-muted/50 border border-muted-foreground/10">
             <p className="text-[11px] leading-relaxed text-muted-foreground italic">
