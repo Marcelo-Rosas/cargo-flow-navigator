@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 

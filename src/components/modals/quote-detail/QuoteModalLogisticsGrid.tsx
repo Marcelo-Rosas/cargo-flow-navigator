@@ -1,4 +1,5 @@
 import { MapPin, Truck, Scale, Box, Route, Package } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface QuoteModalLogisticsGridProps {
   origin: string;
