@@ -13,6 +13,7 @@ export interface EquipmentRentalItem {
   quantity: number;
   unitValue: number;
   total: number;
+  description?: string;
 }
 
 interface EquipmentRentalSectionProps {
@@ -31,33 +32,51 @@ export function EquipmentRentalSection({
   const { data: rates, isLoading } = useEquipmentRentalRates(true);
 
   const [selectionByRate, setSelectionByRate] = useState<
-    Map<string, { selected: boolean; quantity: number }>
+    Map<string, { selected: boolean; quantity: number; description?: string }>
   >(new Map());
 
   useEffect(() => {
     if (initialItems.length > 0) {
-      const map = new Map<string, { selected: boolean; quantity: number }>();
+      const map = new Map<string, { selected: boolean; quantity: number; description?: string }>();
       for (const item of initialItems) {
         if (item.selected && item.quantity > 0) {
-          map.set(item.id, { selected: true, quantity: item.quantity });
+          map.set(item.id, {
+            selected: true,
+            quantity: item.quantity,
+            description: item.description,
+          });
         }
       }
       setSelectionByRate(map);
     }
   }, [initialItems]);
 
-  const handleChange = (rate: EquipmentRentalRate, selected: boolean, quantity: number) => {
+  const handleChange = (
+    rate: EquipmentRentalRate,
+    selected: boolean,
+    quantity: number,
+    description?: string
+  ) => {
     if (!rates) return;
     setSelectionByRate((prev) => {
       const next = new Map(prev);
       if (selected && quantity > 0) {
-        next.set(rate.id, { selected: true, quantity });
+        const existing = prev.get(rate.id);
+        next.set(rate.id, {
+          selected: true,
+          quantity,
+          description: description ?? existing?.description,
+        });
       } else {
         next.delete(rate.id);
       }
 
       const items: EquipmentRentalItem[] = rates.map((r) => {
-        const sel = next.get(r.id) ?? { selected: false, quantity: 0 };
+        const sel = next.get(r.id) ?? {
+          selected: false,
+          quantity: 0,
+          description: undefined,
+        };
         const q = sel.selected ? sel.quantity : 0;
         const total = q * r.value;
         return {
@@ -68,6 +87,44 @@ export function EquipmentRentalSection({
           quantity: q,
           unitValue: r.value,
           total,
+          description: sel.description,
+        };
+      });
+      const total = items.reduce((s, i) => s + i.total, 0);
+      onChange(
+        total,
+        items.filter((i) => i.selected && i.quantity > 0)
+      );
+      return next;
+    });
+  };
+
+  const handleDescriptionChange = (rateId: string, description: string) => {
+    if (!rates) return;
+    setSelectionByRate((prev) => {
+      const next = new Map(prev);
+      const existing = prev.get(rateId);
+      if (existing?.selected) {
+        next.set(rateId, { ...existing, description: description || undefined });
+      }
+
+      const items: EquipmentRentalItem[] = rates.map((r) => {
+        const sel = next.get(r.id) ?? {
+          selected: false,
+          quantity: 0,
+          description: undefined,
+        };
+        const q = sel.selected ? sel.quantity : 0;
+        const total = q * r.value;
+        return {
+          id: r.id,
+          name: r.name,
+          code: r.code,
+          selected: sel.selected,
+          quantity: q,
+          unitValue: r.value,
+          total,
+          description: sel.description,
         };
       });
       const total = items.reduce((s, i) => s + i.total, 0);
@@ -109,38 +166,55 @@ export function EquipmentRentalSection({
           return (
             <div
               key={rate.id}
-              className="flex items-center gap-3 px-3 py-2 bg-background hover:bg-muted/30"
+              className="flex flex-col gap-1 px-3 py-2 bg-background hover:bg-muted/30"
             >
-              <Checkbox
-                checked={sel.selected}
-                onCheckedChange={(checked) =>
-                  handleChange(rate, !!checked, checked ? Math.max(1, sel.quantity) : 0)
-                }
-                disabled={readOnly}
-              />
-              <span className="flex-1 text-sm truncate">{rate.name}</span>
-              <span className="text-sm text-muted-foreground tabular-nums">
-                R$ {rate.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / {rate.unit}
-              </span>
-              <div className="w-20">
-                <Input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={sel.selected ? sel.quantity : ''}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    const q = isNaN(v) ? 0 : Math.max(0, v);
-                    handleChange(rate, q > 0, q);
-                  }}
-                  placeholder="0"
-                  disabled={readOnly || !sel.selected}
-                  className="h-8 text-right"
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  checked={sel.selected}
+                  onCheckedChange={(checked) =>
+                    handleChange(
+                      rate,
+                      !!checked,
+                      checked ? Math.max(1, sel.quantity) : 0,
+                      sel.description
+                    )
+                  }
+                  disabled={readOnly}
                 />
+                <span className="flex-1 text-sm truncate">{rate.name}</span>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  R$ {rate.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /{' '}
+                  {rate.unit}
+                </span>
+                <div className="w-20">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={sel.selected ? sel.quantity : ''}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      const q = isNaN(v) ? 0 : Math.max(0, v);
+                      handleChange(rate, q > 0, q, sel.description);
+                    }}
+                    placeholder="0"
+                    disabled={readOnly || !sel.selected}
+                    className="h-8 text-right"
+                  />
+                </div>
+                <span className="w-24 text-right text-sm tabular-nums">
+                  R$ {lineTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
               </div>
-              <span className="w-24 text-right text-sm tabular-nums">
-                R$ {lineTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
+              {sel.selected && (
+                <Input
+                  placeholder="Descrição (opcional)"
+                  value={sel.description ?? ''}
+                  onChange={(e) => handleDescriptionChange(rate.id, e.target.value)}
+                  disabled={readOnly}
+                  className="h-8 ml-6 text-sm"
+                />
+              )}
             </div>
           );
         })}

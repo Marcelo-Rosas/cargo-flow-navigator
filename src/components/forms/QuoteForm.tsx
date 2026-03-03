@@ -49,6 +49,8 @@ import {
   usePaymentTerms,
   usePricingParameter,
   useConditionalFees,
+  usePricingRulesConfig,
+  resolvePricingRule,
 } from '@/hooks/usePricingRules';
 import { usePriceTableRowByKmRange, usePriceTableRows } from '@/hooks/usePriceTableRows';
 import {
@@ -264,38 +266,41 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedTdeEnabled = form.watch('tde_enabled');
   const watchedTearEnabled = form.watch('tear_enabled');
 
-  // Serialização estável para debounce (evita reexecução a cada tecla)
-  const calcSnapshot = JSON.stringify([
+  // Dual Debounce: StableSnapshot (400ms) + CostsSnapshot (50ms)
+  const stableSnapshot = JSON.stringify([
     watchedOrigin,
     watchedDestination,
     watchedWeight,
     watchedVolume,
     watchedCargoValue,
-    watchedToll,
-    watchedAluguelMaquinas,
-    watchedDescarga,
     watchedKmDistance,
     watchedPriceTableId,
+    watchedVehicleTypeId,
     watchedTdeEnabled,
     watchedTearEnabled,
   ]);
-  const debouncedSnapshot = useDebouncedValue(calcSnapshot, 400);
+  const costsSnapshot = JSON.stringify([watchedToll, watchedAluguelMaquinas, watchedDescarga]);
+  const debouncedStable = useDebouncedValue(stableSnapshot, 400);
+  const debouncedCosts = useDebouncedValue(costsSnapshot, 50);
+
   const debounced = useMemo(() => {
     try {
-      const arr = JSON.parse(debouncedSnapshot || '[]') as unknown[];
+      const stable = JSON.parse(debouncedStable || '[]') as unknown[];
+      const costs = JSON.parse(debouncedCosts || '[]') as unknown[];
       return {
-        origin: (arr[0] as string) ?? '',
-        destination: (arr[1] as string) ?? '',
-        weight: (arr[2] as number) ?? 0,
-        volume: (arr[3] as number) ?? 0,
-        cargoValue: (arr[4] as number) ?? 0,
-        toll: (arr[5] as number) ?? 0,
-        aluguelMaquinas: (arr[6] as number) ?? 0,
-        descarga: (arr[7] as number) ?? 0,
-        kmDistance: (arr[8] as number | undefined) ?? undefined,
-        priceTableId: (arr[9] as string) ?? '',
-        tdeEnabled: (arr[10] as boolean) ?? false,
-        tearEnabled: (arr[11] as boolean) ?? false,
+        origin: (stable[0] as string) ?? '',
+        destination: (stable[1] as string) ?? '',
+        weight: (stable[2] as number) ?? 0,
+        volume: (stable[3] as number) ?? 0,
+        cargoValue: (stable[4] as number) ?? 0,
+        kmDistance: (stable[5] as number | undefined) ?? undefined,
+        priceTableId: (stable[6] as string) ?? '',
+        vehicleTypeId: (stable[7] as string) ?? '',
+        tdeEnabled: (stable[8] as boolean) ?? false,
+        tearEnabled: (stable[9] as boolean) ?? false,
+        toll: (costs[0] as number) ?? 0,
+        aluguelMaquinas: (costs[1] as number) ?? 0,
+        descarga: (costs[2] as number) ?? 0,
       };
     } catch {
       return {
@@ -304,17 +309,19 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         weight: 0,
         volume: 0,
         cargoValue: 0,
+        kmDistance: undefined as number | undefined,
+        priceTableId: '',
+        vehicleTypeId: '',
+        tdeEnabled: false,
+        tearEnabled: false,
         toll: 0,
         aluguelMaquinas: 0,
         descarga: 0,
-        kmDistance: undefined as number | undefined,
-        priceTableId: '',
-        tdeEnabled: false,
-        tearEnabled: false,
       };
     }
-  }, [debouncedSnapshot]);
-  const isCalculationStale = calcSnapshot !== debouncedSnapshot;
+  }, [debouncedStable, debouncedCosts]);
+
+  const isCalculationStale = stableSnapshot !== debouncedStable || costsSnapshot !== debouncedCosts;
   const watchedPaymentTermId = form.watch('payment_term_id');
   const selectedPaymentTerm = paymentTerms?.find((t) => t.id === watchedPaymentTermId);
 
@@ -355,6 +362,20 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   // Regime tributário global (1 = Simples → ICMS 0%; 0 = Normal)
   const { data: taxRegimeParam } = usePricingParameter('tax_regime_simples');
   const taxRegimeSimples = taxRegimeParam?.value != null ? Number(taxRegimeParam.value) : 1;
+
+  // Regras da central (precedência: veículo > global > constante)
+  const { data: pricingRules } = usePricingRulesConfig(true);
+  const resolvedPricingParams = useMemo(() => {
+    const vtId = debounced.vehicleTypeId || undefined;
+    return {
+      taxRegimeSimples,
+      dasPercent: resolvePricingRule(pricingRules, 'das_percent', vtId, 14),
+      markupPercent: resolvePricingRule(pricingRules, 'markup_percent', vtId, 30),
+      overheadPercent: resolvePricingRule(pricingRules, 'overhead_percent', vtId, 15),
+      tdePercent: resolvePricingRule(pricingRules, 'tde_percent', vtId, 20),
+      tearPercent: resolvePricingRule(pricingRules, 'tear_percent', vtId, 20),
+    };
+  }, [pricingRules, debounced.vehicleTypeId, taxRegimeSimples]);
 
   // ANTT floor rate (Piso mínimo carreteiro) - Tabela A / Carga Geral
   const selectedVehicle = vehicleTypes?.find((v) => v.id === watchedVehicleTypeId) ?? null;
@@ -414,7 +435,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       icmsRatePercent: icmsRate,
       tdeEnabled: debounced.tdeEnabled || false,
       tearEnabled: debounced.tearEnabled || false,
-      pricingParams: { taxRegimeSimples },
+      pricingParams: resolvedPricingParams,
     });
   }, [
     debounced.origin,
@@ -425,14 +446,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debounced.toll,
     debounced.aluguelMaquinas,
     debounced.descarga,
-    debounced.kmDistance,
     debounced.priceTableId,
     debounced.tdeEnabled,
     debounced.tearEnabled,
     debouncedKmBand,
     priceTableRow,
     icmsRate,
-    taxRegimeSimples,
+    resolvedPricingParams,
   ]);
 
   // Passo 2: calcular o total das taxas condicionais usando o baseFreight intermediário
@@ -493,7 +513,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       icmsRatePercent: icmsRate,
       tdeEnabled: debounced.tdeEnabled || false,
       tearEnabled: debounced.tearEnabled || false,
-      pricingParams: { taxRegimeSimples },
+      pricingParams: resolvedPricingParams,
       extras: {
         conditionalFees: computedConditionalFees,
         waitingTimeCost: additionalFeesSelection.waitingTimeCost,
@@ -510,14 +530,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debounced.toll,
     debounced.aluguelMaquinas,
     debounced.descarga,
-    debounced.kmDistance,
     debounced.priceTableId,
     debounced.tdeEnabled,
     debounced.tearEnabled,
     debouncedKmBand,
     priceTableRow,
     icmsRate,
-    taxRegimeSimples,
+    resolvedPricingParams,
     computedConditionalFees,
     additionalFeesSelection.waitingTimeCost,
     additionalFeesSelection.waitingTimeHours,
@@ -734,6 +753,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       }>('calculate-distance-webrouter', {
         origin_cep: originCep,
         destination_cep: destinationCep,
+        categoria_veiculo:
+          (selectedVehicle as { ailog_category?: string | null } | undefined)?.ailog_category ??
+          undefined,
         axes_count: selectedVehicle?.axes_count ?? undefined,
       });
 

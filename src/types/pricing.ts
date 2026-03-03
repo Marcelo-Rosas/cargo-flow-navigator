@@ -22,6 +22,9 @@ export interface VehicleType {
   code: string;
   name: string;
   axes_count: number | null;
+  ailog_category: string | null;
+  rolling_type: string | null;
+  vehicle_profile: string | null;
   capacity_kg: number | null;
   capacity_m3: number | null;
   active: boolean;

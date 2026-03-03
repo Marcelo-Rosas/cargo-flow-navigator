@@ -32,14 +32,13 @@ const STEPS = [
 ] as const;
 
 const STEP_FIELDS: (keyof QuoteFormData)[][] = [
-  ['client_name', 'origin', 'destination'],
+  ['client_name', 'origin', 'destination', 'vehicle_type_id'],
   [
     'cargo_type',
     'weight',
     'volume',
     'freight_modality',
     'price_table_id',
-    'vehicle_type_id',
     'payment_term_id',
     'km_distance',
   ],
@@ -184,6 +183,7 @@ export function QuoteFormWizard({
           form={form}
           clients={clients}
           shippers={shippers}
+          vehicleTypes={vehicleTypes}
           onClientSelect={onClientSelect}
           onShipperSelect={onShipperSelect}
           onOriginCepBlur={onOriginCepBlur}
@@ -200,7 +200,6 @@ export function QuoteFormWizard({
         <CargoLogisticsStep
           form={form}
           priceTablesFiltered={priceTablesFiltered}
-          vehicleTypes={vehicleTypes}
           paymentTerms={paymentTerms}
           weightUnit={weightUnit}
           setWeightUnit={setWeightUnit}

@@ -33,12 +33,6 @@ interface PriceTable {
   modality: string | null;
 }
 
-interface VehicleType {
-  id: string;
-  name: string;
-  code: string;
-}
-
 interface PaymentTerm {
   id: string;
   name: string;
@@ -48,7 +42,6 @@ interface PaymentTerm {
 interface CargoLogisticsStepProps {
   form: UseFormReturn<QuoteFormData>;
   priceTablesFiltered: PriceTable[];
-  vehicleTypes: VehicleType[];
   paymentTerms: PaymentTerm[];
   weightUnit: 'kg' | 'ton';
   setWeightUnit: (unit: 'kg' | 'ton') => void;
@@ -57,7 +50,6 @@ interface CargoLogisticsStepProps {
 export function CargoLogisticsStep({
   form,
   priceTablesFiltered,
-  vehicleTypes,
   paymentTerms,
   weightUnit,
   setWeightUnit,
@@ -233,30 +225,6 @@ export function CargoLogisticsStep({
           />
         </div>
         <div className="grid grid-cols-3 gap-4">
-          <FormField
-            control={form.control}
-            name="vehicle_type_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo de Veículo</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ''}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar veículo..." />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {vehicleTypes.map((vehicle) => (
-                      <SelectItem key={vehicle.id} value={vehicle.id}>
-                        {vehicle.name} ({vehicle.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
           <FormField
             control={form.control}
             name="payment_term_id"

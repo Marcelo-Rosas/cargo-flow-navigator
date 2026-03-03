@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { NumericInput } from '@/components/ui/numeric-input';
-import { Loader2, Calculator, CalendarDays, TrendingUp, ReceiptText } from 'lucide-react';
+import { Loader2, Calculator, CalendarDays, TrendingUp, ReceiptText, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { UnloadingCostSection } from '@/components/quotes/UnloadingCostSection';
@@ -45,8 +45,11 @@ export function PricingStep({
   onUnloadingCostChange,
 }: PricingStepProps) {
   const c = calculationResult?.components;
-  const p = calculationResult?.profitability;
   const t = calculationResult?.totals;
+  const p = calculationResult?.profitability;
+  const m = calculationResult?.meta;
+  const icmsByUf = (m as { icmsBreakdownByUf?: Record<string, number> } | undefined)
+    ?.icmsBreakdownByUf;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
@@ -55,14 +58,26 @@ export function PricingStep({
           <Calculator className="w-4 h-4 text-primary" />
           <h3 className="font-bold text-xs uppercase tracking-widest">Pricing & Composição</h3>
         </div>
-        {isCalculationStale && (
-          <Badge
-            variant="outline"
-            className="animate-pulse bg-amber-50 text-amber-600 border-amber-200 py-0.5 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800"
-          >
-            <Loader2 className="w-3 h-3 animate-spin mr-1" /> Calculando...
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {calculationResult?.status === 'OUT_OF_RANGE' && (
+            <Badge variant="destructive" className="text-[10px]">
+              Distância fora da faixa
+            </Badge>
+          )}
+          {calculationResult?.status === 'MISSING_DATA' && (
+            <Badge variant="secondary" className="text-[10px]">
+              Tabela não selecionada
+            </Badge>
+          )}
+          {isCalculationStale && (
+            <Badge
+              variant="outline"
+              className="animate-pulse bg-amber-50 text-amber-600 border-amber-200 py-0.5 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800"
+            >
+              <Loader2 className="w-3 h-3 animate-spin mr-1" /> Calculando...
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -242,6 +257,9 @@ export function PricingStep({
                   value={formatCurrency((c?.tde ?? 0) + (c?.tear ?? 0))}
                 />
               )}
+              {c?.dispatchFee != null && c.dispatchFee > 0 && (
+                <ResultRow label="Taxa de expedição" value={formatCurrency(c.dispatchFee)} />
+              )}
               {c?.conditionalFeesTotal != null && c.conditionalFeesTotal > 0 && (
                 <ResultRow
                   label="Taxas Condicionais"
@@ -274,6 +292,10 @@ export function PricingStep({
                 <ResultRow label="ICMS" value={formatCurrency(t.icms)} />
               )}
 
+              {icmsByUf && Object.keys(icmsByUf).length > 0 && (
+                <IcmsByUfSection breakdown={icmsByUf} formatCurrency={formatCurrency} />
+              )}
+
               <Separator className="my-2" />
               <ResultRow label="Margem Bruta" value={formatCurrency(p?.margemBruta ?? 0)} />
               <ResultRow label="Overhead (Fixo)" value={formatCurrency(p?.overhead ?? 0)} />
@@ -304,6 +326,32 @@ function ResultRow({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between text-xs sm:text-sm animate-in fade-in duration-300">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{value}</span>
+    </div>
+  );
+}
+
+function IcmsByUfSection({
+  breakdown,
+  formatCurrency,
+}: {
+  breakdown: Record<string, number>;
+  formatCurrency: (v: number) => string;
+}) {
+  const entries = Object.entries(breakdown).filter(([, v]) => v > 0);
+  if (entries.length === 0) return null;
+  return (
+    <div className="space-y-1.5 pt-2">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+        <MapPin className="w-3.5 h-3.5" /> ICMS por Estado
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+        {entries.map(([uf, value]) => (
+          <div key={uf} className="flex justify-between">
+            <span>{uf}</span>
+            <span className="font-medium tabular-nums">{formatCurrency(value)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

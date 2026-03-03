@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Settings2, Truck, Clock, Receipt, Fuel, Route, CreditCard, Percent } from 'lucide-react';
 
+import { PricingRulesManager } from './PricingRulesManager';
 import { PricingParametersSection } from './PricingParametersSection';
 import { VehicleTypesSection } from './VehicleTypesSection';
 import { WaitingTimeRulesSection } from './WaitingTimeRulesSection';
@@ -24,10 +25,12 @@ import {
   useTacRates,
   useTollRoutes,
   usePaymentTerms,
+  usePricingRulesConfig,
 } from '@/hooks/usePricingRules';
 
 export function PricingRulesTab() {
   const { data: parameters } = usePricingParameters();
+  const { data: pricingRules } = usePricingRulesConfig(false);
   const { data: vehicleTypes } = useVehicleTypes(false);
   const { data: waitingRules } = useWaitingTimeRules();
   const { data: conditionalFees } = useConditionalFees(false);
@@ -46,6 +49,22 @@ export function PricingRulesTab() {
       </CardHeader>
       <CardContent>
         <Accordion type="single" collapsible className="w-full">
+          {/* Central de Regras de Precificação */}
+          <AccordionItem value="pricing-rules-manager">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3">
+                <Percent className="h-5 w-5 text-muted-foreground" />
+                <span>Central de Regras (Markup, DAS, ICMS, TDE/TEAR)</span>
+                <Badge variant="secondary" className="ml-2">
+                  {pricingRules?.length ?? 0} regras
+                </Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <PricingRulesManager />
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Impostos e Margens */}
           <AccordionItem value="taxes-margins">
             <AccordionTrigger className="hover:no-underline">

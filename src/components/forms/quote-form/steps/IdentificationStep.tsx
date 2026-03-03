@@ -13,10 +13,17 @@ import {
 import type { UseFormReturn } from 'react-hook-form';
 import type { QuoteFormData } from '../types';
 
+interface VehicleType {
+  id: string;
+  name: string;
+  code: string;
+}
+
 interface IdentificationStepProps {
   form: UseFormReturn<QuoteFormData>;
   clients: { id: string; name: string; email?: string | null; zip_code?: string | null }[];
   shippers: { id: string; name: string; email?: string | null; zip_code?: string | null }[];
+  vehicleTypes: VehicleType[];
   onClientSelect: (clientId: string) => void;
   onShipperSelect: (shipperId: string) => void;
   onOriginCepBlur: () => Promise<void>;
@@ -33,6 +40,7 @@ export function IdentificationStep({
   form,
   clients,
   shippers,
+  vehicleTypes,
   onClientSelect,
   onShipperSelect,
   onOriginCepBlur,
@@ -186,6 +194,30 @@ export function IdentificationStep({
       {/* Rota */}
       <div className="space-y-4">
         <h3 className="font-semibold text-foreground">Rota</h3>
+        <FormField
+          control={form.control}
+          name="vehicle_type_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tipo de Veículo</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || ''}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar veículo..." />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {vehicleTypes.map((vehicle) => (
+                    <SelectItem key={vehicle.id} value={vehicle.id}>
+                      {vehicle.name} ({vehicle.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -250,7 +282,14 @@ export function IdentificationStep({
             variant="outline"
             size="sm"
             onClick={onCalculateKm}
-            disabled={isCalculatingKm || isLoadingOriginCep || isLoadingDestinationCep}
+            disabled={
+              isCalculatingKm ||
+              isLoadingOriginCep ||
+              isLoadingDestinationCep ||
+              !form.watch('origin')?.trim() ||
+              !form.watch('destination')?.trim() ||
+              !form.watch('vehicle_type_id')
+            }
           >
             {isCalculatingKm && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Calcular KM

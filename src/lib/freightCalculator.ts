@@ -87,8 +87,14 @@ export interface FreightCalculationInput {
     dispatchFee: number;
   };
 
-  // Alíquota ICMS (já normalizada em %)
+  // Alíquota ICMS (já normalizada em %). Ignorada quando kmByUf + icmsByUf presentes.
   icmsRatePercent: number;
+
+  /** KM percorrido por UF (ex: { SP: 120, MG: 80 }). Quando presente, usa ICMS proporcional. */
+  kmByUf?: Record<string, number>;
+
+  /** Alíquota ICMS por UF em % (ex: { SP: 18, MG: 18 }). Usado com kmByUf. */
+  icmsByUf?: Record<string, number>;
 
   // Taxas NTC opcionais
   tdeEnabled?: boolean;
@@ -105,6 +111,8 @@ export interface FreightCalculationInput {
     overheadPercent?: number;
     targetMarginPercent?: number;
     markupScope?: MarkupScope;
+    tdePercent?: number;
+    tearPercent?: number;
   };
 
   // Custos diretos (valores fixos em R$ e/ou %)
@@ -142,6 +150,7 @@ export interface FreightCalculationInput {
       quantity: number;
       unitValue: number;
       total: number;
+      description?: string;
     }>;
   };
 
@@ -172,6 +181,8 @@ export interface FreightCalculationOutput {
     billableWeightKg: number;
     /** KM inteiro usado no cálculo (paridade com backend km_band_used) */
     kmBandUsed?: number;
+    /** Breakdown de ICMS por UF (R$). Preenchido quando kmByUf + icmsByUf são usados. */
+    icmsBreakdownByUf?: Record<string, number>;
   };
 
   components: {
@@ -277,6 +288,7 @@ export interface StoredPricingBreakdown {
       quantity: number;
       unitValue: number;
       total: number;
+      description?: string;
     }>;
     // ANTT piso mínimo (memória de cálculo) - opcional
     antt?: {
@@ -447,6 +459,8 @@ function resolveParams(input: FreightCalculationInput) {
       pp?.overheadPercent ?? input.overheadPercent ?? FREIGHT_CONSTANTS.DEFAULT_OVERHEAD_PERCENT,
     targetMarginPercent: pp?.targetMarginPercent ?? FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT,
     markupScope: pp?.markupScope ?? ('BASE_ONLY' as MarkupScope),
+    tdePercent: pp?.tdePercent ?? FREIGHT_CONSTANTS.NTC_TDE_PERCENT,
+    tearPercent: pp?.tearPercent ?? FREIGHT_CONSTANTS.NTC_TEAR_PERCENT,
   };
 }
 
@@ -641,13 +655,11 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
     ? baseCost // Fracionado: sem markup sobre frete peso (NTC referência)
     : round2(markupBase * (1 + params.markupPercent / 100));
 
-  // ---- STEP 5: TAXAS NTC (20% sobre baseFreight) ----
-  const tde = input.tdeEnabled
-    ? round2(baseFreight * (FREIGHT_CONSTANTS.NTC_TDE_PERCENT / 100))
-    : 0;
-  const tear = input.tearEnabled
-    ? round2(baseFreight * (FREIGHT_CONSTANTS.NTC_TEAR_PERCENT / 100))
-    : 0;
+  // ---- STEP 5: TAXAS NTC (% sobre baseFreight, regra ou constante) ----
+  const tdePct = params.tdePercent ?? FREIGHT_CONSTANTS.NTC_TDE_PERCENT;
+  const tearPct = params.tearPercent ?? FREIGHT_CONSTANTS.NTC_TEAR_PERCENT;
+  const tde = input.tdeEnabled ? round2(baseFreight * (tdePct / 100)) : 0;
+  const tear = input.tearEnabled ? round2(baseFreight * (tearPct / 100)) : 0;
 
   // ---- STEP 6: EXTRAS ----
   const conditionalFeesTotal = round2(input.extras?.conditionalFees?.total ?? 0);
@@ -675,7 +687,32 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
     Math.max(receitaBruta * (params.dasPercent / 100), params.dasProvisionMinValue)
   );
   const das = dasProvision;
-  const icms = round2(receitaBruta * (icmsPercent / 100));
+
+  // ICMS: proporcional por UF (quando kmByUf + icmsByUf) ou taxa única
+  let icms: number;
+  let icmsBreakdownByUf: Record<string, number> | undefined;
+  if (
+    input.kmByUf &&
+    Object.keys(input.kmByUf).length > 0 &&
+    input.icmsByUf &&
+    Object.keys(input.icmsByUf).length > 0
+  ) {
+    const totalKm = Object.values(input.kmByUf).reduce((a, b) => a + b, 0);
+    if (totalKm > 0) {
+      icmsBreakdownByUf = {};
+      icms = round2(
+        Object.entries(input.kmByUf).reduce((sum, [uf, km]) => {
+          const pct = input.icmsByUf?.[uf] ?? icmsPercent;
+          icmsBreakdownByUf![uf] = round2((km / totalKm) * receitaBruta * (pct / 100));
+          return sum + icmsBreakdownByUf![uf];
+        }, 0)
+      );
+    } else {
+      icms = round2(receitaBruta * (icmsPercent / 100));
+    }
+  } else {
+    icms = round2(receitaBruta * (icmsPercent / 100));
+  }
   const totalImpostos = round2(das + icms);
   const totalCliente = round2(receitaBruta + totalImpostos);
 
@@ -704,6 +741,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       cubageWeightKg,
       billableWeightKg,
       kmBandUsed,
+      icmsBreakdownByUf,
     },
     components: {
       baseCost,

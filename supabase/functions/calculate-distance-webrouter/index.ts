@@ -4,6 +4,8 @@ type Input = {
   origin_cep: string;
   destination_cep: string;
   axes_count?: number;
+  /** Categoria AILOG/WebRouter (ex: "2","4","6","7","8","12"). Preferida sobre axes_count. */
+  categoria_veiculo?: string;
 };
 
 interface TollPlaza {
@@ -135,7 +137,11 @@ Deno.serve(async (req) => {
     }
 
     const axesCount = body.axes_count;
-    const categoria = axesToCategoria(axesCount);
+    const categoriaVeiculo = body.categoria_veiculo;
+    const categoria =
+      categoriaVeiculo && /^\d+$/.test(String(categoriaVeiculo))
+        ? String(categoriaVeiculo)
+        : axesToCategoria(axesCount);
 
     const webRouterBody = {
       autenticacao: { chaveAcesso: apiKey },
@@ -154,7 +160,7 @@ Deno.serve(async (req) => {
     };
 
     console.log(
-      `[webrouter] CEPs: ${originCep} → ${destinationCep}, eixos: ${axesCount ?? 'default'}, categoria: ${categoria}`
+      `[webrouter] CEPs: ${originCep} → ${destinationCep}, categoria: ${categoria}${categoriaVeiculo ? ' (AILOG)' : ` (axes: ${axesCount ?? 'default'})`}`
     );
 
     const res = await fetch(WEBROUTER_URL, {
