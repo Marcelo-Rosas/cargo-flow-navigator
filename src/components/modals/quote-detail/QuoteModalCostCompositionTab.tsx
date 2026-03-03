@@ -262,7 +262,7 @@ export function QuoteModalCostCompositionTab({
                     -{formatCurrency(overhead)}
                   </TableCell>
                 </TableRow>
-                <TableRow className="bg-muted/10">
+                <TableRow className="bg-blue-50/50 dark:bg-blue-900/10 border-l-4 border-l-blue-500">
                   <TableCell className="font-semibold">(-) Custo Repasse (Motorista)</TableCell>
                   <TableCell />
                 </TableRow>
@@ -288,36 +288,30 @@ export function QuoteModalCostCompositionTab({
                   </TableCell>
                   <TableCell />
                 </TableRow>
-                {grisValue > 0 && (
-                  <TableRow>
-                    <TableCell className="pl-8 text-muted-foreground">
-                      • GRIS ({breakdown.rates?.grisPercent?.toFixed(2) ?? 0}%)
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-destructive">
-                      -{formatCurrency(grisValue)}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {tsoValue > 0 && (
-                  <TableRow>
-                    <TableCell className="pl-8 text-muted-foreground">
-                      • TSO ({breakdown.rates?.tsoPercent?.toFixed(2) ?? 0}%)
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-destructive">
-                      -{formatCurrency(tsoValue)}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {rctrcValue > 0 && (
-                  <TableRow>
-                    <TableCell className="pl-8 text-muted-foreground">
-                      • RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2) ?? 0}%)
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-destructive">
-                      -{formatCurrency(rctrcValue)}
-                    </TableCell>
-                  </TableRow>
-                )}
+                <TableRow>
+                  <TableCell className="pl-8 text-muted-foreground">
+                    • GRIS ({breakdown.rates?.grisPercent?.toFixed(2) ?? 0}%)
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-destructive">
+                    -{formatCurrency(grisValue)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="pl-8 text-muted-foreground">
+                    • TSO ({breakdown.rates?.tsoPercent?.toFixed(2) ?? 0}%)
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-destructive">
+                    -{formatCurrency(tsoValue)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="pl-8 text-muted-foreground">
+                    • RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2) ?? 0}%)
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-destructive">
+                    -{formatCurrency(rctrcValue)}
+                  </TableCell>
+                </TableRow>
                 {tdeValue > 0 && (
                   <TableRow>
                     <TableCell className="pl-8 text-muted-foreground">• TDE (NTC)</TableCell>
