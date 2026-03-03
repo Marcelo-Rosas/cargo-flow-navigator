@@ -1,7 +1,6 @@
-import { Receipt, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
+import { TrendingUp, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   Table,
   TableBody,
@@ -82,10 +81,15 @@ export function QuoteModalCostCompositionTab({
       regimeFiscal?: 'simples_nacional' | 'excesso_sublimite' | 'normal';
     }
   )?.regimeFiscal;
-  const custoEfetivoMotorista =
-    (breakdown.profitability as { custoMotorista?: number })?.custoMotorista ??
-    breakdown.profitability?.custosCarreteiro ??
-    0;
+  const custoEfetivoMotorista = breakdown.components?.baseCost ?? 0;
+  const pedagio = breakdown.components?.toll ?? 0;
+  const grisValue = breakdown.components?.gris ?? 0;
+  const tsoValue = breakdown.components?.tso ?? 0;
+  const rctrcValue = breakdown.components?.rctrc ?? 0;
+  const tdeValue = breakdown.components?.tde ?? 0;
+  const tearValue = breakdown.components?.tear ?? 0;
+  const dispatchFeeValue = breakdown.components?.dispatchFee ?? 0;
+  const aluguelMaquinasValue = breakdown.components?.aluguelMaquinas ?? 0;
 
   const composicaoRows: { label: string; value: number }[] = [];
   if (breakdown.components) {
@@ -259,26 +263,97 @@ export function QuoteModalCostCompositionTab({
                   </TableCell>
                 </TableRow>
                 <TableRow className="bg-muted/10">
-                  <TableCell className="font-semibold">(-) Custos Diretos</TableCell>
+                  <TableCell className="font-semibold">(-) Custo Repasse (Motorista)</TableCell>
                   <TableCell />
                 </TableRow>
                 <TableRow>
                   <TableCell className="pl-8 text-muted-foreground">
-                    • Custo Motorista (Frete Peso / Tabela NTC)
+                    • Custo Motorista (Frete Base)
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-destructive">
                     -{formatCurrency(custoEfetivoMotorista)}
                   </TableCell>
                 </TableRow>
-                <TableRow>
-                  <TableCell className="pl-8 text-muted-foreground">• Pedágio e Serviços</TableCell>
-                  <TableCell className="text-right tabular-nums text-destructive">
-                    -
-                    {formatCurrency(
-                      (breakdown.profitability as { custoServicos?: number })?.custoServicos ?? 0
-                    )}
+                {pedagio > 0 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground">• Pedágio</TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
+                      -{formatCurrency(pedagio)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                <TableRow className="bg-muted/10">
+                  <TableCell className="font-semibold">
+                    (-) Custos Variáveis de Risco (s/ NF)
                   </TableCell>
+                  <TableCell />
                 </TableRow>
+                {grisValue > 0 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground">
+                      • GRIS ({breakdown.rates?.grisPercent?.toFixed(2) ?? 0}%)
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
+                      -{formatCurrency(grisValue)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {tsoValue > 0 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground">
+                      • TSO ({breakdown.rates?.tsoPercent?.toFixed(2) ?? 0}%)
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
+                      -{formatCurrency(tsoValue)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {rctrcValue > 0 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground">
+                      • RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2) ?? 0}%)
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
+                      -{formatCurrency(rctrcValue)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {tdeValue > 0 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground">• TDE (NTC)</TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
+                      -{formatCurrency(tdeValue)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {tearValue > 0 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground">• TEAR (NTC)</TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
+                      -{formatCurrency(tearValue)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {dispatchFeeValue > 0 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground">
+                      • Taxa de Despacho (NTC)
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
+                      -{formatCurrency(dispatchFeeValue)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {aluguelMaquinasValue > 0 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground">
+                      • Aluguel de Máquinas
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
+                      -{formatCurrency(aluguelMaquinasValue)}
+                    </TableCell>
+                  </TableRow>
+                )}
                 <TableRow
                   className={cn(
                     'border-t-2',
@@ -287,9 +362,7 @@ export function QuoteModalCostCompositionTab({
                       : 'bg-destructive/10'
                   )}
                 >
-                  <TableCell className="text-lg font-bold">
-                    (=) Resultado Líquido (Lucro Real)
-                  </TableCell>
+                  <TableCell className="text-lg font-bold">(=) Resultado Líquido</TableCell>
                   <TableCell className="text-right">
                     <Badge
                       variant={resultadoLiquido >= 0 ? 'default' : 'destructive'}
@@ -301,7 +374,7 @@ export function QuoteModalCostCompositionTab({
                 </TableRow>
                 <TableRow>
                   <TableCell className="font-semibold">
-                    Margem sobre Faturamento Bruto (meta: {targetMarginPercent}%)
+                    Resultado Líquido (Mínimo Viável: {targetMarginPercent}%)
                   </TableCell>
                   <TableCell className="text-right">
                     <Badge variant={isBelowTarget ? 'destructive' : 'default'}>
@@ -322,12 +395,16 @@ export function QuoteModalCostCompositionTab({
               desta cotação:{' '}
               <span className="font-medium text-foreground">
                 Overhead {breakdown.rates?.overheadPercent?.toFixed(2) ?? '—'}%
-              </span>{' '}
-              e{' '}
+              </span>
+              ,{' '}
               <span className="font-medium text-foreground">
                 Margem Alvo {targetMarginPercent?.toFixed(2) ?? '—'}%
               </span>
-              . Para conferência, utilize a calculadora na tela de{' '}
+              . Os custos de risco (GRIS, TSO e RCTR-C) são calculados sobre o{' '}
+              <span className="font-medium text-foreground">Valor da Nota Fiscal (Valor NF)</span>{' '}
+              conforme tabelas NTC. O &quot;Custo Motorista&quot; corresponde ao{' '}
+              <span className="font-medium text-foreground">Frete Base</span> da Memória de Cálculo.
+              Para conferência, utilize a calculadora na tela de{' '}
               <span className="underline">Regras de Precificação</span>.
             </p>
           </div>
