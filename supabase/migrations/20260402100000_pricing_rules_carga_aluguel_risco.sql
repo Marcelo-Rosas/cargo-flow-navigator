@@ -1,16 +1,7 @@
--- Novas categorias e regras: Carga e Descarga, Aluguel, Taxas de Risco (GRIS/TSO/RCTR-C)
+-- Novas regras: Carga e Descarga, Aluguel, Taxas de Risco (GRIS/TSO/RCTR-C)
+-- Enum values adicionados em 20260402090000_add_enum_carga_descarga_aluguel.sql
 
--- 1. Adicionar novos valores ao enum pricing_rule_category (PostgreSQL 9.1+)
-DO $$ BEGIN
-  ALTER TYPE pricing_rule_category ADD VALUE 'carga_descarga';
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-DO $$ BEGIN
-  ALTER TYPE pricing_rule_category ADD VALUE 'aluguel';
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
--- 2. Inserir regras de Carga e Descarga
+-- 1. Inserir regras de Carga e Descarga
 INSERT INTO public.pricing_rules_config (
   key,
   label,
