@@ -134,37 +134,77 @@ Deno.serve(async (req) => {
     const fallbacksApplied: string[] = [];
 
     // =====================================================
-    // GET GLOBAL PARAMETERS
+    // GET PARAMETERS (pricing_rules_config with fallback to pricing_parameters)
     // =====================================================
 
-    const { data: allParams } = await supabase.from('pricing_parameters').select('key, value');
+    let vehicleTypeIdForRules: string | null = null;
+    if (input.vehicle_type_code) {
+      const { data: vt } = await supabase
+        .from('vehicle_types')
+        .select('id')
+        .eq('code', input.vehicle_type_code)
+        .eq('active', true)
+        .maybeSingle();
+      vehicleTypeIdForRules = vt?.id ?? null;
+    }
 
+    const { data: allRules } = await supabase
+      .from('pricing_rules_config')
+      .select('key, value, vehicle_type_id')
+      .eq('is_active', true);
+
+    function resolveRule(key: string, vtId: string | null | undefined): number | undefined {
+      if (!allRules?.length) return undefined;
+      const byKey = allRules.filter((r: { key: string }) => r.key === key);
+      if (byKey.length === 0) return undefined;
+      const vehicleRule = vtId
+        ? byKey.find((r: { vehicle_type_id: string | null }) => r.vehicle_type_id === vtId)
+        : null;
+      const globalRule = byKey.find(
+        (r: { vehicle_type_id: string | null }) => r.vehicle_type_id == null
+      );
+      const rule = vehicleRule ?? globalRule;
+      return rule ? Number(rule.value) : undefined;
+    }
+
+    // Fallback: pricing_parameters (legacy)
+    const { data: allParams } = await supabase.from('pricing_parameters').select('key, value');
     const paramsMap = new Map<string, number>();
-    allParams?.forEach((p) => paramsMap.set(p.key, Number(p.value)));
+    allParams?.forEach((p: { key: string; value: number }) =>
+      paramsMap.set(p.key, Number(p.value))
+    );
 
     const cubageFactor = paramsMap.get('cubage_factor') ?? FREIGHT_CONSTANTS.CUBAGE_FACTOR_KG_M3;
     const dasPercent =
-      input.das_percent ?? paramsMap.get('das_percent') ?? FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT;
+      input.das_percent ??
+      resolveRule('das_percent', vehicleTypeIdForRules) ??
+      paramsMap.get('das_percent') ??
+      FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT;
     const markupPercent =
       input.markup_percent ??
+      resolveRule('markup_percent', vehicleTypeIdForRules) ??
       paramsMap.get('markup_percent') ??
       FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT;
     const overheadPercent =
       input.overhead_percent ??
+      resolveRule('overhead_percent', vehicleTypeIdForRules) ??
       paramsMap.get('overhead_percent') ??
       FREIGHT_CONSTANTS.DEFAULT_OVERHEAD_PERCENT;
+    const profitMarginPercent =
+      resolveRule('profit_margin_percent', vehicleTypeIdForRules) ??
+      paramsMap.get('profit_margin_percent') ??
+      FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
+    const regimeSimplesNacional =
+      (resolveRule('regime_simples_nacional', vehicleTypeIdForRules) ?? 1) === 1;
+    const excessoSublimite = (resolveRule('excesso_sublimite', vehicleTypeIdForRules) ?? 0) === 1;
+
     const carreteiroPercent = input.carreteiro_percent ?? paramsMap.get('carreteiro_percent') ?? 0;
     const descargaValue = input.descarga_value ?? 0;
     const aluguelMaquinasValue = input.aluguel_maquinas_value ?? 0;
 
     const correctionFactor = paramsMap.get('correction_factor_inctf') ?? 1.0;
 
-    // Regime tributário global: tabela pricing_parameters, key = tax_regime_simples.
-    // 1 = Simples Nacional (ICMS 0%, DAS = provisão por frete). Default = 1 quando a chave não existe.
-    const isSimples = (paramsMap.get('tax_regime_simples') ?? 1) === 1;
-    const dasProvisionPercent =
-      paramsMap.get('das_provision_percent') ?? FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT;
-    const dasProvisionMinValue = paramsMap.get('das_provision_min_value') ?? 0;
+    const isSimples = regimeSimplesNacional && !excessoSublimite;
 
     if (!paramsMap.has('das_percent'))
       fallbacksApplied.push(
@@ -185,7 +225,22 @@ Deno.serve(async (req) => {
     // =====================================================
 
     const cubageWeightKg = input.volume_m3 * cubageFactor;
-    const billableWeightKg = Math.max(input.weight_kg, cubageWeightKg);
+    let billableWeightKg = Math.max(input.weight_kg, cubageWeightKg);
+
+    // Trava Fracionado: mínimo 1.000 kg para viabilidade
+    let ltlMinWeightApplied = false;
+    const originalWeightKg = input.weight_kg;
+    if (input.price_table_id) {
+      const { data: ptModality } = await supabase
+        .from('price_tables')
+        .select('modality')
+        .eq('id', input.price_table_id)
+        .maybeSingle();
+      if (ptModality?.modality === 'fracionado' && billableWeightKg < 1000) {
+        billableWeightKg = 1000;
+        ltlMinWeightApplied = true;
+      }
+    }
 
     // =====================================================
     // GET PRICE TABLE ROW
@@ -638,10 +693,11 @@ Deno.serve(async (req) => {
     }
 
     // =====================================================
-    // CALCULATE RECEITA BRUTA
+    // TAC & PAYMENT ADJUSTMENTS (NTC 2.6 + prazo)
     // =====================================================
 
-    const receitaBruta =
+    const tacAdjustment = frete_peso * (tacPercent / 100);
+    const receitaBrutaPreTac =
       frete_peso +
       toll +
       gris +
@@ -654,55 +710,80 @@ Deno.serve(async (req) => {
       conditionalFeesTotal +
       waitingTimeCost +
       aluguelMaquinasValue;
-
-    // =====================================================
-    // APPLY TAC ADJUSTMENT (NTC 2.6: apenas sobre frete peso)
-    // =====================================================
-
-    const tacAdjustment = frete_peso * (tacPercent / 100);
-    const receitaComTac = receitaBruta + tacAdjustment;
-
-    // =====================================================
-    // APPLY PAYMENT TERM ADJUSTMENT
-    // =====================================================
-
+    const receitaComTac = receitaBrutaPreTac + tacAdjustment;
     const paymentAdjustment = receitaComTac * (paymentAdjustmentPercent / 100);
-    const receitaFinal = receitaComTac + paymentAdjustment;
 
     // =====================================================
-    // CALCULATE TAXES "POR FORA" (no gross-up)
-    // Provisão DAS = max(receita × das_provision_percent/100, das_provision_min_value).
-    // No Simples: totals.das = provisão por frete (colchão); ICMS = 0.
+    // GROSS-UP HÍBRIDO (Asset-Light)
+    // Simples: divisor = 1 - (Overhead + DAS + Lucro)/100, ICMS=0
+    // Sublimite: divisor = 1 - (Overhead + DAS + ICMS + Lucro)/100
+    // Alinhado com freightCalculator client-side.
     // =====================================================
 
-    const baseProvisao = receitaFinal;
-    const das = Math.max(baseProvisao * (dasProvisionPercent / 100), dasProvisionMinValue);
-    const icms = receitaFinal * (icmsPercent / 100);
-    const totalImpostos = das + icms;
-
-    // =====================================================
-    // CALCULATE TOTAL CLIENTE
-    // =====================================================
-
-    const totalCliente = receitaFinal + totalImpostos;
-
-    // =====================================================
-    // CALCULATE PROFITABILITY
-    // Margem Bruta = Total Cliente - Custo Carreteiro (real) - Carga/Descarga - Provisionamento DAS
-    // Usa ntc_base (custo da tabela) em vez de Piso ANTT — evita prejuízo em cargas leves
-    // Resultado Líquido = Margem Bruta - Overhead
-    // Margem % = Resultado Líquido / Total Cliente
-    // =====================================================
-
-    const custosCarreteiro = ntc_base; // Custo real da tabela NTC (frete_peso + frete_valor + gris + tso + dispatch)
+    const custoMotorista = frete_peso; // NTC: base cost (frete peso)
+    const custoServicos =
+      toll +
+      gris +
+      tso +
+      frete_valor +
+      tde +
+      tear +
+      dispatchFee +
+      conditionalFeesTotal +
+      waitingTimeCost +
+      aluguelMaquinasValue +
+      tacAdjustment +
+      paymentAdjustment;
+    const custosCarreteiro = ntc_base;
     const custosDescarga = descargaValue;
-    const custosDiretos = custosCarreteiro + custosDescarga;
+    const custosDiretos = custoMotorista + custoServicos + custosDescarga;
 
-    const margemBruta = totalCliente - custosCarreteiro - custosDescarga - das;
-    const overhead = margemBruta * (overheadPercent / 100);
-    const resultadoLiquido = margemBruta - overhead;
+    let regimeFiscal: 'simples_nacional' | 'excesso_sublimite' | 'normal';
+    let icmsNoDivisor: boolean;
+    if (regimeSimplesNacional && !excessoSublimite) {
+      regimeFiscal = 'simples_nacional';
+      icmsNoDivisor = false;
+    } else if (regimeSimplesNacional && excessoSublimite) {
+      regimeFiscal = 'excesso_sublimite';
+      icmsNoDivisor = true;
+    } else {
+      regimeFiscal = 'normal';
+      icmsNoDivisor = true;
+    }
 
-    const margemPercent = totalCliente > 0 ? (resultadoLiquido / totalCliente) * 100 : 0;
+    const taxaBruta = icmsNoDivisor
+      ? (overheadPercent + dasPercent + icmsPercent + profitMarginPercent) / 100
+      : (overheadPercent + dasPercent + profitMarginPercent) / 100;
+
+    let totalCliente: number;
+    let das: number;
+    let icms: number;
+
+    if (taxaBruta >= 1) {
+      fallbacksApplied.push(
+        `gross_up: soma Overhead+DAS+ICMS+Lucro >= 100%, usando modelo por fora`
+      );
+      const receitaFinal = receitaBrutaPreTac + tacAdjustment + paymentAdjustment;
+      const dasProvisionMinValue = paramsMap.get('das_provision_min_value') ?? 0;
+      das = roundCurrency(Math.max(receitaFinal * (dasPercent / 100), dasProvisionMinValue));
+      icms = roundCurrency(receitaFinal * (icmsPercent / 100));
+      totalCliente = roundCurrency(receitaFinal + das + icms);
+    } else {
+      totalCliente = roundCurrency(custosDiretos / (1 - taxaBruta));
+      das = roundCurrency(totalCliente * (dasPercent / 100));
+      icms =
+        regimeFiscal === 'simples_nacional' ? 0 : roundCurrency(totalCliente * (icmsPercent / 100));
+    }
+
+    const totalImpostos = das + icms;
+    const receitaLiquida = roundCurrency(totalCliente - totalImpostos);
+    const overhead = roundCurrency(receitaLiquida * (overheadPercent / 100));
+    const resultadoLiquido = roundCurrency(
+      receitaLiquida - overhead - custosCarreteiro - custosDescarga
+    );
+    const margemBruta = roundCurrency(receitaLiquida - overhead - custoMotorista - custoServicos);
+    const margemPercent =
+      totalCliente > 0 ? roundCurrency((resultadoLiquido / totalCliente) * 100) : 0;
 
     // =====================================================
     // BUILD RESPONSE
@@ -724,6 +805,8 @@ Deno.serve(async (req) => {
       ...(priceTableRowId && { price_table_row_id: priceTableRowId }),
       ...(priceTableRowId && { ntc_base: roundCurrency(ntc_base) }),
       antt_piso_carreteiro: roundCurrency(pisoAnttCarreteiro),
+      ...(ltlMinWeightApplied && { ltl_min_weight_applied: true }),
+      ...(ltlMinWeightApplied && { original_weight_kg: roundCurrency(originalWeightKg) }),
     };
 
     const components: FreightComponents = {
@@ -744,7 +827,7 @@ Deno.serve(async (req) => {
     };
 
     const rates: FreightRates = {
-      das_percent: dasProvisionPercent,
+      das_percent: dasPercent,
       icms_percent: icmsPercent,
       gris_percent: grisPercent,
       tso_percent: tsoPercent,
@@ -756,8 +839,8 @@ Deno.serve(async (req) => {
     };
 
     const totals: FreightTotals = {
-      receita_bruta: roundCurrency(receitaFinal),
-      das: roundCurrency(das),
+      receita_bruta: receitaLiquida,
+      das,
       icms: roundCurrency(icms),
       tac_adjustment: roundCurrency(tacAdjustment),
       payment_adjustment: roundCurrency(paymentAdjustment),
@@ -767,12 +850,17 @@ Deno.serve(async (req) => {
 
     const profitability: FreightProfitability = {
       custos_carreteiro: roundCurrency(custosCarreteiro),
+      custo_motorista: roundCurrency(custoMotorista),
+      custos_servicos: roundCurrency(custoServicos),
       custos_descarga: roundCurrency(custosDescarga),
       custos_diretos: roundCurrency(custosDiretos),
-      margem_bruta: roundCurrency(margemBruta),
-      overhead: roundCurrency(overhead),
-      resultado_liquido: roundCurrency(resultadoLiquido),
-      margem_percent: roundCurrency(margemPercent),
+      receita_liquida: receitaLiquida,
+      margem_bruta: margemBruta,
+      overhead,
+      resultado_liquido: resultadoLiquido,
+      margem_percent: margemPercent,
+      profit_margin_target: profitMarginPercent,
+      regime_fiscal: regimeFiscal,
     };
 
     const response: CalculateFreightResponse = {

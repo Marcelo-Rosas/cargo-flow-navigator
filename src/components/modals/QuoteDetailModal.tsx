@@ -1,32 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import {
-  MapPin,
-  Calendar,
-  DollarSign,
-  Pencil,
-  Building2,
-  Mail,
-  Package,
-  Scale,
-  Box,
-  ArrowRightLeft,
-  Truck,
-  CreditCard,
-  Route,
-  AlertTriangle,
-  TrendingUp,
-  Receipt,
-  FileText,
-  Loader2,
-  Landmark,
-  RefreshCw,
-} from 'lucide-react';
+import { AlertTriangle, Receipt, FileText, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
 import type { Database, Json } from '@/integrations/supabase/types';
@@ -65,6 +42,14 @@ import {
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { QuotePaymentProofList } from '@/components/documents/QuotePaymentProofList';
 import { useProcessQuotePaymentProof } from '@/hooks/useQuotePaymentProofs';
+import {
+  QuoteModalHeader,
+  QuoteModalFinancialSummary,
+  QuoteModalLogisticsGrid,
+  QuoteModalCostCompositionTab,
+  QuoteModalEquipmentItemsTab,
+  QuoteModalHistoryTab,
+} from '@/components/modals/quote-detail';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -215,46 +200,61 @@ export function QuoteDetailModal({
   const originalMarginPercent =
     breakdown?.meta?.marginPercent ?? breakdown?.profitability?.margemPercent;
   const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
-  const isBelowTargetMeta =
-    marginStatus === 'BELOW_TARGET' ||
-    (originalMarginPercent !== undefined && originalMarginPercent < TARGET_MARGIN_PERCENT);
 
-  // Visão contábil desejada:
-  // Margem Bruta = Total Cliente - Custo Carreteiro (real) - Carga/Descarga - Provisionamento DAS
-  // Usa custosCarreteiro do breakdown (custo real da tabela) em vez de Piso ANTT para cargas leves.
-  // Fallback para Piso ANTT quando custosCarreteiro não disponível (compatibilidade).
-  // Resultado Líquido = Margem Bruta - Overhead
-  // Margem % = Resultado Líquido / Total Cliente
-  const totalClienteView =
-    breakdown?.totals != null
-      ? isSimplesNacional
-        ? (breakdown.totals.receitaBruta || 0) + (breakdown.totals.das || 0)
-        : breakdown.totals.totalCliente || 0
-      : 0;
+  // Visão contábil (DRE Asset-Light):
+  // Total Cliente = Faturamento Bruto | Receita Líquida = Total - Impostos
+  // Resultado Líquido e Margem % vêm do breakdown quando disponível
+  const totalClienteView = breakdown?.totals?.totalCliente ?? 0;
+  const receitaLiquidaView =
+    (breakdown?.profitability as { receitaLiquida?: number } | undefined)?.receitaLiquida ?? null;
 
   const pisoAnttView = Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0);
   const custosCarreteiroView =
     breakdown?.profitability?.custosCarreteiro ??
     (breakdown?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
     null;
+  const custoMotoristaView =
+    (breakdown?.profitability as { custoMotorista?: number } | undefined)?.custoMotorista ??
+    custosCarreteiroView;
   const custoCarreteiroParaMargem =
-    custosCarreteiroView != null && Number(custosCarreteiroView) > 0
-      ? Number(custosCarreteiroView)
+    (custoMotoristaView ?? custosCarreteiroView) != null &&
+    Number(custoMotoristaView ?? custosCarreteiroView) > 0
+      ? Number(custoMotoristaView ?? custosCarreteiroView)
       : pisoAnttView;
   const cargaDescargaView = breakdown?.profitability?.custosDescarga ?? 0;
   const provisaoDasView = breakdown?.totals?.das ?? 0;
   const margemBrutaView =
-    totalClienteView - custoCarreteiroParaMargem - cargaDescargaView - provisaoDasView;
+    totalClienteView -
+    custoCarreteiroParaMargem -
+    cargaDescargaView -
+    provisaoDasView -
+    (breakdown?.totals?.icms ?? 0);
 
   const overheadView = breakdown?.profitability?.overhead ?? 0;
-  const resultadoLiquidoView = margemBrutaView - overheadView;
-  const margemPercentView =
-    totalClienteView > 0 ? (resultadoLiquidoView / totalClienteView) * 100 : 0;
-  const isBelowTargetView = margemPercentView < TARGET_MARGIN_PERCENT;
+  const resultadoLiquidoView = (
+    breakdown?.profitability?.resultadoLiquido != null
+      ? breakdown.profitability.resultadoLiquido
+      : margemBrutaView - overheadView
+  ) as number;
+  const margemPercentView = (
+    breakdown?.profitability?.margemPercent != null
+      ? breakdown.profitability.margemPercent
+      : totalClienteView > 0
+        ? (resultadoLiquidoView / totalClienteView) * 100
+        : 0
+  ) as number;
+  const targetMargin =
+    (breakdown?.profitability as { profitMarginTarget?: number; profit_margin_target?: number })
+      ?.profitMarginTarget ??
+    (breakdown?.profitability as { profit_margin_target?: number })?.profit_margin_target ??
+    TARGET_MARGIN_PERCENT;
+  const isBelowTargetView = margemPercentView < targetMargin;
 
   // Mantém compatibilidade com o alerta de margem existente
   const marginPercent = originalMarginPercent;
-  const isBelowTarget = isBelowTargetMeta;
+  const isBelowTarget =
+    marginStatus === 'BELOW_TARGET' ||
+    (originalMarginPercent !== undefined && originalMarginPercent < targetMargin);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -414,818 +414,230 @@ export function QuoteDetailModal({
     }
   };
 
+  const handleSaveAntt = async () => {
+    if (!quote || !anttCalc || !anttRate) return;
+    const current = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+    const updated: StoredPricingBreakdown = {
+      calculatedAt: current?.calculatedAt || new Date().toISOString(),
+      version: current?.version || '4.0-fob-lotacao-markup-scope',
+      status: current?.status || 'OK',
+      error: current?.error,
+      meta: {
+        ...(current?.meta || {
+          routeUfLabel: formatRouteUf(quote.origin, quote.destination),
+          kmBandLabel: null,
+          kmStatus: 'OK',
+          marginStatus: 'AT_TARGET',
+          marginPercent: 0,
+        }),
+        antt: {
+          operationTable: 'A',
+          cargoType: 'carga_geral',
+          axesCount: Number(axesCount),
+          kmDistance: Number(kmDistance),
+          ccd: Number(anttRate.ccd || 0),
+          cc: Number(anttRate.cc || 0),
+          ida: Number(anttCalc.ida),
+          retornoVazio: 0,
+          total: Number(anttCalc.total),
+          calculatedAt: new Date().toISOString(),
+        },
+      },
+      weights: current?.weights || { cubageWeight: 0, billableWeight: 0, tonBillable: 0 },
+      components: current?.components || {
+        baseCost: 0,
+        baseFreight: 0,
+        toll: 0,
+        aluguelMaquinas: 0,
+        gris: 0,
+        tso: 0,
+        rctrc: 0,
+        adValorem: 0,
+        tde: 0,
+        tear: 0,
+        dispatchFee: 0,
+        conditionalFeesTotal: 0,
+        waitingTimeCost: 0,
+        dasProvision: 0,
+      },
+      totals: current?.totals || {
+        receitaBruta: 0,
+        das: 0,
+        icms: 0,
+        totalImpostos: 0,
+        totalCliente: 0,
+      },
+      profitability: current?.profitability || {
+        custosCarreteiro: 0,
+        custosDescarga: 0,
+        custosDiretos: 0,
+        margemBruta: 0,
+        overhead: 0,
+        resultadoLiquido: 0,
+        margemPercent: 0,
+      },
+      rates: current?.rates || {
+        dasPercent: 14,
+        icmsPercent: 0,
+        grisPercent: 0,
+        tsoPercent: 0,
+        costValuePercent: 0,
+        markupPercent: 30,
+        overheadPercent: 15,
+        targetMarginPercent: 15,
+      },
+      conditionalFeesBreakdown: current?.conditionalFeesBreakdown,
+    };
+    const { error } = await supabase
+      .from('quotes')
+      .update(
+        asInsert({
+          pricing_breakdown: updated as unknown as typeof quote.pricing_breakdown,
+        })
+      )
+      .eq('id', asDb(quote.id));
+    if (error) {
+      toast.error('Erro ao salvar piso ANTT');
+      return;
+    }
+    toast.success('Piso ANTT salvo na memória de cálculo');
+    queryClient.invalidateQueries({ queryKey: ['quotes'] });
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-3">
-                <span className="text-xl font-bold">{quote.quote_code ?? 'Cotação'}</span>
-                <Badge className={cn(stageInfo.color)}>{stageInfo.label}</Badge>
-                {routeUfLabel && (
-                  <Badge variant="outline" className="text-xs">
-                    <Route className="w-3 h-3 mr-1" />
-                    {routeUfLabel}
-                  </Badge>
-                )}
-                {kmBandLabel && (
-                  <Badge variant="outline" className="text-xs">
-                    {kmBandLabel} km
-                  </Badge>
-                )}
-              </DialogTitle>
-              <div className="flex items-center gap-2">
-                {canManage && canConvert && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsConvertModalOpen(true)}
-                      className="gap-2"
-                    >
-                      <ArrowRightLeft className="w-4 h-4" />
-                      Converter para OS
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleConvertToFAT}
-                      disabled={isConvertingToFat}
-                      className="gap-2"
-                    >
-                      {isConvertingToFat ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Receipt className="w-4 h-4" />
-                      )}
-                      Converter para FAT
-                    </Button>
-                  </>
-                )}
-                {canManage && (
-                  <>
-                    {breakdown && quote?.price_table_id && quote?.km_distance && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRecalcular}
-                        disabled={
-                          calculateFreightMutation.isPending || updateQuoteMutation.isPending
-                        }
-                        className="gap-1.5"
-                        title="Recalcular memória de cálculo (usa custo real da tabela)"
-                      >
-                        {calculateFreightMutation.isPending ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        )}
-                        Recalcular
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="icon" onClick={() => setIsEditFormOpen(true)}>
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
+          <QuoteModalHeader
+            quoteCode={quote.quote_code ?? 'Cotação'}
+            clientName={quote.client_name}
+            stageLabel={stageInfo.label}
+            stageColor={stageInfo.color}
+            routeUfLabel={routeUfLabel || null}
+            kmBandLabel={kmBandLabel ?? null}
+            canManage={canManage}
+            canConvert={canConvert}
+            isConvertingToFat={isConvertingToFat}
+            isRecalculating={calculateFreightMutation.isPending || updateQuoteMutation.isPending}
+            onConvertToOS={() => setIsConvertModalOpen(true)}
+            onConvertToFAT={handleConvertToFAT}
+            onRecalcular={handleRecalcular}
+            onEdit={() => setIsEditFormOpen(true)}
+            showRecalcular={!!(breakdown && quote?.price_table_id && quote?.km_distance)}
+          />
 
-          {/* Mini cards: Adiantamento e Saldo (qualquer split %) */}
-          {paymentTerm && (paymentTerm.advance_percent ?? 0) > 0 && (
-            <div className="grid grid-cols-2 gap-3 -mt-2">
-              <div className="p-3 rounded-lg border bg-primary/5 border-primary/20">
-                <p className="text-xs text-muted-foreground mb-0.5">
-                  Adiantamento {paymentTerm.advance_percent}%
-                </p>
-                <p className="font-semibold text-foreground">
-                  {formatCurrency((totalClienteView * (paymentTerm.advance_percent ?? 0)) / 100)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {quote.advance_due_date ? formatDate(quote.advance_due_date) : '—'}
-                </p>
-              </div>
-              <div className="p-3 rounded-lg border bg-muted/30 border-border">
-                <p className="text-xs text-muted-foreground mb-0.5">
-                  Saldo {100 - (paymentTerm.advance_percent ?? 0)}%
-                </p>
-                <p className="font-semibold text-foreground">
-                  {formatCurrency(
-                    (totalClienteView * (100 - (paymentTerm.advance_percent ?? 0))) / 100
-                  )}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {quote.balance_due_date ? formatDate(quote.balance_due_date) : '—'}
-                </p>
-              </div>
-            </div>
+          {kmStatus === 'OUT_OF_RANGE' && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Distância fora da faixa de quilometragem da tabela de preços selecionada
+              </AlertDescription>
+            </Alert>
           )}
 
-          <Tabs defaultValue="resumo" className="mt-4">
-            <TabsList className={cn('grid w-full', showDocFatTab ? 'grid-cols-3' : 'grid-cols-2')}>
-              <TabsTrigger value="resumo">Resumo</TabsTrigger>
-              <TabsTrigger value="pedagios" className="gap-2">
-                <Landmark className="w-4 h-4" />
+          <QuoteModalFinancialSummary
+            totalCliente={totalClienteView}
+            receitaLiquida={receitaLiquidaView != null ? receitaLiquidaView : undefined}
+            resultadoLiquido={resultadoLiquidoView}
+            margemPercent={margemPercentView}
+            isBelowTarget={isBelowTarget}
+            targetMarginPercent={targetMargin}
+            marginPercentForAlert={marginPercent}
+          />
+
+          <QuoteModalLogisticsGrid
+            origin={quote.origin}
+            originCep={quote.origin_cep}
+            destination={quote.destination}
+            destinationCep={quote.destination_cep}
+            vehicleName={(vehicleType as { name?: string } | null)?.name}
+            vehicleCode={(vehicleType as { code?: string } | null)?.code}
+            weight={quote.weight}
+            volume={quote.volume}
+            kmDistance={quote.km_distance}
+            cargoType={quote.cargo_type}
+            custoMotorista={custoMotoristaView != null ? Number(custoMotoristaView) : null}
+            totalCliente={totalClienteView > 0 ? totalClienteView : null}
+          />
+
+          <Tabs defaultValue="composicao" className="mt-4">
+            <TabsList
+              className={cn(
+                'grid w-full',
+                showDocFatTab ? 'grid-cols-5' : 'grid-cols-4',
+                'overflow-x-auto'
+              )}
+            >
+              <TabsTrigger value="composicao" className="gap-1.5 text-xs">
+                <Receipt className="w-3.5 h-3.5" />
+                Composição
+              </TabsTrigger>
+              <TabsTrigger value="itens" className="gap-1.5 text-xs">
+                Itens
+              </TabsTrigger>
+              <TabsTrigger value="historico" className="gap-1.5 text-xs">
+                Histórico
+              </TabsTrigger>
+              <TabsTrigger value="pedagios" className="gap-1.5 text-xs">
+                <Landmark className="w-3.5 h-3.5" />
                 Pedágios
                 {tollPlazas.length > 0 && (
-                  <Badge variant="secondary" className="text-xs ml-1">
+                  <Badge variant="secondary" className="text-[10px] ml-1 px-1">
                     {tollPlazas.length}
                   </Badge>
                 )}
               </TabsTrigger>
               {showDocFatTab && (
-                <TabsTrigger value="doc_fat" className="gap-2">
-                  <FileText className="w-4 h-4" />
+                <TabsTrigger value="doc_fat" className="gap-1.5 text-xs">
+                  <FileText className="w-3.5 h-3.5" />
                   Doc Fat
                 </TabsTrigger>
               )}
             </TabsList>
 
-            <TabsContent value="resumo" className="space-y-6 mt-4 m-0">
-              {/* Margin Alert */}
-              {isBelowTarget && marginPercent !== undefined && (
-                <Alert
-                  variant="destructive"
-                  className="bg-warning/10 border-warning text-warning-foreground"
-                >
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    Margem de {marginPercent.toFixed(1)}% está abaixo da meta de{' '}
-                    {TARGET_MARGIN_PERCENT}%
-                  </AlertDescription>
-                </Alert>
-              )}
+            <TabsContent value="composicao" className="space-y-4 mt-4 m-0">
+              <QuoteModalCostCompositionTab
+                breakdown={breakdown}
+                isSimplesNacional={isSimplesNacional}
+                pisoAnttTotal={pisoAnttView}
+                custosDescarga={cargaDescargaView}
+                conditionalFeesData={conditionalFeesData ?? undefined}
+                margemBruta={margemBrutaView}
+                overhead={overheadView}
+                resultadoLiquido={resultadoLiquidoView}
+                margemPercent={margemPercentView}
+                isBelowTarget={isBelowTarget}
+                targetMarginPercent={targetMargin}
+                canManage={!!canManage}
+                axesCount={axesCount}
+                kmDistance={kmDistance}
+                anttRateCcd={anttRate?.ccd}
+                anttRateCc={anttRate?.cc}
+                hasAnttCalc={!!anttCalc}
+                onSaveAntt={handleSaveAntt}
+              />
+            </TabsContent>
 
-              {/* OUT_OF_RANGE Alert */}
-              {kmStatus === 'OUT_OF_RANGE' && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    Distância fora da faixa de quilometragem da tabela de preços selecionada
-                  </AlertDescription>
-                </Alert>
-              )}
+            <TabsContent value="itens" className="space-y-4 mt-4 m-0">
+              <QuoteModalEquipmentItemsTab breakdown={breakdown} />
+            </TabsContent>
 
-              {/* Client Info */}
-              <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Building2 className="w-6 h-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground text-lg">{quote.client_name}</p>
-                    {quote.client_email && (
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Mail className="w-3.5 h-3.5" />
-                        {quote.client_email}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Shipper Info */}
-              {(quote.shipper_name || quote.freight_type) && (
-                <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                  <h4 className="font-semibold text-foreground mb-3">Embarcador</h4>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      {quote.shipper_name && (
-                        <p className="font-medium text-foreground">{quote.shipper_name}</p>
-                      )}
-                      {quote.shipper_email && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                          <Mail className="w-3.5 h-3.5" />
-                          {quote.shipper_email}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      {quote.freight_type && (
-                        <Badge variant="outline" className="text-sm">
-                          {quote.freight_type}
-                        </Badge>
-                      )}
-                      {quote.freight_modality && (
-                        <Badge variant="outline" className="text-sm">
-                          {quote.freight_modality === 'lotacao' ? 'Lotação' : 'Fracionado'}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Route */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <MapPin className="w-4 h-4" />
-                    <span className="text-sm">Origem</span>
-                  </div>
-                  <p className="font-medium text-foreground">{quote.origin}</p>
-                  {quote.origin_cep && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      CEP: {quote.origin_cep.replace(/(\d{5})(\d{3})/, '$1-$2')}
-                    </p>
-                  )}
-                </div>
-                <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <MapPin className="w-4 h-4" />
-                    <span className="text-sm">Destino</span>
-                  </div>
-                  <p className="font-medium text-foreground">{quote.destination}</p>
-                  {quote.destination_cep && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      CEP: {quote.destination_cep.replace(/(\d{5})(\d{3})/, '$1-$2')}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Cargo Info */}
-              {(quote.cargo_type || quote.weight || quote.volume) && (
-                <div>
-                  <h4 className="font-semibold text-foreground mb-3">Dados da Carga</h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    {quote.cargo_type && (
-                      <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <Package className="w-4 h-4" />
-                          <span className="text-xs">Tipo</span>
-                        </div>
-                        <p className="font-medium text-foreground text-sm">{quote.cargo_type}</p>
-                      </div>
-                    )}
-                    {quote.weight && (
-                      <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <Scale className="w-4 h-4" />
-                          <span className="text-xs">Peso</span>
-                        </div>
-                        <p className="font-medium text-foreground text-sm">
-                          {Number(quote.weight) >= 1000
-                            ? `${(Number(quote.weight) / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} t`
-                            : `${Number(quote.weight).toLocaleString('pt-BR')} kg`}
-                        </p>
-                      </div>
-                    )}
-                    {quote.volume && (
-                      <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <Box className="w-4 h-4" />
-                          <span className="text-xs">Volume</span>
-                        </div>
-                        <p className="font-medium text-foreground text-sm">
-                          {Number(quote.volume).toLocaleString('pt-BR')} m³
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Pricing Details */}
-              {(priceTable ||
-                vehicleType ||
-                paymentTerm ||
-                quote.km_distance ||
-                quote.freight_modality ||
-                anttCalc) && (
-                <div>
-                  <h4 className="font-semibold text-foreground mb-3">Detalhes de Precificação</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    {priceTable && (
-                      <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <DollarSign className="w-4 h-4" />
-                          <span className="text-xs">Tabela de Preços</span>
-                        </div>
-                        <p className="font-medium text-foreground text-sm">{priceTable.name}</p>
-                      </div>
-                    )}
-                    {vehicleType && (
-                      <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <Truck className="w-4 h-4" />
-                          <span className="text-xs">Veículo</span>
-                        </div>
-                        <p className="font-medium text-foreground text-sm">
-                          {vehicleType.name} ({vehicleType.code})
-                        </p>
-                      </div>
-                    )}
-                    {paymentTerm && (
-                      <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <CreditCard className="w-4 h-4" />
-                          <span className="text-xs">Prazo Pagamento</span>
-                        </div>
-                        <p className="font-medium text-foreground text-sm">
-                          {paymentTerm.name}
-                          {paymentTerm.adjustment_percent !== 0 && (
-                            <span className="text-muted-foreground ml-1">
-                              ({paymentTerm.adjustment_percent > 0 ? '+' : ''}
-                              {paymentTerm.adjustment_percent}%)
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    )}
-                    {quote.km_distance && (
-                      <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <Route className="w-4 h-4" />
-                          <span className="text-xs">Distância</span>
-                        </div>
-                        <p className="font-medium text-foreground text-sm">
-                          {Number(quote.km_distance).toLocaleString('pt-BR')} km
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Mini card R$/KM — referência ANTT */}
-                    {anttCalc && Number(kmDistance ?? 0) > 0 && (
-                      <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 col-span-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="text-xs font-semibold text-primary">
-                              Custo ANTT/km
-                            </span>
-                            <span className="text-[10px] text-muted-foreground ml-1.5">
-                              (referência carreteiro)
-                            </span>
-                          </div>
-                          <span className="font-bold text-primary text-base">
-                            R$ {(anttCalc.total / Number(kmDistance)).toFixed(2)}/km
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Piso mínimo ANTT (carreteiro) - Tabela A / Carga Geral */}
-                    <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <DollarSign className="w-4 h-4" />
-                          <span className="text-xs">Piso ANTT (carreteiro)</span>
-                        </div>
-                        <Badge variant="outline" className="text-[10px]">
-                          Tabela A • Carga Geral
-                        </Badge>
-                      </div>
-
-                      {anttCalc ? (
-                        <>
-                          <p className="font-semibold text-foreground mt-1">
-                            {formatCurrency(anttCalc.total)}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {axesCount || '-'} eixos •{' '}
-                            {Number(kmDistance || 0).toLocaleString('pt-BR')} km
-                          </p>
-                          <p className="text-[11px] text-muted-foreground mt-1">
-                            Memória: ({Number(kmDistance || 0).toLocaleString('pt-BR')} ×{' '}
-                            {Number(anttRate?.ccd || 0).toFixed(4)}) +{' '}
-                            {Number(anttRate?.cc || 0).toFixed(2)}
-                          </p>
-                          {canManage && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="mt-2"
-                              onClick={async () => {
-                                const current =
-                                  quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
-                                const updated: StoredPricingBreakdown = {
-                                  calculatedAt: current?.calculatedAt || new Date().toISOString(),
-                                  version: current?.version || '4.0-fob-lotacao-markup-scope',
-                                  status: current?.status || 'OK',
-                                  error: current?.error,
-                                  meta: {
-                                    ...(current?.meta || {
-                                      routeUfLabel: formatRouteUf(quote.origin, quote.destination),
-                                      kmBandLabel: null,
-                                      kmStatus: 'OK',
-                                      marginStatus: 'AT_TARGET',
-                                      marginPercent: 0,
-                                    }),
-                                    antt: {
-                                      operationTable: 'A',
-                                      cargoType: 'carga_geral',
-                                      axesCount: Number(axesCount),
-                                      kmDistance: Number(kmDistance),
-                                      ccd: Number(anttRate?.ccd || 0),
-                                      cc: Number(anttRate?.cc || 0),
-                                      ida: Number(anttCalc.ida),
-                                      retornoVazio: 0,
-                                      total: Number(anttCalc.total),
-                                      calculatedAt: new Date().toISOString(),
-                                    },
-                                  },
-                                  // mantém o resto se existir; senão cria estrutura mínima
-                                  weights: current?.weights || {
-                                    cubageWeight: 0,
-                                    billableWeight: 0,
-                                    tonBillable: 0,
-                                  },
-                                  components: current?.components || {
-                                    baseCost: 0,
-                                    baseFreight: 0,
-                                    toll: 0,
-                                    aluguelMaquinas: 0,
-                                    gris: 0,
-                                    tso: 0,
-                                    rctrc: 0,
-                                    adValorem: 0,
-                                    tde: 0,
-                                    tear: 0,
-                                    dispatchFee: 0,
-                                    conditionalFeesTotal: 0,
-                                    waitingTimeCost: 0,
-                                    dasProvision: 0,
-                                  },
-                                  totals: current?.totals || {
-                                    receitaBruta: 0,
-                                    das: 0,
-                                    icms: 0,
-                                    totalImpostos: 0,
-                                    totalCliente: 0,
-                                  },
-                                  profitability: current?.profitability || {
-                                    custosCarreteiro: 0,
-                                    custosDescarga: 0,
-                                    custosDiretos: 0,
-                                    margemBruta: 0,
-                                    overhead: 0,
-                                    resultadoLiquido: 0,
-                                    margemPercent: 0,
-                                  },
-                                  rates: current?.rates || {
-                                    dasPercent: 14,
-                                    icmsPercent: 0,
-                                    grisPercent: 0,
-                                    tsoPercent: 0,
-                                    costValuePercent: 0,
-                                    markupPercent: 30,
-                                    overheadPercent: 15,
-                                    targetMarginPercent: 15,
-                                  },
-                                  conditionalFeesBreakdown: current?.conditionalFeesBreakdown,
-                                };
-
-                                const { error } = await supabase
-                                  .from('quotes')
-                                  .update(
-                                    asInsert({
-                                      pricing_breakdown:
-                                        updated as unknown as typeof quote.pricing_breakdown,
-                                    })
-                                  )
-                                  .eq('id', asDb(quote.id));
-
-                                if (error) {
-                                  toast.error('Erro ao salvar piso ANTT');
-                                  return;
-                                }
-                                toast.success('Piso ANTT salvo na memória de cálculo');
-                                queryClient.invalidateQueries({ queryKey: ['quotes'] });
-                              }}
-                            >
-                              Salvar no breakdown
-                            </Button>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <p className="font-medium text-muted-foreground mt-1">—</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Cadastre CCD/CC em ANTT Floor Rates e selecione veículo + KM.
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Pricing Breakdown */}
-              {breakdown &&
-                breakdown.totals &&
-                (() => {
-                  const hasFees =
-                    Object.keys(breakdown.conditionalFeesBreakdown ?? {}).filter(
-                      (k) => (breakdown.conditionalFeesBreakdown as Record<string, number>)[k] > 0
-                    ).length > 0 || (breakdown.components?.waitingTimeCost ?? 0) > 0;
-
-                  return (
-                    <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-4">
-                      {/* Cabeçalho */}
-                      <h4 className="font-semibold text-foreground flex items-center gap-2">
-                        <Receipt className="w-4 h-4" />
-                        Breakdown do Cálculo
-                      </h4>
-
-                      {/* Tabs internas */}
-                      <Tabs defaultValue="memoria" className="w-full">
-                        <TabsList
-                          className={cn('grid w-full', hasFees ? 'grid-cols-3' : 'grid-cols-2')}
-                        >
-                          <TabsTrigger value="memoria">Memória</TabsTrigger>
-                          <TabsTrigger value="custos">Custos</TabsTrigger>
-                          {hasFees && <TabsTrigger value="taxas">Taxas</TabsTrigger>}
-                        </TabsList>
-
-                        {/* ── Aba Memória ── */}
-                        <TabsContent value="memoria" className="mt-3 space-y-2 text-sm">
-                          {breakdown.components && (
-                            <>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Frete Base</span>
-                                <span>{formatCurrency(breakdown.components.baseFreight || 0)}</span>
-                              </div>
-                              {breakdown.components.toll > 0 && (
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Pedágio</span>
-                                  <span>{formatCurrency(breakdown.components.toll)}</span>
-                                </div>
-                              )}
-                              {(breakdown.components.aluguelMaquinas ?? 0) > 0 && (
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Aluguel de Máquinas</span>
-                                  <span>
-                                    {formatCurrency(breakdown.components.aluguelMaquinas ?? 0)}
-                                  </span>
-                                </div>
-                              )}
-                              {breakdown.components.rctrc > 0 && (
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">
-                                    RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2)}%)
-                                  </span>
-                                  <span>{formatCurrency(breakdown.components.rctrc)}</span>
-                                </div>
-                              )}
-                              {breakdown.components.gris > 0 && (
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">
-                                    GRIS ({breakdown.rates?.grisPercent?.toFixed(2)}%)
-                                  </span>
-                                  <span>{formatCurrency(breakdown.components.gris)}</span>
-                                </div>
-                              )}
-                              {breakdown.components.tso > 0 && (
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">
-                                    TSO ({breakdown.rates?.tsoPercent?.toFixed(2)}%)
-                                  </span>
-                                  <span>{formatCurrency(breakdown.components.tso)}</span>
-                                </div>
-                              )}
-                              {breakdown.components.tde > 0 && (
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">TDE (NTC)</span>
-                                  <span>{formatCurrency(breakdown.components.tde)}</span>
-                                </div>
-                              )}
-                              {breakdown.components.tear > 0 && (
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">TEAR (NTC)</span>
-                                  <span>{formatCurrency(breakdown.components.tear)}</span>
-                                </div>
-                              )}
-                            </>
-                          )}
-
-                          <Separator className="my-2" />
-
-                          <div className="flex justify-between font-medium">
-                            <span>Receita Bruta</span>
-                            <span>{formatCurrency(breakdown.totals.receitaBruta || 0)}</span>
-                          </div>
-
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>
-                              Provisionamento DAS ({breakdown.rates?.dasPercent?.toFixed(2)}%)
-                            </span>
-                            <span>{formatCurrency(breakdown.totals.das || 0)}</span>
-                          </div>
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>
-                              ICMS (
-                              {isSimplesNacional
-                                ? '0.00'
-                                : (breakdown.rates?.icmsPercent?.toFixed(2) ?? '0.00')}
-                              %)
-                            </span>
-                            <span>
-                              {formatCurrency(isSimplesNacional ? 0 : breakdown.totals.icms || 0)}
-                            </span>
-                          </div>
-
-                          <Separator className="my-2" />
-
-                          <div className="flex justify-between font-semibold text-base">
-                            <span>Total Cliente</span>
-                            <span className="text-primary">
-                              {formatCurrency(
-                                isSimplesNacional && breakdown?.totals
-                                  ? (breakdown.totals.receitaBruta || 0) +
-                                      (breakdown.totals.das || 0)
-                                  : breakdown.totals?.totalCliente || 0
-                              )}
-                            </span>
-                          </div>
-                        </TabsContent>
-
-                        {/* ── Aba Custos ── */}
-                        <TabsContent value="custos" className="mt-3 space-y-2 text-sm">
-                          <p className="text-xs text-muted-foreground mb-3">
-                            Custos deduzidos da Receita Bruta para apurar a Margem Bruta.
-                          </p>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Piso ANTT (carreteiro)</span>
-                            <span>
-                              {formatCurrency(
-                                Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0)
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Carga e Descarga</span>
-                            <span>
-                              {formatCurrency(breakdown?.profitability?.custosDescarga ?? 0)}
-                            </span>
-                          </div>
-                        </TabsContent>
-
-                        {/* ── Aba Taxas (só quando hasFees) ── */}
-                        {hasFees && (
-                          <TabsContent value="taxas" className="mt-3 space-y-2 text-sm">
-                            {breakdown.conditionalFeesBreakdown &&
-                              Object.entries(breakdown.conditionalFeesBreakdown).map(
-                                ([feeId, value]) => {
-                                  const fee = conditionalFeesData?.find((f) => f.id === feeId);
-                                  if (!value) return null;
-                                  return (
-                                    <div key={feeId} className="flex justify-between">
-                                      <span className="text-muted-foreground flex items-center gap-1">
-                                        {fee ? fee.name : 'Taxa adicional'}
-                                        {fee && (
-                                          <Badge
-                                            variant="outline"
-                                            className="text-[10px] py-0 ml-1"
-                                          >
-                                            {fee.code}
-                                          </Badge>
-                                        )}
-                                      </span>
-                                      <span>{formatCurrency(value as number)}</span>
-                                    </div>
-                                  );
-                                }
-                              )}
-                            {(breakdown.components?.waitingTimeCost ?? 0) > 0 && (
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Estadia / Hora Parada</span>
-                                <span>{formatCurrency(breakdown.components!.waitingTimeCost)}</span>
-                              </div>
-                            )}
-                            <Separator className="my-2" />
-                            <div className="flex justify-between font-medium">
-                              <span>Total Taxas</span>
-                              <span>
-                                {formatCurrency(
-                                  Object.values(breakdown.conditionalFeesBreakdown ?? {}).reduce(
-                                    (s, v) => s + (v as number),
-                                    0
-                                  ) + (breakdown.components?.waitingTimeCost ?? 0)
-                                )}
-                              </span>
-                            </div>
-                          </TabsContent>
-                        )}
-                      </Tabs>
-
-                      {/* ── Rentabilidade — sempre visível, fora das tabs ── */}
-                      {breakdown.profitability && (
-                        <div
-                          className={cn(
-                            'rounded-lg p-3 border',
-                            isBelowTargetView
-                              ? 'bg-destructive/5 border-destructive/20'
-                              : 'bg-success/5 border-success/20'
-                          )}
-                        >
-                          <h5 className="font-medium text-foreground mb-2 flex items-center gap-2 text-sm">
-                            <TrendingUp className="w-3.5 h-3.5" />
-                            Rentabilidade
-                          </h5>
-                          <div className="space-y-1.5 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Margem Bruta</span>
-                              <span>{formatCurrency(margemBrutaView)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Overhead</span>
-                              <span>{formatCurrency(overheadView)}</span>
-                            </div>
-                            <div className="flex justify-between font-medium items-center gap-2">
-                              <span>Resultado Líquido</span>
-                              <Badge
-                                variant={resultadoLiquidoView >= 0 ? 'default' : 'destructive'}
-                                className={
-                                  resultadoLiquidoView >= 0
-                                    ? 'bg-success text-success-foreground'
-                                    : ''
-                                }
-                              >
-                                {formatCurrency(resultadoLiquidoView)}
-                              </Badge>
-                            </div>
-                            <div className="flex justify-between font-semibold items-center gap-2">
-                              <span>Margem %</span>
-                              <Badge
-                                variant={isBelowTargetView ? 'destructive' : 'default'}
-                                className={
-                                  !isBelowTargetView ? 'bg-success text-success-foreground' : ''
-                                }
-                              >
-                                {margemPercentView.toFixed(1)}%
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-              {/* Value (fallback if no breakdown) */}
-              {!breakdown && (
-                <div className="p-6 rounded-lg bg-primary/5 border border-primary/20">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-primary">
-                      <DollarSign className="w-5 h-5" />
-                      <span className="font-medium">Valor Total</span>
-                    </div>
-                    <p className="text-3xl font-bold text-primary">
-                      {formatCurrency(Number(quote.value))}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Validity */}
-              {quote.validity_date && (
-                <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Calendar className="w-4 h-4" />
-                    <span className="text-sm">Validade da Cotação</span>
-                  </div>
-                  <p className="font-medium text-foreground">{formatDate(quote.validity_date)}</p>
-                </div>
-              )}
-
-              {/* Tags */}
-              {quote.tags && quote.tags.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-foreground mb-2">Tags</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {quote.tags.map((tag) => (
-                      <Badge
-                        key={tag}
-                        variant="secondary"
-                        className={cn(
-                          tag === 'urgente' && 'bg-destructive/10 text-destructive',
-                          tag === 'contrato' && 'bg-primary/10 text-primary',
-                          tag === 'refrigerado' && 'bg-accent text-accent-foreground'
-                        )}
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Notes */}
-              {quote.notes && (
-                <div>
-                  <h4 className="font-semibold text-foreground mb-2">Observações</h4>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{quote.notes}</p>
-                </div>
-              )}
-
-              {/* Timestamps */}
-              <Separator />
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Criado em: {formatDateTime(quote.created_at)}</span>
-                <span>Atualizado em: {formatDateTime(quote.updated_at)}</span>
-              </div>
+            <TabsContent value="historico" className="space-y-4 mt-4 m-0">
+              <QuoteModalHistoryTab
+                createdAt={quote.created_at}
+                updatedAt={quote.updated_at}
+                advanceDueDate={
+                  (quote as { advance_due_date?: string | null })?.advance_due_date ?? null
+                }
+                balanceDueDate={
+                  (quote as { balance_due_date?: string | null })?.balance_due_date ?? null
+                }
+                advancePercent={
+                  (paymentTerm as { advance_percent?: number | null } | null)?.advance_percent ??
+                  null
+                }
+                totalCliente={totalClienteView}
+              />
             </TabsContent>
 
             <TabsContent value="pedagios" className="space-y-4 mt-4 m-0">

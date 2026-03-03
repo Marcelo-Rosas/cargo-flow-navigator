@@ -3,6 +3,10 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 type Input = {
   origin_cep: string;
   destination_cep: string;
+  /** UF origem (2 letras). Usado no fallback geográfico 50/50 quando km_by_uf não é extraído. */
+  origin_uf?: string;
+  /** UF destino (2 letras). Usado no fallback geográfico 50/50 quando km_by_uf não é extraído. */
+  destination_uf?: string;
   axes_count?: number;
   /** Categoria AILOG/WebRouter (ex: "2","4","6","7","8","12"). Preferida sobre axes_count. */
   categoria_veiculo?: string;
@@ -81,6 +85,90 @@ const ERROR_MAP: Record<string, { status: number; message: string }> = {
   LIMITE_CONSUMO_ATINGIDO: { status: 429, message: 'Limite de consumo atingido' },
   ERRO_CALCULO_ROTEIRO: { status: 422, message: 'Erro ao calcular rota' },
 };
+
+function normalizeUf(v: string | undefined): string | undefined {
+  const s = (v || '').toString().trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(s) ? s : undefined;
+}
+
+/**
+ * Extract km per UF from WebRouter response.
+ * Priority: 1) ordemRoteiro, 2) pathSegments/resumoEstados, 3) tollPlazas, 4) geographic 50/50.
+ */
+function extractKmByUf(
+  rota: Record<string, unknown>,
+  totalKm: number,
+  tollPlazas: TollPlaza[],
+  opts?: { originUf?: string; destinationUf?: string }
+): Record<string, number> | undefined {
+  const acc: Record<string, number> = {};
+
+  // 1. Try ordemRoteiro (array of points with cidade.uf and distanciaAcumulada or similar)
+  const ordemRoteiro = rota?.ordemRoteiro;
+  if (Array.isArray(ordemRoteiro) && ordemRoteiro.length >= 2) {
+    for (let i = 1; i < ordemRoteiro.length; i++) {
+      const curr = ordemRoteiro[i] as {
+        uf?: string;
+        cidade?: { uf?: string };
+        distancia?: number;
+        distanciaAcumulada?: number;
+      };
+      const prev = ordemRoteiro[i - 1] as { distancia?: number; distanciaAcumulada?: number };
+      const uf = (curr?.cidade as { uf?: string } | undefined)?.uf ?? curr?.uf ?? '';
+      const prevDist = prev?.distanciaAcumulada ?? prev?.distancia ?? 0;
+      const currDist = curr?.distanciaAcumulada ?? curr?.distancia ?? prevDist;
+      const delta = Math.max(0, currDist - prevDist);
+      if (uf && delta > 0) acc[uf] = (acc[uf] ?? 0) + delta;
+    }
+    if (Object.keys(acc).length > 0) return acc;
+  }
+
+  // 2. Try path.pathSegments or resumoEstados (if API returns km per state directly)
+  const pathSegments = (rota?.path as Record<string, unknown> | undefined)?.pathSegments;
+  if (Array.isArray(pathSegments)) {
+    for (const seg of pathSegments) {
+      const s = seg as { uf?: string; km?: number; distancia?: number };
+      const uf = s?.uf ?? '';
+      const kmVal = s?.km ?? s?.distancia ?? 0;
+      if (uf && kmVal > 0) acc[uf] = (acc[uf] ?? 0) + kmVal;
+    }
+    if (Object.keys(acc).length > 0) return acc;
+  }
+  const resumoEstados = rota?.resumoEstados as Record<string, number> | undefined;
+  if (resumoEstados && typeof resumoEstados === 'object') {
+    for (const [uf, kmVal] of Object.entries(resumoEstados)) {
+      const k = Number(kmVal);
+      if (uf && Number.isFinite(k) && k > 0) acc[uf] = (acc[uf] ?? 0) + k;
+    }
+    if (Object.keys(acc).length > 0) return acc;
+  }
+
+  // 3. Fallback: distribute totalKm across toll plaza segments
+  if (tollPlazas.length > 0 && totalKm > 0) {
+    const sorted = [...tollPlazas].sort((a, b) => a.ordemPassagem - b.ordemPassagem);
+    const segmentKm = totalKm / (sorted.length + 1);
+    for (let i = 0; i < sorted.length; i++) {
+      const uf = sorted[i].uf || 'XX';
+      acc[uf] = (acc[uf] ?? 0) + segmentKm;
+    }
+    const lastUf = sorted[sorted.length - 1]?.uf || 'XX';
+    acc[lastUf] = (acc[lastUf] ?? 0) + segmentKm;
+    return acc;
+  }
+
+  // 4. Geographic fallback: 50% origin UF, 50% destination UF (tributariamente mais seguro)
+  const originUf = normalizeUf(opts?.originUf);
+  const destinationUf = normalizeUf(opts?.destinationUf);
+  if (totalKm > 0 && originUf && destinationUf) {
+    const halfKm = totalKm / 2;
+    if (originUf === destinationUf) {
+      return { [originUf]: totalKm };
+    }
+    return { [originUf]: halfKm, [destinationUf]: halfKm };
+  }
+
+  return undefined;
+}
 
 /**
  * Extract toll plazas from WebRouter response.
@@ -205,6 +293,32 @@ Deno.serve(async (req) => {
 
     const rotas = data?.rotas;
     const rota = Array.isArray(rotas) ? rotas[0] : null;
+
+    // Logs detalhados da resposta WebRouter (estrutura para depuração)
+    if (rota && typeof rota === 'object') {
+      const rotaKeys = Object.keys(rota as Record<string, unknown>);
+      console.log(`[webrouter] rota keys: ${rotaKeys.join(', ')}`);
+      const ordemRoteiro = (rota as Record<string, unknown>).ordemRoteiro;
+      if (Array.isArray(ordemRoteiro)) {
+        console.log(
+          `[webrouter] ordemRoteiro length: ${ordemRoteiro.length}, sample[0]: ${JSON.stringify(ordemRoteiro[0])}`
+        );
+      } else {
+        console.log(
+          `[webrouter] ordemRoteiro: ${ordemRoteiro === undefined ? 'undefined' : typeof ordemRoteiro}`
+        );
+      }
+      const path = (rota as Record<string, unknown>).path;
+      if (path && typeof path === 'object') {
+        const pathKeys = Object.keys(path as Record<string, unknown>);
+        console.log(`[webrouter] path keys: ${pathKeys.join(', ')}`);
+      }
+      const resumoEstados = (rota as Record<string, unknown>).resumoEstados;
+      if (resumoEstados != null) {
+        console.log(`[webrouter] resumoEstados: ${JSON.stringify(resumoEstados)}`);
+      }
+    }
+
     const distanciaKM = rota?.path?.distanciaKM;
     const km = typeof distanciaKM === 'number' ? distanciaKM : null;
 
@@ -217,10 +331,25 @@ Deno.serve(async (req) => {
 
     const custos = rota?.custos ?? {};
     const tollPlazas = rota ? extractTollPlazas(rota as Record<string, unknown>) : [];
+    const originUf = normalizeUf(body.origin_uf);
+    const destinationUf = normalizeUf(body.destination_uf);
+    const kmByUf = extractKmByUf((rota as Record<string, unknown>) ?? {}, km, tollPlazas, {
+      originUf: originUf ?? undefined,
+      destinationUf: destinationUf ?? undefined,
+    });
 
+    const kmByUfSource = kmByUf
+      ? Object.keys(kmByUf).length > 0
+        ? Object.entries(kmByUf)
+            .map(([uf, k]) => `${uf}:${Math.round(k)}`)
+            .join(', ')
+        : 'empty'
+      : 'n/a';
     console.log(
-      `[webrouter] Resultado: ${km} km, pedágio: ${custos.pedagio}, tag: ${custos.pedagioTag}, praças: ${tollPlazas.length}`
+      `[webrouter] Resultado: ${km} km, pedágio: ${custos.pedagio}, tag: ${custos.pedagioTag}, praças: ${tollPlazas.length}, km_by_uf: ${kmByUfSource}`
     );
+
+    const consolidatedKmByUf = kmByUf && Object.keys(kmByUf).length > 0 ? kmByUf : undefined;
 
     return new Response(
       JSON.stringify({
@@ -230,6 +359,7 @@ Deno.serve(async (req) => {
           toll: custos.pedagio ?? undefined,
           toll_tag: custos.pedagioTag ?? undefined,
           toll_plazas: tollPlazas,
+          km_by_uf: consolidatedKmByUf,
           source: 'webrouter',
         },
       }),

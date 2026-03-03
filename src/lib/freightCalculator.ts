@@ -110,6 +110,12 @@ export interface FreightCalculationInput {
     markupPercent?: number;
     overheadPercent?: number;
     targetMarginPercent?: number;
+    /** Margem de lucro alvo (%) para Gross-up. Default 15. */
+    profitMarginPercent?: number;
+    /** Regime Simples Nacional (ICMS na DAS). Default true. */
+    regimeSimplesNacional?: boolean;
+    /** Excesso de Sublimite (ICMS separado). Default false. */
+    excessoSublimite?: boolean;
     markupScope?: MarkupScope;
     tdePercent?: number;
     tearPercent?: number;
@@ -183,6 +189,10 @@ export interface FreightCalculationOutput {
     kmBandUsed?: number;
     /** Breakdown de ICMS por UF (R$). Preenchido quando kmByUf + icmsByUf são usados. */
     icmsBreakdownByUf?: Record<string, number>;
+    /** Trava 1t aplicada no fracionado (peso real < 1000 kg) */
+    ltlMinWeightApplied?: boolean;
+    /** Peso real informado (antes da trava 1t) */
+    originalWeightKg?: number;
   };
 
   components: {
@@ -211,6 +221,7 @@ export interface FreightCalculationOutput {
     markupPercent: number;
     overheadPercent: number;
     targetMarginPercent: number;
+    profitMarginPercent: number;
     markupScope: MarkupScope;
   };
 
@@ -223,13 +234,18 @@ export interface FreightCalculationOutput {
   };
 
   profitability: {
+    custoMotorista: number;
     custosCarreteiro: number;
     custosDescarga: number;
+    custoServicos: number;
     custosDiretos: number;
+    receitaLiquida: number;
     margemBruta: number;
     overhead: number;
     resultadoLiquido: number;
     margemPercent: number;
+    profitMarginTarget: number;
+    regimeFiscal: 'simples_nacional' | 'excesso_sublimite' | 'normal';
   };
 
   conditionalFeesBreakdown: Record<string, number>;
@@ -269,6 +285,16 @@ export interface StoredPricingBreakdown {
 
     // Praças de pedágio retornadas pelo WebRouter
     tollPlazas?: TollPlaza[];
+
+    /** KM por UF (para restauração e recálculo ICMS proporcional) */
+    kmByUf?: Record<string, number>;
+
+    /** Trava 1t aplicada no fracionado */
+    ltlMinWeightApplied?: boolean;
+    /** Peso real informado (antes da trava 1t) */
+    originalWeightKg?: number;
+    regimeSimplesNacional?: boolean;
+    excessoSublimite?: boolean;
 
     /** Itens de carga/descarga (tabela) para herança na OS */
     unloadingCost?: Array<{
@@ -337,13 +363,18 @@ export interface StoredPricingBreakdown {
   };
 
   profitability: {
+    custoMotorista?: number;
     custosCarreteiro: number;
     custosDescarga: number;
+    custoServicos?: number;
     custosDiretos: number;
+    receitaLiquida?: number;
     margemBruta: number;
     overhead: number;
     resultadoLiquido: number;
     margemPercent: number;
+    profitMarginTarget?: number;
+    regimeFiscal?: 'simples_nacional' | 'excesso_sublimite' | 'normal';
   };
 
   rates: {
@@ -355,6 +386,7 @@ export interface StoredPricingBreakdown {
     markupPercent: number;
     overheadPercent: number;
     targetMarginPercent: number;
+    profitMarginPercent?: number;
   };
 
   conditionalFeesBreakdown?: Record<string, number>;
@@ -458,10 +490,70 @@ function resolveParams(input: FreightCalculationInput) {
     overheadPercent:
       pp?.overheadPercent ?? input.overheadPercent ?? FREIGHT_CONSTANTS.DEFAULT_OVERHEAD_PERCENT,
     targetMarginPercent: pp?.targetMarginPercent ?? FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT,
+    profitMarginPercent: pp?.profitMarginPercent ?? FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT,
+    regimeSimplesNacional: pp?.regimeSimplesNacional ?? true,
+    excessoSublimite: pp?.excessoSublimite ?? false,
     markupScope: pp?.markupScope ?? ('BASE_ONLY' as MarkupScope),
     tdePercent: pp?.tdePercent ?? FREIGHT_CONSTANTS.NTC_TDE_PERCENT,
     tearPercent: pp?.tearPercent ?? FREIGHT_CONSTANTS.NTC_TEAR_PERCENT,
   };
+}
+
+/** Regime fiscal para Gross-up */
+export type RegimeFiscal = 'simples_nacional' | 'excesso_sublimite' | 'normal';
+
+/**
+ * Calcula Total Cliente via Gross-up Híbrido (Asset-Light).
+ * Simples: divisor = 1 - (Overhead% + DAS% + Lucro%)/100, ICMS=0.
+ * Sublimite: divisor = 1 - (Overhead% + DAS% + ICMS% + Lucro%)/100.
+ */
+function calculateGrossUpHibrido(
+  custosDiretos: number,
+  overheadPercent: number,
+  dasPercent: number,
+  profitMarginPercent: number,
+  icmsPercent: number,
+  regimeSimples: boolean,
+  excessoSublimite: boolean
+): {
+  totalCliente: number;
+  receitaBruta: number;
+  das: number;
+  icms: number;
+  regimeFiscal: RegimeFiscal;
+} {
+  let regimeFiscal: RegimeFiscal;
+  let icmsNoDivisor: boolean;
+
+  if (regimeSimples && !excessoSublimite) {
+    regimeFiscal = 'simples_nacional';
+    icmsNoDivisor = false;
+  } else if (regimeSimples && excessoSublimite) {
+    regimeFiscal = 'excesso_sublimite';
+    icmsNoDivisor = true;
+  } else {
+    regimeFiscal = 'normal';
+    icmsNoDivisor = true;
+  }
+
+  const taxaBruta = icmsNoDivisor
+    ? (overheadPercent + dasPercent + icmsPercent + profitMarginPercent) / 100
+    : (overheadPercent + dasPercent + profitMarginPercent) / 100;
+
+  if (taxaBruta >= 1) {
+    throw new Error(
+      `Soma de Overhead (${overheadPercent}%) + DAS (${dasPercent}%) + ` +
+        `${icmsNoDivisor ? `ICMS (${icmsPercent}%) + ` : ''}` +
+        `Lucro (${profitMarginPercent}%) não pode ser >= 100%`
+    );
+  }
+
+  const totalCliente = round2(custosDiretos / (1 - taxaBruta));
+  const das = round2(totalCliente * (dasPercent / 100));
+  const icms = regimeFiscal === 'simples_nacional' ? 0 : round2(totalCliente * (icmsPercent / 100));
+  const receitaBruta = round2(totalCliente - das - icms);
+
+  return { totalCliente, receitaBruta, das, icms, regimeFiscal };
 }
 
 function resolveDirectCosts(input: FreightCalculationInput, receitaBruta: number) {
@@ -499,8 +591,10 @@ function getLtlWeightColumn(weightKg: number): string | null {
 export function calculateFreight(input: FreightCalculationInput): FreightCalculationOutput {
   const params = resolveParams(input);
   let icmsPercent = normalizeIcmsRate(input.icmsRatePercent);
-  // Simples Nacional: ICMS não incide (linha visível 0% / R$ 0,00)
-  if (params.taxRegimeSimples === 1) icmsPercent = 0;
+  // Simples Nacional sem excesso: ICMS na DAS (não incide separadamente)
+  if (params.regimeSimplesNacional && !params.excessoSublimite) {
+    icmsPercent = 0;
+  }
   const kmBandUsed = Math.round(Number(input.kmDistance || 0));
 
   // Empty result factory
@@ -550,13 +644,18 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
     },
     totals: { receitaBruta: 0, das: 0, icms: 0, totalImpostos: 0, totalCliente: 0 },
     profitability: {
+      custoMotorista: 0,
       custosCarreteiro: 0,
       custosDescarga: 0,
+      custoServicos: 0,
       custosDiretos: 0,
+      receitaLiquida: 0,
       margemBruta: 0,
       overhead: 0,
       resultadoLiquido: 0,
       margemPercent: 0,
+      profitMarginTarget: 0,
+      regimeFiscal: 'simples_nacional' as const,
     },
     conditionalFeesBreakdown: {},
   });
@@ -588,7 +687,14 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
 
   // ---- STEP 1: PESO FATURÁVEL ----
   const cubageWeightKg = round2(input.volumeM3 * params.cubageFactor);
-  const billableWeightKg = Math.max(input.weightKg, cubageWeightKg);
+  let billableWeightKg = Math.max(input.weightKg, cubageWeightKg);
+
+  // Trava Fracionado: mínimo 1.000 kg para viabilidade
+  const ltlMinWeightApplied = input.modality === 'fracionado' && billableWeightKg < 1000;
+  if (ltlMinWeightApplied) {
+    billableWeightKg = 1000;
+  }
+  const originalWeightKg = input.weightKg;
 
   // ---- STEP 2: BASE COST (branch por modalidade) ----
   const isLtl = input.modality === 'fracionado';
@@ -665,32 +771,26 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const conditionalFeesTotal = round2(input.extras?.conditionalFees?.total ?? 0);
   const waitingTimeCost = round2(input.extras?.waitingTimeCost ?? 0);
 
-  // ---- STEP 7: RECEITA BRUTA ----
+  // ---- STEP 7: CUSTOS DIRETOS (Asset-Light) ----
+  const custoMotorista = baseCost;
   const aluguelMaquinas = round2(input.aluguelMaquinasValue ?? 0);
-  const receitaBruta = round2(
-    baseFreight +
-      input.tollValue +
+  const custoServicos = round2(
+    input.tollValue +
       aluguelMaquinas +
       gris +
       tso +
       rctrc +
-      0 + // adValorem always 0
       tde +
       tear +
       dispatchFee +
       conditionalFeesTotal +
       waitingTimeCost
   );
+  const { descargaValue } = resolveDirectCosts(input, 0);
+  const custosDiretos = round2(custoMotorista + custoServicos + descargaValue);
 
-  // ---- STEP 8: IMPOSTOS POR FORA (provisão DAS com mínimo) ----
-  const dasProvision = round2(
-    Math.max(receitaBruta * (params.dasPercent / 100), params.dasProvisionMinValue)
-  );
-  const das = dasProvision;
-
-  // ICMS: proporcional por UF (quando kmByUf + icmsByUf) ou taxa única
-  let icms: number;
-  let icmsBreakdownByUf: Record<string, number> | undefined;
+  // ICMS percent médio (proporcional por UF quando kmByUf + icmsByUf)
+  let icmsPercentForGrossUp = icmsPercent;
   if (
     input.kmByUf &&
     Object.keys(input.kmByUf).length > 0 &&
@@ -699,30 +799,57 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   ) {
     const totalKm = Object.values(input.kmByUf).reduce((a, b) => a + b, 0);
     if (totalKm > 0) {
-      icmsBreakdownByUf = {};
-      icms = round2(
+      icmsPercentForGrossUp = round2(
         Object.entries(input.kmByUf).reduce((sum, [uf, km]) => {
           const pct = input.icmsByUf?.[uf] ?? icmsPercent;
-          icmsBreakdownByUf![uf] = round2((km / totalKm) * receitaBruta * (pct / 100));
-          return sum + icmsBreakdownByUf![uf];
+          return sum + (km / totalKm) * pct;
         }, 0)
       );
-    } else {
-      icms = round2(receitaBruta * (icmsPercent / 100));
     }
-  } else {
-    icms = round2(receitaBruta * (icmsPercent / 100));
   }
-  const totalImpostos = round2(das + icms);
-  const totalCliente = round2(receitaBruta + totalImpostos);
 
-  // ---- STEP 9: RENTABILIDADE ----
-  const { carreteiroValue, descargaValue } = resolveDirectCosts(input, receitaBruta);
-  const custosDiretos = round2(carreteiroValue + descargaValue);
-  const margemBruta = round2(receitaBruta - totalImpostos - custosDiretos);
-  const overhead = round2(margemBruta * (params.overheadPercent / 100));
-  const resultadoLiquido = round2(margemBruta - overhead);
-  const margemPercent = receitaBruta > 0 ? round2((resultadoLiquido / receitaBruta) * 100) : 0;
+  // ---- STEP 8: GROSS-UP HÍBRIDO (Asset-Light) ----
+  const profitMarginPercent = params.profitMarginPercent ?? FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
+  const regimeSimples = params.regimeSimplesNacional ?? true;
+  const excessoSublimite = params.excessoSublimite ?? false;
+
+  const { totalCliente, receitaBruta, das, icms, regimeFiscal } = calculateGrossUpHibrido(
+    custosDiretos,
+    params.overheadPercent,
+    params.dasPercent,
+    profitMarginPercent,
+    icmsPercentForGrossUp,
+    regimeSimples,
+    excessoSublimite
+  );
+
+  // receitaBruta do gross-up = totalCliente - das - icms (receita líquida de impostos)
+  const totalImpostos = round2(das + icms);
+  const receitaLiquida = round2(totalCliente - totalImpostos);
+
+  // ICMS breakdown por UF (para exibição)
+  let icmsBreakdownByUf: Record<string, number> | undefined;
+  if (
+    regimeFiscal !== 'simples_nacional' &&
+    input.kmByUf &&
+    Object.keys(input.kmByUf).length > 0 &&
+    icms > 0
+  ) {
+    const totalKm = Object.values(input.kmByUf).reduce((a, b) => a + b, 0);
+    if (totalKm > 0) {
+      icmsBreakdownByUf = {};
+      Object.entries(input.kmByUf).forEach(([uf, km]) => {
+        icmsBreakdownByUf![uf] = round2((km / totalKm) * icms);
+      });
+    }
+  }
+
+  // ---- STEP 9: DRE ASSET-LIGHT ----
+  const dasProvision = das;
+  const overhead = round2(receitaLiquida * (params.overheadPercent / 100));
+  const resultadoLiquido = round2(receitaLiquida - overhead - custosDiretos);
+  const margemBruta = round2(receitaLiquida - overhead - custoMotorista - custoServicos);
+  const margemPercent = totalCliente > 0 ? round2((resultadoLiquido / totalCliente) * 100) : 0;
 
   // ---- STEP 10: META STATUS ----
   let marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET' = 'AT_TARGET';
@@ -742,6 +869,8 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       billableWeightKg,
       kmBandUsed,
       icmsBreakdownByUf,
+      ltlMinWeightApplied: ltlMinWeightApplied || undefined,
+      originalWeightKg,
     },
     components: {
       baseCost,
@@ -768,17 +897,29 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       markupPercent: params.markupPercent,
       overheadPercent: params.overheadPercent,
       targetMarginPercent: params.targetMarginPercent,
+      profitMarginPercent,
       markupScope: params.markupScope,
     },
-    totals: { receitaBruta, das, icms, totalImpostos, totalCliente },
+    totals: {
+      receitaBruta: totalCliente,
+      das,
+      icms,
+      totalImpostos,
+      totalCliente,
+    },
     profitability: {
-      custosCarreteiro: carreteiroValue,
+      custoMotorista,
+      custosCarreteiro: custoMotorista,
       custosDescarga: descargaValue,
+      custoServicos,
       custosDiretos,
+      receitaLiquida,
       margemBruta,
       overhead,
       resultadoLiquido,
       margemPercent,
+      profitMarginTarget: profitMarginPercent,
+      regimeFiscal,
     },
     conditionalFeesBreakdown: input.extras?.conditionalFees?.breakdown ?? {},
   };
@@ -805,12 +946,17 @@ export function buildStoredBreakdown(
       marginStatus: output.meta.marginStatus,
       marginPercent: output.meta.marginPercent,
       kmBandUsed: output.meta.kmBandUsed,
+      ltlMinWeightApplied: output.meta.ltlMinWeightApplied,
+      originalWeightKg: output.meta.originalWeightKg,
+      regimeSimplesNacional: input.pricingParams?.regimeSimplesNacional,
+      excessoSublimite: input.pricingParams?.excessoSublimite,
       selectedConditionalFeeIds: input.extras?.conditionalFees?.ids,
       waitingTimeEnabled: input.extras?.waitingTimeEnabled,
       waitingTimeHours: input.extras?.waitingTimeHours,
       markupScope: output.rates.markupScope,
       unloadingCost: input.extras?.unloadingCostItems,
       equipmentRental: input.extras?.equipmentRentalItems,
+      kmByUf: input.kmByUf,
     },
 
     weights: {
@@ -848,6 +994,7 @@ export function buildStoredBreakdown(
       markupPercent: output.rates.markupPercent,
       overheadPercent: output.rates.overheadPercent,
       targetMarginPercent: output.rates.targetMarginPercent,
+      profitMarginPercent: (output.rates as { profitMarginPercent?: number }).profitMarginPercent,
     },
 
     conditionalFeesBreakdown:

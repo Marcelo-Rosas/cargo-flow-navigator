@@ -89,6 +89,24 @@ type Quote = Database['public']['Tables']['quotes']['Row'];
 
 const USE_WIZARD = true;
 
+/** Extrai itens de descarga do pricing_breakdown para hidratação síncrona (antes do primeiro cálculo). */
+function readUnloadingCostFromBreakdown(breakdown: unknown): UnloadingCostItem[] {
+  if (!breakdown || typeof breakdown !== 'object') return [];
+  const meta = (breakdown as StoredPricingBreakdown).meta;
+  if (!meta || typeof meta !== 'object') return [];
+  const items = (meta as { unloadingCost?: UnloadingCostItem[] }).unloadingCost;
+  return Array.isArray(items) ? items : [];
+}
+
+/** Extrai itens de aluguel do pricing_breakdown para hidratação síncrona (antes do primeiro cálculo). */
+function readEquipmentRentalFromBreakdown(breakdown: unknown): EquipmentRentalItem[] {
+  if (!breakdown || typeof breakdown !== 'object') return [];
+  const meta = (breakdown as StoredPricingBreakdown).meta;
+  if (!meta || typeof meta !== 'object') return [];
+  const items = (meta as { equipmentRental?: EquipmentRentalItem[] }).equipmentRental;
+  return Array.isArray(items) ? items : [];
+}
+
 // Select/Combobox podem passar number; coerce para string
 const idString = z
   .union([z.string(), z.number()])
@@ -201,6 +219,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   // Toll plazas from WebRouter
   const [tollPlazas, setTollPlazas] = useState<TollPlaza[]>([]);
+  // KM per UF from WebRouter (for ICMS proportional breakdown)
+  const [kmByUf, setKmByUf] = useState<Record<string, number> | null>(null);
 
   // Weight unit toggle: kg or ton
   const [weightUnit, setWeightUnit] = useState<'kg' | 'ton'>('ton');
@@ -209,8 +229,12 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const [additionalFeesSelection, setAdditionalFeesSelection] = useState<AdditionalFeesSelection>(
     defaultAdditionalFeesSelection
   );
-  const [unloadingCostItems, setUnloadingCostItems] = useState<UnloadingCostItem[]>([]);
-  const [equipmentRentalItems, setEquipmentRentalItems] = useState<EquipmentRentalItem[]>([]);
+  const [unloadingCostItems, setUnloadingCostItems] = useState<UnloadingCostItem[]>(() =>
+    readUnloadingCostFromBreakdown(quote?.pricing_breakdown)
+  );
+  const [equipmentRentalItems, setEquipmentRentalItems] = useState<EquipmentRentalItem[]>(() =>
+    readEquipmentRentalFromBreakdown(quote?.pricing_breakdown)
+  );
 
   const form = useForm<QuoteFormData>({
     resolver: zodResolver(quoteSchema),
@@ -365,13 +389,30 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   // Regras da central (precedência: veículo > global > constante)
   const { data: pricingRules } = usePricingRulesConfig(true);
+  const icmsByUfMap = useMemo(() => {
+    if (!pricingRules?.length) return undefined;
+    const map: Record<string, number> = {};
+    for (const r of pricingRules) {
+      if (r.key?.startsWith('icms_uf_')) {
+        const uf = r.key.replace('icms_uf_', '').toUpperCase();
+        const val = Number(r.value);
+        if (uf && Number.isFinite(val)) map[uf] = val;
+      }
+    }
+    return Object.keys(map).length > 0 ? map : undefined;
+  }, [pricingRules]);
   const resolvedPricingParams = useMemo(() => {
     const vtId = debounced.vehicleTypeId || undefined;
+    const regimeSimplesVal = resolvePricingRule(pricingRules, 'regime_simples_nacional', vtId, 1);
+    const excessoVal = resolvePricingRule(pricingRules, 'excesso_sublimite', vtId, 0);
     return {
       taxRegimeSimples,
       dasPercent: resolvePricingRule(pricingRules, 'das_percent', vtId, 14),
       markupPercent: resolvePricingRule(pricingRules, 'markup_percent', vtId, 30),
       overheadPercent: resolvePricingRule(pricingRules, 'overhead_percent', vtId, 15),
+      profitMarginPercent: resolvePricingRule(pricingRules, 'profit_margin_percent', vtId, 15),
+      regimeSimplesNacional: (regimeSimplesVal ?? 1) === 1,
+      excessoSublimite: (excessoVal ?? 0) === 1,
       tdePercent: resolvePricingRule(pricingRules, 'tde_percent', vtId, 20),
       tearPercent: resolvePricingRule(pricingRules, 'tear_percent', vtId, 20),
     };
@@ -433,6 +474,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       priceTableRow: priceTableRow || null,
       priceTableId: debounced.priceTableId || undefined,
       icmsRatePercent: icmsRate,
+      kmByUf: kmByUf ?? undefined,
+      icmsByUf: icmsByUfMap,
       tdeEnabled: debounced.tdeEnabled || false,
       tearEnabled: debounced.tearEnabled || false,
       pricingParams: resolvedPricingParams,
@@ -452,6 +495,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debouncedKmBand,
     priceTableRow,
     icmsRate,
+    kmByUf,
+    icmsByUfMap,
     resolvedPricingParams,
   ]);
 
@@ -511,6 +556,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       priceTableRow: priceTableRow || null,
       priceTableId: debounced.priceTableId || undefined,
       icmsRatePercent: icmsRate,
+      kmByUf: kmByUf ?? undefined,
+      icmsByUf: icmsByUfMap,
       tdeEnabled: debounced.tdeEnabled || false,
       tearEnabled: debounced.tearEnabled || false,
       pricingParams: resolvedPricingParams,
@@ -536,6 +583,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debouncedKmBand,
     priceTableRow,
     icmsRate,
+    kmByUf,
+    icmsByUfMap,
     resolvedPricingParams,
     computedConditionalFees,
     additionalFeesSelection.waitingTimeCost,
@@ -568,9 +617,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       } else {
         setAdditionalFeesSelection(defaultAdditionalFeesSelection);
         setTollPlazas([]);
+        setKmByUf(null);
         setUnloadingCostItems([]);
         setEquipmentRentalItems([]);
       }
+      setKmByUf((bd?.meta as { kmByUf?: Record<string, number> } | undefined)?.kmByUf ?? null);
 
       const quoteWeightKg = Number(quote.weight) || 0;
       const weightInUnit = kgToUnit(quoteWeightKg, weightUnit);
@@ -609,6 +660,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     } else {
       setAdditionalFeesSelection(defaultAdditionalFeesSelection);
       setTollPlazas([]);
+      setKmByUf(null);
       setUnloadingCostItems([]);
       setEquipmentRentalItems([]);
       form.reset({
@@ -738,6 +790,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const handleCalculateKm = async () => {
     const originCep = sanitizeCep(form.getValues('origin_cep') || '');
     const destinationCep = sanitizeCep(form.getValues('destination_cep') || '');
+    const originStr = form.getValues('origin') || '';
+    const destinationStr = form.getValues('destination') || '';
+    const originUfForApi = extractUf(originStr) ?? undefined;
+    const destinationUfForApi = extractUf(destinationStr) ?? undefined;
 
     if (originCep.length !== 8 || destinationCep.length !== 8) {
       toast.error('Preencha os CEPs de origem e destino para calcular a distância');
@@ -748,11 +804,18 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     try {
       const data = await invokeEdgeFunction<{
         success: boolean;
-        data?: { km_distance: number; toll?: number; toll_plazas?: TollPlaza[] };
+        data?: {
+          km_distance: number;
+          toll?: number;
+          toll_plazas?: TollPlaza[];
+          km_by_uf?: Record<string, number>;
+        };
         error?: string;
       }>('calculate-distance-webrouter', {
         origin_cep: originCep,
         destination_cep: destinationCep,
+        origin_uf: originUfForApi,
+        destination_uf: destinationUfForApi,
         categoria_veiculo:
           (selectedVehicle as { ailog_category?: string | null } | undefined)?.ailog_category ??
           undefined,
@@ -788,6 +851,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         ? data.data.toll_plazas
         : [];
       setTollPlazas(plazas);
+
+      // Store km per UF for ICMS proportional breakdown
+      const kmByUfData = data.data?.km_by_uf;
+      setKmByUf(
+        kmByUfData && typeof kmByUfData === 'object' && Object.keys(kmByUfData).length > 0
+          ? kmByUfData
+          : null
+      );
 
       const plazaCount = plazas.length;
       if (toll > 0) {
@@ -862,6 +933,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         kmDistance: data.km_distance || 0,
         priceTableRow: priceTableRow || null,
         icmsRatePercent: icmsRate,
+        kmByUf: kmByUf ?? undefined,
+        icmsByUf: icmsByUfMap,
         tdeEnabled: data.tde_enabled || false,
         tearEnabled: data.tear_enabled || false,
         extras: {

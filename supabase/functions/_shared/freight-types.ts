@@ -89,6 +89,10 @@ export interface FreightMeta {
   ntc_base?: number;
   /** Piso ANTT carreteiro (km × CCD + CC) para custos diretos e rentabilidade */
   antt_piso_carreteiro?: number;
+  /** Trava 1t aplicada no fracionado */
+  ltl_min_weight_applied?: boolean;
+  /** Peso real informado (antes da trava 1t) */
+  original_weight_kg?: number;
 }
 
 export interface FreightComponents {
@@ -134,12 +138,17 @@ export interface FreightTotals {
 
 export interface FreightProfitability {
   custos_carreteiro: number;
+  custo_motorista?: number;
+  custos_servicos?: number;
   custos_descarga: number;
   custos_diretos: number;
+  receita_liquida?: number;
   margem_bruta: number;
   overhead: number;
   resultado_liquido: number;
   margem_percent: number;
+  profit_margin_target?: number;
+  regime_fiscal?: 'simples_nacional' | 'excesso_sublimite' | 'normal';
 }
 
 export interface CalculateFreightResponse {

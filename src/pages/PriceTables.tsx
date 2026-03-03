@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -115,7 +116,19 @@ const BRAZILIAN_STATES = [
   'TO',
 ];
 
+const VALID_TABS = ['tabelas', 'vigentes', 'icms', 'regras', 'simulador'] as const;
+
 export default function PriceTables() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const activeTab = VALID_TABS.includes(tabParam as (typeof VALID_TABS)[number])
+    ? (tabParam as (typeof VALID_TABS)[number])
+    : 'tabelas';
+
+  const handleTabChange = (value: string) => {
+    setSearchParams({ tab: value });
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -126,7 +139,7 @@ export default function PriceTables() {
           </p>
         </div>
 
-        <Tabs defaultValue="tabelas" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList>
             <TabsTrigger value="tabelas" className="gap-2">
               <TableIcon className="h-4 w-4" />
