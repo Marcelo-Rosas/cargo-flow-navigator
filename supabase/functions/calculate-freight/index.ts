@@ -619,6 +619,11 @@ Deno.serve(async (req) => {
     const destUf = extractUf(input.destination);
     let icmsPercent: number = FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT;
 
+    const resolveIcmsFromRules = (): number | undefined => {
+      const ruleValue = resolveRule('icms_default', vehicleTypeIdForRules) as number | undefined;
+      return ruleValue !== undefined ? normalizeIcmsRate(ruleValue) : undefined;
+    };
+
     if (originUf && destUf) {
       const { data: icmsRow } = await supabase
         .from('icms_rates')
@@ -630,9 +635,23 @@ Deno.serve(async (req) => {
       if (icmsRow?.rate_percent !== undefined) {
         icmsPercent = normalizeIcmsRate(Number(icmsRow.rate_percent));
       } else {
-        fallbacksApplied.push(
-          `icms_rates: ${originUf}→${destUf} não encontrada, usando ${FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT}%`
-        );
+        const icmsFromRules = resolveIcmsFromRules();
+        if (icmsFromRules !== undefined) {
+          icmsPercent = icmsFromRules;
+          fallbacksApplied.push(
+            `icms_rates: ${originUf}→${destUf} não encontrada, usando icms_default da Central de Regras`
+          );
+        } else {
+          fallbacksApplied.push(
+            `icms_rates: ${originUf}→${destUf} não encontrada, usando ${FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT}%`
+          );
+        }
+      }
+    } else {
+      const icmsFromRules = resolveIcmsFromRules();
+      if (icmsFromRules !== undefined) {
+        icmsPercent = icmsFromRules;
+        fallbacksApplied.push('icms_default: origem/destino não informados, usando regra global');
       }
     }
 

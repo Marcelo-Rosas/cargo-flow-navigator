@@ -66,7 +66,7 @@ export function CargoLogisticsStep({
       {/* Dados da Carga */}
       <div className="space-y-4">
         <h3 className="font-semibold text-foreground border-b pb-2">Detalhes da Carga</h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField
             control={form.control}
             name="cargo_type"
@@ -171,7 +171,7 @@ export function CargoLogisticsStep({
       {/* Configuração Logística */}
       <div className="space-y-4">
         <h3 className="font-semibold text-foreground border-b pb-2">Configuração Logística</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="freight_modality"
@@ -224,7 +224,7 @@ export function CargoLogisticsStep({
             )}
           />
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField
             control={form.control}
             name="payment_term_id"

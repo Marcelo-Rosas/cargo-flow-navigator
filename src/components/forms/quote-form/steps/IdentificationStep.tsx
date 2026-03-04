@@ -56,8 +56,8 @@ export function IdentificationStep({
     <div className="space-y-6">
       {/* Dados do Cliente */}
       <div className="space-y-4">
-        <h3 className="font-semibold text-foreground">Dados do Cliente</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <h3 className="font-semibold text-foreground border-b pb-2">Dados do Cliente</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="client_id"
@@ -113,8 +113,8 @@ export function IdentificationStep({
 
       {/* Embarcador */}
       <div className="space-y-4">
-        <h3 className="font-semibold text-foreground">Embarcador</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <h3 className="font-semibold text-foreground border-b pb-2">Embarcador</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="shipper_id"
@@ -153,7 +153,7 @@ export function IdentificationStep({
             )}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="shipper_name"

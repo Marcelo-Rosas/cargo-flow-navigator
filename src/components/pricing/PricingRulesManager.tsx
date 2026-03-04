@@ -11,6 +11,8 @@ import {
   AlertCircle,
   Package,
   Wrench,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -28,9 +30,32 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { usePricingRulesConfig, useVehicleTypes } from '@/hooks/usePricingRules';
 import type { PricingRuleConfig } from '@/hooks/usePricingRules';
-import { useUpdatePricingRuleConfig } from '@/hooks/usePricingRulesMutations';
+import {
+  useCreatePricingRuleConfig,
+  useDeletePricingRuleConfig,
+  useUpdatePricingRuleConfig,
+} from '@/hooks/usePricingRulesMutations';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +71,17 @@ const CATEGORIES = [
   { id: 'prazo', label: 'Prazo', icon: Calendar },
 ] as const;
 
+const PROTECTED_RULE_KEYS = new Set([
+  'das_percent',
+  'markup_percent',
+  'overhead_percent',
+  'profit_margin_percent',
+  'regime_simples_nacional',
+  'excesso_sublimite',
+]);
+
+const DEFAULT_VALUE_TYPE = 'percentage';
+
 function formatValue(rule: PricingRuleConfig): string {
   const v = Number(rule.value);
   if (rule.value_type === 'percentage') return `${v.toFixed(2)}%`;
@@ -57,9 +93,17 @@ function formatValue(rule: PricingRuleConfig): string {
 export function PricingRulesManager() {
   const { data: rules, isLoading } = usePricingRulesConfig(false);
   const { data: vehicleTypes } = useVehicleTypes(false);
+  const createMutation = useCreatePricingRuleConfig();
   const updateMutation = useUpdatePricingRuleConfig();
+  const deleteMutation = useDeletePricingRuleConfig();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
+  const [createCategory, setCreateCategory] = useState<string | null>(null);
+  const [newKey, setNewKey] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const [newValueType, setNewValueType] = useState<string>(DEFAULT_VALUE_TYPE);
+  const [newValue, setNewValue] = useState('');
+  const [newVehicleTypeId, setNewVehicleTypeId] = useState<string | ''>('');
 
   // Filtra regras legadas de ICMS por UF e TDE/TEAR NTC:
   // - ICMS por UF é gerido na tela de Alíquotas de ICMS.
@@ -74,6 +118,14 @@ export function PricingRulesManager() {
   const getVehicleName = (vehicleTypeId: string | null) => {
     if (!vehicleTypeId) return 'Global';
     return vehicleTypes?.find((v) => v.id === vehicleTypeId)?.name ?? vehicleTypeId.slice(0, 8);
+  };
+
+  const resetCreateForm = () => {
+    setNewKey('');
+    setNewLabel('');
+    setNewValueType(DEFAULT_VALUE_TYPE);
+    setNewValue('');
+    setNewVehicleTypeId('');
   };
 
   const handleStartEdit = (rule: PricingRuleConfig) => {
@@ -101,6 +153,36 @@ export function PricingRulesManager() {
     setEditingId(null);
     setEditValue('');
   };
+
+  const handleCreateRule = async () => {
+    if (!createCategory) return;
+    if (!newKey.trim() || !newLabel.trim()) {
+      toast.error('Preencha chave e rótulo da regra');
+      return;
+    }
+    const numericValue = parseFloat(newValue);
+    if (Number.isNaN(numericValue)) {
+      toast.error('Valor inválido');
+      return;
+    }
+    try {
+      await createMutation.mutateAsync({
+        key: newKey.trim(),
+        label: newLabel.trim(),
+        category: createCategory,
+        value_type: newValueType,
+        value: numericValue,
+        vehicle_type_id: newVehicleTypeId || null,
+      });
+      toast.success('Regra criada com sucesso');
+      resetCreateForm();
+      setCreateCategory(null);
+    } catch {
+      toast.error('Erro ao criar regra');
+    }
+  };
+
+  const isProtectedRule = (rule: PricingRuleConfig) => PROTECTED_RULE_KEYS.has(rule.key);
 
   // Configurações Fiscais (Motor Híbrido Simples vs Sublimite)
   const regimeSimplesRule = rules?.find(
@@ -298,6 +380,23 @@ export function PricingRulesManager() {
           {CATEGORIES.map(({ id, label }) => (
             <TabsContent key={id} value={id} className="mt-4">
               <div className="rounded-lg border">
+                <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40">
+                  <p className="text-xs text-muted-foreground">
+                    Regras da categoria <span className="font-medium">{label}</span>
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-2 text-xs"
+                    onClick={() => {
+                      resetCreateForm();
+                      setCreateCategory(id);
+                    }}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Nova regra
+                  </Button>
+                </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -365,13 +464,55 @@ export function PricingRulesManager() {
                                 </Button>
                               </div>
                             ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleStartEdit(rule)}
-                              >
-                                Editar
-                              </Button>
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleStartEdit(rule)}
+                                >
+                                  Editar
+                                </Button>
+                                {!isProtectedRule(rule) && (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-destructive"
+                                        disabled={deleteMutation.isPending}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Excluir regra?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          A regra <strong>{rule.label}</strong> (
+                                          <code>{rule.key}</code>) será removida da Central de
+                                          Regras. Esta ação não pode ser desfeita.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                          onClick={async () => {
+                                            try {
+                                              await deleteMutation.mutateAsync(rule.id);
+                                              toast.success('Regra excluída com sucesso');
+                                            } catch {
+                                              toast.error('Erro ao excluir regra');
+                                            }
+                                          }}
+                                        >
+                                          Excluir
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                )}
+                              </div>
                             )}
                           </TableCell>
                         </TableRow>
@@ -384,6 +525,105 @@ export function PricingRulesManager() {
           ))}
         </Tabs>
       </div>
+
+      <Dialog
+        open={createCategory !== null}
+        onOpenChange={(open) => !open && setCreateCategory(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova regra da Central de Regras</DialogTitle>
+            <DialogDescription className="text-xs">
+              Crie uma nova regra para a categoria{' '}
+              <span className="font-semibold">
+                {CATEGORIES.find((c) => c.id === createCategory)?.label ?? ''}
+              </span>
+              . Regras por veículo têm precedência sobre regras globais.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="new-key">Chave</Label>
+                <Input
+                  id="new-key"
+                  placeholder="ex: gris_percent"
+                  value={newKey}
+                  onChange={(e) => setNewKey(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="new-label">Rótulo</Label>
+                <Input
+                  id="new-label"
+                  placeholder="Ex: GRIS (%)"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label>Tipo de valor</Label>
+                <select
+                  className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                  value={newValueType}
+                  onChange={(e) => setNewValueType(e.target.value)}
+                >
+                  <option value="percentage">Percentual (%)</option>
+                  <option value="fixed">Fixo (R$)</option>
+                  <option value="per_km">Por km (R$/km)</option>
+                  <option value="per_ton">Por tonelada (R$/ton)</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="new-value">Valor</Label>
+                <Input
+                  id="new-value"
+                  type="number"
+                  step="0.01"
+                  value={newValue}
+                  onChange={(e) => setNewValue(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Escopo</Label>
+                <select
+                  className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                  value={newVehicleTypeId}
+                  onChange={(e) => setNewVehicleTypeId(e.target.value)}
+                >
+                  <option value="">Global</option>
+                  {vehicleTypes?.map((vt) => (
+                    <option key={vt.id} value={vt.id}>
+                      {vt.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="space-x-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                resetCreateForm();
+                setCreateCategory(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleCreateRule} disabled={createMutation.isPending}>
+              {createMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                'Criar regra'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
