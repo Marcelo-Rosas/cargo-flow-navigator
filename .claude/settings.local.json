@@ -4,5 +4,29 @@
       "Bash(supabase functions:*)",
       "Bash(git:*)"
     ]
+  },
+  "hooks": {
+    "TaskCompleted": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash.audit-financeiro.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash.context-injector.sh"
+          }
+        ]
+      }
+    ]
   }
 }

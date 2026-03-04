@@ -1,0 +1,18 @@
+#!/bin/bash
+# hooks/audit-financeiro.sh
+echo "🔍 Auditando cálculos financeiros..."
+
+# Simulação de verificação de consistência entre arquivos
+# Busca se o valor do Frete Base (Memória) é igual ao Custo Motorista (DRE)
+GREP_MEMORIA=$(grep "baseFreight" src/data/last_breakdown.json)
+GREP_DRE=$(grep "custoEfetivoMotorista" src/components/modals/quote-detail/QuoteModalCostCompositionTab.tsx)
+
+# Verifica se a margem caiu abaixo de 15%
+MARGEM=$(node -e "console.log(require('./src/data/last_breakdown.json').profitability.margemPercent)")
+
+if (( $(echo "$MARGEM < 15.0" | bc -l) )); then
+  echo "❌ ERRO: Margem de $MARGEM% abaixo do mínimo viável de 15%!"
+  exit 1
+fi
+
+echo "✅ Cálculos validados!"

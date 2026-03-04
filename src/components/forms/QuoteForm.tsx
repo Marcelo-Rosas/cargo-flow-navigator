@@ -262,6 +262,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       toll: 0,
       aluguel_maquinas: 0,
       descarga: 0,
+      // tde_enabled / tear_enabled permanecem no schema para compatibilidade,
+      // mas deixam de ser controlados manualmente na UI (governança via regras).
       tde_enabled: false,
       tear_enabled: false,
       notes: '',
@@ -287,8 +289,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedToll = form.watch('toll');
   const watchedAluguelMaquinas = form.watch('aluguel_maquinas');
   const watchedDescarga = form.watch('descarga');
-  const watchedTdeEnabled = form.watch('tde_enabled');
-  const watchedTearEnabled = form.watch('tear_enabled');
 
   // Dual Debounce: StableSnapshot (400ms) + CostsSnapshot (50ms)
   const stableSnapshot = JSON.stringify([
@@ -300,8 +300,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     watchedKmDistance,
     watchedPriceTableId,
     watchedVehicleTypeId,
-    watchedTdeEnabled,
-    watchedTearEnabled,
   ]);
   const costsSnapshot = JSON.stringify([watchedToll, watchedAluguelMaquinas, watchedDescarga]);
   const debouncedStable = useDebouncedValue(stableSnapshot, 400);
@@ -320,8 +318,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         kmDistance: (stable[5] as number | undefined) ?? undefined,
         priceTableId: (stable[6] as string) ?? '',
         vehicleTypeId: (stable[7] as string) ?? '',
-        tdeEnabled: (stable[8] as boolean) ?? false,
-        tearEnabled: (stable[9] as boolean) ?? false,
         toll: (costs[0] as number) ?? 0,
         aluguelMaquinas: (costs[1] as number) ?? 0,
         descarga: (costs[2] as number) ?? 0,
@@ -336,8 +332,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         kmDistance: undefined as number | undefined,
         priceTableId: '',
         vehicleTypeId: '',
-        tdeEnabled: false,
-        tearEnabled: false,
         toll: 0,
         aluguelMaquinas: 0,
         descarga: 0,
@@ -418,6 +412,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     };
   }, [pricingRules, debounced.vehicleTypeId, taxRegimeSimples]);
 
+  // Governança: habilita TDE/TEAR exclusivamente via regras (percentual > 0),
+  // sem intervenção manual do vendedor no formulário.
+  const tdeEnabledByRule = (resolvedPricingParams.tdePercent ?? 0) > 0;
+  const tearEnabledByRule = (resolvedPricingParams.tearPercent ?? 0) > 0;
+
   // ANTT floor rate (Piso mínimo carreteiro) - Tabela A / Carga Geral
   const selectedVehicle = vehicleTypes?.find((v) => v.id === watchedVehicleTypeId) ?? null;
   // Fallback: quando vehicleTypes ainda está carregando, usa o axesCount salvo no breakdown
@@ -476,8 +475,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       icmsRatePercent: icmsRate,
       kmByUf: kmByUf ?? undefined,
       icmsByUf: icmsByUfMap,
-      tdeEnabled: debounced.tdeEnabled || false,
-      tearEnabled: debounced.tearEnabled || false,
+      tdeEnabled: tdeEnabledByRule,
+      tearEnabled: tearEnabledByRule,
       pricingParams: resolvedPricingParams,
     });
   }, [
@@ -490,14 +489,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debounced.aluguelMaquinas,
     debounced.descarga,
     debounced.priceTableId,
-    debounced.tdeEnabled,
-    debounced.tearEnabled,
     debouncedKmBand,
     priceTableRow,
     icmsRate,
     kmByUf,
     icmsByUfMap,
     resolvedPricingParams,
+    tdeEnabledByRule,
+    tearEnabledByRule,
   ]);
 
   // Passo 2: calcular o total das taxas condicionais usando o baseFreight intermediário
@@ -558,8 +557,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       icmsRatePercent: icmsRate,
       kmByUf: kmByUf ?? undefined,
       icmsByUf: icmsByUfMap,
-      tdeEnabled: debounced.tdeEnabled || false,
-      tearEnabled: debounced.tearEnabled || false,
+      tdeEnabled: tdeEnabledByRule,
+      tearEnabled: tearEnabledByRule,
       pricingParams: resolvedPricingParams,
       extras: {
         conditionalFees: computedConditionalFees,
@@ -578,14 +577,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debounced.aluguelMaquinas,
     debounced.descarga,
     debounced.priceTableId,
-    debounced.tdeEnabled,
-    debounced.tearEnabled,
     debouncedKmBand,
     priceTableRow,
     icmsRate,
     kmByUf,
     icmsByUfMap,
     resolvedPricingParams,
+    tdeEnabledByRule,
+    tearEnabledByRule,
     computedConditionalFees,
     additionalFeesSelection.waitingTimeCost,
     additionalFeesSelection.waitingTimeHours,
@@ -1933,35 +1932,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                         initialItems={unloadingCostItems}
                       />
                     </div>
-                  </div>
-
-                  {/* NTC Taxes */}
-                  <div className="flex gap-6">
-                    <FormField
-                      control={form.control}
-                      name="tde_enabled"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center gap-2">
-                          <FormControl>
-                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                          <FormLabel className="!mt-0 text-sm font-normal">TDE (20%)</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="tear_enabled"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center gap-2">
-                          <FormControl>
-                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                          <FormLabel className="!mt-0 text-sm font-normal">TEAR (20%)</FormLabel>
-                        </FormItem>
-                      )}
-                    />
                   </div>
 
                   {/* Calculated Values */}

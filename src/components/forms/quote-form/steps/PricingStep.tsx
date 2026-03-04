@@ -135,32 +135,6 @@ export function PricingStep({
               onChange={onUnloadingCostChange}
               initialItems={unloadingCostItems}
             />
-            <div className="flex gap-8 p-4 border rounded-lg bg-muted/10">
-              <FormField
-                control={form.control}
-                name="tde_enabled"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <FormLabel className="text-xs font-bold uppercase">TDE</FormLabel>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="tear_enabled"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <FormLabel className="text-xs font-bold uppercase">TEAR</FormLabel>
-                  </FormItem>
-                )}
-              />
-            </div>
             <AdditionalFeesSection
               selection={additionalFeesSelection}
               onChange={setAdditionalFeesSelection}
