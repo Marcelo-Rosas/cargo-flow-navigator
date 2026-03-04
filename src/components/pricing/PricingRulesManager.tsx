@@ -37,7 +37,8 @@ import { cn } from '@/lib/utils';
 const CATEGORIES = [
   { id: 'imposto', label: 'Impostos', icon: Percent },
   { id: 'markup', label: 'Markup & Overhead', icon: Wallet },
-  { id: 'taxa', label: 'Taxas (TDE/TEAR)', icon: Receipt },
+  { id: 'risco', label: 'Risco / Seguros', icon: AlertCircle },
+  { id: 'taxa', label: 'Taxas Condicionais', icon: Receipt },
   { id: 'carga_descarga', label: 'Carga e Descarga', icon: Package },
   { id: 'aluguel', label: 'Aluguel', icon: Wrench },
   { id: 'veiculo', label: 'Por Veículo', icon: Truck },
@@ -60,8 +61,13 @@ export function PricingRulesManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
-  // Filtra regras legadas de ICMS por UF: gestão agora é feita na tela dedicada de alíquotas.
-  const visibleRules = rules?.filter((r) => !r.key.startsWith('icms_uf_')) ?? [];
+  // Filtra regras legadas de ICMS por UF e TDE/TEAR NTC:
+  // - ICMS por UF é gerido na tela de Alíquotas de ICMS.
+  // - TDE/TEAR NTC agora são tratados como Taxas Condicionais em conditional_fees.
+  const visibleRules =
+    rules?.filter(
+      (r) => !r.key.startsWith('icms_uf_') && r.key !== 'tde_percent' && r.key !== 'tear_percent'
+    ) ?? [];
 
   const rulesByCategory = (category: string) => visibleRules.filter((r) => r.category === category);
 
