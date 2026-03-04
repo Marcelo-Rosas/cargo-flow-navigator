@@ -761,11 +761,12 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
     ? baseCost // Fracionado: sem markup sobre frete peso (NTC referência)
     : round2(markupBase * (1 + params.markupPercent / 100));
 
-  // ---- STEP 5: TAXAS NTC (% sobre baseFreight, regra ou constante) ----
-  const tdePct = params.tdePercent ?? FREIGHT_CONSTANTS.NTC_TDE_PERCENT;
-  const tearPct = params.tearPercent ?? FREIGHT_CONSTANTS.NTC_TEAR_PERCENT;
-  const tde = input.tdeEnabled ? round2(baseFreight * (tdePct / 100)) : 0;
-  const tear = input.tearEnabled ? round2(baseFreight * (tearPct / 100)) : 0;
+  // ---- STEP 5: TAXAS NTC (TDE/TEAR desativadas no cálculo) ----
+  // Mantidas apenas para compatibilidade de tipos, mas o motor financeiro 360°
+  // não aplica mais TDE/TEAR como taxas NTC — elas são representadas via
+  // conditional_fees (TEAR/TPD) conforme seleção do usuário.
+  const tde = 0;
+  const tear = 0;
 
   // ---- STEP 6: EXTRAS ----
   const conditionalFeesTotal = round2(input.extras?.conditionalFees?.total ?? 0);
@@ -780,8 +781,6 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       gris +
       tso +
       rctrc +
-      tde +
-      tear +
       dispatchFee +
       conditionalFeesTotal +
       waitingTimeCost

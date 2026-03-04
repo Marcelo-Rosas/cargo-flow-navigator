@@ -60,7 +60,10 @@ export function PricingRulesManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
-  const rulesByCategory = (category: string) => rules?.filter((r) => r.category === category) ?? [];
+  // Filtra regras legadas de ICMS por UF: gestão agora é feita na tela dedicada de alíquotas.
+  const visibleRules = rules?.filter((r) => !r.key.startsWith('icms_uf_')) ?? [];
+
+  const rulesByCategory = (category: string) => visibleRules.filter((r) => r.category === category);
 
   const getVehicleName = (vehicleTypeId: string | null) => {
     if (!vehicleTypeId) return 'Global';
@@ -270,8 +273,9 @@ export function PricingRulesManager() {
       {/* Central de Regras por Categoria */}
       <div>
         <p className="mb-4 text-sm text-muted-foreground">
-          Edite Markup, DAS, ICMS por UF, TDE/TEAR e outras regras sem alterar código. Regras por
-          veículo têm precedência sobre regras globais.
+          Edite Markup, DAS, TDE/TEAR e outras regras sem alterar código. Regras por veículo têm
+          precedência sobre regras globais. As alíquotas de ICMS por UF são geridas na tela
+          específica de Alíquotas de ICMS.
         </p>
         <Tabs defaultValue="imposto" className="w-full">
           <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 overflow-x-auto">

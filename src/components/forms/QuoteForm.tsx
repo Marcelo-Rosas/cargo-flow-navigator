@@ -412,11 +412,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     };
   }, [pricingRules, debounced.vehicleTypeId, taxRegimeSimples]);
 
-  // Governança: habilita TDE/TEAR exclusivamente via regras (percentual > 0),
-  // sem intervenção manual do vendedor no formulário.
-  const tdeEnabledByRule = (resolvedPricingParams.tdePercent ?? 0) > 0;
-  const tearEnabledByRule = (resolvedPricingParams.tearPercent ?? 0) > 0;
-
   // ANTT floor rate (Piso mínimo carreteiro) - Tabela A / Carga Geral
   const selectedVehicle = vehicleTypes?.find((v) => v.id === watchedVehicleTypeId) ?? null;
   // Fallback: quando vehicleTypes ainda está carregando, usa o axesCount salvo no breakdown
@@ -475,8 +470,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       icmsRatePercent: icmsRate,
       kmByUf: kmByUf ?? undefined,
       icmsByUf: icmsByUfMap,
-      tdeEnabled: tdeEnabledByRule,
-      tearEnabled: tearEnabledByRule,
+      // TDE/TEAR NTC desativados no cálculo: representados via conditional_fees (TEAR/TPD)
+      tdeEnabled: false,
+      tearEnabled: false,
       pricingParams: resolvedPricingParams,
     });
   }, [
@@ -495,8 +491,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     kmByUf,
     icmsByUfMap,
     resolvedPricingParams,
-    tdeEnabledByRule,
-    tearEnabledByRule,
   ]);
 
   // Passo 2: calcular o total das taxas condicionais usando o baseFreight intermediário
@@ -557,8 +551,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       icmsRatePercent: icmsRate,
       kmByUf: kmByUf ?? undefined,
       icmsByUf: icmsByUfMap,
-      tdeEnabled: tdeEnabledByRule,
-      tearEnabled: tearEnabledByRule,
+      // TDE/TEAR NTC desativados no cálculo: representados via conditional_fees (TEAR/TPD)
+      tdeEnabled: false,
+      tearEnabled: false,
       pricingParams: resolvedPricingParams,
       extras: {
         conditionalFees: computedConditionalFees,
@@ -583,8 +578,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     kmByUf,
     icmsByUfMap,
     resolvedPricingParams,
-    tdeEnabledByRule,
-    tearEnabledByRule,
     computedConditionalFees,
     additionalFeesSelection.waitingTimeCost,
     additionalFeesSelection.waitingTimeHours,
