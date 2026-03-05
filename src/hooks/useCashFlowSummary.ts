@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CashFlowSummaryRow {
@@ -74,6 +74,64 @@ export function useCashFlowSummary(params?: { monthFrom?: string; monthTo?: stri
         }))
         .sort((a, b) => b.period.localeCompare(a.period))
         .slice(0, 12);
+    },
+  });
+}
+
+export interface PendingInstallment {
+  id: string;
+  amount: number;
+  due_date: string;
+  document_code: string | null;
+  document_type: 'FAT' | 'PAG';
+}
+
+export function usePendingInstallments(limit = 12) {
+  return useQuery({
+    queryKey: ['pending-installments', limit],
+    queryFn: async (): Promise<PendingInstallment[]> => {
+      const { data, error } = await supabase
+        .from('financial_installments')
+        .select('id, amount, due_date, status, financial_documents(code, type)')
+        .eq('status', 'pendente')
+        .order('due_date', { ascending: true })
+        .limit(limit);
+
+      if (error) throw error;
+
+      return (
+        (data ?? []) as {
+          id: string;
+          amount: number;
+          due_date: string;
+          financial_documents: { code: string | null; type: 'FAT' | 'PAG' } | null;
+        }[]
+      ).map((row) => ({
+        id: row.id,
+        amount: Number(row.amount ?? 0),
+        due_date: row.due_date,
+        document_code: row.financial_documents?.code ?? null,
+        document_type: row.financial_documents?.type ?? 'PAG',
+      }));
+    },
+  });
+}
+
+export function useSettleInstallments() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (ids.length === 0) return null;
+      const { error } = await supabase
+        .from('financial_installments')
+        .update({ status: 'baixado', settled_at: new Date().toISOString() })
+        .in('id', ids);
+      if (error) throw error;
+      return ids;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-installments'] });
     },
   });
 }

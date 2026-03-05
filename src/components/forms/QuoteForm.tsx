@@ -50,7 +50,9 @@ import {
   usePricingParameter,
   useConditionalFees,
   usePricingRulesConfig,
+  usePricingRulesByCategory,
   resolvePricingRule,
+  type PricingRuleConfig,
 } from '@/hooks/usePricingRules';
 import { usePriceTableRowByKmRange, usePriceTableRows } from '@/hooks/usePriceTableRows';
 import {
@@ -105,6 +107,142 @@ function readEquipmentRentalFromBreakdown(breakdown: unknown): EquipmentRentalIt
   if (!meta || typeof meta !== 'object') return [];
   const items = (meta as { equipmentRental?: EquipmentRentalItem[] }).equipmentRental;
   return Array.isArray(items) ? items : [];
+}
+
+function getRuleMetadataString(rule: PricingRuleConfig, key: string): string | undefined {
+  const raw = (rule.metadata as Record<string, unknown> | null | undefined)?.[key];
+  return typeof raw === 'string' && raw.trim().length > 0 ? raw : undefined;
+}
+
+function findPricingRuleForItem(
+  item: { id?: string; code?: string; ruleKey?: string },
+  rules: PricingRuleConfig[]
+): PricingRuleConfig | undefined {
+  const byRuleKey =
+    typeof item.ruleKey === 'string' && item.ruleKey.trim().length > 0 ? item.ruleKey : undefined;
+  if (byRuleKey) {
+    const found = rules.find((rule) => rule.key === byRuleKey);
+    if (found) return found;
+  }
+
+  const byCode =
+    typeof item.code === 'string' && item.code.trim().length > 0 ? item.code : undefined;
+  if (byCode) {
+    const found = rules.find((rule) => rule.key === byCode);
+    if (found) return found;
+  }
+
+  const byId = typeof item.id === 'string' && item.id.trim().length > 0 ? item.id : undefined;
+  if (byId) {
+    const found = rules.find((rule) => {
+      if (rule.id === byId) return true;
+      const legacyId = getRuleMetadataString(rule, 'legacy_id');
+      return legacyId === byId;
+    });
+    if (found) return found;
+  }
+
+  return undefined;
+}
+
+function normalizeEquipmentRentalItems(
+  items: EquipmentRentalItem[],
+  rules: PricingRuleConfig[]
+): { items: EquipmentRentalItem[]; changed: boolean } {
+  if (!items.length || !rules.length) return { items, changed: false };
+  let changed = false;
+
+  const normalized = items.map((item) => {
+    const rule = findPricingRuleForItem(item, rules);
+    if (!rule) return item;
+
+    const ruleKey = rule.key;
+    const unitFromRule = getRuleMetadataString(rule, 'unit') ?? item.unit ?? 'dia';
+    const legacyId = getRuleMetadataString(rule, 'legacy_id') ?? item.legacyId;
+    const unitValue = Number(rule.value) || 0;
+    const quantity = Number(item.quantity) || 0;
+    const total = quantity * unitValue;
+
+    const next: EquipmentRentalItem = {
+      ...item,
+      id: ruleKey,
+      ruleKey,
+      legacyId,
+      name: rule.label,
+      code: rule.key,
+      unit: unitFromRule,
+      unitValue,
+      total,
+      selected: item.selected ?? quantity > 0,
+    };
+
+    if (
+      next.id !== item.id ||
+      next.ruleKey !== item.ruleKey ||
+      next.code !== item.code ||
+      next.name !== item.name ||
+      next.unit !== item.unit ||
+      next.unitValue !== item.unitValue ||
+      next.total !== item.total ||
+      next.legacyId !== item.legacyId
+    ) {
+      changed = true;
+    }
+
+    return next;
+  });
+
+  return { items: normalized, changed };
+}
+
+function normalizeUnloadingCostItems(
+  items: UnloadingCostItem[],
+  rules: PricingRuleConfig[]
+): { items: UnloadingCostItem[]; changed: boolean } {
+  if (!items.length || !rules.length) return { items, changed: false };
+  let changed = false;
+
+  const normalized = items.map((item) => {
+    const rule = findPricingRuleForItem(item, rules);
+    if (!rule) return item;
+
+    const ruleKey = rule.key;
+    const unitFromRule = getRuleMetadataString(rule, 'unit') ?? item.unit ?? 'unidade';
+    const legacyId = getRuleMetadataString(rule, 'legacy_id') ?? item.legacyId;
+    const unitValue = Number(rule.value) || 0;
+    const quantity = Number(item.quantity) || 0;
+    const total = quantity * unitValue;
+
+    const next: UnloadingCostItem = {
+      ...item,
+      id: ruleKey,
+      ruleKey,
+      legacyId,
+      name: rule.label,
+      code: rule.key,
+      unit: unitFromRule,
+      unitValue,
+      total,
+      quantity,
+    };
+
+    if (
+      next.id !== item.id ||
+      next.ruleKey !== item.ruleKey ||
+      next.code !== item.code ||
+      next.name !== item.name ||
+      next.unit !== item.unit ||
+      next.unitValue !== item.unitValue ||
+      next.total !== item.total ||
+      next.legacyId !== item.legacyId
+    ) {
+      changed = true;
+    }
+
+    return next;
+  });
+
+  return { items: normalized, changed };
 }
 
 // Select/Combobox podem passar number; coerce para string
@@ -235,6 +373,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const [equipmentRentalItems, setEquipmentRentalItems] = useState<EquipmentRentalItem[]>(() =>
     readEquipmentRentalFromBreakdown(quote?.pricing_breakdown)
   );
+  const { data: equipmentPricingRules = [] } = usePricingRulesByCategory('aluguel', true);
+  const { data: unloadingPricingRules = [] } = usePricingRulesByCategory('carga_descarga', true);
 
   const form = useForm<QuoteFormData>({
     resolver: zodResolver(quoteSchema),
@@ -410,6 +550,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       profitMarginPercent: resolvePricingRule(pricingRules, 'profit_margin_percent', vtId, 15),
       regimeSimplesNacional: (regimeSimplesVal ?? 1) === 1,
       excessoSublimite: (excessoVal ?? 0) === 1,
+      grisPercent: resolvePricingRule(pricingRules, 'gris_percent', vtId, 0.3),
+      tsoPercent: resolvePricingRule(pricingRules, 'tso_percent', vtId, 0.15),
+      costValuePercent: resolvePricingRule(pricingRules, 'cost_value_percent', vtId, 0.3),
       tdePercent: resolvePricingRule(pricingRules, 'tde_percent', vtId, 20),
       tearPercent: resolvePricingRule(pricingRules, 'tear_percent', vtId, 20),
     };
@@ -695,6 +838,24 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     }
   }, [quote, form, weightUnit, open]);
 
+  useEffect(() => {
+    if (!quote) return;
+
+    if (equipmentPricingRules.length > 0) {
+      setEquipmentRentalItems((prev) => {
+        const normalized = normalizeEquipmentRentalItems(prev, equipmentPricingRules);
+        return normalized.changed ? normalized.items : prev;
+      });
+    }
+
+    if (unloadingPricingRules.length > 0) {
+      setUnloadingCostItems((prev) => {
+        const normalized = normalizeUnloadingCostItems(prev, unloadingPricingRules);
+        return normalized.changed ? normalized.items : prev;
+      });
+    }
+  }, [quote, equipmentPricingRules, unloadingPricingRules]);
+
   const handleClientSelect = (clientId: string) => {
     const selectedClient = clients?.find((c) => c.id === clientId);
     if (selectedClient) {
@@ -920,6 +1081,15 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     }
 
     try {
+      const normalizedUnloading = normalizeUnloadingCostItems(
+        unloadingCostItems,
+        unloadingPricingRules
+      ).items;
+      const normalizedEquipment = normalizeEquipmentRentalItems(
+        equipmentRentalItems,
+        equipmentPricingRules
+      ).items;
+
       // Build pricing breakdown for storage
       let pricingBreakdown = buildStoredBreakdown(calculationResult, {
         originCity: data.origin,
@@ -941,8 +1111,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
           waitingTimeCost: additionalFeesSelection.waitingTimeCost,
           waitingTimeHours: additionalFeesSelection.waitingTimeHours,
           waitingTimeEnabled: additionalFeesSelection.waitingTimeEnabled,
-          unloadingCostItems: unloadingCostItems.length > 0 ? unloadingCostItems : undefined,
-          equipmentRentalItems: equipmentRentalItems.length > 0 ? equipmentRentalItems : undefined,
+          unloadingCostItems: normalizedUnloading.length > 0 ? normalizedUnloading : undefined,
+          equipmentRentalItems: normalizedEquipment.length > 0 ? normalizedEquipment : undefined,
         },
       });
 

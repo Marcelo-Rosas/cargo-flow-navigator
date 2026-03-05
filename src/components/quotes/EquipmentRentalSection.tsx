@@ -2,13 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useEquipmentRentalRates } from '@/hooks/useEquipmentRentalRates';
-import type { EquipmentRentalRate } from '@/hooks/useEquipmentRentalRates';
+import { usePricingRulesByCategory, type PricingRuleConfig } from '@/hooks/usePricingRules';
 
 export interface EquipmentRentalItem {
   id: string;
+  ruleKey?: string;
+  legacyId?: string;
   name: string;
   code: string;
+  unit?: string;
   selected: boolean;
   quantity: number;
   unitValue: number;
@@ -29,7 +31,7 @@ export function EquipmentRentalSection({
   initialItems = [],
   readOnly = false,
 }: EquipmentRentalSectionProps) {
-  const { data: rates, isLoading } = useEquipmentRentalRates(true);
+  const { data: rates, isLoading } = usePricingRulesByCategory('aluguel', true);
 
   const [selectionByRate, setSelectionByRate] = useState<
     Map<string, { selected: boolean; quantity: number; description?: string }>
@@ -40,7 +42,7 @@ export function EquipmentRentalSection({
       const map = new Map<string, { selected: boolean; quantity: number; description?: string }>();
       for (const item of initialItems) {
         if (item.selected && item.quantity > 0) {
-          map.set(item.id, {
+          map.set(item.ruleKey ?? item.code ?? item.id, {
             selected: true,
             quantity: item.quantity,
             description: item.description,
@@ -51,45 +53,69 @@ export function EquipmentRentalSection({
     }
   }, [initialItems]);
 
+  const getRuleUnit = (rule: PricingRuleConfig) => {
+    const raw = (rule.metadata as { unit?: unknown } | null | undefined)?.unit;
+    return typeof raw === 'string' && raw.trim() ? raw : 'dia';
+  };
+
+  const getRuleLegacyId = (rule: PricingRuleConfig) => {
+    const raw = (rule.metadata as { legacy_id?: unknown } | null | undefined)?.legacy_id;
+    return typeof raw === 'string' && raw.trim() ? raw : undefined;
+  };
+
+  const toSelectionKey = (rule: PricingRuleConfig) => rule.key;
+
+  const buildItems = (
+    allRules: PricingRuleConfig[],
+    selection: Map<string, { selected: boolean; quantity: number; description?: string }>
+  ): EquipmentRentalItem[] =>
+    allRules.map((rule) => {
+      const selectionKey = toSelectionKey(rule);
+      const sel = selection.get(selectionKey) ?? {
+        selected: false,
+        quantity: 0,
+        description: undefined,
+      };
+      const q = sel.selected ? sel.quantity : 0;
+      const unitValue = Number(rule.value) || 0;
+      const total = q * unitValue;
+      return {
+        id: selectionKey,
+        ruleKey: selectionKey,
+        legacyId: getRuleLegacyId(rule),
+        name: rule.label,
+        code: rule.key,
+        unit: getRuleUnit(rule),
+        selected: sel.selected,
+        quantity: q,
+        unitValue,
+        total,
+        description: sel.description,
+      };
+    });
+
   const handleChange = (
-    rate: EquipmentRentalRate,
+    rate: PricingRuleConfig,
     selected: boolean,
     quantity: number,
     description?: string
   ) => {
     if (!rates) return;
+    const selectionKey = toSelectionKey(rate);
     setSelectionByRate((prev) => {
       const next = new Map(prev);
       if (selected && quantity > 0) {
-        const existing = prev.get(rate.id);
-        next.set(rate.id, {
+        const existing = prev.get(selectionKey);
+        next.set(selectionKey, {
           selected: true,
           quantity,
           description: description ?? existing?.description,
         });
       } else {
-        next.delete(rate.id);
+        next.delete(selectionKey);
       }
 
-      const items: EquipmentRentalItem[] = rates.map((r) => {
-        const sel = next.get(r.id) ?? {
-          selected: false,
-          quantity: 0,
-          description: undefined,
-        };
-        const q = sel.selected ? sel.quantity : 0;
-        const total = q * r.value;
-        return {
-          id: r.id,
-          name: r.name,
-          code: r.code,
-          selected: sel.selected,
-          quantity: q,
-          unitValue: r.value,
-          total,
-          description: sel.description,
-        };
-      });
+      const items = buildItems(rates, next);
       const total = items.reduce((s, i) => s + i.total, 0);
       onChange(
         total,
@@ -108,25 +134,7 @@ export function EquipmentRentalSection({
         next.set(rateId, { ...existing, description: description || undefined });
       }
 
-      const items: EquipmentRentalItem[] = rates.map((r) => {
-        const sel = next.get(r.id) ?? {
-          selected: false,
-          quantity: 0,
-          description: undefined,
-        };
-        const q = sel.selected ? sel.quantity : 0;
-        const total = q * r.value;
-        return {
-          id: r.id,
-          name: r.name,
-          code: r.code,
-          selected: sel.selected,
-          quantity: q,
-          unitValue: r.value,
-          total,
-          description: sel.description,
-        };
-      });
+      const items = buildItems(rates, next);
       const total = items.reduce((s, i) => s + i.total, 0);
       onChange(
         total,
@@ -138,10 +146,10 @@ export function EquipmentRentalSection({
 
   const computedTotal = useMemo(() => {
     if (!rates) return 0;
-    return rates.reduce((s, r) => {
-      const sel = selectionByRate.get(r.id);
+    return rates.reduce((s, rule) => {
+      const sel = selectionByRate.get(toSelectionKey(rule));
       if (!sel?.selected || sel.quantity <= 0) return s;
-      return s + sel.quantity * r.value;
+      return s + sel.quantity * (Number(rule.value) || 0);
     }, 0);
   }, [rates, selectionByRate]);
 
@@ -161,11 +169,14 @@ export function EquipmentRentalSection({
       <Label>Aluguel de Máquinas</Label>
       <div className="rounded-md border divide-y">
         {rates.map((rate) => {
-          const sel = selectionByRate.get(rate.id) ?? { selected: false, quantity: 0 };
-          const lineTotal = sel.selected && sel.quantity > 0 ? sel.quantity * rate.value : 0;
+          const selectionKey = toSelectionKey(rate);
+          const unitValue = Number(rate.value) || 0;
+          const unit = getRuleUnit(rate);
+          const sel = selectionByRate.get(selectionKey) ?? { selected: false, quantity: 0 };
+          const lineTotal = sel.selected && sel.quantity > 0 ? sel.quantity * unitValue : 0;
           return (
             <div
-              key={rate.id}
+              key={selectionKey}
               className="flex flex-col gap-1 px-3 py-2 bg-background hover:bg-muted/30"
             >
               <div className="flex items-center gap-3">
@@ -181,10 +192,9 @@ export function EquipmentRentalSection({
                   }
                   disabled={readOnly}
                 />
-                <span className="flex-1 text-sm truncate">{rate.name}</span>
+                <span className="flex-1 text-sm truncate">{rate.label}</span>
                 <span className="text-sm text-muted-foreground tabular-nums">
-                  R$ {rate.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /{' '}
-                  {rate.unit}
+                  R$ {unitValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / {unit}
                 </span>
                 <div className="w-20">
                   <Input
@@ -210,7 +220,7 @@ export function EquipmentRentalSection({
                 <Input
                   placeholder="Descrição (opcional)"
                   value={sel.description ?? ''}
-                  onChange={(e) => handleDescriptionChange(rate.id, e.target.value)}
+                  onChange={(e) => handleDescriptionChange(selectionKey, e.target.value)}
                   disabled={readOnly}
                   className="h-8 ml-6 text-sm"
                 />

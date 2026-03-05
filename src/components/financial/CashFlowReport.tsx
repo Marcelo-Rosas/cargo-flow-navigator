@@ -1,4 +1,5 @@
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -7,12 +8,29 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useCashFlowSummary } from '@/hooks/useCashFlowSummary';
+import {
+  useCashFlowSummary,
+  usePendingInstallments,
+  useSettleInstallments,
+} from '@/hooks/useCashFlowSummary';
 import { formatCurrency } from '@/lib/formatters';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 
 export function CashFlowReport() {
   const { data: rows, isLoading, isError, error } = useCashFlowSummary();
+  const {
+    data: pendingInstallments,
+    isLoading: pendingLoading,
+    isError: pendingError,
+    error: pendingErrorObj,
+  } = usePendingInstallments();
+  const settleMutation = useSettleInstallments();
+  const pendingRows = pendingInstallments ?? [];
+  const isSettleDisabled = pendingRows.length === 0 || settleMutation.isLoading;
+  const handleSettleAll = () => {
+    if (pendingRows.length === 0 || settleMutation.isLoading) return;
+    settleMutation.mutate(pendingRows.map((row) => row.id));
+  };
 
   if (isLoading) {
     return <TableSkeleton rows={6} columns={4} title />;
@@ -81,6 +99,59 @@ export function CashFlowReport() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      <div className="rounded-lg border bg-card p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-foreground">Parcelas pendentes</h3>
+          <Button size="sm" variant="outline" onClick={handleSettleAll} disabled={isSettleDisabled}>
+            {settleMutation.isLoading ? 'Processando...' : 'Marcar todas como baixadas'}
+          </Button>
+        </div>
+
+        {pendingLoading ? (
+          <p className="text-sm text-muted-foreground">Carregando parcelas pendentes...</p>
+        ) : pendingError ? (
+          <p className="text-sm text-destructive">
+            Falha ao buscar parcelas pendentes:{' '}
+            {(pendingErrorObj instanceof Error && pendingErrorObj.message) || 'Erro desconhecido'}
+          </p>
+        ) : pendingRows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhuma parcela pendente encontrada.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Documento</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead className="text-right">Vencimento</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pendingRows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell>{row.document_code ?? '—'}</TableCell>
+                  <TableCell>{row.document_type}</TableCell>
+                  <TableCell className="text-right">
+                    {new Date(row.due_date).toLocaleDateString('pt-BR')}
+                  </TableCell>
+                  <TableCell className="text-right text-destructive">
+                    {formatCurrency(row.amount)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+
+        {settleMutation.isError && (
+          <p className="text-xs text-destructive">
+            {settleMutation.error instanceof Error
+              ? settleMutation.error.message
+              : 'Não foi possível baixar as parcelas.'}
+          </p>
+        )}
       </div>
 
       {/* Placeholder para gráfico futuro (Recharts) */}

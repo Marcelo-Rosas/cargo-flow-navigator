@@ -371,6 +371,14 @@ export function QuoteModalCostCompositionTab({
                     </TableCell>
                   </TableRow>
                 )}
+                {custosDescarga > 0 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground">• Carga e Descarga</TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
+                      -{formatCurrency(custosDescarga)}
+                    </TableCell>
+                  </TableRow>
+                )}
                 <TableRow
                   className={cn(
                     'border-t-2',

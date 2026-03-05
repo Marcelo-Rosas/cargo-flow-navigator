@@ -257,6 +257,14 @@ Deno.serve(async (req) => {
     let kmBandUsed: number | undefined;
     let priceTableRowId: string | undefined;
 
+    const toFiniteNumber = (value: unknown): number | undefined => {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : undefined;
+    };
+
+    const resolveRulePercent = (key: string): number | undefined =>
+      toFiniteNumber(resolveRule(key, vehicleTypeIdForRules));
+
     // =====================================================
     // DETECT MODALITY (lotacao vs fracionado)
     // =====================================================
@@ -397,10 +405,18 @@ Deno.serve(async (req) => {
               );
             }
 
-            // Fracionado: GRIS e TSO da linha (variam por faixa km), fallback ltl_parameters
-            grisPercent = Number(priceRow.gris_percent) ?? ltlParams?.gris_percent ?? 0.3;
-            tsoPercent = Number(priceRow.tso_percent) || 0;
-            costValuePercent = Number(priceRow.cost_value_percent) || 0;
+            // Fracionado: linha da tabela > ltl_parameters (somente GRIS) > Central > default
+            const ruleGris = resolveRulePercent('gris_percent');
+            const ruleTso = resolveRulePercent('tso_percent');
+            const ruleCostVal = resolveRulePercent('cost_value_percent');
+            const ptGris = toFiniteNumber(priceRow.gris_percent);
+            const ptTso = toFiniteNumber(priceRow.tso_percent);
+            const ptCostVal = toFiniteNumber(priceRow.cost_value_percent);
+            const ltlGris = toFiniteNumber(ltlParams?.gris_percent);
+            // Precedencia: Central > linha km > ltl_parameters (somente GRIS) > default
+            grisPercent = ruleGris ?? ptGris ?? ltlGris ?? 0.3;
+            tsoPercent = ruleTso ?? ptTso ?? 0.15;
+            costValuePercent = ruleCostVal ?? ptCostVal ?? 0.3;
             dispatchFee = ltlParams?.dispatch_fee ?? 102.9;
           } else {
             // =====================================================
@@ -409,9 +425,16 @@ Deno.serve(async (req) => {
             const costPerTon = Number(priceRow.cost_per_ton) || 0;
             baseCost = (billableWeightKg / 1000) * costPerTon;
 
-            grisPercent = Number(priceRow.gris_percent) || 0;
-            tsoPercent = Number(priceRow.tso_percent) || 0;
-            costValuePercent = Number(priceRow.cost_value_percent) || 0;
+            const ruleGris = resolveRulePercent('gris_percent');
+            const ruleTso = resolveRulePercent('tso_percent');
+            const ruleCostVal = resolveRulePercent('cost_value_percent');
+            const ptGris = toFiniteNumber(priceRow.gris_percent);
+            const ptTso = toFiniteNumber(priceRow.tso_percent);
+            const ptCostVal = toFiniteNumber(priceRow.cost_value_percent);
+            // Precedencia: Central > linha km > default
+            grisPercent = ruleGris ?? ptGris ?? 0.3;
+            tsoPercent = ruleTso ?? ptTso ?? 0.15;
+            costValuePercent = ruleCostVal ?? ptCostVal ?? 0.3;
 
             console.log(
               `[calculate-freight] NTC Lotação Dez/25 | Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, frete_peso: ${baseCost}`
@@ -422,6 +445,9 @@ Deno.serve(async (req) => {
           responseStatus = 'OUT_OF_RANGE';
           responseError = `Não existe faixa para ${kmBandUsed} km nessa tabela`;
           fallbacksApplied.push(`price_table_row: nenhuma faixa para ${kmBandUsed} km`);
+          grisPercent = resolveRulePercent('gris_percent') ?? 0.3;
+          tsoPercent = resolveRulePercent('tso_percent') ?? 0.15;
+          costValuePercent = resolveRulePercent('cost_value_percent') ?? 0.3;
         }
       }
     }

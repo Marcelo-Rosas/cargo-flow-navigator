@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Truck, Users, Search, Loader2 } from 'lucide-react';
 import {
@@ -19,6 +20,20 @@ export function GlobalSearchDialog() {
     clearSearch();
   };
 
+  const groupedResults = useMemo(() => {
+    return results.reduce(
+      (acc, result) => {
+        if (!result.type) return acc;
+        if (!acc[result.type]) {
+          acc[result.type] = [];
+        }
+        acc[result.type].push(result);
+        return acc;
+      },
+      {} as Record<SearchResult['type'], SearchResult[]>
+    );
+  }, [results]);
+
   const getIcon = (type: SearchResult['type']) => {
     switch (type) {
       case 'quote':
@@ -27,6 +42,8 @@ export function GlobalSearchDialog() {
         return <Truck className="w-4 h-4 text-green-500" />;
       case 'client':
         return <Users className="w-4 h-4 text-purple-500" />;
+      default:
+        return <Search className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -38,19 +55,10 @@ export function GlobalSearchDialog() {
         return 'Ordens de Serviço';
       case 'client':
         return 'Clientes';
+      default:
+        return 'Resultados';
     }
   };
-
-  const groupedResults = results.reduce(
-    (acc, result) => {
-      if (!acc[result.type]) {
-        acc[result.type] = [];
-      }
-      acc[result.type].push(result);
-      return acc;
-    },
-    {} as Record<SearchResult['type'], SearchResult[]>
-  );
 
   return (
     <CommandDialog open={isOpen} onOpenChange={setIsOpen}>
@@ -94,7 +102,9 @@ export function GlobalSearchDialog() {
                 {getIcon(result.type)}
                 <div className="flex flex-col">
                   <span className="font-medium">{result.title}</span>
-                  <span className="text-sm text-muted-foreground">{result.subtitle}</span>
+                  {result.subtitle && (
+                    <span className="text-sm text-muted-foreground">{result.subtitle}</span>
+                  )}
                 </div>
               </CommandItem>
             ))}

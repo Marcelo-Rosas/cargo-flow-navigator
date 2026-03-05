@@ -119,6 +119,9 @@ export interface FreightCalculationInput {
     markupScope?: MarkupScope;
     tdePercent?: number;
     tearPercent?: number;
+    grisPercent?: number;
+    tsoPercent?: number;
+    costValuePercent?: number;
   };
 
   // Custos diretos (valores fixos em R$ e/ou %)
@@ -138,7 +141,7 @@ export interface FreightCalculationInput {
       total: number;
       breakdown?: Record<string, number>;
     };
-    /** Itens de carga/descarga (tabela unloading_cost_rates) para persistir em meta */
+    /** Itens de carga/descarga (Central de Regras) para persistir em meta */
     unloadingCostItems?: Array<{
       id: string;
       name: string;
@@ -147,7 +150,7 @@ export interface FreightCalculationInput {
       unitValue: number;
       total: number;
     }>;
-    /** Itens de aluguel de máquinas (tabela equipment_rental_rates) para persistir em meta */
+    /** Itens de aluguel de máquinas (Central de Regras) para persistir em meta */
     equipmentRentalItems?: Array<{
       id: string;
       name: string;
@@ -496,6 +499,9 @@ function resolveParams(input: FreightCalculationInput) {
     markupScope: pp?.markupScope ?? ('BASE_ONLY' as MarkupScope),
     tdePercent: pp?.tdePercent ?? FREIGHT_CONSTANTS.NTC_TDE_PERCENT,
     tearPercent: pp?.tearPercent ?? FREIGHT_CONSTANTS.NTC_TEAR_PERCENT,
+    grisPercent: pp?.grisPercent ?? 0.3,
+    tsoPercent: pp?.tsoPercent ?? 0.15,
+    costValuePercent: pp?.costValuePercent ?? 0.3,
   };
 }
 
@@ -725,15 +731,28 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   }
 
   // ---- STEP 3: COMPONENTES PERCENTUAIS SOBRE VALOR DA CARGA ----
+  const toFiniteNumber = (value: unknown): number | undefined => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : undefined;
+  };
+  const centralGrisPercent = toFiniteNumber(params.grisPercent);
+  const centralTsoPercent = toFiniteNumber(params.tsoPercent);
+  const centralCostValuePercent = toFiniteNumber(params.costValuePercent);
+  const rowGrisPercent = toFiniteNumber(row.gris_percent);
+  const rowTsoPercent = toFiniteNumber(row.tso_percent);
+  const rowCostValuePercent = toFiniteNumber(row.cost_value_percent);
+
   let grisPercent: number;
-  const tsoPercent = Number(row.tso_percent) || 0;
-  const costValuePercent = Number(row.cost_value_percent) || 0;
+  const tsoPercent = centralTsoPercent ?? rowTsoPercent ?? 0.15;
+  const costValuePercent = centralCostValuePercent ?? rowCostValuePercent ?? 0.3;
 
   if (isLtl && input.ltlParams) {
-    // Fracionado: GRIS vem de ltl_parameters
-    grisPercent = input.ltlParams.grisPercent;
+    // Fracionado: Central > linha da tabela > ltl_parameters > default
+    grisPercent =
+      centralGrisPercent ?? rowGrisPercent ?? toFiniteNumber(input.ltlParams.grisPercent) ?? 0.3;
   } else {
-    grisPercent = Number(row.gris_percent) || 0;
+    // Lotacao: Central > linha da tabela > default
+    grisPercent = centralGrisPercent ?? rowGrisPercent ?? 0.3;
   }
 
   let gris = round2(input.cargoValue * (grisPercent / 100));
@@ -812,7 +831,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const regimeSimples = params.regimeSimplesNacional ?? true;
   const excessoSublimite = params.excessoSublimite ?? false;
 
-  const { totalCliente, receitaBruta, das, icms, regimeFiscal } = calculateGrossUpHibrido(
+  const { totalCliente, das, icms, regimeFiscal } = calculateGrossUpHibrido(
     custosDiretos,
     params.overheadPercent,
     params.dasPercent,
@@ -900,7 +919,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       markupScope: params.markupScope,
     },
     totals: {
-      receitaBruta: totalCliente,
+      receitaBruta: receitaLiquida,
       das,
       icms,
       totalImpostos,

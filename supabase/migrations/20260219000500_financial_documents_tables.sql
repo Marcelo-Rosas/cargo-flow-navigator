@@ -57,31 +57,32 @@ CREATE TRIGGER update_financial_installments_updated_at
 ALTER TABLE public.financial_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.financial_installments ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Authenticated users can view financial_documents"
-  ON public.financial_documents FOR SELECT
+CREATE POLICY "financial_documents_select_admin_finance" ON public.financial_documents
+  FOR SELECT
   TO authenticated
-  USING (true);
+  USING (public.has_profile(ARRAY['admin','financeiro']::public.user_profile[]));
 
-CREATE POLICY "Authenticated users can insert financial_documents"
-  ON public.financial_documents FOR INSERT
+CREATE POLICY "financial_documents_insert_admin_finance" ON public.financial_documents
+  FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (public.has_profile(ARRAY['admin','financeiro']::public.user_profile[]));
 
-CREATE POLICY "Authenticated users can update financial_documents"
-  ON public.financial_documents FOR UPDATE
+CREATE POLICY "financial_documents_update_admin_finance" ON public.financial_documents
+  FOR UPDATE
   TO authenticated
-  USING (true);
+  USING (public.has_profile(ARRAY['admin','financeiro']::public.user_profile[]))
+  WITH CHECK (public.has_profile(ARRAY['admin','financeiro']::public.user_profile[]));
 
-CREATE POLICY "Authenticated users can view financial_installments"
-  ON public.financial_installments FOR SELECT
+CREATE POLICY "financial_installments_select_admin_finance" ON public.financial_installments
+  FOR SELECT
   TO authenticated
-  USING (true);
+  USING (public.has_profile(ARRAY['admin','financeiro']::public.user_profile[]));
 
-CREATE POLICY "Authenticated users can manage financial_installments"
-  ON public.financial_installments FOR ALL
+CREATE POLICY "financial_installments_manage_admin_finance" ON public.financial_installments
+  FOR ALL
   TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (public.has_profile(ARRAY['admin','financeiro']::public.user_profile[]))
+  WITH CHECK (public.has_profile(ARRAY['admin','financeiro']::public.user_profile[]));
 
 -- ensure_financial_document RPC: idempotent create from quote (FAT) or order (PAG)
 CREATE OR REPLACE FUNCTION public.ensure_financial_document(

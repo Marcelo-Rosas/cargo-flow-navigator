@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useUnloadingCostRates } from '@/hooks/useUnloadingCostRates';
-import type { UnloadingCostRate } from '@/hooks/useUnloadingCostRates';
+import { usePricingRulesByCategory, type PricingRuleConfig } from '@/hooks/usePricingRules';
 
 export interface UnloadingCostItem {
   id: string;
+  ruleKey?: string;
+  legacyId?: string;
   name: string;
   code: string;
+  unit?: string;
   quantity: number;
   unitValue: number;
   total: number;
@@ -26,7 +28,7 @@ export function UnloadingCostSection({
   initialItems = [],
   readOnly = false,
 }: UnloadingCostSectionProps) {
-  const { data: rates, isLoading } = useUnloadingCostRates(true);
+  const { data: rates, isLoading } = usePricingRulesByCategory('carga_descarga', true);
 
   const [quantitiesByRate, setQuantitiesByRate] = useState<Map<string, number>>(new Map());
 
@@ -34,31 +36,55 @@ export function UnloadingCostSection({
     if (initialItems.length > 0) {
       const map = new Map<string, number>();
       for (const item of initialItems) {
-        if (item.quantity > 0) map.set(item.id, item.quantity);
+        if (item.quantity > 0) map.set(item.ruleKey ?? item.code ?? item.id, item.quantity);
       }
       setQuantitiesByRate(map);
     }
   }, [initialItems]);
 
-  const handleQuantityChange = (rate: UnloadingCostRate, qty: number) => {
+  const getRuleUnit = (rule: PricingRuleConfig) => {
+    const raw = (rule.metadata as { unit?: unknown } | null | undefined)?.unit;
+    return typeof raw === 'string' && raw.trim() ? raw : 'unidade';
+  };
+
+  const getRuleLegacyId = (rule: PricingRuleConfig) => {
+    const raw = (rule.metadata as { legacy_id?: unknown } | null | undefined)?.legacy_id;
+    return typeof raw === 'string' && raw.trim() ? raw : undefined;
+  };
+
+  const toSelectionKey = (rule: PricingRuleConfig) => rule.key;
+
+  const buildItems = (
+    allRules: PricingRuleConfig[],
+    quantities: Map<string, number>
+  ): UnloadingCostItem[] =>
+    allRules.map((rule) => {
+      const selectionKey = toSelectionKey(rule);
+      const q = quantities.get(selectionKey) ?? 0;
+      const unitValue = Number(rule.value) || 0;
+      const total = q * unitValue;
+      return {
+        id: selectionKey,
+        ruleKey: selectionKey,
+        legacyId: getRuleLegacyId(rule),
+        name: rule.label,
+        code: rule.key,
+        unit: getRuleUnit(rule),
+        quantity: q,
+        unitValue,
+        total,
+      };
+    });
+
+  const handleQuantityChange = (rate: PricingRuleConfig, qty: number) => {
     if (!rates) return;
+    const selectionKey = toSelectionKey(rate);
     setQuantitiesByRate((prev) => {
       const next = new Map(prev);
-      if (qty > 0) next.set(rate.id, qty);
-      else next.delete(rate.id);
+      if (qty > 0) next.set(selectionKey, qty);
+      else next.delete(selectionKey);
 
-      const items: UnloadingCostItem[] = rates.map((r) => {
-        const q = next.get(r.id) ?? 0;
-        const total = q * r.value;
-        return {
-          id: r.id,
-          name: r.name,
-          code: r.code,
-          quantity: q,
-          unitValue: r.value,
-          total,
-        };
-      });
+      const items = buildItems(rates, next);
       const total = items.reduce((s, i) => s + i.total, 0);
       onChange(
         total,
@@ -70,9 +96,9 @@ export function UnloadingCostSection({
 
   const computedTotal = useMemo(() => {
     if (!rates) return 0;
-    return rates.reduce((s, r) => {
-      const q = quantitiesByRate.get(r.id) ?? 0;
-      return s + q * r.value;
+    return rates.reduce((s, rule) => {
+      const q = quantitiesByRate.get(toSelectionKey(rule)) ?? 0;
+      return s + q * (Number(rule.value) || 0);
     }, 0);
   }, [rates, quantitiesByRate]);
 
@@ -92,16 +118,19 @@ export function UnloadingCostSection({
       <Label>Carga e Descarga</Label>
       <div className="rounded-md border divide-y">
         {rates.map((rate) => {
-          const qty = quantitiesByRate.get(rate.id) ?? 0;
-          const lineTotal = qty * rate.value;
+          const selectionKey = toSelectionKey(rate);
+          const unitValue = Number(rate.value) || 0;
+          const unit = getRuleUnit(rate);
+          const qty = quantitiesByRate.get(selectionKey) ?? 0;
+          const lineTotal = qty * unitValue;
           return (
             <div
-              key={rate.id}
+              key={selectionKey}
               className="flex items-center gap-3 px-3 py-2 bg-background hover:bg-muted/30"
             >
-              <span className="flex-1 text-sm truncate">{rate.name}</span>
+              <span className="flex-1 text-sm truncate">{rate.label}</span>
               <span className="text-sm text-muted-foreground tabular-nums">
-                R$ {rate.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / {rate.unit}
+                R$ {unitValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / {unit}
               </span>
               <div className="w-20">
                 <Input
