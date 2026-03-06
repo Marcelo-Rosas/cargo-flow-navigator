@@ -1,0 +1,15 @@
+[
+  {
+    "id": "row-1",
+    "price_table_id": "table-1",
+    "km_from": 0,
+    "km_to": 500,
+    "cost_per_ton": 120,
+    "cost_per_kg": 0,
+    "gris_percent": 0.3,
+    "tso_percent": 0.15,
+    "cost_value_percent": 0.3,
+    "weight_rate_above_200": 250,
+    "km_min": 0
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "id": "shipper-1",
+    "name": "Embarcador Teste",
+    "email": "embarcador@teste.com",
+    "zip_code": "12345000"
+  }
+]

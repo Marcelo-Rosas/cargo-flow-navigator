@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
+import { cardQueryKey } from '@/lib/card-mapping';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -44,6 +45,7 @@ export interface OrderWithOccurrences extends Order {
         | 'freight_type'
         | 'km_distance'
         | 'vehicle_type_id'
+        | 'pricing_breakdown'
       > & {
         vehicle_type?: {
           axes_count: number | null;
@@ -81,6 +83,7 @@ export function useOrders() {
             freight_type,
             km_distance,
             vehicle_type_id,
+            pricing_breakdown,
             vehicle_type:vehicle_types (
               axes_count,
               code,
@@ -124,6 +127,7 @@ export function useOrder(id: string) {
             freight_type,
             km_distance,
             vehicle_type_id,
+            pricing_breakdown,
             vehicle_type:vehicle_types (
               axes_count,
               code,
@@ -161,6 +165,7 @@ export function useCreateOrder() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
     },
   });
 }
@@ -180,9 +185,10 @@ export function useUpdateOrder() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: cardQueryKey(null, id) });
     },
   });
 }
@@ -202,8 +208,10 @@ export function useUpdateOrderStage() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: cardQueryKey(null, id) });
     },
   });
 }
@@ -217,8 +225,10 @@ export function useDeleteOrder() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: cardQueryKey(null, id) });
     },
   });
 }
@@ -305,9 +315,14 @@ export function useConvertQuoteToOrder() {
 
       return order;
     },
-    onSuccess: () => {
+    onSuccess: (order, quoteId) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: cardQueryKey(quoteId, null) });
+      if (order?.id) {
+        queryClient.invalidateQueries({ queryKey: cardQueryKey(quoteId, order.id) });
+      }
     },
   });
 }

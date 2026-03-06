@@ -1,10 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   DragStartEvent,
-  closestCenter,
+  pointerWithin,
   PointerSensor,
   useSensor,
   useSensors,
@@ -46,6 +47,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
+import { findContainer, moveItem, type ItemsState } from '@/lib/kanban-dnd';
 import { toast } from 'sonner';
 import { OrderForm } from '@/components/forms/OrderForm';
 import { OrderDetailModal } from '@/components/modals/OrderDetailModal';
@@ -109,7 +111,7 @@ export default function Operations() {
   const { data: orders, isLoading, isError, error, refetch } = useOrders();
   const updateStageMutation = useUpdateOrderStage();
   const deleteOrderMutation = useDeleteOrder();
-  const [activeOrder, setActiveOrder] = useState<OrderWithOccurrences | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -246,8 +248,10 @@ export default function Operations() {
     sortDir,
   ]);
 
-  const ordersByStage = useMemo(() => {
-    const grouped: Record<OrderStage, OrderWithOccurrences[]> = {
+  type OrderItemsState = ItemsState<OrderWithOccurrences>;
+
+  const buildItemsState = useCallback((source: OrderWithOccurrences[]): OrderItemsState => {
+    const base: OrderItemsState = {
       ordem_criada: [],
       busca_motorista: [],
       documentacao: [],
@@ -255,49 +259,122 @@ export default function Operations() {
       em_transito: [],
       entregue: [],
     };
-
-    filteredOrders.forEach((order) => {
-      grouped[order.stage].push(order);
-    });
-
-    return grouped;
-  }, [filteredOrders]);
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const order = orders?.find((o) => o.id === event.active.id);
-    if (order) setActiveOrder(order);
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    if (!canManageOperations) {
-      toast.error('Seu perfil é somente leitura para alterações');
-      setActiveOrder(null);
-      return;
+    for (const order of source) {
+      base[order.stage]?.push(order);
     }
+    return base;
+  }, []);
 
+  const [items, setItems] = useState<OrderItemsState>(() => buildItemsState(filteredOrders));
+
+  // Snapshot taken at drag-start for rollback if the mutation fails.
+  const snapshotRef = useRef<OrderItemsState | null>(null);
+
+  // Prevents jitter when a card crosses a container boundary rapidly.
+  const recentlyMovedToNewContainer = useRef(false);
+
+  // Keep local items in sync with filters while no drag is active.
+  useEffect(() => {
+    if (activeId) return;
+    setItems(buildItemsState(filteredOrders));
+  }, [filteredOrders, buildItemsState, activeId]);
+
+  const activeOrder = useMemo(
+    () => (activeId ? (orders?.find((o) => o.id === activeId) ?? null) : null),
+    [activeId, orders]
+  );
+
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const id = String(event.active.id);
+      setActiveId(id);
+      snapshotRef.current = items;
+    },
+    [items]
+  );
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
     const { active, over } = event;
-    setActiveOrder(null);
+    if (!over) return;
 
-    if (!over || !orders) return;
+    setItems((previous) => {
+      const next = moveItem(previous, active.id, over.id);
+      if (!next) return previous;
 
-    const activeOrder = orders.find((o) => o.id === active.id);
-    if (!activeOrder) return;
+      const fromContainer = findContainer(previous, active.id);
+      const toContainer = findContainer(next, active.id);
 
-    // Check if dropped on a column
-    const targetStage = ORDER_STAGES.find((s) => s.id === over.id);
-    if (targetStage && targetStage.id !== activeOrder.stage) {
+      if (fromContainer && toContainer && fromContainer !== toContainer) {
+        if (recentlyMovedToNewContainer.current) {
+          return previous;
+        }
+        recentlyMovedToNewContainer.current = true;
+        requestAnimationFrame(() => {
+          recentlyMovedToNewContainer.current = false;
+        });
+      }
+
+      return next;
+    });
+  }, []);
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveId(null);
+
+      if (!over) {
+        if (snapshotRef.current) {
+          setItems(snapshotRef.current);
+          snapshotRef.current = null;
+        }
+        return;
+      }
+
+      const activeIdStr = String(active.id);
+      const previous = snapshotRef.current ?? items;
+      const fromContainer = findContainer(previous, activeIdStr) as OrderStage | null;
+      const toContainer = findContainer(items, activeIdStr) as OrderStage | null;
+
+      if (!fromContainer || !toContainer || fromContainer === toContainer) {
+        snapshotRef.current = null;
+        return;
+      }
+
+      const fullOrder = orders?.find((o) => o.id === activeIdStr);
+      if (!fullOrder) {
+        snapshotRef.current = null;
+        return;
+      }
+
+      if (!canManageOperations) {
+        toast.error('Seu perfil é somente leitura para alterações');
+        if (snapshotRef.current) {
+          setItems(snapshotRef.current);
+        }
+        snapshotRef.current = null;
+        return;
+      }
+
+      const targetStage = toContainer;
+      const targetMeta = ORDER_STAGES.find((s) => s.id === targetStage);
+
       // Validate stage transition (can't skip to entregue without POD)
-      if (targetStage.id === 'entregue' && !activeOrder.has_pod) {
+      if (targetStage === 'entregue' && !fullOrder.has_pod) {
         toast.error('É necessário anexar o comprovante de entrega (POD) antes de finalizar');
+        if (snapshotRef.current) {
+          setItems(snapshotRef.current);
+        }
+        snapshotRef.current = null;
         return;
       }
 
       try {
         await updateStageMutation.mutateAsync({
-          id: activeOrder.id,
-          stage: targetStage.id,
+          id: fullOrder.id,
+          stage: targetStage,
         });
-        toast.success(`OS movida para ${targetStage.label}`);
+        toast.success(`OS movida para ${targetMeta?.label ?? targetStage}`);
       } catch (error: unknown) {
         const msg = (error instanceof Error ? error.message : String(error)).toString();
         if (
@@ -305,42 +382,19 @@ export default function Operations() {
           msg.toLowerCase().includes('pod obrigatorio')
         ) {
           toast.error('Anexe o comprovante de entrega (POD) antes de finalizar');
-          return;
+        } else {
+          toast.error('Erro ao mover OS');
         }
-        toast.error('Erro ao mover OS');
-      }
-      return;
-    }
 
-    // Check if dropped on another card
-    const overOrder = orders.find((o) => o.id === over.id);
-    if (overOrder && activeOrder.stage !== overOrder.stage) {
-      if (overOrder.stage === 'entregue' && !activeOrder.has_pod) {
-        toast.error('É necessário anexar o comprovante de entrega (POD) antes de finalizar');
-        return;
-      }
-
-      try {
-        await updateStageMutation.mutateAsync({
-          id: activeOrder.id,
-          stage: overOrder.stage,
-        });
-        toast.success(
-          `OS movida para ${ORDER_STAGES.find((s) => s.id === overOrder.stage)?.label}`
-        );
-      } catch (error: unknown) {
-        const msg = (error instanceof Error ? error.message : String(error)).toString();
-        if (
-          msg.toLowerCase().includes('pod obrigatório') ||
-          msg.toLowerCase().includes('pod obrigatorio')
-        ) {
-          toast.error('Anexe o comprovante de entrega (POD) antes de finalizar');
-          return;
+        if (snapshotRef.current) {
+          setItems(snapshotRef.current);
         }
-        toast.error('Erro ao mover OS');
+      } finally {
+        snapshotRef.current = null;
       }
-    }
-  };
+    },
+    [canManageOperations, items, orders, updateStageMutation]
+  );
 
   const handleConfirmCancelOrder = async () => {
     if (!cancelOrder) return;
@@ -570,36 +624,40 @@ export default function Operations() {
           {viewMode === 'kanban' && (
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCenter}
+              collisionDetection={pointerWithin}
               onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
               onDragEnd={handleDragEnd}
             >
               <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
-                {ORDER_STAGES.map((stage) => (
-                  <KanbanColumn
-                    key={stage.id}
-                    id={stage.id}
-                    title={stage.label}
-                    count={ordersByStage[stage.id].length}
-                    color={stageColors[stage.id]}
-                    items={ordersByStage[stage.id].map((o) => o.id)}
-                  >
-                    {ordersByStage[stage.id].map((order) => (
-                      <OrderCard
-                        key={order.id}
-                        order={order}
-                        onEdit={() => setSelectedOrder(order)}
-                        onRegisterOccurrence={
-                          canManageOperations ? () => setOccurrenceOrder(order) : undefined
-                        }
-                        onCancelOrder={
-                          canManageOperations ? () => setCancelOrder(order) : undefined
-                        }
-                        canManageActions={canManageOperations}
-                      />
-                    ))}
-                  </KanbanColumn>
-                ))}
+                {ORDER_STAGES.map((stage) => {
+                  const columnItems = items[stage.id] ?? [];
+                  return (
+                    <KanbanColumn
+                      key={stage.id}
+                      id={stage.id}
+                      title={stage.label}
+                      count={columnItems.length}
+                      color={stageColors[stage.id]}
+                      items={columnItems.map((o) => o.id)}
+                    >
+                      {columnItems.map((order) => (
+                        <OrderCard
+                          key={order.id}
+                          order={order}
+                          onEdit={() => setSelectedOrder(order)}
+                          onRegisterOccurrence={
+                            canManageOperations ? () => setOccurrenceOrder(order) : undefined
+                          }
+                          onCancelOrder={
+                            canManageOperations ? () => setCancelOrder(order) : undefined
+                          }
+                          canManageActions={canManageOperations}
+                        />
+                      ))}
+                    </KanbanColumn>
+                  );
+                })}
               </div>
 
               <DragOverlay>

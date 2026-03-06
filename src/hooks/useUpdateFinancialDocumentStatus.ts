@@ -17,6 +17,7 @@ export function useUpdateFinancialDocumentStatus() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['card'] });
     },
   });
 }

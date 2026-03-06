@@ -23,6 +23,7 @@ import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import type { AdditionalFeesSelection } from '@/components/quotes/AdditionalFeesSection';
 import type { EquipmentRentalItem } from '@/components/quotes/EquipmentRentalSection';
 import type { UnloadingCostItem } from '@/components/quotes/UnloadingCostSection';
+import type { Database } from '@/integrations/supabase/types';
 
 const STEPS = [
   { id: 'identification', label: 'Identificação' },
@@ -86,6 +87,8 @@ interface QuoteFormWizardProps {
   vehicleTypeName: string;
   clientName: string;
   shipperName: string;
+  priceTableRow: Database['public']['Tables']['price_table_rows']['Row'] | null;
+  isLoadingPriceRow: boolean;
 }
 
 export function QuoteFormWizard({
@@ -124,6 +127,8 @@ export function QuoteFormWizard({
   vehicleTypeName,
   clientName,
   shipperName,
+  priceTableRow,
+  isLoadingPriceRow,
 }: QuoteFormWizardProps) {
   const [step, setStep] = useState(0);
   const canNext = step < STEPS.length - 1;
@@ -143,8 +148,37 @@ export function QuoteFormWizard({
   };
 
   const handleSubmitClick = () => {
+    if (!canSubmit) return;
     form.handleSubmit(onSubmit)();
   };
+
+  const status = calculationResult?.status ?? 'MISSING_DATA';
+  const isStatusInvalid = status !== 'OK';
+  const canSubmit =
+    !isLoading &&
+    !isLoadingPriceRow &&
+    !isCalculationStale &&
+    !isStatusInvalid &&
+    !!priceTableRow &&
+    !!calculationResult;
+
+  let blockedReason: string | null = null;
+  if (!calculationResult) {
+    blockedReason = 'Aguardando o cálculo do frete...';
+  } else if (isLoading) {
+    blockedReason = 'Salvando...';
+  } else if (status === 'OUT_OF_RANGE') {
+    blockedReason = calculationResult?.error || 'Verifique a faixa de km da tabela selecionada.';
+  } else if (status === 'MISSING_DATA') {
+    blockedReason =
+      calculationResult?.error || 'Selecione a tabela de preços e verifique suas faixas.';
+  } else if (isCalculationStale) {
+    blockedReason = 'Há alterações pendentes de cálculo. Execute novamente antes de salvar.';
+  } else if (isLoadingPriceRow) {
+    blockedReason = 'Aguardando carregamento da tabela de preços...';
+  } else if (!priceTableRow) {
+    blockedReason = 'Escolha a faixa correta de km para habilitar o envio.';
+  }
 
   return (
     <div className="space-y-6">
@@ -232,6 +266,16 @@ export function QuoteFormWizard({
 
       {/* Footer */}
       <div className="flex justify-between pt-4 border-t">
+        {!canNext && blockedReason && (
+          <p
+            role="status"
+            aria-live="polite"
+            data-testid="wizard-blocked-reason"
+            className="text-xs text-warning-foreground max-w-[360px] leading-tight"
+          >
+            {blockedReason}
+          </p>
+        )}
         <div>
           {isEditing && onDelete && (
             <AlertDialog>
@@ -278,7 +322,12 @@ export function QuoteFormWizard({
               <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           ) : (
-            <Button type="button" onClick={handleSubmitClick} disabled={isLoading}>
+            <Button
+              type="button"
+              data-testid="wizard-submit"
+              onClick={handleSubmitClick}
+              disabled={!canSubmit}
+            >
               {isLoading ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar Cotação'}
             </Button>
           )}

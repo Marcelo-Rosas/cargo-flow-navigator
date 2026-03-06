@@ -1,0 +1,65 @@
+{
+  "success": true,
+  "status": "OK",
+  "error": null,
+  "meta": {
+    "route_uf_label": "SP / RJ",
+    "km_band_label": "0-500",
+    "km_status": "OK",
+    "margin_status": "AT_TARGET",
+    "margin_percent": 15,
+    "cubage_factor": 1.1,
+    "cubage_weight_kg": 950,
+    "billable_weight_kg": 1000,
+    "km_band_used": "0-500",
+    "price_table_row_id": "row-1"
+  },
+  "components": {
+    "base_cost": 6000,
+    "base_freight": 6000,
+    "toll": 200,
+    "gris": 100,
+    "tso": 80,
+    "rctrc": 50,
+    "ad_valorem": 30,
+    "tde": 25,
+    "tear": 15,
+    "dispatch_fee": 20,
+    "conditional_fees_total": 0,
+    "waiting_time_cost": 0,
+    "das_provision": 0,
+    "aluguel_maquinas": 0
+  },
+  "rates": {
+    "das_percent": 14,
+    "icms_percent": 0,
+    "gris_percent": 0.3,
+    "tso_percent": 0.25,
+    "cost_value_percent": 0.3,
+    "markup_percent": 30,
+    "overhead_percent": 15,
+    "tac_percent": 0,
+    "payment_adjustment_percent": 0
+  },
+  "totals": {
+    "receita_bruta": 10000,
+    "das": 140,
+    "icms": 0,
+    "tac_adjustment": 0,
+    "payment_adjustment": 0,
+    "total_impostos": 140,
+    "total_cliente": 10000
+  },
+  "profitability": {
+    "custos_carreteiro": 2500,
+    "custos_descarga": 200,
+    "custos_diretos": 2700,
+    "margem_bruta": 4000,
+    "overhead": 500,
+    "resultado_liquido": 3500,
+    "margem_percent": 35
+  },
+  "conditional_fees_breakdown": {},
+  "fallbacks_applied": [],
+  "errors": []
+}

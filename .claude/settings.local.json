@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(supabase functions:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(node -e \":*)"
     ]
   },
   "hooks": {

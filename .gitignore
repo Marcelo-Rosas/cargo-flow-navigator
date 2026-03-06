@@ -35,6 +35,7 @@ supabase/functions/**/deno.lock
 APIs/
 *.env
 *.env.*
+*.env.e2e
 *_keys.txt
 debug-*.mjs
 tmp/

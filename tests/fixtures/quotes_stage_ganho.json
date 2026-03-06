@@ -1,0 +1,41 @@
+[
+  {
+    "id": "quote-test-1",
+    "quote_code": "QT-TEST",
+    "client_name": "Cliente Teste",
+    "origin": "São Paulo, SP",
+    "destination": "Rio de Janeiro, RJ",
+    "stage": "ganho",
+    "value": 10000,
+    "created_at": "2026-03-05T12:00:00.000Z",
+    "updated_at": "2026-03-05T12:00:00.000Z",
+    "price_table_id": "table-1",
+    "vehicle_type_id": "vehicle-1",
+    "payment_term_id": "term-50",
+    "pricing_breakdown": {
+      "meta": {
+        "routeUfLabel": "SP / RJ",
+        "kmBandLabel": "0-500",
+        "marginStatus": "AT_TARGET",
+        "antt": {
+          "total": 100,
+          "operationTable": "A",
+          "cargoType": "carga_geral",
+          "axesCount": 2,
+          "kmDistance": 100,
+          "ccd": 2.5,
+          "cc": 30,
+          "ida": 280,
+          "calculatedAt": "2026-03-05T12:00:00.000Z"
+        }
+      },
+      "components": {
+        "baseCost": 1000,
+        "baseFreight": 1000
+      },
+      "totals": {
+        "totalCliente": 10000
+      }
+    }
+  }
+]

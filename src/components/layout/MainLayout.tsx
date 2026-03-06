@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
+import { LayoutProvider, useLayout } from './LayoutContext';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 
@@ -7,11 +8,16 @@ interface MainLayoutProps {
   children: ReactNode;
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
+function MainLayoutInner({ children }: MainLayoutProps) {
+  const { sidebarWidth } = useLayout();
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      <div className="pl-[72px] md:pl-64 transition-all duration-200">
+      <div
+        className="transition-[padding] duration-200 ease-[cubic-bezier(0.22,0.9,0.32,1)]"
+        style={{ paddingLeft: sidebarWidth }}
+        data-testid="main-content"
+      >
         <Topbar />
         <motion.main
           className="p-6"
@@ -23,5 +29,13 @@ export function MainLayout({ children }: MainLayoutProps) {
         </motion.main>
       </div>
     </div>
+  );
+}
+
+export function MainLayout({ children }: MainLayoutProps) {
+  return (
+    <LayoutProvider>
+      <MainLayoutInner>{children}</MainLayoutInner>
+    </LayoutProvider>
   );
 }

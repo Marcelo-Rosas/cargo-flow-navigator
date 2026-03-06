@@ -8,6 +8,9 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "npm run lint:types && npm run lint:eslint",
+    "validate": "bash scripts/validate.sh",
+    "validate:ci": "npm run lint && npm run build && npm run test:e2e",
+    "validate:ui": "npm run test:e2e:ui",
     "format": "prettier --write src/",
     "preview": "vite preview",
     "prepare": "husky",
@@ -19,7 +22,10 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:local": "cross-env PW_BASE_URL=http://localhost:4173 playwright test",
     "test:e2e:report": "playwright show-report",
-    "test:e2e:codegen": "playwright codegen https://cargo-flow-navigator.vercel.app"
+    "test:e2e:codegen": "playwright codegen https://cargo-flow-navigator.vercel.app",
+    "test:e2e:auth": "npx playwright test --project=chromium-auth",
+    "test:e2e:mocks": "npx playwright test tests/e2e/quote-*.spec.ts --project=chromium-mocks",
+    "test:e2e:seeded": "npx playwright test tests/e2e/flows/*.seeded.spec.ts --project=chromium-auth"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

@@ -108,13 +108,14 @@ export function OrderCard({
   return (
     <motion.div
       ref={setNodeRef}
+      data-testid={`order-card-${order.id}`}
       style={style}
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className={cn(
-        'bg-card rounded-lg border shadow-sm p-4 cursor-pointer group',
-        'hover:shadow-md hover:border-primary/40 transition-all duration-200',
+        'bg-card rounded-lg border border-border shadow-card p-4 cursor-pointer group',
+        'hover:shadow-card-hover hover:border-primary/30 transition-all duration-200',
         isDragging && 'opacity-90 rotate-1 scale-[1.02] shadow-xl z-50',
         hasOccurrences && 'border-l-4 border-l-warning',
         hasPendingDocs && hasDocumentsToShow && 'border-l-4 border-l-amber-400',
@@ -129,6 +130,7 @@ export function OrderCard({
             <button
               {...attributes}
               {...listeners}
+              data-testid={`order-card-drag-handle-${order.id}`}
               className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => e.stopPropagation()}
             >

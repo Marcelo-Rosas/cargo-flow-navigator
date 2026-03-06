@@ -73,6 +73,8 @@ Acesse `http://localhost:5173`.
 | `npm run build:dev` | Build em modo development              |
 | `npm run preview`   | Preview do build local                  |
 | `npm run lint`      | ESLint                                  |
+| `npm run test:e2e:auth` | Playwright com autenticação         |
+| `npm run test:e2e:mocks` | Specs determinísticas com mocks    |
 
 ## Estrutura de pastas (resumida)
 
@@ -114,3 +116,29 @@ Acesse `http://localhost:5173`.
 ## Contribuição
 
 Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para padrões de código e fluxo de contribuição.
+
+## Testes Playwright
+
+- ### Testes com autenticação (storageState)
+  1. Copie `.env.example` para `.env`:
+     ```bash
+     cp .env.example .env
+     ```
+  2. Defina `PW_TEST_USER` e `PW_TEST_PASSWORD` (credenciais reais).
+  3. Gere o storage state:
+     ```bash
+     npx playwright test --project=setup
+     ```
+  4. Rode as specs que exigem autenticação:
+     ```bash
+     npx playwright test --project=chromium-auth
+     ```
+  > **Windows/PowerShell:** use flags com `--project=chromium-auth` (nunca `\--project\=...`).
+
+- ### Testes determinísticos (mocks)
+  ```bash
+  npx playwright test tests/e2e/quote-wizard-gating.spec.ts --project=chromium
+  npx playwright test tests/e2e/quote-advance-race.spec.ts --project=chromium
+  ```
+
+Esses comandos usam mocks determinísticos e não dependem do `setup/auth`. Utilize `npm run test:e2e:mocks` para executar ambos de uma vez.

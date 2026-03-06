@@ -1355,6 +1355,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   shippers?.find((s) => s.id === form.watch('shipper_id'))?.name ||
                   '—'
                 }
+                priceTableRow={priceTableRow}
+                isLoadingPriceRow={isLoadingPriceRow}
               />
             ) : (
               <>

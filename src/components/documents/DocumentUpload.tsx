@@ -104,6 +104,7 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'analise_gr', label: 'Análise GR (Gerenciamento de Risco)' },
     { value: 'doc_rota', label: 'Documento de Rota' },
     { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
+    { value: 'pod', label: 'Canhoto (POD)' },
     { value: 'outros', label: 'Outros' },
   ],
   entregue: [
@@ -117,6 +118,7 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
     { value: 'analise_gr', label: 'Análise GR (Gerenciamento de Risco)' },
     { value: 'doc_rota', label: 'Documento de Rota' },
     { value: 'comprovante_vpo', label: 'Comprovante VPO (Vale-Pedágio)' },
+    { value: 'pod', label: 'Canhoto (POD)' },
     { value: 'outros', label: 'Outros' },
   ],
 };

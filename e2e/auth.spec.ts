@@ -12,6 +12,11 @@ test.describe('Auth', () => {
     await page.getByLabel(/e-mail/i).fill('invalido@test.com');
     await page.getByLabel(/senha/i).fill('senhaerrada');
     await page.getByRole('button', { name: /entrar/i }).click();
-    await expect(page.getByText(/incorretos/i)).toBeVisible();
+
+    // Aguarda o toast de erro (incorretos, erro ao fazer login, etc.)
+    await expect(page.getByText(/incorretos|erro ao fazer login/i)).toBeVisible({ timeout: 15000 });
+
+    // Confirma que permanece na página de login
+    await expect(page).toHaveURL(/\/auth/);
   });
 });

@@ -28,6 +28,7 @@ export function useEnsureFinancialDocument() {
         qc.invalidateQueries({ queryKey: ['financial-kanban'] }),
         qc.invalidateQueries({ queryKey: ['quotes'] }),
         qc.invalidateQueries({ queryKey: ['orders'] }),
+        qc.invalidateQueries({ queryKey: ['card'] }),
       ]);
     },
   });

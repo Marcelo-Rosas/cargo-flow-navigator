@@ -39,7 +39,7 @@ import { DriverQualificationPanel } from '@/components/operational/DriverQualifi
 import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
 import { useVehicleByPlate } from '@/hooks/useVehicles';
-import { useUpdateOrder } from '@/hooks/useOrders';
+import { useUpdateOrder, type OrderWithOccurrences } from '@/hooks/useOrders';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEnsureFinancialDocument } from '@/hooks/useEnsureFinancialDocument';
 import { useTripsForOrder, useLinkOrderToTrip } from '@/hooks/useTrips';
@@ -61,47 +61,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 
-type Order = Database['public']['Tables']['orders']['Row'];
-type Occurrence = Database['public']['Tables']['occurrences']['Row'];
-type Quote = Database['public']['Tables']['quotes']['Row'];
 type OrderStage = Database['public']['Enums']['order_stage'];
-
-interface OrderWithOccurrences extends Order {
-  occurrences: Occurrence[];
-  price_table?: { name: string } | null;
-  vehicle_type?: { name: string; code: string; axes_count: number | null } | null;
-  payment_term?: {
-    name: string;
-    code: string;
-    adjustment_percent: number;
-    advance_percent: number | null;
-    days: number | null;
-  } | null;
-  quote?:
-    | (Pick<
-        Quote,
-        | 'id'
-        | 'shipper_name'
-        | 'shipper_id'
-        | 'client_name'
-        | 'client_id'
-        | 'origin'
-        | 'origin_cep'
-        | 'destination'
-        | 'destination_cep'
-        | 'freight_type'
-        | 'km_distance'
-        | 'vehicle_type_id'
-        | 'pricing_breakdown'
-      > & {
-        vehicle_type?: {
-          axes_count: number | null;
-          code: string;
-          name: string;
-        } | null;
-      })
-    | null;
-}
 
 interface OrderDetailModalProps {
   open: boolean;

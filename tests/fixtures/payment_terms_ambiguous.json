@@ -1,0 +1,16 @@
+[
+  {
+    "id": "term-amb-1",
+    "code": "AMB1",
+    "name": "Ambíguo A",
+    "advance_percent": 50,
+    "active": true
+  },
+  {
+    "id": "term-amb-2",
+    "code": "AMB2",
+    "name": "Ambíguo B",
+    "advance_percent": 50,
+    "active": true
+  }
+]

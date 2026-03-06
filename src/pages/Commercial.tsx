@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -23,6 +23,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
+import { findContainer, moveItem, type ItemsState } from '@/lib/kanban-dnd';
 import { toast } from 'sonner';
 import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
@@ -47,14 +48,41 @@ export default function Commercial() {
   const { canWrite } = useUserRole();
   const { data: quotes, isLoading, isError, error, refetch } = useQuotes();
   const updateStageMutation = useUpdateQuoteStage();
-  const [activeQuote, setActiveQuote] = useState<Quote | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
   const [emailingQuote, setEmailingQuote] = useState<Quote | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
-  const [overStage, setOverStage] = useState<QuoteStage | null>(null);
   const canManageCommercial = canWrite;
+
+  type QuoteItemsState = ItemsState<Quote>;
+
+  // Canonical Kanban state: quotes grouped by stage with stable ordering.
+  const buildItemsState = useCallback((source: Quote[] | undefined): QuoteItemsState => {
+    const base: QuoteItemsState = {
+      novo_pedido: [],
+      qualificacao: [],
+      precificacao: [],
+      enviado: [],
+      negociacao: [],
+      ganho: [],
+      perdido: [],
+    };
+    if (!source) return base;
+    for (const quote of source) {
+      base[quote.stage]?.push(quote);
+    }
+    return base;
+  }, []);
+
+  const [items, setItems] = useState<QuoteItemsState>(() => buildItemsState(quotes));
+
+  // Snapshot for rollback on mutation error.
+  const snapshotRef = useRef<QuoteItemsState | null>(null);
+
+  // Guard to prevent jitter when crossing containers quickly.
+  const recentlyMovedToNewContainer = useRef(false);
 
   // Sincroniza selectedQuote com o cache quando quotes atualiza (após save/edit)
   useEffect(() => {
@@ -88,111 +116,124 @@ export default function Commercial() {
     );
   }, [quotes, searchTerm]);
 
-  const quotesByStage = useMemo(() => {
-    const grouped: Record<QuoteStage, Quote[]> = {
-      novo_pedido: [],
-      qualificacao: [],
-      precificacao: [],
-      enviado: [],
-      negociacao: [],
-      ganho: [],
-      perdido: [],
-    };
+  // Sync local Kanban items whenever the filtered list changes,
+  // but never clobber the optimistic state while a drag is active.
+  useEffect(() => {
+    if (activeId) return;
+    setItems(buildItemsState(filteredQuotes));
+  }, [filteredQuotes, buildItemsState, activeId]);
 
-    filteredQuotes.forEach((quote) => {
-      grouped[quote.stage].push(quote);
+  const activeQuote = useMemo(
+    () => (activeId ? (quotes?.find((q) => q.id === activeId) ?? null) : null),
+    [activeId, quotes]
+  );
+
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const id = String(event.active.id);
+      setActiveId(id);
+      snapshotRef.current = items;
+    },
+    [items]
+  );
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    setItems((previous) => {
+      const next = moveItem(previous, active.id, over.id);
+      if (!next) return previous;
+
+      const fromContainer = findContainer(previous, active.id);
+      const toContainer = findContainer(next, active.id);
+
+      if (fromContainer && toContainer && fromContainer !== toContainer) {
+        if (recentlyMovedToNewContainer.current) {
+          return previous;
+        }
+        recentlyMovedToNewContainer.current = true;
+        requestAnimationFrame(() => {
+          recentlyMovedToNewContainer.current = false;
+        });
+      }
+
+      return next;
     });
+  }, []);
 
-    return grouped;
-  }, [filteredQuotes]);
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveId(null);
 
-  const displayQuotesByStage = useMemo(() => {
-    if (!activeQuote || !overStage || overStage === activeQuote.stage) {
-      return quotesByStage;
-    }
-    const result = { ...quotesByStage };
-    result[activeQuote.stage] = result[activeQuote.stage].filter((q) => q.id !== activeQuote.id);
-    result[overStage] = [...result[overStage], activeQuote];
-    return result;
-  }, [quotesByStage, activeQuote, overStage]);
+      if (!over) {
+        // Dropped outside any droppable — rollback to snapshot if we have one.
+        if (snapshotRef.current) {
+          setItems(snapshotRef.current);
+          snapshotRef.current = null;
+        }
+        return;
+      }
 
-  const handleDragStart = (event: DragStartEvent) => {
-    const quote = quotes?.find((q) => q.id === event.active.id);
-    if (quote) setActiveQuote(quote);
-    setOverStage(null);
-  };
+      const activeIdStr = String(active.id);
+      const previous = snapshotRef.current ?? items;
+      const fromContainer = findContainer(previous, activeIdStr) as QuoteStage | null;
+      const toContainer = findContainer(items, activeIdStr) as QuoteStage | null;
 
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over || !quotes) {
-      setOverStage(null);
-      return;
-    }
-    const activeQuote = quotes.find((q) => q.id === active.id);
-    if (!activeQuote) return;
+      if (!fromContainer || !toContainer || fromContainer === toContainer) {
+        snapshotRef.current = null;
+        return;
+      }
 
-    const targetStage =
-      (QUOTE_STAGES.find((s) => s.id === over.id)?.id as QuoteStage) ??
-      (quotes.find((q) => q.id === over.id)?.stage as QuoteStage | undefined);
-    if (targetStage && targetStage !== activeQuote.stage) {
-      setOverStage(targetStage);
-    } else {
-      setOverStage(null);
-    }
-  };
+      const fullQuote = quotes?.find((q) => q.id === activeIdStr);
+      if (!fullQuote) {
+        snapshotRef.current = null;
+        return;
+      }
 
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveQuote(null);
-    setOverStage(null);
+      // Read-only users must not persist changes; rollback visual state.
+      if (!canManageCommercial) {
+        toast.error('Seu perfil é somente leitura para alterações');
+        if (snapshotRef.current) {
+          setItems(snapshotRef.current);
+        }
+        snapshotRef.current = null;
+        return;
+      }
 
-    if (!canManageCommercial) {
-      toast.error('Seu perfil é somente leitura para alterações');
-      return;
-    }
+      const targetStage = toContainer;
+      const targetMeta = QUOTE_STAGES.find((s) => s.id === targetStage);
 
-    if (!over || !quotes) return;
-
-    const activeQuote = quotes.find((q) => q.id === active.id);
-    if (!activeQuote) return;
-
-    // Check if dropped on a column
-    const targetStage = QUOTE_STAGES.find((s) => s.id === over.id);
-    if (targetStage && targetStage.id !== activeQuote.stage) {
-      // If moving to "ganho", open convert modal
-      if (targetStage.id === 'ganho') {
-        setConvertingQuote(activeQuote);
+      // Moving to "ganho" opens the convert modal instead of PATCH.
+      if (targetStage === 'ganho') {
+        setConvertingQuote(fullQuote);
+        if (snapshotRef.current) {
+          setItems(snapshotRef.current);
+        }
+        snapshotRef.current = null;
         return;
       }
 
       try {
         await updateStageMutation.mutateAsync({
-          id: activeQuote.id,
-          stage: targetStage.id,
+          id: fullQuote.id,
+          stage: targetStage,
         });
-        toast.success(`Cotação movida para ${targetStage.label}`);
+        toast.success(`Cotação movida para ${targetMeta?.label ?? targetStage}`);
       } catch (error) {
+        console.error('Erro ao mover cotação', error);
+        // Rollback on failure.
+        if (snapshotRef.current) {
+          setItems(snapshotRef.current);
+        }
         toast.error('Erro ao mover cotação');
+      } finally {
+        snapshotRef.current = null;
       }
-      return;
-    }
-
-    // Check if dropped on another card (same stage)
-    const overQuote = quotes.find((q) => q.id === over.id);
-    if (overQuote && activeQuote.stage !== overQuote.stage) {
-      try {
-        await updateStageMutation.mutateAsync({
-          id: activeQuote.id,
-          stage: overQuote.stage,
-        });
-        toast.success(
-          `Cotação movida para ${QUOTE_STAGES.find((s) => s.id === overQuote.stage)?.label}`
-        );
-      } catch (error) {
-        toast.error('Erro ao mover cotação');
-      }
-    }
-  };
+    },
+    [canManageCommercial, items, quotes, updateStageMutation]
+  );
 
   const totalPipelineValue = useMemo(() => {
     if (!quotes) return 0;
@@ -297,26 +338,29 @@ export default function Commercial() {
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
-            {QUOTE_STAGES.map((stage) => (
-              <KanbanColumn
-                key={stage.id}
-                id={stage.id}
-                title={stage.label}
-                count={displayQuotesByStage[stage.id].length}
-                color={stage.color}
-                items={displayQuotesByStage[stage.id].map((q) => q.id)}
-              >
-                {displayQuotesByStage[stage.id].map((quote) => (
-                  <QuoteCard
-                    key={quote.id}
-                    quote={quote}
-                    onEdit={() => setSelectedQuote(quote)}
-                    onSendEmail={() => setEmailingQuote(quote)}
-                    canManageActions={canManageCommercial}
-                  />
-                ))}
-              </KanbanColumn>
-            ))}
+            {QUOTE_STAGES.map((stage) => {
+              const columnItems = items[stage.id] ?? [];
+              return (
+                <KanbanColumn
+                  key={stage.id}
+                  id={stage.id}
+                  title={stage.label}
+                  count={columnItems.length}
+                  color={stage.color}
+                  items={columnItems.map((q) => q.id)}
+                >
+                  {columnItems.map((quote) => (
+                    <QuoteCard
+                      key={quote.id}
+                      quote={quote}
+                      onEdit={() => setSelectedQuote(quote)}
+                      onSendEmail={() => setEmailingQuote(quote)}
+                      canManageActions={canManageCommercial}
+                    />
+                  ))}
+                </KanbanColumn>
+              );
+            })}
           </div>
 
           <DragOverlay>

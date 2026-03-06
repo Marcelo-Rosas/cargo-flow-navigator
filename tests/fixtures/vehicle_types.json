@@ -1,0 +1,9 @@
+[
+  {
+    "id": "vehicle-1",
+    "code": "VUC",
+    "name": "VUC Teste",
+    "axes_count": 2,
+    "active": true
+  }
+]

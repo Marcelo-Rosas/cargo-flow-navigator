@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
+import { cardQueryKey } from '@/lib/card-mapping';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -59,6 +60,7 @@ export function useCreateQuote() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
     },
   });
 }
@@ -78,8 +80,10 @@ export function useUpdateQuote() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: cardQueryKey(id, null) });
     },
   });
 }
@@ -99,8 +103,10 @@ export function useUpdateQuoteStage() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: cardQueryKey(id, null) });
     },
   });
 }
@@ -114,8 +120,10 @@ export function useDeleteQuote() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: cardQueryKey(id, null) });
     },
   });
 }

@@ -1,9 +1,17 @@
+import { existsSync, statSync } from 'node:fs';
 import { expect } from '@playwright/test';
 import { test as setup } from '@playwright/test';
 
 const authFile = '.auth/user.json';
 
 setup('authenticate', async ({ page }) => {
+  if (existsSync(authFile)) {
+    const stats = statSync(authFile);
+    if (stats.size > 0) {
+      return;
+    }
+  }
+
   const user = process.env.PW_TEST_USER;
   const password = process.env.PW_TEST_PASSWORD;
 

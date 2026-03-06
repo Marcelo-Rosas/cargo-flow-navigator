@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, Receipt, FileText, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,7 @@ import type { CalculateFreightInput } from '@/types/freight';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { supabase } from '@/integrations/supabase/client';
-import { asDb, asInsert, filterSupabaseSingle } from '@/lib/supabase-utils';
+import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { formatRouteUf, StoredPricingBreakdown, TollPlaza } from '@/lib/freightCalculator';
 import {
   Table,
@@ -86,6 +86,8 @@ export function QuoteDetailModal({
   const [activePaymentTermId, setActivePaymentTermId] = useState<string | null>(
     quote?.payment_term_id ?? null
   );
+  const advanceRequestId = useRef(0);
+  const [isAdvanceChanging, setIsAdvanceChanging] = useState(false);
 
   // Sync activePaymentTermId when quote prop changes (e.g. modal opens with different quote)
   useEffect(() => {
@@ -285,31 +287,70 @@ export function QuoteDetailModal({
     if (!quote) return;
     const prev = selectedAdvancePercent;
     setSelectedAdvancePercent(value);
+    setIsAdvanceChanging(true);
+    const currentRequest = ++advanceRequestId.current;
+    const isLatest = () => advanceRequestId.current === currentRequest;
+
     try {
       const targetPercent = Number(value); // 0, 50, ou 70
-      const { data: term, error } = await supabase
-        .from('payment_terms')
-        .select('id')
-        .eq('advance_percent', targetPercent)
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      if (!term) {
+      const localCandidates =
+        paymentTermsList?.filter((term) => Number(term.advance_percent ?? 0) === targetPercent) ??
+        [];
+      let targetTermId: string | undefined =
+        localCandidates.length === 1 ? localCandidates[0].id : undefined;
+
+      if (!targetTermId) {
+        const { data, error } = await supabase
+          .from('payment_terms')
+          .select('id, code, advance_percent')
+          .eq('advance_percent', targetPercent)
+          .eq('active', true)
+          .limit(2);
+        if (error) throw error;
+        if (!isLatest()) return;
+        const rows = (
+          filterSupabaseRows<{ id: string; code: string | null }>(data ?? []) || []
+        ).slice(0, 2);
+        if (rows.length === 1) {
+          targetTermId = rows[0].id;
+        } else if (rows.length > 1) {
+          if (!isLatest()) return;
+          toast.error(
+            'Há mais de uma condição de pagamento com este percentual. Revise a configuração antes de atualizar.'
+          );
+          setSelectedAdvancePercent(prev);
+          return;
+        } else {
+          if (!isLatest()) return;
+          toast.error('Condição de pagamento não encontrada');
+          setSelectedAdvancePercent(prev);
+          return;
+        }
+      }
+      if (!targetTermId) {
+        if (!isLatest()) return;
         toast.error('Condição de pagamento não encontrada');
         setSelectedAdvancePercent(prev);
         return;
       }
+
+      if (!isLatest()) return;
       await updateQuoteMutation.mutateAsync({
         id: quote.id,
-        updates: { payment_term_id: term.id },
+        updates: { payment_term_id: targetTermId },
       });
-      // Atualiza o ID local para que a query ['payment-term', activePaymentTermId]
-      // re-execute com o novo ID e os mini cards reflitam imediatamente
-      setActivePaymentTermId(term.id);
+      if (!isLatest()) return;
+      setActivePaymentTermId(targetTermId);
       toast.success('Adiantamento atualizado');
     } catch {
-      toast.error('Erro ao salvar adiantamento');
-      setSelectedAdvancePercent(prev);
+      if (isLatest()) {
+        toast.error('Erro ao salvar adiantamento');
+        setSelectedAdvancePercent(prev);
+      }
+    } finally {
+      if (advanceRequestId.current === currentRequest) {
+        setIsAdvanceChanging(false);
+      }
     }
   };
 
@@ -733,14 +774,21 @@ export function QuoteDetailModal({
                     <Select
                       value={selectedAdvancePercent}
                       onValueChange={handleAdvancePercentChange}
-                      disabled={!canManage || updateQuoteMutation.isPending}
+                      disabled={!canManage || updateQuoteMutation.isPending || isAdvanceChanging}
                     >
-                      <SelectTrigger className="w-full max-w-[260px]">
+                      <SelectTrigger
+                        className="w-full max-w-[260px]"
+                        data-testid="advance-select-trigger"
+                      >
                         <SelectValue placeholder="Selecionar..." />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent data-testid="advance-select-content">
                         {advanceOptions.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
+                          <SelectItem
+                            key={opt.value}
+                            value={opt.value}
+                            data-testid={`advance-option-${opt.value}`}
+                          >
                             {opt.label}
                           </SelectItem>
                         ))}

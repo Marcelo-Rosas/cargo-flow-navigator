@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -21,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { BrandLogo } from '@/components/BrandLogo';
+import { useLayout } from '@/components/layout/LayoutContext';
 import { useUserRole, type UserProfile } from '@/hooks/useUserRole';
 
 const navItems = [
@@ -76,7 +76,7 @@ const bottomNavItems: NavItem[] = [
 ];
 
 export function Sidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isSidebarCollapsed: isCollapsed, toggleSidebar } = useLayout();
   const location = useLocation();
   const { perfil } = useUserRole();
   const filteredNavItems = navItems.filter(
@@ -89,6 +89,7 @@ export function Sidebar() {
       animate={{ width: isCollapsed ? 72 : 256 }}
       transition={{ duration: 0.2, ease: [0.22, 0.9, 0.32, 1] }}
       className="fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border flex flex-col"
+      data-testid="sidebar"
     >
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-sidebar-border">
@@ -161,8 +162,9 @@ export function Sidebar() {
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => setIsCollapsed(!isCollapsed)}
+        onClick={toggleSidebar}
         className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-sidebar border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent shadow-md"
+        data-testid="sidebar-toggle"
       >
         {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
       </Button>

@@ -10,6 +10,7 @@ import { FinancialDetailModal } from '@/components/modals/FinancialDetailModal';
 import { TabButton } from '@/components/financial/TabButton';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useFinancialBoardData } from '@/hooks/useFinancialBoardData';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { useTripsReconciliation } from '@/hooks/useReconciliation';
 import { useUpdateFinancialDocumentStatus } from '@/hooks/useUpdateFinancialDocumentStatus';
 import { KanbanSkeleton } from '@/components/skeletons/KanbanSkeleton';
@@ -39,6 +40,8 @@ export default function Financial() {
   const boardData = tab === 'receber' ? receber : tab === 'pagar' ? pagar : receber;
   const columnsConfig = activeType === 'FAT' ? FAT_COLUMNS : PAG_COLUMNS;
   const updateStatusMutation = useUpdateFinancialDocumentStatus();
+
+  useRealtimeSubscription(['financial_documents', 'financial_installments']);
 
   const totalReceber = receber.rows.length;
   const totalPagar = pagar.rows.length;

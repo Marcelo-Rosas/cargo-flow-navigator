@@ -1,0 +1,8 @@
+[
+  {
+    "id": "client-1",
+    "name": "Cliente Teste",
+    "email": "cliente@teste.com",
+    "zip_code": "01001000"
+  }
+]

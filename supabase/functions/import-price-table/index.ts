@@ -1,3 +1,4 @@
+/// <reference path="../_shared/deno.d.ts" />
 import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
 

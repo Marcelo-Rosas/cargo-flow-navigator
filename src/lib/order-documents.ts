@@ -50,7 +50,7 @@ export const STAGE_NEXT_REQUIREMENTS = {
   coleta_realizada: [],
 
   // Para sair de "em_transito" e ir para "entregue"
-  em_transito: [{ key: 'has_pod', label: 'POD', group: 'entrega' }],
+  em_transito: [{ key: 'has_pod', label: 'Canhoto (POD)', group: 'entrega' }],
 
   // Último estágio não tem próxima fase
   entregue: [],

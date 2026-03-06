@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -11,6 +11,7 @@ import {
   DragOverEvent,
   DragEndEvent,
   defaultDropAnimationSideEffects,
+  UniqueIdentifier,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { toast } from 'sonner';
@@ -34,6 +35,17 @@ interface FinancialKanbanBoardProps {
   onCardClick: (doc: FinancialKanbanRow) => void;
 }
 
+/** Returns the target status for any droppable id (column or card). */
+function resolveTargetStatus(
+  rows: FinancialKanbanRow[],
+  columnsConfig: ColumnConfig[],
+  overId: UniqueIdentifier
+): string | null {
+  const overIdStr = String(overId);
+  if (columnsConfig.some((c) => c.id === overIdStr)) return overIdStr;
+  return rows.find((r) => r.id === overIdStr)?.status ?? null;
+}
+
 export function FinancialKanbanBoard({
   initialRows,
   type,
@@ -44,6 +56,13 @@ export function FinancialKanbanBoard({
   const [optimisticRows, setOptimisticRows] = useState(initialRows);
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  // Snapshot captured at drag-start for reliable rollback on mutation error.
+  const snapshotRef = useRef<FinancialKanbanRow[]>([]);
+
+  // Prevents jitter when a card crosses a container boundary rapidly.
+  const recentlyMovedToNewContainer = useRef(false);
+
+  // Sync with fresh server data only while no drag is in progress.
   useEffect(() => {
     if (!activeId) {
       setOptimisticRows(initialRows);
@@ -62,68 +81,82 @@ export function FinancialKanbanBoard({
   const columns = groupFinancialKanbanColumns(optimisticRows, type);
   const activeRow = optimisticRows.find((row) => row.id === activeId);
 
-  const findTargetStatus = (overId: string): string | null => {
-    if (columnsConfig.some((c) => c.id === overId)) return overId;
-    const targetCard = optimisticRows.find((r) => r.id === overId);
-    if (targetCard) return targetCard.status;
-    return null;
-  };
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(String(event.active.id));
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeIdStr = String(active.id);
-    const overIdStr = String(over.id);
-
-    if (activeIdStr === overIdStr) return;
-
-    const targetStatus = findTargetStatus(overIdStr);
-    if (!targetStatus) return;
-
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const id = String(event.active.id);
+    setActiveId(id);
+    // Take a snapshot before any optimistic changes.
     setOptimisticRows((prev) => {
-      const activeIndex = prev.findIndex((r) => r.id === activeIdStr);
-      if (activeIndex === -1) return prev;
-
-      const newRows = [...prev];
-      if (newRows[activeIndex].status !== targetStatus) {
-        newRows[activeIndex] = { ...newRows[activeIndex], status: targetStatus };
-      }
-      return newRows;
+      snapshotRef.current = prev;
+      return prev;
     });
-  };
+  }, []);
 
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
+  const handleDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const { active, over } = event;
+      if (!over) return;
 
-    if (!over) return;
+      const activeIdStr = String(active.id);
+      const overIdStr = String(over.id);
+      if (activeIdStr === overIdStr) return;
 
-    const activeIdStr = String(active.id);
-    const overIdStr = String(over.id);
-    const targetStatus = findTargetStatus(overIdStr);
-    const originalRow = initialRows.find((r) => r.id === activeIdStr);
+      // Skip if we just moved to a new container this frame (anti-jitter).
+      if (recentlyMovedToNewContainer.current) return;
 
-    if (targetStatus && originalRow && originalRow.status !== targetStatus) {
-      const columnLabel = columnsConfig.find((c) => c.id === targetStatus)?.label ?? targetStatus;
+      const targetStatus = resolveTargetStatus(optimisticRows, columnsConfig, overIdStr);
+      if (!targetStatus) return;
 
-      try {
-        await updateStatusMutation.mutateAsync({
-          id: activeIdStr,
-          status: targetStatus,
+      setOptimisticRows((prev) => {
+        const activeIndex = prev.findIndex((r) => r.id === activeIdStr);
+        if (activeIndex === -1) return prev;
+
+        // Guard: avoid setState when nothing actually changes.
+        if (prev[activeIndex].status === targetStatus) return prev;
+
+        recentlyMovedToNewContainer.current = true;
+        requestAnimationFrame(() => {
+          recentlyMovedToNewContainer.current = false;
         });
-        toast.success(`Movido para ${columnLabel}`);
-      } catch (error) {
-        console.error('Falha ao mover card. Revertendo...', error);
-        setOptimisticRows([...initialRows]);
-        toast.error('Erro ao mover o card. Tente novamente.');
+
+        const newRows = [...prev];
+        newRows[activeIndex] = { ...newRows[activeIndex], status: targetStatus };
+        return newRows;
+      });
+    },
+    [optimisticRows, columnsConfig]
+  );
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveId(null);
+
+      if (!over) return;
+
+      const activeIdStr = String(active.id);
+      const overIdStr = String(over.id);
+      const targetStatus = resolveTargetStatus(optimisticRows, columnsConfig, overIdStr);
+      const originalRow = snapshotRef.current.find((r) => r.id === activeIdStr);
+
+      if (targetStatus && originalRow && originalRow.status !== targetStatus) {
+        const columnLabel = columnsConfig.find((c) => c.id === targetStatus)?.label ?? targetStatus;
+
+        try {
+          await updateStatusMutation.mutateAsync({
+            id: activeIdStr,
+            status: targetStatus,
+          });
+          toast.success(`Movido para ${columnLabel}`);
+        } catch (error) {
+          console.error('Falha ao mover card. Revertendo...', error);
+          // Roll back to the snapshot taken at drag-start.
+          setOptimisticRows(snapshotRef.current);
+          toast.error('Erro ao mover o card. Tente novamente.');
+        }
       }
-    }
-  };
+    },
+    [optimisticRows, columnsConfig, updateStatusMutation]
+  );
 
   const dropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({

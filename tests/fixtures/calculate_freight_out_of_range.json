@@ -1,0 +1,65 @@
+{
+  "success": true,
+  "status": "OUT_OF_RANGE",
+  "error": "Distância fora da faixa da tabela selecionada.",
+  "meta": {
+    "route_uf_label": "SP / RJ",
+    "km_band_label": "0-500",
+    "km_status": "OUT_OF_RANGE",
+    "margin_status": "BELOW_TARGET",
+    "margin_percent": 5,
+    "cubage_factor": 1.2,
+    "cubage_weight_kg": 0,
+    "billable_weight_kg": 0,
+    "km_band_used": null,
+    "price_table_row_id": null
+  },
+  "components": {
+    "base_cost": 0,
+    "base_freight": 0,
+    "toll": 0,
+    "gris": 0,
+    "tso": 0,
+    "rctrc": 0,
+    "ad_valorem": 0,
+    "tde": 0,
+    "tear": 0,
+    "dispatch_fee": 0,
+    "conditional_fees_total": 0,
+    "waiting_time_cost": 0,
+    "das_provision": 0,
+    "aluguel_maquinas": 0
+  },
+  "rates": {
+    "das_percent": 14,
+    "icms_percent": 0,
+    "gris_percent": 0,
+    "tso_percent": 0,
+    "cost_value_percent": 0,
+    "markup_percent": 0,
+    "overhead_percent": 0,
+    "tac_percent": 0,
+    "payment_adjustment_percent": 0
+  },
+  "totals": {
+    "receita_bruta": 0,
+    "das": 0,
+    "icms": 0,
+    "tac_adjustment": 0,
+    "payment_adjustment": 0,
+    "total_impostos": 0,
+    "total_cliente": 0
+  },
+  "profitability": {
+    "custos_carreteiro": 0,
+    "custos_descarga": 0,
+    "custos_diretos": 0,
+    "margem_bruta": 0,
+    "overhead": 0,
+    "resultado_liquido": 0,
+    "margem_percent": 0
+  },
+  "conditional_fees_breakdown": {},
+  "fallbacks_applied": [],
+  "errors": ["Distância fora da faixa da tabela selecionada."]
+}
