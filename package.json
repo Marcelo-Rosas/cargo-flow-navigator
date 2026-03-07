@@ -13,6 +13,8 @@
     "validate:ui": "npm run test:e2e:ui",
     "format": "prettier --write src/",
     "preview": "vite preview",
+    "deploy": "vite build && wrangler pages deploy dist",
+    "preview:cf": "wrangler pages dev dist",
     "prepare": "husky",
     "lint:types": "tsc --noEmit",
     "lint:eslint": "eslint .",
@@ -96,6 +98,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "wrangler": "^4.48.0",
     "@eslint/js": "^9.32.0",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/typography": "^0.5.16",
