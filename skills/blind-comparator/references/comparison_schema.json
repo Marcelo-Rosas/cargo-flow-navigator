@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Blind Comparison Result",
+  "description": "Schema for the output of the Blind Comparator skill, detailing the comparison of two outputs (A and B).",
+  "type": "object",
+  "properties": {
+    "winner": {
+      "type": "string",
+      "enum": ["A", "B", "TIE"],
+      "description": "The determined winner of the comparison."
+    },
+    "reasoning": {
+      "type": "string",
+      "description": "A clear, evidence-based explanation for why the winner was chosen."
+    },
+    "rubric": {
+      "type": "object",
+      "description": "The detailed scoring rubric applied to both outputs.",
+      "properties": {
+        "A": {"$ref": "#/definitions/rubricEvaluation"},
+        "B": {"$ref": "#/definitions/rubricEvaluation"}
+      },
+      "required": ["A", "B"]
+    },
+    "output_quality": {
+      "type": "object",
+      "description": "A summary of the quality, strengths, and weaknesses of each output.",
+      "properties": {
+        "A": {"$ref": "#/definitions/qualitySummary"},
+        "B": {"$ref": "#/definitions/qualitySummary"}
+      },
+      "required": ["A", "B"]
+    },
+    "expectation_results": {
+      "type": "object",
+      "description": "The results of checking predefined expectations (assertions). Omit if no expectations were provided.",
+      "properties": {
+        "A": {"$ref": "#/definitions/expectationResult"},
+        "B": {"$ref": "#/definitions/expectationResult"}
+      },
+      "required": ["A", "B"]
+    }
+  },
+  "required": ["winner", "reasoning", "rubric", "output_quality"],
+
+  "definitions": {
+    "rubricEvaluation": {
+      "type": "object",
+      "properties": {
+        "content": {"type": "object", "additionalProperties": {"type": "number"}},
+        "structure": {"type": "object", "additionalProperties": {"type": "number"}},
+        "content_score": {"type": "number"},
+        "structure_score": {"type": "number"},
+        "overall_score": {"type": "number"}
+      },
+      "required": ["content", "structure", "content_score", "structure_score", "overall_score"]
+    },
+    "qualitySummary": {
+      "type": "object",
+      "properties": {
+        "score": {"type": "number", "minimum": 1, "maximum": 10},
+        "strengths": {"type": "array", "items": {"type": "string"}},
+        "weaknesses": {"type": "array", "items": {"type": "string"}}
+      },
+      "required": ["score", "strengths", "weaknesses"]
+    },
+    "expectationResult": {
+      "type": "object",
+      "properties": {
+        "passed": {"type": "integer"},
+        "total": {"type": "integer"},
+        "pass_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {"type": "string"},
+              "passed": {"type": "boolean"}
+            },
+            "required": ["text", "passed"]
+          }
+        }
+      },
+      "required": ["passed", "total", "pass_rate", "details"]
+    }
+  }
+}
