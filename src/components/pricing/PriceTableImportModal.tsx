@@ -181,7 +181,12 @@ export function PriceTableImportModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className={cn('max-h-[90vh] overflow-hidden flex flex-col', modality === 'fracionado' ? 'max-w-6xl' : 'max-w-4xl')}>
+      <DialogContent
+        className={cn(
+          'max-h-[90vh] overflow-hidden flex flex-col',
+          modality === 'fracionado' ? 'max-w-6xl' : 'max-w-4xl'
+        )}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5" />
@@ -314,7 +319,7 @@ export function PriceTableImportModal({
                 {selectedFile?.name}
               </Badge>
               <Badge variant="default">{parseResult.totalRows} linhas</Badge>
-              <Badge variant="secondary" className="text-success">
+              <Badge variant="success">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 {parseResult.validRows} válidas
               </Badge>
@@ -401,19 +406,45 @@ export function PriceTableImportModal({
                       <TableCell>{row.km_to}</TableCell>
                       {modality === 'fracionado' ? (
                         <>
-                          <TableCell className="text-xs">{row.cost_per_ton?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.weight_rate_10?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.weight_rate_20?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.weight_rate_30?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.weight_rate_50?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.weight_rate_70?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.weight_rate_100?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.weight_rate_150?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.weight_rate_200?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.weight_rate_above_200?.toFixed(4) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.cost_value_percent?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.tso_percent?.toFixed(2) ?? '-'}</TableCell>
-                          <TableCell className="text-xs">{row.gris_percent?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell className="text-xs">
+                            {row.cost_per_ton?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.weight_rate_10?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.weight_rate_20?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.weight_rate_30?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.weight_rate_50?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.weight_rate_70?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.weight_rate_100?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.weight_rate_150?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.weight_rate_200?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.weight_rate_above_200?.toFixed(4) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.cost_value_percent?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.tso_percent?.toFixed(2) ?? '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {row.gris_percent?.toFixed(2) ?? '-'}
+                          </TableCell>
                         </>
                       ) : (
                         <>

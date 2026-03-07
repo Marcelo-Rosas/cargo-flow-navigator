@@ -29,15 +29,12 @@ export function TripReconciliationCard({ trip, onClick }: TripReconciliationCard
               {trip.trip_number}
             </span>
             {trip.trip_reconciled ? (
-              <Badge variant="outline" className="text-success border-success/50 text-xs">
+              <Badge variant="success" className="text-xs">
                 <CheckCircle2 className="w-3 h-3 mr-0.5" />
                 OK
               </Badge>
             ) : (
-              <Badge
-                variant="outline"
-                className="text-warning-foreground border-warning/50 text-xs"
-              >
+              <Badge variant="warning" className="text-xs">
                 <AlertCircle className="w-3 h-3 mr-0.5" />
                 Pendente
               </Badge>

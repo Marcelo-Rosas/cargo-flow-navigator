@@ -103,11 +103,7 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
               {trip.trip_number}
             </span>
             <Badge variant="secondary">{trip.status_operational}</Badge>
-            {reconciliation?.trip_reconciled && (
-              <Badge variant="outline" className="text-success border-success/50">
-                Conciliado
-              </Badge>
-            )}
+            {reconciliation?.trip_reconciled && <Badge variant="success">Conciliado</Badge>}
           </DialogTitle>
         </DialogHeader>
 
