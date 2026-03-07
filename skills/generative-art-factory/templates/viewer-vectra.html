@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arte Generativa - Vectra Cargo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy-900: #0D2B3E; --navy-800: #1A3A52; --navy-700: #1e4060;
+      --accent: #E87B2F; --accent-hover: #d06a20; --accent-subtle: rgba(232,123,47,0.10);
+      --neutral-50: #f8f7f4; --neutral-100: #f0ede6; --neutral-200: #e2ddd3; --neutral-400: #9e9a92; --neutral-700: #4a4740;
+      --text-primary: #0D2B3E; --text-muted: #9e9a92; --text-on-dark: #f0ede6;
+      --radius-card: 8px; --radius-button: 6px; --radius-input: 4px;
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--neutral-100); color: var(--text-primary); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+    .sidebar { width: 280px; background: #fff; padding: 1.5rem; border-right: 1px solid var(--neutral-200); display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto; }
+    .main-content { flex: 1; display: flex; align-items: center; justify-content: center; background: var(--neutral-50); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M0 30h60M30 0v60' stroke='%230D2B3E' stroke-width='0.4' stroke-opacity='0.04'/%3E%3Cpath d='M0 0l60 60M60 0L0 60' stroke='%230D2B3E' stroke-width='0.3' stroke-opacity='0.025'/%3E%3C/svg%3E"); }
+    #canvas-container { box-shadow: 0 10px 25px -5px rgba(13,43,62,0.15), 0 8px 10px -6px rgba(13,43,62,0.15); line-height: 0; }
+    .control-group { margin-bottom: 1rem; }
+    .control-group h3 { font-size: 14px; font-weight: 600; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--navy-800); }
+    .control-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 0.35rem; }
+    .control-group input[type="range"] { width: 100%; }
+    .control-group .value-display { font-size: 12px; color: var(--text-muted); }
+    .seed-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .btn { font-family: 'Inter', sans-serif; padding: 0.45rem 1rem; border: 1px solid var(--neutral-200); background: #fff; border-radius: var(--radius-button); cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+    .btn:hover { background: var(--neutral-50); border-color: var(--neutral-400); }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .seed-jump { display: flex; margin-top: 0.5rem; }
+    .seed-jump input { flex: 1; border: 1px solid var(--neutral-200); border-radius: var(--radius-input) 0 0 var(--radius-input); padding: 0.45rem; font-size: 13px; }
+    .seed-jump input:focus { outline: none; border-color: var(--accent); }
+    .seed-jump button { border-radius: 0 var(--radius-input) var(--radius-input) 0; margin-left: -1px; }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <!-- SEÇÃO FIXA: Semente -->
+    <div class="control-group">
+      <h3>Semente</h3>
+      <p style="font-size: 13px; margin-bottom: 0.5rem;">Semente Atual: <span id="seed-display" style="font-weight: 600;"></span></p>
+      <div class="seed-controls">
+        <button class="btn" onclick="changeSeed(-1)">Anterior</button>
+        <button class="btn" onclick="changeSeed(1)">Próxima</button>
+        <button class="btn" onclick="randomizeSeed()" style="grid-column: 1 / -1;">Semente Aleatória</button>
+      </div>
+      <div class="seed-jump">
+        <input type="number" id="seed-input" placeholder="Ir para semente...">
+        <button class="btn" onclick="jumpToSeed()">Ir</button>
+      </div>
+    </div>
+
+    <!-- SEÇÃO VARIÁVEL: Parâmetros do Algoritmo -->
+    <div class="control-group">
+      <h3>Parâmetros</h3>
+      <!-- Controles de parâmetros específicos da arte vão aqui -->
+      <!-- Exemplo:
+      <div>
+        <label for="particle-count">Contagem de Partículas</label>
+        <input type="range" id="particle-count" min="100" max="5000" step="100" value="1000" oninput="updateParam('particleCount', this.value)">
+        <span class="value-display" id="particle-count-value">1000</span>
+      </div>
+      -->
+    </div>
+
+    <!-- SEÇÃO OPCIONAL/VARIÁVEL: Cores -->
+    <div class="control-group">
+      <h3>Cores</h3>
+      <!-- Controles de cores vão aqui, se aplicável -->
+    </div>
+
+    <!-- SEÇÃO FIXA: Ações -->
+    <div class="control-group">
+      <h3>Ações</h3>
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+        <button class="btn" onclick="regenerate()">Regenerar</button>
+        <button class="btn" onclick="resetParams()">Resetar Parâmetros</button>
+        <button class="btn btn-primary" onclick="downloadPNG()">Baixar PNG</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div id="canvas-container"></div>
+  </div>
+
+  <script>
+    // ========================================================
+    // ALGORITMO DE ARTE GENERATIVA (p5.js)
+    // ========================================================
+
+    // SEÇÃO VARIÁVEL: Parâmetros
+    let params = {
+      seed: Math.floor(Math.random() * 100000),
+      // Adicione aqui os parâmetros que seu algoritmo precisa
+    };
+
+    // SEÇÃO VARIÁVEL: Algoritmo Principal
+    function setup() {
+      const canvas = createCanvas(800, 800);
+      canvas.parent('canvas-container');
+      regenerate();
+    }
+
+    function draw() {
+      // Seu código de desenho aqui
+      // Pode ser estático (noLoop()) ou animado
+    }
+
+    // ========================================================
+    // LÓGICA DA INTERFACE (FIXA)
+    // ========================================================
+
+    function regenerate() {
+      randomSeed(params.seed);
+      noiseSeed(params.seed);
+      document.getElementById('seed-display').textContent = params.seed;
+      // Chame sua função de setup/reset do algoritmo aqui
+      clear();
+      background(255);
+      // Exemplo: setupMyArt();
+      draw(); // Se for estático
+    }
+
+    function updateParam(paramName, value) {
+      params[paramName] = Number(value);
+      document.getElementById(`${paramName.replace(/([A-Z])/g, '-$1').toLowerCase()}-value`).textContent = value;
+      regenerate();
+    }
+
+    function resetParams() {
+      // Implemente a lógica para resetar os parâmetros para os valores padrão
+      // Ex: params.particleCount = 1000;
+      regenerate();
+    }
+
+    function changeSeed(delta) {
+      params.seed += delta;
+      regenerate();
+    }
+
+    function randomizeSeed() {
+      params.seed = Math.floor(Math.random() * 100000);
+      regenerate();
+    }
+
+    function jumpToSeed() {
+      const seedInput = document.getElementById('seed-input');
+      const newSeed = parseInt(seedInput.value, 10);
+      if (!isNaN(newSeed)) {
+        params.seed = newSeed;
+        regenerate();
+      }
+    }
+
+    function downloadPNG() {
+      saveCanvas(`vectra-art-${params.seed}`, 'png');
+    }
+
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', () => {
+      // Crie os listeners para os seus parâmetros aqui
+      // Ex: document.getElementById('particle-count').addEventListener('input', (e) => updateParam('particleCount', e.target.value));
+      regenerate();
+    });
+  </script>
+</body>
+</html>
