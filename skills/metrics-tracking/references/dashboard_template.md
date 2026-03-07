@@ -31,11 +31,17 @@
 ## Funil Comercial (Últimos 30 dias)
 
 ```mermaid
-graph TD
-    A[Rascunho] -->|{taxa_conv_1}%| B(Enviado)
-    B -->|{taxa_conv_2}%| C(Negociação)
-    C -->|{taxa_conv_3}%| D(Ganho)
-    C -->|{taxa_rejeicao}%| E(Perdido)
+flowchart TD
+    A[Rascunho] --> B(Enviado)
+    B --> C(Negociação)
+    C --> D(Ganho ✅)
+    C --> E(Perdido ❌)
+
+    style D fill:#16a34a,color:#fff
+    style E fill:#dc2626,color:#fff
+    style A fill:#0D2B3E,color:#fff
+    style B fill:#1A3A52,color:#fff
+    style C fill:#E87B2F,color:#fff
 ```
 
 | Estágio | Cotações | Taxa de Conversão (para o próximo) |
