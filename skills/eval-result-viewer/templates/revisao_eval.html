@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Revisão de Avaliação de Skill</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy-900: #0D2B3E; --navy-800: #1A3A52; --navy-700: #1e4060;
+      --accent: #E87B2F; --accent-hover: #d06a20; --accent-subtle: rgba(232,123,47,0.10);
+      --neutral-50: #f8f7f4; --neutral-100: #f0ede6; --neutral-200: #e2ddd3; --neutral-400: #9e9a92; --neutral-700: #4a4740;
+      --danger: #c0392b; --success: #27ae60; --warning: #f39c12;
+      --text-primary: #0D2B3E; --text-muted: #9e9a92; --text-on-dark: #f0ede6;
+      --shadow-card: 0 1px 3px 0 rgba(13,43,62,0.10); --shadow-hover: 0 10px 25px -5px rgba(13,43,62,0.15);
+      --radius-card: 8px; --radius-button: 6px; --radius-input: 4px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif; font-size: 14px; background: var(--neutral-50);
+      color: var(--text-primary); padding: 2rem;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M0 30h60M30 0v60' stroke='%230D2B3E' stroke-width='0.4' stroke-opacity='0.04'/%3E%3Cpath d='M0 0l60 60M60 0L0 60' stroke='%230D2B3E' stroke-width='0.3' stroke-opacity='0.025'/%3E%3C/svg%3E");
+      background-attachment: fixed;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .page-header { margin-bottom: 1.5rem; }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: var(--navy-900); display: flex; align-items: center; gap: 0.5rem; }
+    .page-header h1 .badge-skill { font-size: 13px; font-weight: 600; background: var(--accent-subtle); color: var(--accent); border-radius: 9999px; padding: 2px 10px; }
+    .tabs { display: flex; border-bottom: 1px solid var(--neutral-200); margin-bottom: 1.5rem; }
+    .tab { padding: 0.75rem 1.25rem; cursor: pointer; font-weight: 500; color: var(--text-muted); border-bottom: 2px solid transparent; }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .run-card { background: #fff; border-radius: var(--radius-card); box-shadow: var(--shadow-card); margin-bottom: 1.5rem; overflow: hidden; }
+    .run-header { padding: 1rem 1.25rem; background: var(--navy-900); color: var(--text-on-dark); }
+    .run-header h2 { font-size: 16px; font-weight: 600; }
+    .run-header .run-id { font-size: 12px; opacity: 0.7; margin-top: 0.25rem; }
+    .run-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--neutral-200); }
+    .run-section { padding: 1.25rem; background: #fff; }
+    .run-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--navy-800); }
+    .prompt { white-space: pre-wrap; background: var(--neutral-50); padding: 0.75rem; border-radius: var(--radius-input); font-size: 13px; max-height: 200px; overflow-y: auto; }
+    .output-file { border: 1px solid var(--neutral-200); border-radius: var(--radius-input); margin-bottom: 0.75rem; }
+    .output-header { padding: 0.5rem 0.75rem; background: var(--neutral-50); font-weight: 500; font-size: 13px; border-bottom: 1px solid var(--neutral-200); }
+    .output-content { padding: 0.75rem; max-height: 300px; overflow: auto; }
+    .output-content img, .output-content canvas { max-width: 100%; }
+    .output-content pre { white-space: pre-wrap; font-size: 12px; }
+    .feedback-textarea { width: 100%; min-height: 100px; padding: 0.75rem; border: 1px solid var(--neutral-200); border-radius: var(--radius-input); font-size: 13px; resize: vertical; }
+    .feedback-textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-subtle); }
+    .status-badge { padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .status-badge.pass { background: var(--success); color: #fff; }
+    .status-badge.fail { background: var(--danger); color: #fff; }
+    .grading-item { display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 0.5rem; font-size: 13px; }
+    .grading-item .status-badge { flex-shrink: 0; }
+    .benchmark-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .summary-card { background: #fff; padding: 1rem; border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
+    .summary-card h4 { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem; }
+    .summary-card .value { font-size: 24px; font-weight: 700; color: var(--navy-900); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="page-header">
+      <h1>Revisão de Avaliação <span class="badge-skill" id="skill-name"></span></h1>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('runs')">Execuções</div>
+      <div class="tab" onclick="showTab('benchmark')">Benchmark</div>
+    </div>
+
+    <div id="runs-content" class="tab-content active"></div>
+    <div id="benchmark-content" class="tab-content"></div>
+
+  </div>
+
+  <script>
+    /*__EMBEDDED_DATA__*/
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js`;
+
+    function renderRuns() {
+      const container = document.getElementById('runs-content');
+      container.innerHTML = '';
+      EMBEDDED_DATA.runs.forEach(run => {
+        const card = document.createElement('div');
+        card.className = 'run-card';
+        card.innerHTML = `
+          <div class="run-header">
+            <h2>${run.prompt.split('\n')[0]}</h2>
+            <div class="run-id">ID: ${run.id}</div>
+          </div>
+          <div class="run-body">
+            <div class="run-section">
+              <h3>Prompt de Avaliação</h3>
+              <div class="prompt">${escapeHtml(run.prompt)}</div>
+              ${run.grading ? renderGrading(run.grading) : ''}
+            </div>
+            <div class="run-section">
+              <h3>Saídas</h3>
+              ${run.outputs.map(renderOutput).join('') || 'Nenhuma saída produzida.'}
+            </div>
+            <div class="run-section" style="grid-column: 1 / -1;">
+              <h3>Feedback</h3>
+              <textarea class="feedback-textarea" id="feedback-${run.id}" oninput="saveFeedback('${run.id}', this.value)" placeholder="Digite seu feedback aqui...">${EMBEDDED_DATA.previous_feedback[run.id] || ''}</textarea>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+        run.outputs.forEach(file => {
+          if (file.type === 'pdf') renderPdf(file, `pdf-canvas-${run.id}-${file.name}`);
+          if (file.type === 'xlsx') renderXlsx(file, `xlsx-table-${run.id}-${file.name}`);
+        });
+      });
+    }
+
+    function renderGrading(grading) {
+      const passRate = grading.summary.pass_rate * 100;
+      let color = 'var(--danger)';
+      if (passRate > 80) color = 'var(--success)';
+      else if (passRate > 50) color = 'var(--warning)';
+
+      return `
+        <h3 style="margin-top: 1.5rem;">Avaliação (Grader)</h3>
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+          <div style="font-size: 24px; font-weight: 700; color: ${color};">${passRate.toFixed(0)}%</div>
+          <div>
+            <div>${grading.summary.passed} de ${grading.summary.total} asserções passaram</div>
+            <div style="font-size: 12px; color: var(--text-muted)"></div>
+          </div>
+        </div>
+        ${grading.expectations.map(e => `
+          <div class="grading-item">
+            <span class="status-badge ${e.passed ? 'pass' : 'fail'}">${e.passed ? 'PASS' : 'FAIL'}</span>
+            <div>
+              <div>${escapeHtml(e.text)}</div>
+              <div style="font-size: 12px; color: var(--text-muted);"><em>Evidência: ${escapeHtml(e.evidence)}</em></div>
+            </div>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    function renderOutput(file) {
+      let content = '';
+      if (file.type === 'text') {
+        const rendered = file.name.endsWith('.md') ? marked.parse(file.content) : `<pre>${escapeHtml(file.content)}</pre>`;
+        content = `<div class="output-content">${rendered}</div>`;
+      } else if (file.type === 'image') {
+        content = `<div class="output-content"><img src="${file.data_uri}" alt="${file.name}"></div>`;
+      } else if (file.type === 'pdf') {
+        content = `<div class="output-content"><canvas id="pdf-canvas-${EMBEDDED_DATA.runs.find(r => r.outputs.includes(file)).id}-${file.name}"></canvas></div>`;
+      } else if (file.type === 'xlsx') {
+        content = `<div class="output-content" id="xlsx-table-${EMBEDDED_DATA.runs.find(r => r.outputs.includes(file)).id}-${file.name}"></div>`;
+      } else {
+        content = `<div class="output-content"><a href="${file.data_uri}" download="${file.name}">Baixar ${file.name}</a></div>`;
+      }
+      return `<div class="output-file"><div class="output-header">${file.name}</div>${content}</div>`;
+    }
+
+    async function renderPdf(file, canvasId) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const pdfData = atob(file.data_uri.split(',')[1]);
+      const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+      const page = await pdfDoc.getPage(1);
+      const viewport = page.getViewport({ scale: 1.5 });
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      const context = canvas.getContext('2d');
+      await page.render({ canvasContext: context, viewport: viewport }).promise;
+    }
+
+    function renderXlsx(file, tableId) {
+      const container = document.getElementById(tableId);
+      if (!container) return;
+      const workbook = XLSX.read(file.data_b64, { type: 'base64' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const html = XLSX.utils.sheet_to_html(worksheet);
+      container.innerHTML = html;
+      container.querySelector('table').style.width = '100%';
+      container.querySelector('table').style.borderCollapse = 'collapse';
+    }
+
+    function renderBenchmark() {
+      const container = document.getElementById('benchmark-content');
+      const benchmark = EMBEDDED_DATA.benchmark;
+      if (!benchmark) {
+        container.innerHTML = 'Nenhum dado de benchmark encontrado.';
+        return;
+      }
+      const summary = benchmark.run_summary;
+      container.innerHTML = `
+        <div class="benchmark-summary">
+          <div class="summary-card"><h4>Taxa de Sucesso (com Skill)</h4><div class="value">${(summary.with_skill.pass_rate * 100).toFixed(1)}%</div></div>
+          <div class="summary-card"><h4>Taxa de Sucesso (sem Skill)</h4><div class="value">${(summary.without_skill.pass_rate * 100).toFixed(1)}%</div></div>
+          <div class="summary-card"><h4>Tempo Médio (com Skill)</h4><div class="value">${summary.with_skill.avg_time_seconds.toFixed(1)}s</div></div>
+          <div class="summary-card"><h4>Custo Médio (com Skill)</h4><div class="value">$${summary.with_skill.avg_cost.toFixed(4)}</div></div>
+        </div>
+        <h3>Notas do Analisador</h3>
+        <ul>${benchmark.analyzer_notes.map(note => `<li>${escapeHtml(note)}</li>`).join('')}</ul>
+      `;
+    }
+
+    let feedbackTimeout;
+    function saveFeedback(runId, feedback) {
+      clearTimeout(feedbackTimeout);
+      feedbackTimeout = setTimeout(() => {
+        const currentFeedback = EMBEDDED_DATA.previous_feedback || {};
+        currentFeedback[runId] = feedback;
+        const payload = { reviews: Object.entries(currentFeedback).map(([id, fb]) => ({ run_id: id, feedback: fb })) };
+        fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }, 500);
+    }
+
+    function showTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelector(`.tab[onclick="showTab('${tabName}')"]`).classList.add('active');
+      document.getElementById(`${tabName}-content`).classList.add('active');
+    }
+
+    function escapeHtml(text) {
+      if (typeof text !== 'string') return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    document.getElementById('skill-name').textContent = EMBEDDED_DATA.skill_name;
+    renderRuns();
+    renderBenchmark();
+  </script>
+</body>
+</html>

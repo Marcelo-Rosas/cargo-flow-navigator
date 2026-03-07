@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Revisão de Eval Set — __SKILL_NAME_PLACEHOLDER__</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Tokens de Design — Vectra Cargo ── */
+    :root {
+      --navy-900: #0D2B3E;
+      --navy-800: #1A3A52;
+      --navy-700: #1e4060;
+      --accent:   #E87B2F;
+      --accent-hover: #d06a20;
+      --accent-subtle: rgba(232,123,47,0.10);
+      --neutral-50:  #f8f7f4;
+      --neutral-100: #f0ede6;
+      --neutral-200: #e2ddd3;
+      --neutral-400: #9e9a92;
+      --neutral-700: #4a4740;
+      --danger:   #c0392b;
+      --danger-hover: #a93226;
+      --text-primary: #0D2B3E;
+      --text-muted:   #9e9a92;
+      --shadow-card: 0 1px 3px 0 rgba(13,43,62,0.10);
+      --shadow-hover: 0 10px 25px -5px rgba(13,43,62,0.15);
+      --radius-card:   8px;
+      --radius-button: 6px;
+      --radius-input:  4px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 14px;
+      background: var(--neutral-50);
+      color: var(--text-primary);
+      padding: 2rem;
+      /* Textura de rotas — linhas finas como malha rodoviária */
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M0 30h60M30 0v60' stroke='%230D2B3E' stroke-width='0.4' stroke-opacity='0.04'/%3E%3Cpath d='M0 0l60 60M60 0L0 60' stroke='%230D2B3E' stroke-width='0.3' stroke-opacity='0.025'/%3E%3C/svg%3E");
+      background-attachment: fixed;
+    }
+
+    /* ── Cabeçalho ── */
+    .page-header {
+      margin-bottom: 1.5rem;
+      max-width: 1100px;
+    }
+    .page-header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--navy-900);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .page-header h1 .badge-skill {
+      font-size: 13px;
+      font-weight: 600;
+      background: var(--accent-subtle);
+      color: var(--accent);
+      border-radius: 9999px;
+      padding: 2px 10px;
+    }
+    .page-header .description {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 0.4rem;
+      font-style: italic;
+    }
+
+    /* ── Controles ── */
+    .controls {
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      max-width: 1100px;
+    }
+    .btn {
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 0.45rem 1rem;
+      border: none;
+      border-radius: var(--radius-button);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .btn-add    { background: var(--navy-800); color: #fff; }
+    .btn-add:hover { background: var(--navy-700); }
+    .btn-export { background: var(--accent); color: #fff; }
+    .btn-export:hover { background: var(--accent-hover); }
+
+    /* ── Tabela ── */
+    table {
+      width: 100%;
+      max-width: 1100px;
+      border-collapse: collapse;
+      background: white;
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+    }
+    th {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--navy-900);
+      color: #f8f7f4;
+      padding: 0.7rem 1rem;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    td {
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid var(--neutral-200);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: var(--neutral-50); }
+    tr:hover td { background: var(--neutral-100); }
+
+    /* ── Cabeçalho de seção ── */
+    .section-header td {
+      background: var(--neutral-200);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 600;
+      font-size: 11px;
+      color: var(--navy-800);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 0.45rem 1rem;
+    }
+    .section-header.trigger td {
+      border-left: 3px solid var(--accent);
+    }
+    .section-header.no-trigger td {
+      border-left: 3px solid var(--neutral-400);
+    }
+
+    /* ── Input de query ── */
+    .query-input {
+      width: 100%;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid var(--neutral-200);
+      border-radius: var(--radius-input);
+      font-size: 13px;
+      font-family: 'Inter', system-ui, sans-serif;
+      color: var(--text-primary);
+      resize: vertical;
+      min-height: 60px;
+      background: #fff;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .query-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-subtle);
+    }
+
+    /* ── Toggle ── */
+    .toggle-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--neutral-400);
+      border-radius: 22px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .toggle .slider::before {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      bottom: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .toggle input:checked + .slider { background: var(--accent); }
+    .toggle input:checked + .slider::before { transform: translateX(18px); }
+    .toggle-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .toggle-label.active { color: var(--accent); }
+
+    /* ── Botão deletar ── */
+    .btn-delete {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--radius-button);
+      cursor: pointer;
+      font-size: 12px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-delete:hover {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    /* ── Rodapé ── */
+    .summary {
+      margin-top: 1rem;
+      color: var(--text-muted);
+      font-size: 12px;
+      max-width: 1100px;
+      display: flex;
+      gap: 1rem;
+    }
+    .summary .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: var(--accent-subtle);
+      color: var(--accent);
+      border-radius: 9999px;
+      padding: 2px 8px;
+      font-weight: 600;
+    }
+    .summary .pill.muted {
+      background: var(--neutral-200);
+      color: var(--neutral-700);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <h1>
+      Revisão de Eval Set
+      <span class="badge-skill" id="skill-name">__SKILL_NAME_PLACEHOLDER__</span>
+    </h1>
+    <p class="description">Descrição atual: <span id="skill-desc">__SKILL_DESCRIPTION_PLACEHOLDER__</span></p>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-add" onclick="addRow()">+ Adicionar Query</button>
+    <button class="btn btn-export" onclick="exportEvalSet()">&#8595; Exportar Eval Set</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:65%">Query</th>
+        <th style="width:20%">Deve Disparar?</th>
+        <th style="width:15%">Ações</th>
+      </tr>
+    </thead>
+    <tbody id="eval-body"></tbody>
+  </table>
+
+  <div class="summary" id="summary"></div>
+
+  <script>
+    const EVAL_DATA = __EVAL_DATA_PLACEHOLDER__;
+
+    let evalItems = [...EVAL_DATA];
+
+    function render() {
+      const tbody = document.getElementById('eval-body');
+      tbody.innerHTML = '';
+
+      // Ordena: deve disparar primeiro
+      const sorted = evalItems
+        .map((item, origIdx) => ({ ...item, origIdx }))
+        .sort((a, b) => (b.should_trigger ? 1 : 0) - (a.should_trigger ? 1 : 0));
+
+      let lastGroup = null;
+      sorted.forEach(item => {
+        const group = item.should_trigger ? 'trigger' : 'no-trigger';
+        if (group !== lastGroup) {
+          const headerRow = document.createElement('tr');
+          headerRow.className = `section-header ${group}`;
+          headerRow.innerHTML = `<td colspan="3">${item.should_trigger ? 'Deve Disparar a Skill' : 'NÃO Deve Disparar a Skill'}</td>`;
+          tbody.appendChild(headerRow);
+          lastGroup = group;
+        }
+
+        const idx = item.origIdx;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><textarea class="query-input" onchange="updateQuery(${idx}, this.value)">${escapeHtml(item.query)}</textarea></td>
+          <td>
+            <div class="toggle-wrapper">
+              <label class="toggle">
+                <input type="checkbox" ${item.should_trigger ? 'checked' : ''} onchange="updateTrigger(${idx}, this.checked)">
+                <span class="slider"></span>
+              </label>
+              <span class="toggle-label ${item.should_trigger ? 'active' : ''}">${item.should_trigger ? 'Sim' : 'Não'}</span>
+            </div>
+          </td>
+          <td><button class="btn-delete" onclick="deleteRow(${idx})">Remover</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      updateSummary();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function updateQuery(idx, value) { evalItems[idx].query = value; updateSummary(); }
+    function updateTrigger(idx, value) { evalItems[idx].should_trigger = value; render(); }
+    function deleteRow(idx) { evalItems.splice(idx, 1); render(); }
+
+    function addRow() {
+      evalItems.push({ query: '', should_trigger: true });
+      render();
+      const inputs = document.querySelectorAll('.query-input');
+      inputs[inputs.length - 1].focus();
+    }
+
+    function updateSummary() {
+      const trigger   = evalItems.filter(i => i.should_trigger).length;
+      const noTrigger = evalItems.filter(i => !i.should_trigger).length;
+      const el = document.getElementById('summary');
+      el.innerHTML = `
+        <span>${evalItems.length} queries no total</span>
+        <span class="pill">${trigger} devem disparar</span>
+        <span class="pill muted">${noTrigger} não devem disparar</span>
+      `;
+    }
+
+    function exportEvalSet() {
+      const valid = evalItems.filter(i => i.query.trim() !== '');
+      const data  = valid.map(i => ({ query: i.query.trim(), should_trigger: i.should_trigger }));
+      const blob  = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url   = URL.createObjectURL(blob);
+      const a     = document.createElement('a');
+      a.href     = url;
+      a.download = 'eval_set.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    render();
+  </script>
+</body>
+</html>
