@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Post-hoc Comparison Analysis",
+  "description": "Schema for the structured analysis of a blind A/B comparison between two skills.",
+  "type": "object",
+  "properties": {
+    "comparison_summary": {
+      "type": "object",
+      "properties": {
+        "winner": {"type": "string", "enum": ["A", "B"]},
+        "winner_skill": {"type": "string", "description": "Path to the winning skill's SKILL.md"},
+        "loser_skill": {"type": "string", "description": "Path to the losing skill's SKILL.md"},
+        "comparator_reasoning": {"type": "string", "description": "Brief summary of why the comparator chose the winner."}
+      },
+      "required": ["winner", "winner_skill", "loser_skill", "comparator_reasoning"]
+    },
+    "winner_strengths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Specific, evidence-based strengths of the winning skill."
+    },
+    "loser_weaknesses": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Specific, evidence-based weaknesses of the losing skill."
+    },
+    "instruction_following": {
+      "type": "object",
+      "properties": {
+        "winner": {
+          "type": "object",
+          "properties": {
+            "score": {"type": "number", "minimum": 1, "maximum": 10},
+            "issues": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "loser": {
+          "type": "object",
+          "properties": {
+            "score": {"type": "number", "minimum": 1, "maximum": 10},
+            "issues": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    },
+    "improvement_suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "priority": {"type": "string", "enum": ["high", "medium", "low"]},
+          "category": {"type": "string", "enum": ["instructions", "tools", "examples", "error_handling", "structure", "references"]},
+          "suggestion": {"type": "string"},
+          "expected_impact": {"type": "string"}
+        },
+        "required": ["priority", "category", "suggestion", "expected_impact"]
+      }
+    },
+    "transcript_insights": {
+      "type": "object",
+      "properties": {
+        "winner_execution_pattern": {"type": "string"},
+        "loser_execution_pattern": {"type": "string"}
+      }
+    }
+  },
+  "required": ["comparison_summary", "winner_strengths", "loser_weaknesses", "improvement_suggestions"]
+}
