@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Grading Result",
+  "description": "Schema for the output of the Grader skill, detailing the evaluation of expectations against an execution transcript and its outputs.",
+  "type": "object",
+  "properties": {
+    "expectations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string"},
+          "passed": {"type": "boolean"},
+          "evidence": {"type": "string"}
+        },
+        "required": ["text", "passed", "evidence"]
+      }
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "passed": {"type": "integer"},
+        "failed": {"type": "integer"},
+        "total": {"type": "integer"},
+        "pass_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      },
+      "required": ["passed", "failed", "total", "pass_rate"]
+    },
+    "execution_metrics": {
+      "type": "object",
+      "description": "Metrics copied from the executor's metrics.json, if available."
+    },
+    "timing": {
+      "type": "object",
+      "description": "Timing data from timing.json, if available."
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim": {"type": "string"},
+          "type": {"type": "string", "enum": ["factual", "process", "quality"]},
+          "verified": {"type": "boolean"},
+          "evidence": {"type": "string"}
+        },
+        "required": ["claim", "type", "verified", "evidence"]
+      }
+    },
+    "user_notes_summary": {
+      "type": "object",
+      "description": "Summary of issues flagged by the executor in user_notes.md."
+    },
+    "eval_feedback": {
+      "type": "object",
+      "properties": {
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "assertion": {"type": "string"},
+              "reason": {"type": "string"}
+            },
+            "required": ["reason"]
+          }
+        },
+        "overall": {"type": "string"}
+      },
+      "required": ["suggestions", "overall"]
+    }
+  },
+  "required": ["expectations", "summary"]
+}
