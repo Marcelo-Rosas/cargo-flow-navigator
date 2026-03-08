@@ -23,6 +23,7 @@ import {
   XCircle,
   AlertCircle,
   IdCard,
+  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ import { OrderForm } from '@/components/forms/OrderForm';
 import { CarreteiroTab } from '@/components/modals/CarreteiroTab';
 import { DriverQualificationPanel } from '@/components/operational/DriverQualificationPanel';
 import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
+import { RiskWorkflowWizard } from '@/components/risk/RiskWorkflowWizard';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
 import { useVehicleByPlate } from '@/hooks/useVehicles';
 import { useUpdateOrder, type OrderWithOccurrences } from '@/hooks/useOrders';
@@ -640,6 +642,10 @@ export function OrderDetailModal({
                   Docs
                 </TabsTrigger>
               )}
+              <TabsTrigger value="risco" className="gap-1.5">
+                <Shield className="w-3.5 h-3.5" />
+                Risco
+              </TabsTrigger>
               <TabsTrigger value="occurrences" className="gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5" />
                 Ocorrências
@@ -1355,6 +1361,20 @@ export function OrderDetailModal({
                   />
                 </TabsContent>
               )}
+
+              {/* Risco Tab */}
+              <TabsContent value="risco" className="m-0 space-y-4">
+                <RiskWorkflowWizard
+                  orderId={order.id}
+                  orderStage={order.stage}
+                  cargoValue={Number(order.cargo_value ?? order.quote?.cargo_value ?? 0)}
+                  kmDistance={Number(order.km_distance ?? order.quote?.km_distance ?? 0)}
+                  driverName={order.driver_name ?? order.quote?.driver_name}
+                  driverCpf={null}
+                  vehiclePlate={order.vehicle_plate ?? order.quote?.vehicle_plate}
+                  tripId={order.trip_id}
+                />
+              </TabsContent>
 
               {/* Timeline Tab */}
               <TabsContent value="timeline" className="m-0 space-y-4">
