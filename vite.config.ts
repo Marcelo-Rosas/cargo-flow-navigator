@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 import { componentTagger } from 'lovable-tagger';
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 // https://vitejs.dev/config/
 // Config estático para compatibilidade com Cloudflare Pages/Wrangler (não usar arrow function).
 const isDev = process.env.NODE_ENV === 'development';
@@ -12,7 +14,7 @@ export default defineConfig({
     host: '::',
     port: 8080,
   },
-  plugins: [react(), ...(isDev ? [componentTagger()] : [])],
+  plugins: [react(), ...(isDev ? [componentTagger()] : []), cloudflare()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
