@@ -11,6 +11,7 @@ export interface CalculateFreightInput {
   payment_term_code?: string;
   tde_enabled?: boolean;
   tear_enabled?: boolean;
+  /** @deprecated v5: conditional fees managed locally via extras.conditionalFees */
   conditional_fees?: string[];
   waiting_hours?: number;
   das_percent?: number;

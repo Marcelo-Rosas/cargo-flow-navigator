@@ -376,12 +376,7 @@ export function QuoteDetailModal({
       payment_term_code: (paymentTerm as { code?: string } | null)?.code ?? 'D30',
       descarga_value: bd?.profitability?.custosDescarga ?? 0,
       aluguel_maquinas_value: bd?.components?.aluguelMaquinas ?? 0,
-      conditional_fees:
-        conditionalFeesData && bd?.meta?.selectedConditionalFeeIds?.length
-          ? (bd.meta.selectedConditionalFeeIds as string[])
-              .map((id) => conditionalFeesData.find((f) => f.id === id)?.code)
-              .filter((c): c is string => !!c)
-          : undefined,
+      // v5: conditional_fees handled locally, not sent to Edge function
       waiting_hours: bd?.meta?.waitingTimeHours ?? undefined,
     };
     try {
