@@ -920,6 +920,13 @@ Deno.serve(async (req) => {
       conditional_fees_breakdown: conditionalFeesBreakdown,
       fallbacks_applied: fallbacksApplied,
       errors: [],
+      // v5: risk pass-through (cobrado do cliente, repassado à seguradora)
+      risk_pass_through: {
+        gris: components.gris,
+        tso: components.tso,
+        rctrc: components.rctrc,
+        total: roundCurrency(components.gris + components.tso + components.rctrc),
+      },
     };
 
     console.log('[calculate-freight] Complete:', {

@@ -104,6 +104,20 @@ export interface CalculateFreightResponse {
   conditional_fees_breakdown: Record<string, number>;
   fallbacks_applied: string[];
   errors: string[];
+
+  /** v5: Risk pass-through revenue (GRIS/TSO/RCTR-C cobrados do cliente) */
+  risk_pass_through?: {
+    gris: number;
+    tso: number;
+    rctrc: number;
+    total: number;
+  };
+
+  /** v5: Estimated risk costs (Buonny, seguro efetivo) */
+  risk_costs?: {
+    items: Array<{ code: string; name: string; cost: number }>;
+    total: number;
+  };
 }
 
 // Legacy types kept for compatibility with older UI helpers.
