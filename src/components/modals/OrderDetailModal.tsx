@@ -39,7 +39,7 @@ import { CarreteiroTab } from '@/components/modals/CarreteiroTab';
 import { DriverQualificationPanel } from '@/components/operational/DriverQualificationPanel';
 import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
 import { RiskWorkflowWizard } from '@/components/risk/RiskWorkflowWizard';
-import { useOrderRiskStatus } from '@/hooks/useRiskEvaluation';
+import { useOrderRiskStatus, useRiskEvaluationByEntity } from '@/hooks/useRiskEvaluation';
 import { CRITICALITY_CONFIG } from '@/types/risk';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
 import { useVehicleByPlate } from '@/hooks/useVehicles';
@@ -186,6 +186,8 @@ export function OrderDetailModal({
   const { data: tripForOrder } = useTripsForOrder(order?.id);
   const linkOrderToTripMutation = useLinkOrderToTrip();
   const { data: riskStatus } = useOrderRiskStatus(order?.id);
+  const tripId = order?.trip_id ?? (tripForOrder as { id?: string } | null)?.id ?? undefined;
+  const { data: tripRiskEval } = useRiskEvaluationByEntity('trip', tripId);
 
   useEffect(() => {
     if (order?.vehicle_plate != null) setPlateInput(order.vehicle_plate);
@@ -638,6 +640,27 @@ export function OrderDetailModal({
               </div>
             </div>
           </DialogHeader>
+
+          {/* VG gate banner */}
+          {showRiskBadge && tripId && tripRiskEval && tripRiskEval.status !== 'approved' && (
+            <div className="flex-shrink-0 rounded-md border border-yellow-500/30 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 text-sm text-yellow-800 dark:text-yellow-200">
+              Esta OS est\u00e1 em VG (
+              {tripForOrder && !Array.isArray(tripForOrder) && 'trip_number' in tripForOrder
+                ? tripForOrder.trip_number
+                : 'viagem'}
+              ) \u2014 gate de risco depende da aprova\u00e7\u00e3o da viagem.
+              {tripRiskEval.criticality && (
+                <Badge
+                  variant={
+                    CRITICALITY_CONFIG[tripRiskEval.criticality]?.badgeVariant ?? 'secondary'
+                  }
+                  className="ml-2 text-[10px]"
+                >
+                  VG: {CRITICALITY_CONFIG[tripRiskEval.criticality]?.label}
+                </Badge>
+              )}
+            </div>
+          )}
 
           <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
             <TabsList className="flex-shrink-0 w-full overflow-x-auto justify-start">
