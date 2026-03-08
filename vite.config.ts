@@ -12,7 +12,7 @@ export default defineConfig({
     host: '::',
     port: 8080,
   },
-  plugins: [react(), isDev && componentTagger()].filter(Boolean),
+  plugins: [react(), ...(isDev ? [componentTagger()] : [])],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
