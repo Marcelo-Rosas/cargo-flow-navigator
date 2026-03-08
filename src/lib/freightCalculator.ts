@@ -405,6 +405,14 @@ export interface StoredPricingBreakdown {
     total: number;
     criticality?: string;
   };
+
+  /** v5: Risk pass-through revenue (GRIS/TSO/RCTR-C cobrados do cliente, repassados à seguradora) */
+  riskPassThrough?: {
+    gris: number;
+    tso: number;
+    rctrc: number;
+    total: number;
+  };
 }
 
 // ============================================
@@ -1060,5 +1068,13 @@ export function buildStoredBreakdown(
 
     // v5: conditional_fees managed via Taxas Adicionais (pricing_rules)
     conditionalFeesBreakdown: undefined,
+
+    // v5: risk pass-through (cobrado do cliente, repassado à seguradora)
+    riskPassThrough: {
+      gris: output.components.gris,
+      tso: output.components.tso,
+      rctrc: output.components.rctrc,
+      total: round2(output.components.gris + output.components.tso + output.components.rctrc),
+    },
   };
 }

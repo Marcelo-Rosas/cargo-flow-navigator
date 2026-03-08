@@ -222,5 +222,11 @@ export function buildStoredBreakdownFromEdgeResponse(
     // not embedded in breakdown. Kept only for legacy v4 breakdowns.
     conditionalFeesBreakdown: undefined,
     riskCosts: riskCosts ?? undefined,
+    riskPassThrough: {
+      gris: c.gris,
+      tso: c.tso,
+      rctrc: c.rctrc,
+      total: Math.round((c.gris + c.tso + c.rctrc) * 100) / 100,
+    },
   };
 }
