@@ -1367,11 +1367,11 @@ export function OrderDetailModal({
                 <RiskWorkflowWizard
                   orderId={order.id}
                   orderStage={order.stage}
-                  cargoValue={Number(order.cargo_value ?? order.quote?.cargo_value ?? 0)}
+                  cargoValue={Number(order.quote?.cargo_value ?? 0)}
                   kmDistance={Number(order.km_distance ?? order.quote?.km_distance ?? 0)}
                   driverName={order.driver_name ?? order.quote?.driver_name}
                   driverCpf={null}
-                  vehiclePlate={order.vehicle_plate ?? order.quote?.vehicle_plate}
+                  vehiclePlate={order.vehicle_type?.code ?? order.quote?.vehicle_type?.code}
                   tripId={order.trip_id}
                 />
               </TabsContent>
