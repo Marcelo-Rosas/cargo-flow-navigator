@@ -502,7 +502,16 @@ Deno.serve(async (req) => {
     const conditionalFeesBreakdown: Record<string, number> = {};
     let conditionalFeesTotal = 0;
 
-    if (input.conditional_fees && input.conditional_fees.length > 0) {
+    // FORBID_CONDITIONAL_FEES: when pricing_parameters has this key set to 'true',
+    // conditional_fees from input are ignored (v5 manages them locally via Taxas Adicionais).
+    const { data: forbidParam } = await supabase
+      .from('pricing_parameters')
+      .select('value')
+      .eq('key', 'FORBID_CONDITIONAL_FEES')
+      .maybeSingle();
+    const forbidConditionalFees = forbidParam?.value === 'true';
+
+    if (!forbidConditionalFees && input.conditional_fees && input.conditional_fees.length > 0) {
       const { data: fees } = await supabase
         .from('conditional_fees')
         .select('*')
