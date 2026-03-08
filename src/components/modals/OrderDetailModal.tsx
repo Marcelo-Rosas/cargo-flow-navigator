@@ -39,6 +39,8 @@ import { CarreteiroTab } from '@/components/modals/CarreteiroTab';
 import { DriverQualificationPanel } from '@/components/operational/DriverQualificationPanel';
 import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
 import { RiskWorkflowWizard } from '@/components/risk/RiskWorkflowWizard';
+import { useOrderRiskStatus } from '@/hooks/useRiskEvaluation';
+import { CRITICALITY_CONFIG } from '@/types/risk';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
 import { useVehicleByPlate } from '@/hooks/useVehicles';
 import { useUpdateOrder, type OrderWithOccurrences } from '@/hooks/useOrders';
@@ -183,6 +185,7 @@ export function OrderDetailModal({
   const ensureFinancialDocumentMutation = useEnsureFinancialDocument();
   const { data: tripForOrder } = useTripsForOrder(order?.id);
   const linkOrderToTripMutation = useLinkOrderToTrip();
+  const { data: riskStatus } = useOrderRiskStatus(order?.id);
 
   useEffect(() => {
     if (order?.vehicle_plate != null) setPlateInput(order.vehicle_plate);
@@ -503,6 +506,7 @@ export function OrderDetailModal({
   const showDriverSection = STAGES_WITH_DRIVER.includes(order.stage);
   const showCarreteiroTab = STAGES_WITH_CARRETEIRO_TAB.includes(order.stage);
   const showDocsTab = STAGES_WITH_DOCS_TAB.includes(order.stage);
+  const showRiskBadge = STAGES_WITH_DOCS_TAB.includes(order.stage); // documentacao+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -554,6 +558,29 @@ export function OrderDetailModal({
               <DialogTitle className="flex items-center gap-3">
                 <span className="text-2xl font-bold">{order.os_number}</span>
                 <Badge className={cn(stageInfo.color)}>{stageInfo.label}</Badge>
+                {showRiskBadge && riskStatus?.criticality && (
+                  <Badge
+                    variant={
+                      CRITICALITY_CONFIG[riskStatus.criticality]?.badgeVariant ?? 'secondary'
+                    }
+                    className="text-[10px]"
+                  >
+                    Risco:{' '}
+                    {CRITICALITY_CONFIG[riskStatus.criticality]?.label ?? riskStatus.criticality}
+                  </Badge>
+                )}
+                {showRiskBadge && riskStatus?.risk_status && (
+                  <Badge
+                    variant={riskStatus.risk_status === 'approved' ? 'default' : 'outline'}
+                    className="text-[10px]"
+                  >
+                    {riskStatus.risk_status === 'approved'
+                      ? 'Gate aprovado'
+                      : riskStatus.risk_status === 'pending'
+                        ? 'Gate pendente'
+                        : riskStatus.risk_status}
+                  </Badge>
+                )}
               </DialogTitle>
 
               <div className="flex items-center gap-2 flex-wrap">
