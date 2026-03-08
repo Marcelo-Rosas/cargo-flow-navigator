@@ -265,6 +265,9 @@ Deno.serve(async (req) => {
     const resolveRulePercent = (key: string): number | undefined =>
       toFiniteNumber(resolveRule(key, vehicleTypeIdForRules));
 
+    // Ad Valorem Lotação — resolve from Central de Riscos
+    const adValoremLotacaoPercent = resolveRulePercent('ad_valorem_lotacao_percent') ?? 0.03;
+
     // =====================================================
     // DETECT MODALITY (lotacao vs fracionado)
     // =====================================================
@@ -420,24 +423,21 @@ Deno.serve(async (req) => {
             dispatchFee = ltlParams?.dispatch_fee ?? 102.9;
           } else {
             // =====================================================
-            // NTC LOTAÇÃO (FTL) Dez/25 — fluxo original inalterado
+            // NTC LOTAÇÃO (FTL) — Ad Valorem substitui GRIS/TSO
             // =====================================================
             const costPerTon = Number(priceRow.cost_per_ton) || 0;
             baseCost = (billableWeightKg / 1000) * costPerTon;
 
-            const ruleGris = resolveRulePercent('gris_percent');
-            const ruleTso = resolveRulePercent('tso_percent');
+            // Lotação: GRIS e TSO são zerados; Ad Valorem cobre custo de risco
+            grisPercent = 0;
+            tsoPercent = 0;
+
             const ruleCostVal = resolveRulePercent('cost_value_percent');
-            const ptGris = toFiniteNumber(priceRow.gris_percent);
-            const ptTso = toFiniteNumber(priceRow.tso_percent);
             const ptCostVal = toFiniteNumber(priceRow.cost_value_percent);
-            // Precedencia: Central > linha km > default
-            grisPercent = ruleGris ?? ptGris ?? 0.3;
-            tsoPercent = ruleTso ?? ptTso ?? 0.15;
             costValuePercent = ruleCostVal ?? ptCostVal ?? 0.3;
 
             console.log(
-              `[calculate-freight] NTC Lotação Dez/25 | Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, frete_peso: ${baseCost}`
+              `[calculate-freight] Lotação Ad Valorem | Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, frete_peso: ${baseCost}, adValoremPercent: ${adValoremLotacaoPercent}%`
             );
           }
         } else {
@@ -460,7 +460,11 @@ Deno.serve(async (req) => {
     let gris = input.cargo_value * (grisPercent / 100);
     let tso = input.cargo_value * (tsoPercent / 100);
     const frete_valor = input.cargo_value * (costValuePercent / 100);
-    const adValorem = 0;
+    // Lotação: Ad Valorem calculado sobre valor NF; Fracionado: sempre 0
+    const adValorem =
+      modality === 'lotacao'
+        ? roundCurrency(input.cargo_value * (adValoremLotacaoPercent / 100))
+        : 0;
 
     // Fracionado: aplicar mínimos NTC
     if (modality === 'fracionado' && ltlParams) {
@@ -780,6 +784,7 @@ Deno.serve(async (req) => {
       gris +
       tso +
       frete_valor +
+      adValorem +
       tde +
       tear +
       dispatchFee +
@@ -870,7 +875,7 @@ Deno.serve(async (req) => {
       gris: roundCurrency(gris),
       tso: roundCurrency(tso),
       rctrc: roundCurrency(frete_valor),
-      ad_valorem: 0,
+      ad_valorem: roundCurrency(adValorem),
       tde: roundCurrency(tde),
       tear: roundCurrency(tear),
       dispatch_fee: roundCurrency(dispatchFee),
@@ -886,6 +891,7 @@ Deno.serve(async (req) => {
       gris_percent: grisPercent,
       tso_percent: tsoPercent,
       cost_value_percent: costValuePercent,
+      ad_valorem_percent: modality === 'lotacao' ? adValoremLotacaoPercent : undefined,
       markup_percent: markupPercent,
       overhead_percent: overheadPercent,
       tac_percent: tacPercent,
@@ -929,12 +935,15 @@ Deno.serve(async (req) => {
       conditional_fees_breakdown: conditionalFeesBreakdown,
       fallbacks_applied: fallbacksApplied,
       errors: [],
-      // v5: risk pass-through (cobrado do cliente, repassado à seguradora)
+      // v5: risk pass-through (cobrado do cliente, repassado à seguradora/GR)
       risk_pass_through: {
         gris: components.gris,
         tso: components.tso,
         rctrc: components.rctrc,
-        total: roundCurrency(components.gris + components.tso + components.rctrc),
+        ad_valorem: components.ad_valorem,
+        total: roundCurrency(
+          components.gris + components.tso + components.rctrc + components.ad_valorem
+        ),
       },
     };
 

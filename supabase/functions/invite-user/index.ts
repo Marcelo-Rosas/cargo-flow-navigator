@@ -137,7 +137,7 @@ deno.serve(async (req: Request) => {
         persistSession: false,
       },
     });
-    const base = deno.env.get('SITE_URL') ?? 'https://cargo-flow-navigator.vercel.app';
+    const base = deno.env.get('SITE_URL') ?? 'https://cargo-flow-navigator.pages.dev';
     const redirectTo = `${base}/auth`;
 
     const { data: inviteData, error: inviteError } =

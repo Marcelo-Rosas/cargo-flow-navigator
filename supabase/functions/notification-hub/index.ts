@@ -34,10 +34,7 @@ interface EntityData {
 // ─────────────────────────────────────────────────────
 
 function serviceClient(): SupabaseClient {
-  return createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 }
 
 /** Replace {{variable}} placeholders in template */
@@ -52,6 +49,12 @@ function renderTemplate(template: string, data: EntityData): string {
 /** Format currency as BRL */
 function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+/** Format Brazilian phone to E.164: 55 + DDD + number */
+function formatPhoneE164(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  return digits.startsWith('55') && digits.length >= 12 ? digits : '55' + digits;
 }
 
 // ─────────────────────────────────────────────────────
@@ -72,10 +75,12 @@ async function resolveEntityData(
     if (entityType === 'quote') {
       const { data: quote } = await sb
         .from('quotes')
-        .select(`
+        .select(
+          `
           id, quote_code, origin, destination, value, stage, freight_type,
           clients!inner(name, email, phone)
-        `)
+        `
+        )
         .eq('id', entityId)
         .maybeSingle();
 
@@ -100,14 +105,16 @@ async function resolveEntityData(
     if (entityType === 'order') {
       const { data: order } = await sb
         .from('orders')
-        .select(`
+        .select(
+          `
           id, os_number, stage, origin, destination,
           driver_name, driver_phone, carreteiro_antt,
           quotes!inner(
             id, quote_code, value,
             clients!inner(name, email, phone)
           )
-        `)
+        `
+        )
         .eq('id', entityId)
         .maybeSingle();
 
@@ -137,10 +144,12 @@ async function resolveEntityData(
     if (entityType === 'financial_document') {
       const { data: doc } = await sb
         .from('financial_documents')
-        .select(`
+        .select(
+          `
           id, code, type, total_amount, status,
           source_type, source_id
-        `)
+        `
+        )
         .eq('id', entityId)
         .maybeSingle();
 
@@ -160,7 +169,10 @@ async function resolveEntityData(
             .maybeSingle();
 
           if (srcQuote) {
-            const client = (srcQuote as Record<string, unknown>).clients as Record<string, unknown> | null;
+            const client = (srcQuote as Record<string, unknown>).clients as Record<
+              string,
+              unknown
+            > | null;
             data.client_name = (client?.name as string) || '';
             if (!log.recipient_email && client?.email) {
               data._recipient_email = client.email as string;
@@ -213,14 +225,22 @@ async function sendEmail(
     return { success: false, error: 'RESEND_API_KEY not configured' };
   }
 
-  const htmlBody = htmlTemplate || `
+  const htmlBody =
+    htmlTemplate ||
+    `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <img src="https://cargo-flow-navigator.vercel.app/brand/logo_vectra.jpg"
+        <img src="https://cargo-flow-navigator.pages.dev/brand/logo_vectra.jpg"
              alt="Vectra Cargo" style="max-height: 60px;" />
       </div>
       <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 24px;">
-        ${body.split('\n').map(line => `<p style="margin: 8px 0; color: #374151; font-size: 14px; line-height: 1.6;">${line}</p>`).join('')}
+        ${body
+          .split('\n')
+          .map(
+            (line) =>
+              `<p style="margin: 8px 0; color: #374151; font-size: 14px; line-height: 1.6;">${line}</p>`
+          )
+          .join('')}
       </div>
       <div style="text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
         <p style="color: #9ca3af; font-size: 12px;">Vectra Cargo Logística &amp; Transportes</p>
@@ -232,7 +252,7 @@ async function sendEmail(
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
+        Authorization: `Bearer ${resendApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -256,50 +276,63 @@ async function sendEmail(
 }
 
 // ─────────────────────────────────────────────────────
-// WhatsApp Sender (via OpenClaw webhook)
+// WhatsApp Sender (via Evolution API)
 // ─────────────────────────────────────────────────────
 
 async function sendWhatsApp(
   recipientPhone: string,
-  message: string,
-  templateKey: string
+  message: string
 ): Promise<{ success: boolean; externalId?: string; error?: string }> {
-  const webhookUrl = Deno.env.get('OPENCLAW_WEBHOOK_URL');
-  const hooksToken = Deno.env.get('OPENCLAW_HOOKS_TOKEN');
+  const baseUrl = Deno.env.get('EVOLUTION_API_URL');
+  const apiKey = Deno.env.get('EVOLUTION_API_KEY');
+  const instance = Deno.env.get('EVOLUTION_INSTANCE');
 
-  if (!webhookUrl) {
-    // OpenClaw not configured — leave as pending_whatsapp for later processing
-    return { success: false, error: 'OPENCLAW_WEBHOOK_URL not configured — pending_whatsapp' };
+  if (!baseUrl || !apiKey || !instance) {
+    return {
+      success: false,
+      error:
+        'Evolution API not configured (EVOLUTION_API_URL/EVOLUTION_API_KEY/EVOLUTION_INSTANCE) — pending_whatsapp',
+    };
   }
 
+  const number = formatPhoneE164(recipientPhone);
+  const url = `${baseUrl.replace(/\/$/, '')}/message/sendText/${instance}`;
+
   try {
-    const res = await fetch(webhookUrl, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${hooksToken || ''}`,
+        apikey: apiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        message,
-        name: templateKey,
-        agentId: 'cargo-notifier',
-        channel: 'whatsapp',
-        to: recipientPhone,
-        model: 'anthropic/claude-haiku-4-5',
-        thinking: 'low',
-        timeoutSeconds: 60,
-      }),
+      body: JSON.stringify({ number, text: message }),
     });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      return { success: false, error: `OpenClaw ${res.status}: ${errText}` };
+    const resText = await res.text();
+    let resJson: Record<string, unknown> | null = null;
+    try {
+      resJson = resText ? (JSON.parse(resText) as Record<string, unknown>) : null;
+    } catch {
+      /* ignore parse error */
     }
 
-    const result = await res.json();
-    return { success: true, externalId: result?.sessionId || result?.id || 'openclaw' };
+    if (!res.ok) {
+      const errDetail = (resJson?.message ?? resJson?.error ?? resText) || res.statusText;
+      return {
+        success: false,
+        error: `Evolution API ${res.status}: ${errDetail} — pending_whatsapp`,
+      };
+    }
+
+    const key = resJson?.key as { id?: string } | undefined;
+    const externalId = key?.id ?? 'evolution';
+    return { success: true, externalId };
   } catch (e) {
-    return { success: false, error: (e as Error).message };
+    const msg = (e as Error).message;
+    return {
+      success: false,
+      error: `Evolution API error: ${msg} — pending_whatsapp`,
+    };
   }
 }
 
@@ -322,9 +355,16 @@ async function processNotification(
   if (!template) {
     await sb
       .from('notification_logs')
-      .update({ status: 'failed', error_message: `Template '${log.template_key}' not found or inactive` } as Record<string, unknown>)
+      .update({
+        status: 'failed',
+        error_message: `Template '${log.template_key}' not found or inactive`,
+      } as Record<string, unknown>)
       .eq('id', log.id);
-    return { success: false, channel: log.channel, error: `Template '${log.template_key}' not found` };
+    return {
+      success: false,
+      channel: log.channel,
+      error: `Template '${log.template_key}' not found`,
+    };
   }
 
   const tmpl = template as unknown as NotificationTemplate;
@@ -347,20 +387,33 @@ async function processNotification(
   const channel = log.channel || tmpl.channel;
 
   if ((channel === 'email' || channel === 'both') && effectiveEmail) {
-    const emailResult = await sendEmail(effectiveEmail, renderedSubject, renderedBody, renderedHtml);
+    const emailResult = await sendEmail(
+      effectiveEmail,
+      renderedSubject,
+      renderedBody,
+      renderedHtml
+    );
     results.push({ channel: 'email', ...emailResult });
   }
 
   if ((channel === 'whatsapp' || channel === 'both') && effectivePhone) {
-    const whatsappResult = await sendWhatsApp(effectivePhone, renderedBody, log.template_key);
+    const whatsappResult = await sendWhatsApp(effectivePhone, renderedBody);
     results.push({ channel: 'whatsapp', ...whatsappResult });
   }
 
   // 6. Update notification_logs
   const allSuccess = results.length > 0 && results.every((r) => r.success);
-  const anyWhatsAppPending = results.some((r) => !r.success && r.error?.includes('pending_whatsapp'));
-  const errors = results.filter((r) => !r.success).map((r) => r.error).join('; ');
-  const externalIds = results.filter((r) => r.externalId).map((r) => `${r.channel}:${r.externalId}`).join(',');
+  const anyWhatsAppPending = results.some(
+    (r) => !r.success && r.error?.includes('pending_whatsapp')
+  );
+  const errors = results
+    .filter((r) => !r.success)
+    .map((r) => r.error)
+    .join('; ');
+  const externalIds = results
+    .filter((r) => r.externalId)
+    .map((r) => `${r.channel}:${r.externalId}`)
+    .join(',');
 
   let newStatus: string;
   if (allSuccess) {
@@ -378,7 +431,9 @@ async function processNotification(
     .update({
       status: newStatus,
       external_id: externalIds || null,
-      ...(newStatus === 'sent' || newStatus === 'partial' ? { sent_at: new Date().toISOString() } : {}),
+      ...(newStatus === 'sent' || newStatus === 'partial'
+        ? { sent_at: new Date().toISOString() }
+        : {}),
       ...(errors && !allSuccess ? { error_message: errors } : {}),
     } as Record<string, unknown>)
     .eq('id', log.id);
@@ -398,7 +453,12 @@ async function processNotifications(
   sb: SupabaseClient,
   logId?: string,
   batch?: boolean
-): Promise<{ processed: number; sent: number; failed: number; results: Array<{ id: string; status: string; error?: string }> }> {
+): Promise<{
+  processed: number;
+  sent: number;
+  failed: number;
+  results: Array<{ id: string; status: string; error?: string }>;
+}> {
   let query = sb
     .from('notification_logs')
     .select('*')

@@ -122,6 +122,8 @@ export interface FreightCalculationInput {
     grisPercent?: number;
     tsoPercent?: number;
     costValuePercent?: number;
+    /** Ad Valorem Lotação (%). Substitui GRIS/TSO para FTL. Default 0.03 (RCTR-C + RC-DC). */
+    adValoremLotacaoPercent?: number;
   };
 
   // Custos diretos (valores fixos em R$ e/ou %)
@@ -225,6 +227,7 @@ export interface FreightCalculationOutput {
     overheadPercent: number;
     targetMarginPercent: number;
     profitMarginPercent: number;
+    adValoremPercent: number;
     markupScope: MarkupScope;
   };
 
@@ -395,6 +398,7 @@ export interface StoredPricingBreakdown {
     overheadPercent: number;
     targetMarginPercent: number;
     profitMarginPercent?: number;
+    adValoremPercent?: number;
   };
 
   conditionalFeesBreakdown?: Record<string, number>;
@@ -406,11 +410,13 @@ export interface StoredPricingBreakdown {
     criticality?: string;
   };
 
-  /** v5: Risk pass-through revenue (GRIS/TSO/RCTR-C cobrados do cliente, repassados à seguradora) */
+  /** v5: Risk pass-through revenue (cobrados do cliente, repassados à seguradora) */
   riskPassThrough?: {
     gris: number;
     tso: number;
     rctrc: number;
+    /** Lotação: Ad Valorem (substitui GRIS/TSO) */
+    adValorem?: number;
     total: number;
   };
 }
@@ -522,6 +528,8 @@ function resolveParams(input: FreightCalculationInput) {
     grisPercent: pp?.grisPercent ?? 0.3,
     tsoPercent: pp?.tsoPercent ?? 0.15,
     costValuePercent: pp?.costValuePercent ?? 0.3,
+    /** Ad Valorem Lotação: substitui GRIS/TSO para FTL. Default 0.03% (RCTR-C 0,015% + RC-DC 0,015%). */
+    adValoremLotacaoPercent: pp?.adValoremLotacaoPercent ?? 0.03,
   };
 }
 
@@ -697,6 +705,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       targetMarginPercent: params.targetMarginPercent,
       markupScope: params.markupScope,
       profitMarginPercent: 0,
+      adValoremPercent: 0,
     },
     totals: { receitaBruta: 0, das: 0, icms: 0, totalImpostos: 0, totalCliente: 0 },
     profitability: {
@@ -793,16 +802,29 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const rowCostValuePercent = toFiniteNumber(row.cost_value_percent);
 
   let grisPercent: number;
-  const tsoPercent = centralTsoPercent ?? rowTsoPercent ?? 0.15;
+  let tsoPercent: number;
   const costValuePercent = centralCostValuePercent ?? rowCostValuePercent ?? 0.3;
 
-  if (isLtl && input.ltlParams) {
-    // Fracionado: Central > linha da tabela > ltl_parameters > default
-    grisPercent =
-      centralGrisPercent ?? rowGrisPercent ?? toFiniteNumber(input.ltlParams.grisPercent) ?? 0.3;
+  // Ad Valorem para Lotação: substitui GRIS/TSO como componente único de custo de risco
+  let adValorem = 0;
+  let adValoremPercent = 0;
+
+  if (!isLtl) {
+    // LOTAÇÃO: Ad Valorem cobre seguro (RCTR-C + RC-DC) + custos GR
+    adValoremPercent = params.adValoremLotacaoPercent;
+    adValorem = round2(input.cargoValue * (adValoremPercent / 100));
+    // Lotação: GRIS e TSO zerados (cobertos pelo Ad Valorem)
+    grisPercent = 0;
+    tsoPercent = 0;
   } else {
-    // Lotacao: Central > linha da tabela > default
-    grisPercent = centralGrisPercent ?? rowGrisPercent ?? 0.3;
+    // FRACIONADO: mantém GRIS/TSO com percentuais NTC de mercado
+    tsoPercent = centralTsoPercent ?? rowTsoPercent ?? 0.15;
+    if (input.ltlParams) {
+      grisPercent =
+        centralGrisPercent ?? rowGrisPercent ?? toFiniteNumber(input.ltlParams.grisPercent) ?? 0.3;
+    } else {
+      grisPercent = centralGrisPercent ?? rowGrisPercent ?? 0.3;
+    }
   }
 
   let gris = round2(input.cargoValue * (grisPercent / 100));
@@ -847,6 +869,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const custoServicos = round2(
     input.tollValue +
       aluguelMaquinas +
+      adValorem + // Lotação: custo risco (seguro + GR); Fracionado: 0
       gris +
       tso +
       rctrc +
@@ -948,7 +971,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       gris,
       tso,
       rctrc,
-      adValorem: 0,
+      adValorem,
       tde,
       tear,
       dispatchFee,
@@ -962,6 +985,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       grisPercent,
       tsoPercent,
       costValuePercent,
+      adValoremPercent,
       markupPercent: params.markupPercent,
       overheadPercent: params.overheadPercent,
       targetMarginPercent: params.targetMarginPercent,
@@ -1064,17 +1088,25 @@ export function buildStoredBreakdown(
       overheadPercent: output.rates.overheadPercent,
       targetMarginPercent: output.rates.targetMarginPercent,
       profitMarginPercent: (output.rates as { profitMarginPercent?: number }).profitMarginPercent,
+      adValoremPercent: output.rates.adValoremPercent || undefined,
     },
 
     // v5: conditional_fees managed via Taxas Adicionais (pricing_rules)
     conditionalFeesBreakdown: undefined,
 
     // v5: risk pass-through (cobrado do cliente, repassado à seguradora)
+    // Lotação: ad_valorem substitui GRIS/TSO; Fracionado: GRIS+TSO+RCTR-C
     riskPassThrough: {
       gris: output.components.gris,
       tso: output.components.tso,
       rctrc: output.components.rctrc,
-      total: round2(output.components.gris + output.components.tso + output.components.rctrc),
+      adValorem: output.components.adValorem,
+      total: round2(
+        output.components.gris +
+          output.components.tso +
+          output.components.rctrc +
+          output.components.adValorem
+      ),
     },
   };
 }

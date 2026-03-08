@@ -22,12 +22,9 @@ function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-const LOGO_URL = 'https://cargo-flow-navigator.vercel.app/brand/logo_vectra.jpg';
+const LOGO_URL = 'https://cargo-flow-navigator.pages.dev/brand/logo_vectra.jpg';
 
-function buildEmailHtml(
-  quote: Record<string, unknown>,
-  paymentTerm: PaymentTerm | null
-): string {
+function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm | null): string {
   const breakdown = quote.pricing_breakdown as Record<string, unknown> | null;
   const meta = breakdown?.meta as Record<string, unknown> | null;
   const components = breakdown?.components as Record<string, unknown> | null;
@@ -40,7 +37,12 @@ function buildEmailHtml(
   const quoteCode = (quote.quote_code as string) || '—';
   const freightType = ((quote.freight_type as string) || '').toUpperCase();
   const freightModality = (quote.freight_modality as string) || '';
-  const modalityLabel = freightModality === 'lotacao' ? 'Lotação' : freightModality === 'fracionado' ? 'Fracionado' : '';
+  const modalityLabel =
+    freightModality === 'lotacao'
+      ? 'Lotação'
+      : freightModality === 'fracionado'
+        ? 'Fracionado'
+        : '';
   const kmBand = (meta?.kmBandLabel as string) || '';
   const routeUf = (meta?.routeUfLabel as string) || '';
 
@@ -85,8 +87,10 @@ function buildEmailHtml(
   if (taxTotal != null) pricingRows.push(pricingRow('Impostos', formatBRL(taxTotal), true));
   // Mark last row
   if (pricingRows.length > 0) {
-    pricingRows[pricingRows.length - 1] = pricingRows[pricingRows.length - 1]
-      .replace('border-bottom:1px solid #e9ecef;', '');
+    pricingRows[pricingRows.length - 1] = pricingRows[pricingRows.length - 1].replace(
+      'border-bottom:1px solid #e9ecef;',
+      ''
+    );
   }
 
   // Build route info rows
@@ -95,10 +99,14 @@ function buildEmailHtml(
   routeRows.push(infoRow('Destino', destination));
   if (routeUf) routeRows.push(infoRow('Rota UF', routeUf));
   if (kmBand) routeRows.push(infoRow('Faixa KM', `${kmBand} km`));
-  if (freightType) routeRows.push(infoRow('Tipo Frete', `${freightType}${modalityLabel ? ` — ${modalityLabel}` : ''}`, true));
+  if (freightType)
+    routeRows.push(
+      infoRow('Tipo Frete', `${freightType}${modalityLabel ? ` — ${modalityLabel}` : ''}`, true)
+    );
 
   // Payment section (only if paymentTerm exists)
-  const paymentHtml = paymentTerm ? `
+  const paymentHtml = paymentTerm
+    ? `
     <!-- Payment Condition -->
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border-left:4px solid #0076BE;border-radius:6px;margin-bottom:24px;">
       <tr>
@@ -107,7 +115,9 @@ function buildEmailHtml(
           <p style="margin:0 0 12px;padding:0 0 12px;border-bottom:1px solid rgba(0,61,102,0.2);color:#003d66;font-size:13px;font-weight:600;">${paymentTerm.name}</p>
         </td>
       </tr>
-      ${advancePercent > 0 ? `
+      ${
+        advancePercent > 0
+          ? `
       <tr>
         <td style="padding:6px 16px;color:#7f8c8d;font-size:12px;font-weight:500;">Adiantamento (${advancePercent}%)</td>
         <td style="padding:6px 16px;color:#003d66;font-size:12px;font-weight:600;text-align:right;">${formatBRL(advanceAmount)}</td>
@@ -115,13 +125,16 @@ function buildEmailHtml(
       <tr>
         <td style="padding:6px 16px 16px;color:#7f8c8d;font-size:12px;font-weight:500;">Saldo (${balancePercent}%)</td>
         <td style="padding:6px 16px 16px;color:#003d66;font-size:12px;font-weight:600;text-align:right;">${formatBRL(balanceAmount)}</td>
-      </tr>` : `
+      </tr>`
+          : `
       <tr>
         <td colspan="2" style="padding:0 16px 16px;color:#7f8c8d;font-size:12px;">
           Prazo: ${paymentTerm.days} dias
         </td>
-      </tr>`}
-    </table>` : '';
+      </tr>`
+      }
+    </table>`
+    : '';
 
   return `
 <!DOCTYPE html>
@@ -284,10 +297,10 @@ Deno.serve(async (req) => {
       .single();
 
     if (quoteError || !quote) {
-      return new Response(
-        JSON.stringify({ error: quoteError?.message || 'Quote not found' }),
-        { status: 404, headers: { ...corsHeaders, 'content-type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: quoteError?.message || 'Quote not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'content-type': 'application/json' },
+      });
     }
 
     // Fetch payment term if available
@@ -308,7 +321,7 @@ Deno.serve(async (req) => {
     const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
+        Authorization: `Bearer ${resendApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -323,18 +336,18 @@ Deno.serve(async (req) => {
 
     if (!resendRes.ok) {
       const resendError = await resendRes.text();
-      return new Response(
-        JSON.stringify({ error: `Resend error: ${resendError}` }),
-        { status: 502, headers: { ...corsHeaders, 'content-type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: `Resend error: ${resendError}` }), {
+        status: 502,
+        headers: { ...corsHeaders, 'content-type': 'application/json' },
+      });
     }
 
     const resendData = await resendRes.json();
 
-    return new Response(
-      JSON.stringify({ success: true, emailId: resendData.id }),
-      { status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ success: true, emailId: resendData.id }), {
+      status: 200,
+      headers: { ...corsHeaders, 'content-type': 'application/json' },
+    });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,

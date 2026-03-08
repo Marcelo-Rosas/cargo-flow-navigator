@@ -24,7 +24,7 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:local": "cross-env PW_BASE_URL=http://localhost:4173 playwright test",
     "test:e2e:report": "playwright show-report",
-    "test:e2e:codegen": "playwright codegen https://cargo-flow-navigator.vercel.app",
+    "test:e2e:codegen": "playwright codegen https://cargo-flow-navigator.pages.dev",
     "test:e2e:auth": "npx playwright test --project=chromium-auth",
     "test:e2e:mocks": "npx playwright test tests/e2e/quote-*.spec.ts --project=chromium-mocks",
     "test:e2e:seeded": "npx playwright test tests/e2e/flows/*.seeded.spec.ts --project=chromium-auth"
@@ -98,7 +98,6 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "wrangler": "^4.48.0",
     "@eslint/js": "^9.32.0",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/typography": "^0.5.16",
@@ -122,6 +121,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.36.0",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "wrangler": "^4.48.0"
   }
 }

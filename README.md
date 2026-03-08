@@ -6,7 +6,7 @@ CRM logístico da **Vectra Cargo** para gestão de cotações, pedidos, clientes
 
 - **Frontend**: React 18, TypeScript, Vite 7, Tailwind CSS, shadcn/ui (Radix), TanStack Query, Framer Motion, Recharts
 - **Backend**: Supabase (PostgreSQL, Auth, RLS, Edge Functions)
-- **Deploy**: Vercel (frontend), Supabase Cloud (backend)
+- **Deploy**: Cloudflare Pages (frontend), Supabase Cloud (backend)
 
 ## Pré-requisitos
 
@@ -108,9 +108,9 @@ Acesse `http://localhost:5173`.
 
 ## Deploy
 
-- **Frontend**: conecte o repositório à Vercel e configure as variáveis de ambiente (`VITE_SUPABASE_*`).
+- **Frontend**: `npm run deploy` (Cloudflare Pages via Wrangler). Configure as variáveis de ambiente no Cloudflare Pages (`VITE_SUPABASE_*`).
 - **Backend**: Supabase Cloud; migrations via `supabase db push`.
-- **Edge Functions**: em produção, configure `ALLOWED_ORIGIN` (ou `ALLOWED_ORIGINS` para múltiplos) no Supabase Dashboard (Edge Functions → Secrets) com o domínio do app. Suporta padrões com `*` (ex.: `https://*.vercel.app` para previews do Vercel).
+- **Edge Functions**: em produção, configure `ALLOWED_ORIGIN` (ou `ALLOWED_ORIGINS` para múltiplos) no Supabase Dashboard (Edge Functions → Secrets) com o domínio do app (ex.: `https://cargo-flow-navigator.pages.dev`).
 - **CI (GitHub Actions)**: para validar migrations no CI, configure o secret `SUPABASE_DB_URL` com o **Session pooler** (Supabase Dashboard → Connect → Session mode, porta 5432). Use o pooler para compatibilidade IPv4 no GitHub Actions.
 
 ## Contribuição

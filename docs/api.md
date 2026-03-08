@@ -6,7 +6,7 @@ Base URL: `https://<project-ref>.supabase.co/functions/v1/<function-name>`
 
 - **ALLOWED_ORIGIN** ou **ALLOWED_ORIGINS**: domínios permitidos (exatos ou com padrão `*`). Exemplos:
   - Exatos: `https://app.vectracargo.com` ou `https://app.vectracargo.com,http://localhost:5173`
-  - Padrão para previews Vercel: `https://*.vercel.app`
+  - Padrão para previews Cloudflare Pages: `https://*.cargo-flow-navigator.pages.dev`
   - Em produção, configure no Supabase Dashboard (Edge Functions → Secrets).
 
 ## 1. calculate-freight

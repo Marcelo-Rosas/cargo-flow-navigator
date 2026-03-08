@@ -89,6 +89,7 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
       grisPercent: response.rates.gris_percent,
       tsoPercent: response.rates.tso_percent,
       costValuePercent: response.rates.cost_value_percent,
+      adValoremPercent: response.rates.ad_valorem_percent,
       markupPercent: response.rates.markup_percent,
       overheadPercent: response.rates.overhead_percent,
       tacPercent: response.rates.tac_percent,
@@ -214,6 +215,7 @@ export function buildStoredBreakdownFromEdgeResponse(
       grisPercent: response.rates.gris_percent,
       tsoPercent: response.rates.tso_percent,
       costValuePercent: response.rates.cost_value_percent,
+      adValoremPercent: response.rates.ad_valorem_percent,
       markupPercent: response.rates.markup_percent,
       overheadPercent: response.rates.overhead_percent,
       targetMarginPercent: response.profitability.profit_margin_target ?? 15,
@@ -226,7 +228,8 @@ export function buildStoredBreakdownFromEdgeResponse(
       gris: c.gris,
       tso: c.tso,
       rctrc: c.rctrc,
-      total: Math.round((c.gris + c.tso + c.rctrc) * 100) / 100,
+      adValorem: c.ad_valorem,
+      total: Math.round((c.gris + c.tso + c.rctrc + c.ad_valorem) * 100) / 100,
     },
   };
 }

@@ -11,7 +11,7 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: process.env.PW_BASE_URL || 'https://cargo-flow-navigator.vercel.app',
+    baseURL: process.env.PW_BASE_URL || 'https://cargo-flow-navigator.pages.dev',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',

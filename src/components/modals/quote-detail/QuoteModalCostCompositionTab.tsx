@@ -98,6 +98,7 @@ export function QuoteModalCostCompositionTab({
   const tearValue = breakdown.components?.tear ?? 0;
   const dispatchFeeValue = breakdown.components?.dispatchFee ?? 0;
   const aluguelMaquinasValue = breakdown.components?.aluguelMaquinas ?? 0;
+  const adValoremValue = breakdown.components?.adValorem ?? 0;
 
   const baseFreight = breakdown.components?.baseFreight ?? 0;
   const pedagioMemoria = breakdown.components?.toll ?? 0;
@@ -124,6 +125,11 @@ export function QuoteModalCostCompositionTab({
       composicaoRows.push({
         label: `TSO (${breakdown.rates?.tsoPercent?.toFixed(2) ?? 0}%)`,
         value: breakdown.components.tso ?? 0,
+      });
+    if (adValoremValue > 0)
+      composicaoRows.push({
+        label: `Ad Valorem (${breakdown.rates?.adValoremPercent?.toFixed(3) ?? '0.030'}%)`,
+        value: adValoremValue,
       });
     if ((breakdown.components.tde ?? 0) > 0)
       composicaoRows.push({ label: 'TDE (NTC)', value: breakdown.components.tde ?? 0 });
@@ -314,16 +320,26 @@ export function QuoteModalCostCompositionTab({
                   </TableCell>
                 </TableRow>
                 {/* Repasse de Risco (receita repassada ao cliente) */}
-                {(grisValue > 0 || tsoValue > 0 || rctrcValue > 0) && (
+                {(grisValue > 0 || tsoValue > 0 || rctrcValue > 0 || adValoremValue > 0) && (
                   <>
                     <TableRow className="bg-emerald-50/50 dark:bg-emerald-900/10 border-l-4 border-l-emerald-500">
                       <TableCell className="font-semibold">
                         (+) Repasse de Risco (cobrado do cliente)
                       </TableCell>
                       <TableCell className="text-right font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
-                        {formatCurrency(grisValue + tsoValue + rctrcValue)}
+                        {formatCurrency(grisValue + tsoValue + rctrcValue + adValoremValue)}
                       </TableCell>
                     </TableRow>
+                    {adValoremValue > 0 && (
+                      <TableRow>
+                        <TableCell className="pl-8 text-muted-foreground">
+                          • Ad Valorem ({breakdown.rates?.adValoremPercent?.toFixed(3) ?? '0.030'}%)
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(adValoremValue)}
+                        </TableCell>
+                      </TableRow>
+                    )}
                     {grisValue > 0 && (
                       <TableRow>
                         <TableCell className="pl-8 text-muted-foreground">

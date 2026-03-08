@@ -62,6 +62,7 @@ export interface FreightRates {
   gris_percent: number;
   tso_percent: number;
   cost_value_percent: number;
+  ad_valorem_percent?: number;
   markup_percent: number;
   overhead_percent: number;
   tac_percent: number;
@@ -105,11 +106,12 @@ export interface CalculateFreightResponse {
   fallbacks_applied: string[];
   errors: string[];
 
-  /** v5: Risk pass-through revenue (GRIS/TSO/RCTR-C cobrados do cliente) */
+  /** v5: Risk pass-through revenue (GRIS/TSO/RCTR-C/Ad Valorem cobrados do cliente) */
   risk_pass_through?: {
     gris: number;
     tso: number;
     rctrc: number;
+    ad_valorem: number;
     total: number;
   };
 

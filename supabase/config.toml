@@ -7,21 +7,17 @@ project_id = "epgedaiukjippepujuzc"
 # Mantenha esta seção sincronizada manualmente como documentação.
 # ────────────────────────────────────────────────────────────────────
 [auth]
-site_url = "https://cargo-flow-navigator.vercel.app"
+site_url = "https://cargo-flow-navigator.pages.dev"
 additional_redirect_urls = [
   # Dev local
   "http://localhost:8080",
   "http://localhost:8080/auth",
   "http://localhost:8080/reset-password",
-  # Domínio principal
-  "https://cargo-flow-navigator.vercel.app",
-  "https://cargo-flow-navigator.vercel.app**",
-  # URL canônica Vercel (redirect)
-  "https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app",
-  "https://cargo-flow-navigator-marcelo-rosas-projects.vercel.app**",
-  # Preview deploys – wildcard para branches
-  "https://cargo-*-flow-navigator-marcelo-rosas-projects.vercel.app",
-  "https://cargo-*-flow-navigator-marcelo-rosas-projects.vercel.app**",
+  # Cloudflare Pages (produção e previews)
+  "https://cargo-flow-navigator.pages.dev",
+  "https://cargo-flow-navigator.pages.dev**",
+  "https://*.cargo-flow-navigator.pages.dev",
+  "https://*.cargo-flow-navigator.pages.dev**",
 ]
 
 [functions.import-price-table]

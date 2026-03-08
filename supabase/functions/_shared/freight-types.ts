@@ -102,7 +102,7 @@ export interface FreightComponents {
   gris: number;
   tso: number;
   rctrc: number; // NTC: frete valor (= cargo_value * cost_value_percent); nome mantido compatibilidade UI
-  ad_valorem: number; // Sempre 0 (legado)
+  ad_valorem: number; // Lotação: cargo_value × ad_valorem_percent; Fracionado: 0
   tde: number; // TODO: generalidades NTC; por ora 0
   tear: number; // TODO: generalidades NTC; por ora 0
   dispatch_fee: number; // Taxa de Despacho (fracionado NTC: R$ por CTe)
@@ -120,6 +120,7 @@ export interface FreightRates {
   gris_percent: number;
   tso_percent: number;
   cost_value_percent: number; // Para RCTR-C
+  ad_valorem_percent?: number; // Ad Valorem Lotação (%)
   markup_percent: number;
   overhead_percent: number;
   tac_percent: number;
@@ -167,11 +168,12 @@ export interface CalculateFreightResponse {
   fallbacks_applied: string[];
   errors: string[];
 
-  /** v5: Risk pass-through revenue (GRIS/TSO/RCTR-C cobrados do cliente) */
+  /** v5: Risk pass-through revenue (GRIS/TSO/RCTR-C/Ad Valorem cobrados do cliente) */
   risk_pass_through?: {
     gris: number;
     tso: number;
     rctrc: number;
+    ad_valorem: number;
     total: number;
   };
 
