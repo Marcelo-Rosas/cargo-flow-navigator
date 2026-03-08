@@ -299,6 +299,9 @@ export interface StoredPricingBreakdown {
     regimeSimplesNacional?: boolean;
     excessoSublimite?: boolean;
 
+    /** Modo de cálculo ICMS: 'A' = alíquota fixa, 'B' = proporcional por UF */
+    icmsMode?: 'A' | 'B';
+
     /** Itens de carga/descarga (tabela) para herança na OS */
     unloadingCost?: Array<{
       id: string;
@@ -600,6 +603,35 @@ function getLtlWeightColumn(weightKg: number): string | null {
 }
 
 // ============================================
+// ICMS BASE CALCULATION
+// ============================================
+
+/**
+ * Calcula a base e o valor de ICMS a partir do breakdown armazenado.
+ * Mode A: alíquota fixa (rates.icmsPercent).
+ * Mode B: proporcional por UF (meta.kmByUf + rates por UF).
+ * Default: mode A.
+ */
+export function calcularBaseICMS(breakdown: StoredPricingBreakdown): {
+  mode: 'A' | 'B';
+  icmsPercent: number;
+  icmsValue: number;
+  baseCalculo: number;
+} {
+  const mode = breakdown.meta?.icmsMode ?? 'A';
+  const totalCliente = breakdown.totals?.totalCliente ?? 0;
+  const icmsPercent = breakdown.rates?.icmsPercent ?? 0;
+  const icmsValue = breakdown.totals?.icms ?? 0;
+
+  return {
+    mode,
+    icmsPercent,
+    icmsValue,
+    baseCalculo: totalCliente,
+  };
+}
+
+// ============================================
 // MAIN CALCULATION FUNCTION
 // ============================================
 
@@ -656,6 +688,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       overheadPercent: params.overheadPercent,
       targetMarginPercent: params.targetMarginPercent,
       markupScope: params.markupScope,
+      profitMarginPercent: 0,
     },
     totals: { receitaBruta: 0, das: 0, icms: 0, totalImpostos: 0, totalCliente: 0 },
     profitability: {
@@ -984,6 +1017,7 @@ export function buildStoredBreakdown(
       unloadingCost: input.extras?.unloadingCostItems,
       equipmentRental: input.extras?.equipmentRentalItems,
       kmByUf: input.kmByUf,
+      icmsMode: input.kmByUf && Object.keys(input.kmByUf).length > 0 ? 'B' : 'A',
     },
 
     weights: {
