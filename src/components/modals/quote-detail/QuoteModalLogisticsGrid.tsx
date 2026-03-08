@@ -12,7 +12,7 @@ interface QuoteModalLogisticsGridProps {
   volume?: number | null;
   kmDistance?: number | null;
   cargoType?: string | null;
-  /** Custo pago ao motorista (tabela NTC) para indicador R$/KM */
+  /** Custo efetivo pago ao motorista para indicador R$/KM */
   custoMotorista?: number | null;
   /** Total cobrado do cliente para indicador R$/KM */
   totalCliente?: number | null;

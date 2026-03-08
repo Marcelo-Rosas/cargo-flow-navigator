@@ -41,6 +41,11 @@ interface QuoteModalCostCompositionTabProps {
   anttRateCc?: number | null;
   hasAnttCalc: boolean;
   onSaveAntt?: () => Promise<void>;
+  /** Valor da carga (NF) para cálculo do seguro real */
+  cargoValue?: number;
+  /** Callback to recalculate freight (v4 → v5 upgrade) */
+  onRecalculate?: () => void;
+  isRecalculating?: boolean;
 }
 
 export function QuoteModalCostCompositionTab({
@@ -62,6 +67,9 @@ export function QuoteModalCostCompositionTab({
   anttRateCc,
   hasAnttCalc,
   onSaveAntt,
+  cargoValue = 0,
+  onRecalculate,
+  isRecalculating = false,
 }: QuoteModalCostCompositionTabProps) {
   if (!breakdown?.totals) {
     return <p className="text-sm text-muted-foreground">Nenhuma memória de cálculo disponível.</p>;
@@ -123,8 +131,28 @@ export function QuoteModalCostCompositionTab({
       composicaoRows.push({ label: 'TEAR (NTC)', value: breakdown.components.tear ?? 0 });
   }
 
+  const breakdownVersion = breakdown.version ?? 'legacy';
+  const isV5 = breakdownVersion.startsWith('5.');
+
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Badge variant={isV5 ? 'default' : 'secondary'} className="text-[10px]">
+            {isV5 ? 'v5 risk-aware' : `v4 (${breakdownVersion})`}
+          </Badge>
+          {breakdown.calculatedAt && (
+            <span className="text-[10px] text-muted-foreground">
+              {new Date(breakdown.calculatedAt).toLocaleString('pt-BR')}
+            </span>
+          )}
+        </div>
+        {!isV5 && onRecalculate && (
+          <Button variant="outline" size="sm" onClick={onRecalculate} disabled={isRecalculating}>
+            {isRecalculating ? 'Recalculando...' : 'Recalcular (v5)'}
+          </Button>
+        )}
+      </div>
       <Tabs defaultValue="memoria" className="w-full">
         <TabsList
           className={cn('grid w-full', hasFees ? 'grid-cols-4' : 'grid-cols-3', 'overflow-x-auto')}
@@ -285,8 +313,52 @@ export function QuoteModalCostCompositionTab({
                     -{formatCurrency(overhead)}
                   </TableCell>
                 </TableRow>
+                {/* Repasse de Risco (receita repassada ao cliente) */}
+                {(grisValue > 0 || tsoValue > 0 || rctrcValue > 0) && (
+                  <>
+                    <TableRow className="bg-emerald-50/50 dark:bg-emerald-900/10 border-l-4 border-l-emerald-500">
+                      <TableCell className="font-semibold">
+                        (+) Repasse de Risco (cobrado do cliente)
+                      </TableCell>
+                      <TableCell className="text-right font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                        {formatCurrency(grisValue + tsoValue + rctrcValue)}
+                      </TableCell>
+                    </TableRow>
+                    {grisValue > 0 && (
+                      <TableRow>
+                        <TableCell className="pl-8 text-muted-foreground">
+                          • GRIS ({breakdown.rates?.grisPercent?.toFixed(2) ?? 0}%)
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(grisValue)}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {tsoValue > 0 && (
+                      <TableRow>
+                        <TableCell className="pl-8 text-muted-foreground">
+                          • TSO ({breakdown.rates?.tsoPercent?.toFixed(2) ?? 0}%)
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(tsoValue)}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {rctrcValue > 0 && (
+                      <TableRow>
+                        <TableCell className="pl-8 text-muted-foreground">
+                          • RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2) ?? 0}%)
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(rctrcValue)}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                )}
+                {/* Custos Diretos */}
                 <TableRow className="bg-blue-50/50 dark:bg-blue-900/10 border-l-4 border-l-blue-500">
-                  <TableCell className="font-semibold">(-) Custo Repasse (Motorista)</TableCell>
+                  <TableCell className="font-semibold">(-) Custos Diretos</TableCell>
                   <TableCell />
                 </TableRow>
                 <TableRow>
@@ -305,36 +377,6 @@ export function QuoteModalCostCompositionTab({
                     </TableCell>
                   </TableRow>
                 )}
-                <TableRow className="bg-muted/10">
-                  <TableCell className="font-semibold">
-                    (-) Custos Variáveis de Risco (s/ NF)
-                  </TableCell>
-                  <TableCell />
-                </TableRow>
-                <TableRow>
-                  <TableCell className="pl-8 text-muted-foreground">
-                    • GRIS ({breakdown.rates?.grisPercent?.toFixed(2) ?? 0}%)
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-destructive">
-                    -{formatCurrency(grisValue)}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="pl-8 text-muted-foreground">
-                    • TSO ({breakdown.rates?.tsoPercent?.toFixed(2) ?? 0}%)
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-destructive">
-                    -{formatCurrency(tsoValue)}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="pl-8 text-muted-foreground">
-                    • RCTR-C ({breakdown.rates?.costValuePercent?.toFixed(2) ?? 0}%)
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-destructive">
-                    -{formatCurrency(rctrcValue)}
-                  </TableCell>
-                </TableRow>
                 {tdeValue > 0 && (
                   <TableRow>
                     <TableCell className="pl-8 text-muted-foreground">• TDE (NTC)</TableCell>
@@ -378,6 +420,35 @@ export function QuoteModalCostCompositionTab({
                       -{formatCurrency(custosDescarga)}
                     </TableCell>
                   </TableRow>
+                )}
+                {/* Custos Reais de Risco (seguro) */}
+                {cargoValue > 0 && (
+                  <>
+                    <TableRow className="bg-amber-50/50 dark:bg-amber-900/10 border-l-4 border-l-amber-500">
+                      <TableCell className="font-semibold">
+                        (-) Custos Reais de Risco (Seguro)
+                      </TableCell>
+                      <TableCell className="text-right font-bold tabular-nums text-destructive">
+                        -{formatCurrency(cargoValue * 0.0003)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        • RCTR-C (0,015% s/ {formatCurrency(cargoValue)})
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        -{formatCurrency(cargoValue * 0.00015)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        • RC-DC (0,015% s/ {formatCurrency(cargoValue)})
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        -{formatCurrency(cargoValue * 0.00015)}
+                      </TableCell>
+                    </TableRow>
+                  </>
                 )}
                 <TableRow
                   className={cn(
@@ -423,24 +494,15 @@ export function QuoteModalCostCompositionTab({
           {/* Nota de Auditoria Financeira */}
           <div className="mt-6 p-4 rounded-md bg-muted/50 border border-muted-foreground/10">
             <p className="text-[11px] leading-relaxed text-muted-foreground italic">
-              <strong>Nota de Auditoria:</strong> O Resultado Líquido exibido foi calculado através
-              do modelo{' '}
-              <span className="font-semibold text-foreground">Gross-up (Asset-Light)</span>,
-              utilizando os parâmetros das Regras de Precificação vigentes no momento da criação
-              desta cotação:{' '}
-              <span className="font-medium text-foreground">
-                Overhead {breakdown.rates?.overheadPercent?.toFixed(2) ?? '—'}%
-              </span>
-              ,{' '}
-              <span className="font-medium text-foreground">
-                Margem Alvo {targetMarginPercent?.toFixed(2) ?? '—'}%
-              </span>
-              . Os custos de risco (GRIS, TSO e RCTR-C) são calculados sobre o{' '}
-              <span className="font-medium text-foreground">Valor da Nota Fiscal (Valor NF)</span>{' '}
-              conforme tabelas NTC. O &quot;Custo Motorista&quot; corresponde ao{' '}
-              <span className="font-medium text-foreground">Frete Base</span> da Memória de Cálculo.
-              Para conferência, utilize a calculadora na tela de{' '}
-              <span className="underline">Regras de Precificação</span>.
+              <strong>Nota de Auditoria (DRE v5):</strong> GRIS, TSO e RCTR-C são classificados como{' '}
+              <span className="font-semibold text-foreground">Repasse de Risco</span> (receita
+              cobrada do embarcador). Os{' '}
+              <span className="font-semibold text-foreground">Custos Reais de Risco</span>{' '}
+              correspondem ao prêmio de seguro (RCTR-C 0,015% + RC-DC 0,015% sobre o valor da
+              carga). O Resultado Líquido usa modelo{' '}
+              <span className="font-semibold text-foreground">Gross-up (Asset-Light)</span> com
+              Overhead {breakdown.rates?.overheadPercent?.toFixed(2) ?? '—'}% e Margem Alvo{' '}
+              {targetMarginPercent?.toFixed(2) ?? '—'}%.
             </p>
           </div>
           {breakdown.meta?.ltlMinWeightApplied && (

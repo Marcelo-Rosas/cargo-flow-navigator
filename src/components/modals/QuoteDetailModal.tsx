@@ -656,6 +656,11 @@ export function QuoteDetailModal({
                 anttRateCc={anttRate?.cc}
                 hasAnttCalc={!!anttCalc}
                 onSaveAntt={handleSaveAntt}
+                cargoValue={Number(quote?.cargo_value) || 0}
+                onRecalculate={handleRecalcular}
+                isRecalculating={
+                  calculateFreightMutation.isPending || updateQuoteMutation.isPending
+                }
               />
             </TabsContent>
 
