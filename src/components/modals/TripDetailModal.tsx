@@ -1,4 +1,5 @@
-import { Truck, DollarSign, Loader2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { Truck, DollarSign, Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -14,6 +15,8 @@ import { useTrip, useTripCostItems, useTripOrdersWithOrders } from '@/hooks/useT
 import { useTripReconciliation } from '@/hooks/useReconciliation';
 import { useTripFinancialSummary } from '@/hooks/useTripFinancialSummary';
 import { useTripFinancialDetails } from '@/hooks/useTripFinancialDetails';
+import { useRiskEvaluationByEntity, useTripOrdersRiskStatus } from '@/hooks/useRiskEvaluation';
+import { CRITICALITY_CONFIG, REQUIREMENT_LABELS } from '@/types/risk';
 import { cn } from '@/lib/utils';
 
 interface TripDetailModalProps {
@@ -58,6 +61,35 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
   const { data: reconciliation } = useTripReconciliation(tripId);
   const { data: summary } = useTripFinancialSummary(tripId);
   const { data: financialDetails } = useTripFinancialDetails(tripId);
+
+  // VG Risk
+  const orderIds = useMemo(
+    () => tripOrders?.map((to) => to.order_id).filter((id): id is string => !!id),
+    [tripOrders]
+  );
+  const { data: tripRiskEval } = useRiskEvaluationByEntity('trip', tripId ?? undefined);
+  const { data: orderRiskStatuses } = useTripOrdersRiskStatus(orderIds);
+
+  const vgSummary = useMemo(() => {
+    if (!orderRiskStatuses || orderRiskStatuses.length === 0) return null;
+    const totalCargoValue = orderRiskStatuses.reduce(
+      (sum, s) => sum + Number(s.cargo_value ?? 0),
+      0
+    );
+    const allApproved = orderRiskStatuses.every(
+      (s) => s.risk_status === 'approved' || s.risk_status === null
+    );
+    const totalRiskCost = orderRiskStatuses.reduce(
+      (sum, s) => sum + Number(s.total_risk_cost ?? 0),
+      0
+    );
+    return {
+      orderCount: orderRiskStatuses.length,
+      totalCargoValue,
+      allApproved,
+      totalRiskCost,
+    };
+  }, [orderRiskStatuses]);
 
   const hasRealDetails = (financialDetails?.length ?? 0) > 0;
   const receitaRealTotal =
@@ -108,6 +140,120 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
         </DialogHeader>
 
         <div className="space-y-6 pt-2">
+          {/* Painel VG — Risco */}
+          {(tripRiskEval || vgSummary) && (
+            <div className="p-4 rounded-lg border border-border space-y-3 bg-muted/20">
+              <h4 className="font-semibold text-foreground flex items-center gap-2">
+                {vgSummary?.allApproved ? (
+                  <ShieldCheck className="w-4 h-4 text-green-600" />
+                ) : (
+                  <ShieldAlert className="w-4 h-4 text-yellow-600" />
+                )}
+                Risco / VG
+                {tripRiskEval && (
+                  <Badge
+                    variant={
+                      CRITICALITY_CONFIG[tripRiskEval.criticality]?.badgeVariant ?? 'secondary'
+                    }
+                    className="ml-1 text-[10px]"
+                  >
+                    {CRITICALITY_CONFIG[tripRiskEval.criticality]?.label ??
+                      tripRiskEval.criticality}
+                  </Badge>
+                )}
+                {tripRiskEval && (
+                  <Badge variant="outline" className="text-[10px]">
+                    {tripRiskEval.status}
+                  </Badge>
+                )}
+              </h4>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                {vgSummary && (
+                  <>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Valor carga (soma)</p>
+                      <p className="font-semibold">{formatCurrency(vgSummary.totalCargoValue)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Ordens</p>
+                      <p className="font-semibold">{vgSummary.orderCount}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Custo risco</p>
+                      <p className="font-semibold">{formatCurrency(vgSummary.totalRiskCost)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">VG Gate</p>
+                      <p
+                        className={cn(
+                          'font-semibold',
+                          vgSummary.allApproved ? 'text-green-600' : 'text-yellow-600'
+                        )}
+                      >
+                        {vgSummary.allApproved ? 'Liberado' : 'Pendente'}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Per-order risk status */}
+              {orderRiskStatuses && orderRiskStatuses.length > 0 && (
+                <div className="rounded-lg border overflow-hidden mt-2">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>OS</TableHead>
+                        <TableHead>Criticidade</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Custo risco</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {orderRiskStatuses.map((s) => (
+                        <TableRow key={s.order_id}>
+                          <TableCell className="font-mono">
+                            {s.os_number ?? s.order_id.slice(0, 8)}
+                          </TableCell>
+                          <TableCell>
+                            {s.criticality ? (
+                              <Badge
+                                variant={
+                                  CRITICALITY_CONFIG[s.criticality]?.badgeVariant ?? 'secondary'
+                                }
+                                className="text-[10px]"
+                              >
+                                {CRITICALITY_CONFIG[s.criticality]?.label ?? s.criticality}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">N/A</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {s.risk_status ? (
+                              <Badge
+                                variant={s.risk_status === 'approved' ? 'default' : 'outline'}
+                                className="text-[10px]"
+                              >
+                                {s.risk_status}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(s.total_risk_cost)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Resumo financeiro */}
           {summary && (
             <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-3">

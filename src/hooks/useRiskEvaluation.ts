@@ -169,6 +169,26 @@ export function useOrderRiskStatus(orderId: string | undefined) {
   });
 }
 
+/** Aggregate risk status for all orders in a trip (VG panel) */
+export function useTripOrdersRiskStatus(orderIds: string[] | undefined) {
+  return useQuery({
+    queryKey: ['trip-orders-risk-status', orderIds],
+    queryFn: async () => {
+      if (!orderIds || orderIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('vw_order_risk_status' as 'documents')
+        .select('*')
+        .in('order_id', orderIds);
+      if (error) {
+        if (error.code === '42P01') return [];
+        throw error;
+      }
+      return (data ?? []) as unknown as OrderRiskStatus[];
+    },
+    enabled: !!orderIds && orderIds.length > 0,
+  });
+}
+
 // ─────────────────────────────────────────────────────
 // Criticality Evaluator (client-side)
 // ─────────────────────────────────────────────────────
