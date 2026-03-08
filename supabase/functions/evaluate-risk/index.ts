@@ -313,6 +313,40 @@ Deno.serve(async (req) => {
     const canAutoApprove =
       (criticality === 'LOW' || criticality === 'MEDIUM') && requirements.length <= 2;
 
+    // 8. Create approval_request for HIGH/CRITICAL (manual approval required)
+    let approvalRequestId: string | null = null;
+    if (!canAutoApprove) {
+      const { data: approvalData } = await supabase
+        .from('approval_requests')
+        .insert({
+          entity_type: 'order',
+          entity_id: body.order_id,
+          approval_type: 'risk_gate',
+          status: 'pending',
+          assigned_to_role: 'admin',
+          title: `Aprovação de Risco — OS ${body.order_id.slice(0, 8)}`,
+          description: `Criticidade: ${criticality}. Valor carga: R$ ${cargoValue.toLocaleString('pt-BR')}. Requisitos: ${requirements.join(', ')}.`,
+          ai_analysis: {
+            criticality,
+            cargo_value: cargoValue,
+            requirements,
+            estimated_costs: estimatedCosts,
+            route_municipalities: routeMunicipalities,
+          },
+        })
+        .select('id')
+        .single();
+
+      if (approvalData) {
+        approvalRequestId = approvalData.id;
+        // Link approval to evaluation
+        await supabase
+          .from('risk_evaluations')
+          .update({ approval_request_id: approvalRequestId })
+          .eq('id', evaluationId);
+      }
+    }
+
     return json({
       success: true,
       evaluation: {
@@ -326,6 +360,7 @@ Deno.serve(async (req) => {
         route_municipalities: routeMunicipalities,
         policy_rules_applied: matchedRuleIds,
         can_auto_approve: canAutoApprove,
+        approval_request_id: approvalRequestId,
       },
       trip_evaluation: tripEvaluation,
       estimated_costs: {
