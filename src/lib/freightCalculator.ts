@@ -361,6 +361,8 @@ export interface StoredPricingBreakdown {
     receitaBruta: number;
     das: number;
     icms: number;
+    tacAdjustment?: number;
+    paymentAdjustment?: number;
     totalImpostos: number;
     totalCliente: number;
   };
@@ -393,6 +395,13 @@ export interface StoredPricingBreakdown {
   };
 
   conditionalFeesBreakdown?: Record<string, number>;
+
+  /** v5: Risk costs estimated by evaluate-risk Edge function */
+  riskCosts?: {
+    items: Array<{ code: string; name: string; cost: number }>;
+    total: number;
+    criticality?: string;
+  };
 }
 
 // ============================================
@@ -841,7 +850,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
     excessoSublimite
   );
 
-  // receitaBruta do gross-up = totalCliente - das - icms (receita líquida de impostos)
+  // receitaBruta = totalCliente (gross revenue); receitaLiquida = totalCliente - impostos
   const totalImpostos = round2(das + icms);
   const receitaLiquida = round2(totalCliente - totalImpostos);
 
@@ -919,7 +928,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       markupScope: params.markupScope,
     },
     totals: {
-      receitaBruta: receitaLiquida,
+      receitaBruta: totalCliente,
       das,
       icms,
       totalImpostos,
@@ -953,7 +962,7 @@ export function buildStoredBreakdown(
 ): StoredPricingBreakdown {
   return {
     calculatedAt: new Date().toISOString(),
-    version: '4.0-fob-lotacao-markup-scope',
+    version: '5.0-risk-aware',
     status: output.status,
     error: output.error,
 
@@ -1015,9 +1024,7 @@ export function buildStoredBreakdown(
       profitMarginPercent: (output.rates as { profitMarginPercent?: number }).profitMarginPercent,
     },
 
-    conditionalFeesBreakdown:
-      Object.keys(output.conditionalFeesBreakdown).length > 0
-        ? output.conditionalFeesBreakdown
-        : undefined,
+    // v5: conditional_fees managed via Taxas Adicionais (pricing_rules)
+    conditionalFeesBreakdown: undefined,
   };
 }

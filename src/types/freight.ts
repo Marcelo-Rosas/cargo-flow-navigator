@@ -79,12 +79,16 @@ export interface FreightTotals {
 
 export interface FreightProfitability {
   custos_carreteiro: number;
+  custo_motorista?: number;
   custos_descarga: number;
   custos_diretos: number;
+  receita_liquida?: number;
   margem_bruta: number;
   overhead: number;
   resultado_liquido: number;
   margem_percent: number;
+  profit_margin_target?: number;
+  regime_fiscal?: 'simples_nacional' | 'excesso_sublimite' | 'normal';
 }
 
 export interface CalculateFreightResponse {

@@ -127,13 +127,13 @@ export interface FreightRates {
 }
 
 export interface FreightTotals {
-  receita_bruta: number; // Soma de components
+  receita_bruta: number; // = total_cliente (gross revenue, before tax deductions)
   das: number;
   icms: number;
   tac_adjustment: number;
   payment_adjustment: number;
   total_impostos: number; // das + icms
-  total_cliente: number; // receita_bruta + total_impostos
+  total_cliente: number; // = receita_bruta (price to client)
 }
 
 export interface FreightProfitability {

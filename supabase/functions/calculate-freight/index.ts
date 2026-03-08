@@ -884,7 +884,7 @@ Deno.serve(async (req) => {
     };
 
     const totals: FreightTotals = {
-      receita_bruta: receitaLiquida,
+      receita_bruta: roundCurrency(totalCliente),
       das,
       icms: roundCurrency(icms),
       tac_adjustment: roundCurrency(tacAdjustment),

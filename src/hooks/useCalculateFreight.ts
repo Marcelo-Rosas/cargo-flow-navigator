@@ -104,13 +104,17 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
       totalCliente: response.totals.total_cliente,
     },
     profitability: {
+      custoMotorista: response.profitability.custo_motorista,
       custosCarreteiro: response.profitability.custos_carreteiro,
       custosDescarga: response.profitability.custos_descarga,
       custosDiretos: response.profitability.custos_diretos,
+      receitaLiquida: response.profitability.receita_liquida,
       margemBruta: response.profitability.margem_bruta,
       overhead: response.profitability.overhead,
       resultadoLiquido: response.profitability.resultado_liquido,
       margemPercent: response.profitability.margem_percent,
+      profitMarginTarget: response.profitability.profit_margin_target,
+      regimeFiscal: response.profitability.regime_fiscal,
     },
     conditionalFeesBreakdown: response.conditional_fees_breakdown,
     fallbacksApplied: response.fallbacks_applied,
@@ -129,7 +133,12 @@ export function buildStoredBreakdownFromEdgeResponse(
       equipmentRental?: unknown[];
     };
     components?: { aluguelMaquinas?: number };
-  } | null
+  } | null,
+  riskCosts?: {
+    items: Array<{ code: string; name: string; cost: number }>;
+    total: number;
+    criticality?: string;
+  }
 ) {
   const c = response.components;
   const wKg = response.meta.billable_weight_kg ?? 0;
@@ -137,7 +146,7 @@ export function buildStoredBreakdownFromEdgeResponse(
   const tonBillable = Math.round((wKg / 1000) * 100) / 100;
   return {
     calculatedAt: new Date().toISOString(),
-    version: '4.0-fob-lotacao-markup-scope',
+    version: '5.0-risk-aware',
     status: response.status,
     error: response.error,
     meta: {
@@ -187,13 +196,17 @@ export function buildStoredBreakdownFromEdgeResponse(
       totalCliente: response.totals.total_cliente,
     },
     profitability: {
+      custoMotorista: response.profitability.custo_motorista,
       custosCarreteiro: response.profitability.custos_carreteiro,
       custosDescarga: response.profitability.custos_descarga,
       custosDiretos: response.profitability.custos_diretos,
+      receitaLiquida: response.profitability.receita_liquida,
       margemBruta: response.profitability.margem_bruta,
       overhead: response.profitability.overhead,
       resultadoLiquido: response.profitability.resultado_liquido,
       margemPercent: response.profitability.margem_percent,
+      profitMarginTarget: response.profitability.profit_margin_target,
+      regimeFiscal: response.profitability.regime_fiscal,
     },
     rates: {
       dasPercent: response.rates.das_percent,
@@ -203,11 +216,11 @@ export function buildStoredBreakdownFromEdgeResponse(
       costValuePercent: response.rates.cost_value_percent,
       markupPercent: response.rates.markup_percent,
       overheadPercent: response.rates.overhead_percent,
-      targetMarginPercent: 15,
+      targetMarginPercent: response.profitability.profit_margin_target ?? 15,
     },
-    conditionalFeesBreakdown:
-      Object.keys(response.conditional_fees_breakdown || {}).length > 0
-        ? response.conditional_fees_breakdown
-        : undefined,
+    // v5: conditional_fees are managed via Taxas Adicionais (pricing_rules),
+    // not embedded in breakdown. Kept only for legacy v4 breakdowns.
+    conditionalFeesBreakdown: undefined,
+    riskCosts: riskCosts ?? undefined,
   };
 }
