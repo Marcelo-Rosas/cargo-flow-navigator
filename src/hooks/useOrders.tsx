@@ -46,6 +46,7 @@ export interface OrderWithOccurrences extends Order {
         | 'km_distance'
         | 'vehicle_type_id'
         | 'pricing_breakdown'
+        | 'cargo_value'
       > & {
         vehicle_type?: {
           axes_count: number | null;
@@ -84,6 +85,7 @@ export function useOrders() {
             km_distance,
             vehicle_type_id,
             pricing_breakdown,
+            cargo_value,
             vehicle_type:vehicle_types (
               axes_count,
               code,
@@ -128,6 +130,7 @@ export function useOrder(id: string) {
             km_distance,
             vehicle_type_id,
             pricing_breakdown,
+            cargo_value,
             vehicle_type:vehicle_types (
               axes_count,
               code,
