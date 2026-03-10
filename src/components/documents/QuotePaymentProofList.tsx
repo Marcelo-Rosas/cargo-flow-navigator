@@ -22,6 +22,7 @@ import {
   useQuoteReconciliation,
   useUpsertQuotePaymentProofAmount,
   useUpdateQuotePaymentProofAmount,
+  useUpdatePaymentProofDeltaReason,
 } from '@/hooks/useQuotePaymentProofs';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -64,6 +65,7 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
   const { data: reconciliation } = useQuoteReconciliation(quoteId);
   const updateMutation = useUpdateQuotePaymentProofAmount();
   const upsertMutation = useUpsertQuotePaymentProofAmount();
+  const deltaReasonMutation = useUpdatePaymentProofDeltaReason();
   const deleteDocMutation = useDeleteDocument();
   const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -108,6 +110,7 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
         expected: number | null;
         received: number | null;
         deltaReason: string | null;
+        proofIds: string[];
       }
     >();
     for (const proof of proofs ?? []) {
@@ -117,23 +120,29 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
         expected: null,
         received: null,
         deltaReason: null,
+        proofIds: [],
       };
       existing.expected = (existing.expected ?? 0) + Number(proof.expected_amount ?? 0);
       existing.received = (existing.received ?? 0) + Number(proof.amount ?? 0);
+      if (proof.delta_reason) existing.deltaReason = proof.delta_reason;
+      existing.proofIds.push(proof.id);
       lines.set(pt, existing);
     }
     // Order: adiantamento, saldo, a_vista, a_prazo
     const order = ['adiantamento', 'saldo', 'a_vista', 'a_prazo'];
-    return order
-      .filter((pt) => lines.has(pt))
-      .map((pt) => ({ ...lines.get(pt)!, deltaReason: deltaReasons[pt] ?? null }));
-  }, [proofs, deltaReasons]);
+    return order.filter((pt) => lines.has(pt)).map((pt) => lines.get(pt)!);
+  }, [proofs]);
 
-  const [deltaReasons, setDeltaReasons] = useState<Record<string, string>>({});
-
-  const handleDeltaReasonChange = (proofType: string, reason: string) => {
-    setDeltaReasons((prev) => ({ ...prev, [proofType]: reason }));
-    // TODO: persist to database when reconciliation_notes column exists
+  const handleDeltaReasonChange = async (proofIds: string[], reason: string) => {
+    const value = reason || null;
+    try {
+      await Promise.all(
+        proofIds.map((id) => deltaReasonMutation.mutateAsync({ id, deltaReason: value }))
+      );
+      toast.success('Motivo salvo');
+    } catch {
+      toast.error('Erro ao salvar motivo');
+    }
   };
 
   const handleStartEdit = (documentId: string, amount: number | null) => {
@@ -265,9 +274,8 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
                           <select
                             className="text-xs border rounded px-1 py-0.5 bg-background"
                             value={line.deltaReason ?? ''}
-                            onChange={(e) =>
-                              handleDeltaReasonChange(line.proofType, e.target.value)
-                            }
+                            onChange={(e) => handleDeltaReasonChange(line.proofIds, e.target.value)}
+                            disabled={deltaReasonMutation.isPending}
                           >
                             <option value="">Selecionar...</option>
                             {DELTA_REASONS.map((r) => (

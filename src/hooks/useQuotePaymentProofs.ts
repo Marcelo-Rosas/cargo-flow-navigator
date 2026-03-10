@@ -10,6 +10,7 @@ interface QuotePaymentProof {
   proof_type: 'a_vista' | 'adiantamento' | 'saldo' | 'a_prazo';
   amount: number | null;
   expected_amount: number | null;
+  delta_reason: string | null;
   status: string;
   created_at: string;
   document?: {
@@ -85,6 +86,23 @@ export function useUpdateQuotePaymentProofAmount() {
       const { error } = await supabase
         .from('quote_payment_proofs' as never)
         .update({ amount, updated_at: new Date().toISOString() } as never)
+        .eq('id', asDb(id));
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quote_payment_proofs'] });
+      queryClient.invalidateQueries({ queryKey: ['quote_reconciliation'] });
+    },
+  });
+}
+
+export function useUpdatePaymentProofDeltaReason() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, deltaReason }: { id: string; deltaReason: string | null }) => {
+      const { error } = await supabase
+        .from('quote_payment_proofs' as never)
+        .update({ delta_reason: deltaReason, updated_at: new Date().toISOString() } as never)
         .eq('id', asDb(id));
       if (error) throw error;
     },
