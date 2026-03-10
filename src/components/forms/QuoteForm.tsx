@@ -303,6 +303,7 @@ const quoteSchema = z
     // Condição financeira: datas manuais (adiantamento, à vista, saldo)
     advance_due_date: z.string().optional(),
     balance_due_date: z.string().optional(),
+    estimated_loading_date: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     // Validação cross-field: se ambas as datas estiverem preenchidas,
@@ -411,6 +412,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       notes: '',
       advance_due_date: '',
       balance_due_date: '',
+      estimated_loading_date: '',
     },
   });
 
@@ -802,6 +804,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         notes: quote.notes || '',
         advance_due_date: (quote as { advance_due_date?: string | null })?.advance_due_date || '',
         balance_due_date: (quote as { balance_due_date?: string | null })?.balance_due_date || '',
+        estimated_loading_date:
+          ((quote as unknown as Record<string, unknown>).estimated_loading_date as string) || '',
       });
     } else {
       setAdditionalFeesSelection(defaultAdditionalFeesSelection);
@@ -1207,6 +1211,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         notes: data.notes || null,
         advance_due_date: data.advance_due_date?.trim() || null,
         balance_due_date: data.balance_due_date?.trim() || null,
+        estimated_loading_date: data.estimated_loading_date?.trim() || null,
       };
 
       if (isEditing && quote) {

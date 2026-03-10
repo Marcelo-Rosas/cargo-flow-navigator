@@ -11,7 +11,8 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
-import { Plus, Filter, Search } from 'lucide-react';
+import { Plus, Filter, Search, CalendarDays } from 'lucide-react';
+import { LoadingFollowUpPanel } from '@/components/commercial/LoadingFollowUpPanel';
 import { KanbanSkeleton } from '@/components/skeletons/KanbanSkeleton';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { KanbanColumn } from '@/components/boards/KanbanColumn';
@@ -50,6 +51,7 @@ export default function Commercial() {
   const updateStageMutation = useUpdateQuoteStage();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFollowUp, setShowFollowUp] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
   const [emailingQuote, setEmailingQuote] = useState<Quote | null>(null);
@@ -316,6 +318,14 @@ export default function Commercial() {
           <Button variant="outline" size="icon" aria-label="Filtrar cotações">
             <Filter className="w-4 h-4" />
           </Button>
+          <Button
+            variant={showFollowUp ? 'default' : 'outline'}
+            size="icon"
+            aria-label="Follow-up de carregamento"
+            onClick={() => setShowFollowUp((v) => !v)}
+          >
+            <CalendarDays className="w-4 h-4" />
+          </Button>
           {canManageCommercial && (
             <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
               <Plus className="w-4 h-4" />
@@ -324,6 +334,8 @@ export default function Commercial() {
           )}
         </div>
       </div>
+
+      {showFollowUp && <LoadingFollowUpPanel />}
 
       {/* Loading State */}
       {isLoading ? (

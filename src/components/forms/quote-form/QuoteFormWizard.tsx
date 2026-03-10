@@ -70,7 +70,13 @@ interface QuoteFormWizardProps {
   // Cargo & Logistics step
   priceTablesFiltered: { id: string; name: string; modality: string | null }[];
   vehicleTypes: { id: string; name: string; code: string }[];
-  paymentTerms: { id: string; name: string; adjustment_percent?: number | null }[];
+  paymentTerms: {
+    id: string;
+    name: string;
+    adjustment_percent?: number | null;
+    advance_percent?: number | null;
+    days?: number;
+  }[];
   weightUnit: 'kg' | 'ton';
   setWeightUnit: (unit: 'kg' | 'ton') => void;
   // Pricing step

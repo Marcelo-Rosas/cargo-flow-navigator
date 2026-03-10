@@ -14,6 +14,14 @@ interface PaymentTerm {
   days: number;
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  pix: 'PIX',
+  boleto: 'Boleto',
+  cartao: 'Cartão',
+  transferencia: 'Transferência',
+  outro: 'Outro',
+};
+
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
@@ -46,9 +54,21 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
   const kmBand = (meta?.kmBandLabel as string) || '';
   const routeUf = (meta?.routeUfLabel as string) || '';
 
+  const profitability = breakdown?.profitability as Record<string, unknown> | null;
+  const rates = breakdown?.rates as Record<string, unknown> | null;
+
   const toll = components?.toll as number | null;
   const insurance = components?.insurance as number | null;
-  const taxTotal = totals?.taxes as number | null;
+  const aluguelMaquinas = components?.aluguelMaquinas as number | null;
+  const custosDescarga = profitability?.custosDescarga as number | null;
+
+  // Taxes
+  const das = totals?.das as number | null;
+  const dasPercent = rates?.dasPercent as number | null;
+
+  // Payment method
+  const paymentMethod = (quote.payment_method as string) || '';
+  const paymentMethodLabel = PAYMENT_METHOD_LABELS[paymentMethod] || '';
 
   // Payment calculations
   const advancePercent = paymentTerm?.advance_percent ?? 0;
@@ -82,9 +102,13 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
 
   // Build pricing rows
   const pricingRows: string[] = [];
-  if (toll != null) pricingRows.push(pricingRow('Pedágio', formatBRL(toll)));
-  if (insurance != null) pricingRows.push(pricingRow('Seguro', formatBRL(insurance)));
-  if (taxTotal != null) pricingRows.push(pricingRow('Impostos', formatBRL(taxTotal), true));
+  if (toll != null && toll > 0) pricingRows.push(pricingRow('Pedágio', formatBRL(toll)));
+  if (insurance != null && insurance > 0)
+    pricingRows.push(pricingRow('Seguro', formatBRL(insurance)));
+  if (aluguelMaquinas != null && aluguelMaquinas > 0)
+    pricingRows.push(pricingRow('Aluguel de Máquinas', formatBRL(aluguelMaquinas)));
+  if (custosDescarga != null && custosDescarga > 0)
+    pricingRows.push(pricingRow('Descarga', formatBRL(custosDescarga)));
   // Mark last row
   if (pricingRows.length > 0) {
     pricingRows[pricingRows.length - 1] = pricingRows[pricingRows.length - 1].replace(
@@ -92,6 +116,19 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
       ''
     );
   }
+
+  // Build tax section
+  const hasTaxInfo = das != null && das > 0;
+  const taxHtml = hasTaxInfo
+    ? `
+    ${sectionHeader('Impostos')}
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef9f0;border-left:4px solid #FF8C00;border-radius:6px;overflow:hidden;margin-bottom:24px;">
+      <tr>
+        <td style="padding:12px 14px;color:#7f8c8d;font-size:13px;font-weight:500;">DAS Simples Nacional${dasPercent ? ` (${dasPercent}%)` : ''}</td>
+        <td style="padding:12px 14px;color:#003d66;font-size:13px;font-weight:600;text-align:right;">${formatBRL(das!)}</td>
+      </tr>
+    </table>`
+    : '';
 
   // Build route info rows
   const routeRows: string[] = [];
@@ -104,19 +141,29 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
       infoRow('Tipo Frete', `${freightType}${modalityLabel ? ` — ${modalityLabel}` : ''}`, true)
     );
 
-  // Payment section (only if paymentTerm exists)
-  const paymentHtml = paymentTerm
+  // Payment section (show if paymentTerm or paymentMethod exists)
+  const hasPaymentInfo = paymentTerm || paymentMethodLabel;
+  const paymentHtml = hasPaymentInfo
     ? `
     <!-- Payment Condition -->
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border-left:4px solid #0076BE;border-radius:6px;margin-bottom:24px;">
       <tr>
         <td colspan="2" style="padding:16px 16px 6px;">
           <p style="margin:0 0 12px;color:#003d66;font-size:11px;text-transform:uppercase;letter-spacing:1.2px;font-weight:800;">Condição de Pagamento</p>
-          <p style="margin:0 0 12px;padding:0 0 12px;border-bottom:1px solid rgba(0,61,102,0.2);color:#003d66;font-size:13px;font-weight:600;">${paymentTerm.name}</p>
+          ${paymentTerm ? `<p style="margin:0 0 12px;padding:0 0 12px;border-bottom:1px solid rgba(0,61,102,0.2);color:#003d66;font-size:13px;font-weight:600;">${paymentTerm.name}</p>` : ''}
         </td>
       </tr>
       ${
-        advancePercent > 0
+        paymentMethodLabel
+          ? `
+      <tr>
+        <td style="padding:6px 16px;color:#7f8c8d;font-size:12px;font-weight:500;">Forma de Pagamento</td>
+        <td style="padding:6px 16px;color:#003d66;font-size:12px;font-weight:600;text-align:right;">${paymentMethodLabel}</td>
+      </tr>`
+          : ''
+      }
+      ${
+        paymentTerm && advancePercent > 0
           ? `
       <tr>
         <td style="padding:6px 16px;color:#7f8c8d;font-size:12px;font-weight:500;">Adiantamento (${advancePercent}%)</td>
@@ -126,12 +173,15 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
         <td style="padding:6px 16px 16px;color:#7f8c8d;font-size:12px;font-weight:500;">Saldo (${balancePercent}%)</td>
         <td style="padding:6px 16px 16px;color:#003d66;font-size:12px;font-weight:600;text-align:right;">${formatBRL(balanceAmount)}</td>
       </tr>`
-          : `
+          : paymentTerm
+            ? `
       <tr>
         <td colspan="2" style="padding:0 16px 16px;color:#7f8c8d;font-size:12px;">
           Prazo: ${paymentTerm.days} dias
         </td>
       </tr>`
+            : `
+      <tr><td colspan="2" style="padding:0 16px 16px;">&nbsp;</td></tr>`
       }
     </table>`
     : '';
@@ -205,6 +255,8 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
                 <td style="padding:20px 16px;color:#FF8C00;font-size:28px;font-weight:700;text-align:right;">${formatBRL(value)}</td>
               </tr>
             </table>
+
+            ${taxHtml}
 
             ${paymentHtml}
 

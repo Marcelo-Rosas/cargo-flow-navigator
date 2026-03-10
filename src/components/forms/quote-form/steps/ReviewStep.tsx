@@ -1,9 +1,19 @@
 import type { UseFormReturn } from 'react-hook-form';
-import { CheckCircle2, MapPin, Truck, DollarSign, FileText } from 'lucide-react';
+import { CheckCircle2, MapPin, Truck, DollarSign, FileText, CalendarDays } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { formatCurrency } from '@/lib/formatters';
 import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import type { QuoteFormData } from '../types';
+import { PAYMENT_METHOD_LABELS } from '@/types/pricing';
+
+function formatDateBR(d: string | undefined): string {
+  if (!d) return '—';
+  try {
+    return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR');
+  } catch {
+    return d;
+  }
+}
 
 interface ReviewStepProps {
   form: UseFormReturn<QuoteFormData>;
@@ -127,6 +137,53 @@ export function ReviewStep({
           </div>
         </div>
       </div>
+
+      {/* Card: Condição de Pagamento e Previsão */}
+      {(values.payment_method ||
+        values.advance_due_date ||
+        values.balance_due_date ||
+        values.estimated_loading_date) && (
+        <div className="border rounded-xl p-5 space-y-4 bg-card/50">
+          <div className="flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
+            <CalendarDays className="w-4 h-4" /> Pagamento e Datas
+          </div>
+          <div className="space-y-2 text-sm">
+            {values.payment_method && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Forma de Pagamento:</span>
+                <span className="font-medium">
+                  {PAYMENT_METHOD_LABELS[
+                    values.payment_method as keyof typeof PAYMENT_METHOD_LABELS
+                  ] || values.payment_method}
+                </span>
+              </div>
+            )}
+            {values.advance_due_date && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Data Adiantamento/À Vista:</span>
+                <span className="font-medium">{formatDateBR(values.advance_due_date)}</span>
+              </div>
+            )}
+            {values.balance_due_date && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Data Saldo/Vencimento:</span>
+                <span className="font-medium">{formatDateBR(values.balance_due_date)}</span>
+              </div>
+            )}
+            {values.estimated_loading_date && (
+              <>
+                <Separator />
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Previsão de Carregamento:</span>
+                  <span className="font-semibold text-primary">
+                    {formatDateBR(values.estimated_loading_date)}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Observações */}
       {values.notes && (

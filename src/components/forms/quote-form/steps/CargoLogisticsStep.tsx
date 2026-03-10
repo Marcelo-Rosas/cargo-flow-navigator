@@ -38,6 +38,8 @@ interface PaymentTerm {
   id: string;
   name: string;
   adjustment_percent?: number | null;
+  advance_percent?: number | null;
+  days?: number;
 }
 
 interface CargoLogisticsStepProps {
@@ -55,6 +57,11 @@ export function CargoLogisticsStep({
   weightUnit,
   setWeightUnit,
 }: CargoLogisticsStepProps) {
+  const watchedPaymentTermId = form.watch('payment_term_id');
+  const selectedTerm = paymentTerms.find((t) => t.id === watchedPaymentTermId) ?? null;
+  const advPercent = selectedTerm?.advance_percent ?? 0;
+  const termDays = selectedTerm?.days ?? 0;
+
   const watchedWeight = form.watch('weight');
   const watchedVolume = form.watch('volume');
   const weightKg = unitToKg(Number(watchedWeight || 0), weightUnit);
@@ -299,6 +306,106 @@ export function CargoLogisticsStep({
             )}
           />
         </div>
+
+        {/* Condição Financeira: datas condicionais ao prazo selecionado */}
+        {selectedTerm && (
+          <div className="space-y-3 rounded-lg border border-dashed p-3">
+            <h4 className="text-sm font-medium">Condição Financeira</h4>
+            {advPercent > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="advance_due_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Data adiantamento ({advPercent}%)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="balance_due_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Data saldo ({100 - advPercent}%)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            ) : termDays === 0 ? (
+              <FormField
+                control={form.control}
+                name="advance_due_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Data do pagamento (à vista)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name="balance_due_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Data de vencimento</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Previsão de Carregamento */}
+        <FormField
+          control={form.control}
+          name="estimated_loading_date"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Previsão de Carregamento</FormLabel>
+              <FormControl>
+                <Input
+                  type="date"
+                  value={field.value || ''}
+                  onChange={(e) => field.onChange(e.target.value)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
       </div>
     </div>
   );
