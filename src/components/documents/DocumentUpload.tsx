@@ -48,6 +48,8 @@ interface DocumentUploadProps {
   onCarrierPaymentDocCreated?: (documentId: string, type: DocumentType) => void;
   /** Called after upload when in Doc FAT context */
   onQuotePaymentDocCreated?: (documentId: string, type: DocumentType) => void;
+  /** Called after any successful upload with the document type */
+  onDocumentUploaded?: (type: DocumentType) => void;
 }
 
 interface UploadingFile {
@@ -178,6 +180,7 @@ export function DocumentUpload({
   onSuccess,
   onCarrierPaymentDocCreated,
   onQuotePaymentDocCreated,
+  onDocumentUploaded,
 }: DocumentUploadProps) {
   const { user } = useAuth();
   const createDocumentMutation = useCreateDocument();
@@ -292,6 +295,8 @@ export function DocumentUpload({
         }
       }
 
+      onDocumentUploaded?.(type);
+
       setUploadingFiles((prev) =>
         prev.map((f) => (f.file === file ? { ...f, progress: 100, status: 'success' } : f))
       );
@@ -304,6 +309,7 @@ export function DocumentUpload({
       updateOrderMutation,
       onCarrierPaymentDocCreated,
       onQuotePaymentDocCreated,
+      onDocumentUploaded,
     ]
   );
 

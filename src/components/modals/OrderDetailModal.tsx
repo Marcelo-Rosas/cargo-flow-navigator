@@ -39,7 +39,11 @@ import { CarreteiroTab } from '@/components/modals/CarreteiroTab';
 import { DriverQualificationPanel } from '@/components/operational/DriverQualificationPanel';
 import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
 import { RiskWorkflowWizard } from '@/components/risk/RiskWorkflowWizard';
-import { useOrderRiskStatus, useRiskEvaluationByEntity } from '@/hooks/useRiskEvaluation';
+import {
+  useOrderRiskStatus,
+  useRiskEvaluationByEntity,
+  useUpdateRiskEvaluation,
+} from '@/hooks/useRiskEvaluation';
 import { CRITICALITY_CONFIG } from '@/types/risk';
 import { useOccurrencesByOrder, useResolveOccurrence } from '@/hooks/useOccurrences';
 import { useVehicleByPlate } from '@/hooks/useVehicles';
@@ -64,6 +68,14 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
+
+type DocumentType = Database['public']['Enums']['document_type'];
+
+/** Maps document types to risk requirement keys */
+const DOC_TYPE_TO_RISK_REQUIREMENT: Partial<Record<DocumentType, string>> = {
+  analise_gr: 'gr_doc',
+  doc_rota: 'rota_doc',
+};
 
 type OrderStage = Database['public']['Enums']['order_stage'];
 
@@ -186,6 +198,7 @@ export function OrderDetailModal({
   const { data: tripForOrder } = useTripsForOrder(order?.id);
   const linkOrderToTripMutation = useLinkOrderToTrip();
   const { data: riskStatus } = useOrderRiskStatus(order?.id);
+  const updateRiskEvaluation = useUpdateRiskEvaluation();
   const tripId = order?.trip_id ?? (tripForOrder as { id?: string } | null)?.id ?? undefined;
   const { data: tripRiskEval } = useRiskEvaluationByEntity('trip', tripId);
 
@@ -500,6 +513,24 @@ export function OrderDetailModal({
     }
   }, [order, manualTollValue, updateOrderMutation, queryClient]);
 
+  const handleDocumentUploaded = useCallback(
+    async (docType: DocumentType) => {
+      const reqKey = DOC_TYPE_TO_RISK_REQUIREMENT[docType];
+      if (!reqKey || !riskStatus?.evaluation_id || !riskStatus.requirements?.includes(reqKey))
+        return;
+      const currentMet = riskStatus.requirements_met ?? {};
+      if (currentMet[reqKey]) return;
+      await updateRiskEvaluation.mutateAsync({
+        id: riskStatus.evaluation_id,
+        requirements_met: { ...currentMet, [reqKey]: true },
+      });
+      toast.success(
+        `Requisito "${reqKey === 'gr_doc' ? 'Análise GR' : 'Rota Documentada'}" atendido automaticamente`
+      );
+    },
+    [riskStatus, updateRiskEvaluation]
+  );
+
   if (!order) return null;
 
   const stageInfo = STAGE_LABELS[order.stage];
@@ -695,6 +726,14 @@ export function OrderDetailModal({
               <TabsTrigger value="risco" className="gap-1.5">
                 <Shield className="w-3.5 h-3.5" />
                 Risco
+                {riskStatus?.risk_status === 'approved' ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                ) : riskStatus?.risk_status === 'pending' ||
+                  riskStatus?.risk_status === 'evaluated' ? (
+                  <Clock className="w-3.5 h-3.5 text-amber-500" />
+                ) : showRiskBadge && !riskStatus?.evaluation_id ? (
+                  <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                ) : null}
               </TabsTrigger>
               <TabsTrigger value="occurrences" className="gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5" />
@@ -1398,6 +1437,7 @@ export function OrderDetailModal({
                             order.has_antt_motorista
                           )
                         }
+                        onDocumentUploaded={handleDocumentUploaded}
                       />
                     </>
                   )}
@@ -1420,7 +1460,7 @@ export function OrderDetailModal({
                   cargoValue={Number(order.quote?.cargo_value ?? 0)}
                   kmDistance={Number(order.km_distance ?? order.quote?.km_distance ?? 0)}
                   driverName={order.driver_name ?? undefined}
-                  driverCpf={null}
+                  driverCpf={order.driver?.cpf ? String(order.driver.cpf) : undefined}
                   vehiclePlate={order.vehicle_type?.code ?? order.quote?.vehicle_type?.code}
                   tripId={order.trip_id}
                 />
