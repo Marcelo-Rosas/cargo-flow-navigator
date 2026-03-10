@@ -1,7 +1,7 @@
 /**
  * Returns CORS headers with origin restricted to ALLOWED_ORIGIN / ALLOWED_ORIGINS.
- * Accepts exact origins or patterns with * (e.g. https://*.pages.dev for Cloudflare previews).
- * In production, set ALLOWED_ORIGIN (e.g. https://app.vectracargo.com).
+ * Accepts exact origins or patterns with * (e.g. https://*.app.vectracargo.com.br for previews).
+ * In production, set ALLOWED_ORIGIN (e.g. https://app.vectracargo.com.br).
  * For multiple origins, use comma-separated ALLOWED_ORIGINS.
  */
 function matchesOrigin(origin: string, pattern: string): boolean {
@@ -34,7 +34,7 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   const allowed =
     getEnv('ALLOWED_ORIGINS') ||
     getEnv('ALLOWED_ORIGIN') ||
-    'http://localhost:5173,http://localhost:8080,https://cargo-flow-navigator.pages.dev,https://*.cargo-flow-navigator.pages.dev';
+    'http://localhost:5173,http://localhost:8080,https://app.vectracargo.com.br,https://*.app.vectracargo.com.br';
   const origins = allowed.split(',').map((o) => o.trim());
   const requestOrigin = req.headers.get('Origin');
 

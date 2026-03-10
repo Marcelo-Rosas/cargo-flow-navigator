@@ -7,17 +7,17 @@ project_id = "epgedaiukjippepujuzc"
 # Mantenha esta seção sincronizada manualmente como documentação.
 # ────────────────────────────────────────────────────────────────────
 [auth]
-site_url = "https://cargo-flow-navigator.pages.dev"
+site_url = "https://app.vectracargo.com.br"
 additional_redirect_urls = [
   # Dev local
   "http://localhost:8080",
   "http://localhost:8080/auth",
   "http://localhost:8080/reset-password",
-  # Cloudflare Pages (produção e previews)
-  "https://cargo-flow-navigator.pages.dev",
-  "https://cargo-flow-navigator.pages.dev**",
-  "https://*.cargo-flow-navigator.pages.dev",
-  "https://*.cargo-flow-navigator.pages.dev**",
+  # Produção e previews
+  "https://app.vectracargo.com.br",
+  "https://app.vectracargo.com.br**",
+  "https://*.app.vectracargo.com.br",
+  "https://*.app.vectracargo.com.br**",
 ]
 
 [functions.import-price-table]

@@ -6,17 +6,17 @@ Segue um prompt técnico e específico para colar no **Cursor** (vale também pa
 
 Você é um agente de código atuando no repositório **C:\Users\marce\cargo-flow-navigator**. Faça um patch para corrigir os fluxos de Auth do Supabase (signup / invite / reset password) garantindo que **NENHUM link de e-mail use domínios de preview da Vercel** (`*-marcelo-rosas-projects.vercel.app`). Todos os redirects devem apontar explicitamente para o domínio de produção:
 
-- PROD_ORIGIN = `https://cargo-flow-navigator.vercel.app`
+- PROD_ORIGIN = `https://app.vectracargo.com.br`
 
 ### Requisitos funcionais (não interpretar diferente)
 1) **Signup (confirmação de e-mail)** deve redirecionar para:
-   - `https://cargo-flow-navigator.vercel.app/auth`
+   - `https://app.vectracargo.com.br/auth`
 
 2) **Recovery (reset password)** deve redirecionar para:
-   - `https://cargo-flow-navigator.vercel.app/reset-password`
+   - `https://app.vectracargo.com.br/reset-password`
 
 3) **Invite users (admin invite)** deve redirecionar para:
-   - `https://cargo-flow-navigator.vercel.app/auth`
+   - `https://app.vectracargo.com.br/auth`
 
 4) Remover/evitar uso de `window.location.origin` como origem de redirects em e-mails, para impedir que preview domains contaminem Redirect URLs do Supabase.
 
@@ -29,7 +29,7 @@ Você é um agente de código atuando no repositório **C:\Users\marce\cargo-flo
 #### A) src/hooks/useAuth.tsx
 - Introduzir uma constante local (ou importável) no topo do arquivo:
   ```ts
-  const PROD_ORIGIN = 'https://cargo-flow-navigator.vercel.app';
+  const PROD_ORIGIN = 'https://app.vectracargo.com.br';
   ```
 - Alterar a função `signUp` para usar:
   - `emailRedirectTo: `${PROD_ORIGIN}/auth``
@@ -41,10 +41,10 @@ Você é um agente de código atuando no repositório **C:\Users\marce\cargo-flo
 - Ajustar o `redirectTo` passado para `inviteUserByEmail` para sempre apontar para `/auth`:
   - Base:
     - se existir `Deno.env.get('SITE_URL')`, usar como base
-    - senão usar `https://cargo-flow-navigator.vercel.app`
+    - senão usar `https://app.vectracargo.com.br`
   - Montar:
     ```ts
-    const base = Deno.env.get('SITE_URL') ?? 'https://cargo-flow-navigator.vercel.app';
+    const base = Deno.env.get('SITE_URL') ?? 'https://app.vectracargo.com.br';
     const redirectTo = `${base}/auth`;
     ```
 - Garantir que **não** passe somente o domínio sem rota.
@@ -56,8 +56,8 @@ Você é um agente de código atuando no repositório **C:\Users\marce\cargo-flo
    - `emailRedirectTo: \`${window.location.origin}`
    - `redirectTo: \`${window.location.origin}`
 2) Garantir que as strings finais aparecem no código:
-   - `https://cargo-flow-navigator.vercel.app/auth`
-   - `https://cargo-flow-navigator.vercel.app/reset-password`
+   - `https://app.vectracargo.com.br/auth`
+   - `https://app.vectracargo.com.br/reset-password`
 
 ### Saída
 - Fazer o patch com diffs claros.

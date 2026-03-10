@@ -42,3 +42,4 @@ tmp/
 data/ngrok/
 CON
 ~$*
+.env*.local

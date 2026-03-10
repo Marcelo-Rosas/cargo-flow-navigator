@@ -24,7 +24,7 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:local": "cross-env PW_BASE_URL=http://localhost:4173 playwright test",
     "test:e2e:report": "playwright show-report",
-    "test:e2e:codegen": "playwright codegen https://cargo-flow-navigator.pages.dev",
+    "test:e2e:codegen": "playwright codegen https://app.vectracargo.com.br",
     "test:e2e:auth": "npx playwright test --project=chromium-auth",
     "test:e2e:mocks": "npx playwright test tests/e2e/quote-*.spec.ts --project=chromium-mocks",
     "test:e2e:seeded": "npx playwright test tests/e2e/flows/*.seeded.spec.ts --project=chromium-auth"

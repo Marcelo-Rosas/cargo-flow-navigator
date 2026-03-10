@@ -22,7 +22,7 @@ function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-const LOGO_URL = 'https://cargo-flow-navigator.pages.dev/brand/logo_vectra.jpg';
+const LOGO_URL = 'https://app.vectracargo.com.br/brand/logo_vectra.jpg';
 
 function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm | null): string {
   const breakdown = quote.pricing_breakdown as Record<string, unknown> | null;

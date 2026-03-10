@@ -1,6 +1,6 @@
 # Playwright — Vectra Cargo (cargo-flow-navigator)
 
-Comandos prontos para automação do app em https://cargo-flow-navigator.pages.dev/
+Comandos prontos para automação do app em https://app.vectracargo.com.br/
 
 ---
 
@@ -30,7 +30,7 @@ Requer `PW_TEST_USER` e `PW_TEST_PASSWORD` no `.env` para testes autenticados.
 ```powershell
 $CODEX_HOME = $env:CODEX_HOME ?? "$env:USERPROFILE\.codex"
 $PWCLI = "$CODEX_HOME\skills\playwright\scripts\playwright_cli.ps1"
-$BASE = "https://cargo-flow-navigator.pages.dev"
+$BASE = "https://app.vectracargo.com.br"
 ```
 
 Ou use `npx` diretamente:
@@ -71,8 +71,8 @@ Execute após cada navegação ou mudança relevante na tela. **Requer sessão a
 & $PWCLI snapshot
 # Ajuste e1, e2, e3 conforme o snapshot
 
-& $PWCLI fill e1 "seu-email@vectracargo.com.br"
-& $PWCLI fill e2 "sua-senha"
+& $PWCLI fill e1 "marcelo.rosas@vectracargo.com.br"
+& $PWCLI fill e2 "Vectra@179mr"
 & $PWCLI snapshot
 
 & $PWCLI click e3
@@ -154,7 +154,7 @@ Use `goto` para navegar sem abrir nova aba (mantém a sessão):
 ```powershell
 $CODEX_HOME = $env:CODEX_HOME ?? "$env:USERPROFILE\.codex"
 $PWCLI = "$CODEX_HOME\skills\playwright\scripts\playwright_cli.ps1"
-$BASE = "https://cargo-flow-navigator.pages.dev"
+$BASE = "https://app.vectracargo.com.br"
 
 & $PWCLI open $BASE --headed
 & $PWCLI snapshot

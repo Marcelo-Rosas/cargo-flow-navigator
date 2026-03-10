@@ -2,7 +2,8 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-const SITE_ORIGIN = window.location.origin;
+/** Production origin for auth redirects (emails); avoids preview domains. */
+const PROD_ORIGIN = 'https://app.vectracargo.com.br';
 
 interface AuthContextType {
   user: User | null;
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${SITE_ORIGIN}/reset-password`,
+      redirectTo: `${PROD_ORIGIN}/reset-password`,
     });
     return { error: error as Error | null };
   };

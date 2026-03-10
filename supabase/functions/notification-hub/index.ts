@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+/// <reference path="../_shared/deno.d.ts" />
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
 
 // ─────────────────────────────────────────────────────
@@ -230,7 +231,7 @@ async function sendEmail(
     `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <img src="https://cargo-flow-navigator.pages.dev/brand/logo_vectra.jpg"
+        <img src="https://app.vectracargo.com.br/brand/logo_vectra.jpg"
              alt="Vectra Cargo" style="max-height: 60px;" />
       </div>
       <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 24px;">
