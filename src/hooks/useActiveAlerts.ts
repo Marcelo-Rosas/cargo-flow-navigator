@@ -58,7 +58,7 @@ export function useActiveAlerts() {
       const { data: docsOrders } = await supabase
         .from('orders')
         .select('id, os_number, has_nfe, has_cte, has_pod')
-        .not('stage', 'in', '("entregue","cancelado")')
+        .neq('stage', asDb('entregue'))
         .or('has_nfe.eq.false,has_cte.eq.false,has_pod.eq.false')
         .order('created_at', { ascending: false })
         .limit(3);

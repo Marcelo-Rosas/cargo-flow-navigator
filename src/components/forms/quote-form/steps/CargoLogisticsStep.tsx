@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { QuoteFormData } from '../types';
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from '@/types/pricing';
 
 const kgToUnit = (kg: number, unit: 'kg' | 'ton') => (unit === 'ton' ? kg / 1000 : kg);
 const unitToKg = (value: number, unit: 'kg' | 'ton') => (unit === 'ton' ? value * 1000 : value);
@@ -244,6 +245,30 @@ export function CargoLogisticsStep({
                         {term.adjustment_percent != null &&
                           term.adjustment_percent !== 0 &&
                           `(${term.adjustment_percent > 0 ? '+' : ''}${term.adjustment_percent}%)`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="payment_method"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Forma de Pagamento</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ''}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar forma..." />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {PAYMENT_METHOD_LABELS[m]}
                       </SelectItem>
                     ))}
                   </SelectContent>

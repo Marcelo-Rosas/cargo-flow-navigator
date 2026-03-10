@@ -29,6 +29,7 @@ import { useDrivers } from '@/hooks/useDrivers';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from '@/types/pricing';
 
 const orderSchema = z.object({
   client_id: z.string().optional(),
@@ -43,6 +44,8 @@ const orderSchema = z.object({
   owner_name: z.string().optional(),
   owner_phone: z.string().optional(),
   eta: z.string().optional(),
+  payment_method: z.string().optional(),
+  carrier_payment_method: z.string().optional(),
   notes: z.string().max(500, 'Observações muito longas').optional(),
 });
 
@@ -79,6 +82,8 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
       owner_name: '',
       owner_phone: '',
       eta: '',
+      payment_method: '',
+      carrier_payment_method: '',
       notes: '',
     },
   });
@@ -99,6 +104,10 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         owner_name: order.owner_name || '',
         owner_phone: order.owner_phone || '',
         eta: order.eta ? new Date(order.eta).toISOString().slice(0, 16) : '',
+        payment_method:
+          ((order as unknown as Record<string, unknown>).payment_method as string) || '',
+        carrier_payment_method:
+          ((order as unknown as Record<string, unknown>).carrier_payment_method as string) || '',
         notes: order.notes || '',
       });
     } else {
@@ -116,6 +125,8 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         owner_name: '',
         owner_phone: '',
         eta: '',
+        payment_method: '',
+        carrier_payment_method: '',
         notes: '',
       });
     }
@@ -171,6 +182,8 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         owner_name: data.owner_name || null,
         owner_phone: data.owner_phone || null,
         eta: data.eta ? new Date(data.eta).toISOString() : null,
+        payment_method: data.payment_method || null,
+        carrier_payment_method: data.carrier_payment_method || null,
         notes: data.notes || null,
       };
 
@@ -319,6 +332,58 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                       <FormControl>
                         <Input type="datetime-local" {...field} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="payment_method"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pagamento Cliente</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Forma de pagamento..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {PAYMENT_METHODS.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {PAYMENT_METHOD_LABELS[m]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="carrier_payment_method"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pagamento Transportador</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Forma de pagamento..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {PAYMENT_METHODS.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {PAYMENT_METHOD_LABELS[m]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

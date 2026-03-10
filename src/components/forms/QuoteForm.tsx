@@ -289,6 +289,7 @@ const quoteSchema = z
     price_table_id: idString,
     vehicle_type_id: idString,
     payment_term_id: idString,
+    payment_method: z.string().optional(),
     km_distance: z.number().min(0, 'Distância inválida').optional(),
     // Pricing components
     cargo_value: z.number().min(0, 'Valor inválido').optional().default(0),
@@ -397,6 +398,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       price_table_id: '',
       vehicle_type_id: '',
       payment_term_id: '',
+      payment_method: '',
       km_distance: undefined,
       cargo_value: 0,
       toll: 0,
@@ -786,6 +788,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         price_table_id: quote.price_table_id || '',
         vehicle_type_id: quote.vehicle_type_id || '',
         payment_term_id: quote.payment_term_id || '',
+        payment_method:
+          ((quote as unknown as Record<string, unknown>).payment_method as string) || '',
         km_distance: quote.km_distance ? Number(quote.km_distance) : undefined,
         cargo_value: Number(quote.cargo_value) || 0,
         toll: Number(quote.toll_value) || 0,
@@ -1190,6 +1194,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         price_table_id: data.price_table_id || null,
         vehicle_type_id: data.vehicle_type_id || null,
         payment_term_id: data.payment_term_id || null,
+        payment_method: data.payment_method || null,
         km_distance:
           data.km_distance != null && Number.isFinite(Number(data.km_distance))
             ? Math.round(Number(data.km_distance))
@@ -1355,7 +1360,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   shippers?.find((s) => s.id === form.watch('shipper_id'))?.name ||
                   '—'
                 }
-                priceTableRow={priceTableRow}
+                priceTableRow={priceTableRow ?? null}
                 isLoadingPriceRow={isLoadingPriceRow}
               />
             ) : (

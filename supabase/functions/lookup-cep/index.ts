@@ -94,19 +94,29 @@ function formatAddress(data: CepData): string {
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
+  const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
 
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
-    const { cep } = await req.json();
+    let body: { cep?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Corpo da requisição inválido' }),
+        { status: 400, headers: jsonHeaders }
+      );
+    }
+    const { cep } = body;
 
     const cleanCep = cep?.replace(/\D/g, '');
     if (!cleanCep || cleanCep.length !== 8) {
       return new Response(
         JSON.stringify({ success: false, error: 'CEP inválido. Informe 8 dígitos.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: jsonHeaders }
       );
     }
 
@@ -128,7 +138,7 @@ Deno.serve(async (req) => {
     if (!data) {
       return new Response(JSON.stringify({ success: false, error: 'CEP não encontrado' }), {
         status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: jsonHeaders,
       });
     }
 
@@ -137,14 +147,14 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true, data }), {
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: jsonHeaders,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('[lookup-cep] Erro:', errorMessage);
     return new Response(JSON.stringify({ success: false, error: 'Erro ao buscar CEP' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: jsonHeaders,
     });
   }
 });

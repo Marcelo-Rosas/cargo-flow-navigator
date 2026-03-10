@@ -183,3 +183,15 @@ export const CONDITIONAL_FEE_CODES = [
 ] as const;
 
 export type ConditionalFeeCode = (typeof CONDITIONAL_FEE_CODES)[number];
+
+// Formas de Pagamento
+export const PAYMENT_METHODS = ['pix', 'boleto', 'cartao', 'transferencia', 'outro'] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  pix: 'PIX',
+  boleto: 'Boleto',
+  cartao: 'Cartão',
+  transferencia: 'Transferência',
+  outro: 'Outro',
+};
