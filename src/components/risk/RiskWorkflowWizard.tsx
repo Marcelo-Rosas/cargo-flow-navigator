@@ -1,5 +1,14 @@
 import { useState, useMemo } from 'react';
-import { Shield, CheckCircle2, XCircle, Clock, AlertTriangle, ChevronRight } from 'lucide-react';
+import {
+  Shield,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  AlertTriangle,
+  ChevronRight,
+  ChevronLeft,
+  Loader2,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,7 +93,7 @@ export function RiskWorkflowWizard({
   // Requirements met status
   const requirementsMet = evaluation?.requirements_met ?? {};
   const requirements = evaluation?.requirements ?? critResult?.requirements ?? [];
-  const allMet = requirements.length > 0 && requirements.every((r) => requirementsMet[r]);
+  const allMet = requirements.length === 0 || requirements.every((r) => requirementsMet[r]);
 
   // Estimated costs
   const estimatedCosts = useMemo(() => {
@@ -100,6 +109,11 @@ export function RiskWorkflowWizard({
   }, [servicesCatalog, critResult]);
 
   const totalEstimatedCost = estimatedCosts.reduce((sum, c) => sum + c.cost, 0);
+
+  // Step completion checks
+  const step1Complete = buonnyValid;
+  const step2Complete = !!evaluation;
+  const step3Complete = step2Complete && allMet;
 
   // Handlers
   const handleCreateEvaluation = async () => {
@@ -180,26 +194,34 @@ export function RiskWorkflowWizard({
 
   return (
     <div className="space-y-4">
-      {/* Stepper */}
+      {/* Stepper — read-only indicators, not clickable */}
       <div className="flex items-center gap-1">
         {STEPS.map((step, i) => {
           const isActive = step.key === currentStep;
           const isPast = i < stepIndex;
+          const isComplete =
+            (i === 0 && step1Complete) ||
+            (i === 1 && step2Complete) ||
+            (i === 2 && step3Complete) ||
+            (i === 3 && (evaluation?.status === 'evaluated' || evaluation?.status === 'approved'));
           return (
             <div key={step.key} className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentStep(step.key)}
+              <div
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
                   isActive && 'bg-primary text-primary-foreground',
-                  isPast && 'bg-primary/20 text-primary',
+                  isPast && !isActive && 'bg-primary/20 text-primary',
                   !isActive && !isPast && 'bg-muted text-muted-foreground'
                 )}
                 data-testid={`risk-wizard-step-${step.key}`}
               >
-                <span>{step.short}</span>
+                {isComplete && !isActive ? (
+                  <CheckCircle2 className="h-3 w-3" />
+                ) : (
+                  <span>{step.short}</span>
+                )}
                 <span className="hidden sm:inline">{step.label}</span>
-              </button>
+              </div>
               {i < STEPS.length - 1 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
             </div>
           );
@@ -217,9 +239,9 @@ export function RiskWorkflowWizard({
               buonnyEvidence={buonnyEvidence}
               buonnyValid={buonnyValid}
               isEditable={isEditable}
-              evaluation={evaluation}
               onSimulate={handleBuonnyCheck}
               isLoading={buonnyCheck.isPending}
+              canAdvance={step1Complete}
               onNext={() => setCurrentStep('rules')}
             />
           )}
@@ -232,6 +254,7 @@ export function RiskWorkflowWizard({
               isEditable={isEditable}
               onCreateEvaluation={handleCreateEvaluation}
               isLoading={evaluateRisk.isPending}
+              canAdvance={step2Complete}
               onNext={() => setCurrentStep('evidence')}
               onBack={() => setCurrentStep('buonny')}
             />
@@ -244,6 +267,7 @@ export function RiskWorkflowWizard({
               onToggle={handleToggleRequirement}
               estimatedCosts={estimatedCosts}
               totalEstimatedCost={totalEstimatedCost}
+              canAdvance={step3Complete}
               onNext={() => setCurrentStep('submit')}
               onBack={() => setCurrentStep('rules')}
             />
@@ -292,9 +316,9 @@ function StepBuonny({
   buonnyEvidence,
   buonnyValid,
   isEditable,
-  evaluation,
   onSimulate,
   isLoading,
+  canAdvance,
   onNext,
 }: {
   driverName?: string | null;
@@ -303,9 +327,9 @@ function StepBuonny({
   buonnyEvidence: ReturnType<typeof Array.prototype.find>;
   buonnyValid: boolean;
   isEditable: boolean;
-  evaluation: unknown;
   onSimulate: () => void;
   isLoading: boolean;
+  canAdvance: boolean;
   onNext: () => void;
 }) {
   const payload = (buonnyEvidence as { payload?: Record<string, unknown> })?.payload;
@@ -365,26 +389,35 @@ function StepBuonny({
       )}
 
       <div className="flex justify-between">
-        {isEditable && evaluation && (
+        {isEditable && (
           <Button
             variant="outline"
             size="sm"
             onClick={onSimulate}
             disabled={isLoading || buonnyValid || !driverCpf}
           >
-            {isLoading
-              ? 'Consultando...'
-              : buonnyValid
-                ? 'Consulta válida'
-                : !driverCpf
-                  ? 'CPF não informado'
-                  : 'Consultar Buonny'}
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Consultando...
+              </>
+            ) : buonnyValid ? (
+              'Consulta válida'
+            ) : !driverCpf ? (
+              'CPF não informado'
+            ) : (
+              'Consultar Buonny'
+            )}
           </Button>
         )}
-        <Button size="sm" onClick={onNext} className="ml-auto">
+        <Button size="sm" onClick={onNext} disabled={!canAdvance} className="ml-auto">
           Próximo <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
+
+      {!canAdvance && isEditable && (
+        <p className="text-xs text-muted-foreground">Execute a consulta Buonny para avançar.</p>
+      )}
     </div>
   );
 }
@@ -398,6 +431,7 @@ function StepRules({
   isEditable,
   onCreateEvaluation,
   isLoading,
+  canAdvance,
   onNext,
   onBack,
 }: {
@@ -408,6 +442,7 @@ function StepRules({
   isEditable: boolean;
   onCreateEvaluation: () => void;
   isLoading: boolean;
+  canAdvance: boolean;
   onNext: () => void;
   onBack: () => void;
 }) {
@@ -459,15 +494,26 @@ function StepRules({
 
       {!evaluation && isEditable && critResult && (
         <Button size="sm" onClick={onCreateEvaluation} disabled={isLoading}>
-          {isLoading ? 'Criando...' : 'Criar Avaliação de Risco'}
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              Criando...
+            </>
+          ) : (
+            'Criar Avaliação de Risco'
+          )}
         </Button>
+      )}
+
+      {!evaluation && isEditable && (
+        <p className="text-xs text-muted-foreground">Crie a avaliação de risco para avançar.</p>
       )}
 
       <div className="flex justify-between">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          Voltar
+          <ChevronLeft className="h-4 w-4" /> Voltar
         </Button>
-        <Button size="sm" onClick={onNext} disabled={!evaluation}>
+        <Button size="sm" onClick={onNext} disabled={!canAdvance}>
           Próximo <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -483,6 +529,7 @@ function StepEvidence({
   onToggle,
   estimatedCosts,
   totalEstimatedCost,
+  canAdvance,
   onNext,
   onBack,
 }: {
@@ -492,6 +539,7 @@ function StepEvidence({
   onToggle: (req: string, met: boolean) => void;
   estimatedCosts: { code: string; name: string; cost: number }[];
   totalEstimatedCost: number;
+  canAdvance: boolean;
   onNext: () => void;
   onBack: () => void;
 }) {
@@ -527,7 +575,7 @@ function StepEvidence({
           })}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">Nenhuma exigência identificada.</p>
+        <p className="text-sm text-muted-foreground">Nenhuma exigência adicional identificada.</p>
       )}
 
       {estimatedCosts.length > 0 && (
@@ -546,11 +594,15 @@ function StepEvidence({
         </div>
       )}
 
+      {!canAdvance && requirements.length > 0 && (
+        <p className="text-xs text-muted-foreground">Marque todas as exigências para avançar.</p>
+      )}
+
       <div className="flex justify-between">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          Voltar
+          <ChevronLeft className="h-4 w-4" /> Voltar
         </Button>
-        <Button size="sm" onClick={onNext}>
+        <Button size="sm" onClick={onNext} disabled={!canAdvance}>
           Próximo <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -634,7 +686,7 @@ function StepSubmit({
       </div>
 
       {critResult && (
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex items-center gap-4 text-sm flex-wrap">
           <div>
             <span className="text-muted-foreground">Criticidade: </span>
             <RiskCriticalityBadge criticality={critResult.criticality} />
@@ -650,7 +702,7 @@ function StepSubmit({
         </div>
       )}
 
-      {isEditable && !isSubmitted && (
+      {isEditable && !isSubmitted && !isAutoApproved && (
         <Textarea
           placeholder="Notas para o aprovador (opcional)"
           value={notes}
@@ -675,15 +727,20 @@ function StepSubmit({
 
       <div className="flex justify-between">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          Voltar
+          <ChevronLeft className="h-4 w-4" /> Voltar
         </Button>
         {isEditable && !isSubmitted && !isAutoApproved && (
           <Button size="sm" onClick={onSubmit} disabled={!canSubmit || isLoading}>
-            {isLoading
-              ? 'Enviando...'
-              : willAutoApprove
-                ? 'Aprovar Automaticamente'
-                : 'Enviar para Aprovação'}
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Enviando...
+              </>
+            ) : willAutoApprove ? (
+              'Aprovar Automaticamente'
+            ) : (
+              'Enviar para Aprovação'
+            )}
           </Button>
         )}
       </div>
