@@ -14,22 +14,51 @@ export interface CashFlowSummaryRow {
 export interface CashFlowByMonth {
   period: string;
   periodLabel: string;
+  /** Entradas realizadas (baixadas) */
   entradas: number;
+  /** Saídas realizadas (baixadas) */
   saidas: number;
+  /** Entradas previstas (pendentes) */
+  entradasPrevistas: number;
+  /** Saídas previstas (pendentes) */
+  saidasPrevistas: number;
+  /** Saldo realizado = entradas - saidas */
   saldo: number;
+  /** Saldo acumulado (running total) */
+  saldoAcumulado: number;
   fatDocCount: number;
   pagDocCount: number;
 }
 
-export function useCashFlowSummary(params?: { monthFrom?: string; monthTo?: string }) {
+export interface CashFlowFilters {
+  monthFrom?: string;
+  monthTo?: string;
+}
+
+export function useCashFlowSummary(params?: CashFlowFilters) {
   return useQuery({
     queryKey: ['cash-flow-summary', params?.monthFrom, params?.monthTo],
     queryFn: async (): Promise<CashFlowByMonth[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('v_cash_flow_summary' as 'documents')
         .select('*')
-        .order('period', { ascending: false })
-        .limit(24);
+        .order('period', { ascending: true });
+
+      // Apply date filters when provided
+      if (params?.monthFrom) {
+        query = query.gte('period', params.monthFrom + '-01');
+      }
+      if (params?.monthTo) {
+        // End of month: add -01 and use lte
+        query = query.lte('period', params.monthTo + '-01');
+      }
+
+      // Fallback: limit to 24 months if no filter
+      if (!params?.monthFrom && !params?.monthTo) {
+        query = query.limit(48);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         if (error.code === '42P01' || error.code === 'PGRST116') return [];
@@ -40,7 +69,14 @@ export function useCashFlowSummary(params?: { monthFrom?: string; monthTo?: stri
 
       const byPeriod = new Map<
         string,
-        { entradas: number; saidas: number; fatCount: number; pagCount: number }
+        {
+          entradas: number;
+          saidas: number;
+          entradasPrevistas: number;
+          saidasPrevistas: number;
+          fatCount: number;
+          pagCount: number;
+        }
       >();
 
       for (const r of rows) {
@@ -48,32 +84,49 @@ export function useCashFlowSummary(params?: { monthFrom?: string; monthTo?: stri
         const curr = byPeriod.get(key) ?? {
           entradas: 0,
           saidas: 0,
+          entradasPrevistas: 0,
+          saidasPrevistas: 0,
           fatCount: 0,
           pagCount: 0,
         };
 
         if (r.type === 'FAT') {
           curr.entradas += Number(r.settled_amount) || 0;
+          curr.entradasPrevistas += Number(r.pending_amount) || 0;
           curr.fatCount += r.doc_count || 0;
         } else if (r.type === 'PAG') {
           curr.saidas += Number(r.settled_amount) || 0;
+          curr.saidasPrevistas += Number(r.pending_amount) || 0;
           curr.pagCount += r.doc_count || 0;
         }
         byPeriod.set(key, curr);
       }
 
-      return Array.from(byPeriod.entries())
-        .map(([period, v]) => ({
+      // Sort ascending for running total calculation
+      const sorted = Array.from(byPeriod.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+      let runningTotal = 0;
+      const result: CashFlowByMonth[] = sorted.map(([period, v]) => {
+        const entradas = round2(v.entradas);
+        const saidas = round2(v.saidas);
+        const saldo = round2(entradas - saidas);
+        runningTotal = round2(runningTotal + saldo);
+        return {
           period,
           periodLabel: formatPeriodLabel(period),
-          entradas: Math.round(v.entradas * 100) / 100,
-          saidas: Math.round(v.saidas * 100) / 100,
-          saldo: Math.round((v.entradas - v.saidas) * 100) / 100,
+          entradas,
+          saidas,
+          entradasPrevistas: round2(v.entradasPrevistas),
+          saidasPrevistas: round2(v.saidasPrevistas),
+          saldo,
+          saldoAcumulado: runningTotal,
           fatDocCount: v.fatCount,
           pagDocCount: v.pagCount,
-        }))
-        .sort((a, b) => b.period.localeCompare(a.period))
-        .slice(0, 12);
+        };
+      });
+
+      // Return most recent 12, but keep desc order for display
+      return result.slice(-12).reverse();
     },
   });
 }
@@ -86,7 +139,7 @@ export interface PendingInstallment {
   document_type: 'FAT' | 'PAG';
 }
 
-export function usePendingInstallments(limit = 12) {
+export function usePendingInstallments(limit = 50) {
   return useQuery({
     queryKey: ['pending-installments', limit],
     queryFn: async (): Promise<PendingInstallment[]> => {
@@ -132,6 +185,7 @@ export function useSettleInstallments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
       queryClient.invalidateQueries({ queryKey: ['pending-installments'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
     },
   });
 }
@@ -143,4 +197,8 @@ function formatPeriodLabel(period: string): string {
   } catch {
     return period;
   }
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }

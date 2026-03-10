@@ -18,6 +18,7 @@ import { OverviewTab } from '@/components/dashboard/tabs/OverviewTab';
 import { CommercialTab } from '@/components/dashboard/tabs/CommercialTab';
 import { OperationsTab } from '@/components/dashboard/tabs/OperationsTab';
 import { NtcInsightsTab } from '@/components/dashboard/tabs/NtcInsightsTab';
+import { NewsTab } from '@/components/dashboard/tabs/NewsTab';
 import {
   useDashboardStats,
   useRecentOrders,
@@ -97,6 +98,7 @@ export default function Dashboard() {
     queryClient.invalidateQueries({ queryKey: ['ntc-inctf-series'] });
     queryClient.invalidateQueries({ queryKey: ['ntc-fuel-reference'] });
     queryClient.invalidateQueries({ queryKey: ['ai-usage-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['news-items'] });
   };
 
   const hasError = statsIsError || ordersIsError || conversionIsError || revenueIsError;
@@ -275,6 +277,7 @@ export default function Dashboard() {
           <TabsTrigger value="commercial">Comercial</TabsTrigger>
           <TabsTrigger value="operations">Operacional</TabsTrigger>
           <TabsTrigger value="ntc-insights">Inteligência NTC</TabsTrigger>
+          <TabsTrigger value="news">News</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -307,6 +310,10 @@ export default function Dashboard() {
 
         <TabsContent value="ntc-insights" className="space-y-6">
           <NtcInsightsTab />
+        </TabsContent>
+
+        <TabsContent value="news" className="space-y-6">
+          <NewsTab />
         </TabsContent>
       </Tabs>
     </MainLayout>

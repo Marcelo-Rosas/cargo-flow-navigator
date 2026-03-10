@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface Driver {
   id: string;
   name: string;
+  cpf: string | null;
   phone: string | null;
   cnh: string | null;
   cnh_category: string | null;
@@ -22,7 +23,7 @@ export function useDrivers(activeOnly = true, options: UseDriversOptions = {}) {
     queryFn: async () => {
       let query = supabase
         .from('drivers')
-        .select('id, name, phone, cnh, cnh_category, antt, active')
+        .select('id, name, cpf, phone, cnh, cnh_category, antt, active')
         .order('name', { ascending: true });
       if (activeOnly) {
         query = query.eq('active', asDb(true));
@@ -45,6 +46,7 @@ export function useDrivers(activeOnly = true, options: UseDriversOptions = {}) {
           if (fe) throw fe;
           return (filterSupabaseRows<Driver>(fd) || []).map((d) => ({
             ...d,
+            cpf: null,
             cnh: null,
             cnh_category: null,
             antt: null,
@@ -64,6 +66,7 @@ export function useCreateDriver() {
   return useMutation({
     mutationFn: async (driver: {
       name: string;
+      cpf?: string | null;
       phone?: string | null;
       cnh?: string | null;
       cnh_category?: string | null;
@@ -92,6 +95,7 @@ export function useUpdateDriver() {
       id: string;
       updates: {
         name?: string;
+        cpf?: string | null;
         phone?: string | null;
         cnh?: string | null;
         cnh_category?: string | null;
@@ -131,7 +135,7 @@ export function useDriver(id: string | null | undefined) {
 
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, name, phone, cnh, cnh_category, antt, active')
+        .select('id, name, cpf, phone, cnh, cnh_category, antt, active')
         .eq('id', asDb(id))
         .maybeSingle();
 

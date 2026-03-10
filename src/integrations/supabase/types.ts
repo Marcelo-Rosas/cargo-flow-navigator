@@ -655,6 +655,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      news_items: {
+        Row: {
+          id: string;
+          title: string;
+          summary: string;
+          source_type: string;
+          source_name: string | null;
+          source_url: string | null;
+          relevance_score: number | null;
+          created_at: string;
+          raw_snippet: string | null;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          summary: string;
+          source_type: string;
+          source_name?: string | null;
+          source_url?: string | null;
+          relevance_score?: number | null;
+          created_at?: string;
+          raw_snippet?: string | null;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          summary?: string;
+          source_type?: string;
+          source_name?: string | null;
+          source_url?: string | null;
+          relevance_score?: number | null;
+          created_at?: string;
+          raw_snippet?: string | null;
+        };
+        Relationships: [];
+      };
       ntc_cost_indices: {
         Row: {
           created_at: string;

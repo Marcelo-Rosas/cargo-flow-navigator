@@ -1,5 +1,6 @@
 import { expect, Page, test } from '@playwright/test';
 import {
+  injectFakeSession,
   mockAuthUserRoute,
   mockCurrentUserProfileRoute,
   mockPaymentTermsRoute,
@@ -24,8 +25,6 @@ const conditionalFeesFixture = loadFixture('conditional_fees.json');
 const anttRatesFixture = loadFixture('antt_floor_rates.json');
 const calculateFreightOk = loadFixture('calculate_freight_ok.json');
 const calculateFreightOutOfRange = loadFixture('calculate_freight_out_of_range.json');
-
-test.use({ storageState: '.auth/user.json' });
 
 async function setupWizardMocks(
   page: Page,
@@ -55,7 +54,9 @@ async function setupWizardMocks(
 }
 
 const fillBaseQuoteForm = async (page: Page, km: string) => {
-  await page.getByRole('button', { name: 'Nova Cotação' }).click();
+  const newQuoteBtn = page.getByRole('button', { name: 'Nova Cotação' });
+  await newQuoteBtn.waitFor({ state: 'visible', timeout: 15_000 });
+  await newQuoteBtn.click();
   await page.getByLabel('Nome do Cliente *').fill('E2E Cliente');
   await page.getByLabel('Origem *').fill('São Paulo, SP');
   await page.getByLabel('Destino *').fill('Rio de Janeiro, RJ');
@@ -74,9 +75,10 @@ const fillBaseQuoteForm = async (page: Page, km: string) => {
 };
 
 test('wizard blocks CTA when km out of range', async ({ page }) => {
+  await injectFakeSession(page);
   await registerFallbackRoutes(page);
   await mockAuthUserRoute(page);
-  await mockCurrentUserProfileRoute(page);
+  await mockCurrentUserProfileRoute(page, 'operacional');
   await setupWizardMocks(page, []);
   await page.route('**/functions/v1/calculate-freight**', async (route) => {
     if (route.request().method() === 'OPTIONS') {
@@ -111,9 +113,10 @@ test('wizard blocks CTA when km out of range', async ({ page }) => {
 });
 
 test('wizard shows "Salvando..." while submit is pending', async ({ page }) => {
+  await injectFakeSession(page);
   await registerFallbackRoutes(page);
   await mockAuthUserRoute(page);
-  await mockCurrentUserProfileRoute(page);
+  await mockCurrentUserProfileRoute(page, 'operacional');
   const priceTableRows = loadFixture('price_table_rows_valid.json');
   await setupWizardMocks(page, priceTableRows, { delayPost: 800 });
   await page.route('**/functions/v1/calculate-freight**', async (route) => {

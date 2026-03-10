@@ -1460,7 +1460,7 @@ export function OrderDetailModal({
                   cargoValue={Number(order.quote?.cargo_value ?? 0)}
                   kmDistance={Number(order.km_distance ?? order.quote?.km_distance ?? 0)}
                   driverName={order.driver_name ?? undefined}
-                  driverCpf={order.driver?.cpf ? String(order.driver.cpf) : undefined}
+                  driverCpf={order.driver?.cpf ?? undefined}
                   vehiclePlate={order.vehicle_type?.code ?? order.quote?.vehicle_type?.code}
                   tripId={order.trip_id}
                 />

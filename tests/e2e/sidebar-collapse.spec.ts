@@ -4,6 +4,7 @@
  */
 import { expect, test } from '@playwright/test';
 import {
+  injectFakeSession,
   mockAuthUserRoute,
   mockCurrentUserProfileRoute,
   mockQuotesRoute,
@@ -17,12 +18,11 @@ const clientsFixture = loadFixture('clients.json');
 const priceTablesFixture = loadFixture('price_tables.json');
 const vehicleTypesFixture = loadFixture('vehicle_types.json');
 
-test.use({ storageState: '.auth/user.json' });
-
 test('sidebar collapse adjusts main content without gap', async ({ page }) => {
+  await injectFakeSession(page);
   await registerFallbackRoutes(page);
   await mockAuthUserRoute(page);
-  await mockCurrentUserProfileRoute(page);
+  await mockCurrentUserProfileRoute(page, 'operacional');
   await mockQuotesRoute(page, quotesFixture);
   await mockStaticRoute(page, 'clients', clientsFixture);
   await mockStaticRoute(page, 'price_tables', priceTablesFixture);
@@ -31,14 +31,12 @@ test('sidebar collapse adjusts main content without gap', async ({ page }) => {
   await page.goto('/comercial');
   await expect(page.getByRole('heading', { name: /Bem-vindo de volta/i })).toHaveCount(0);
 
-  const sidebar = page.getByTestId('sidebar').or(page.getByRole('complementary'));
+  const sidebar = page.getByTestId('sidebar');
   const mainContent = page.getByTestId('main-content');
   const mainRegion = page.getByRole('main').first();
-  const toggle = page
-    .getByTestId('sidebar-toggle')
-    .or(page.getByRole('complementary').getByRole('button').last());
+  const toggle = page.getByTestId('sidebar-toggle');
 
-  await expect(sidebar).toBeVisible();
+  await expect(sidebar).toBeVisible({ timeout: 15_000 });
   await expect(mainContent).toBeVisible();
   await expect(toggle).toBeVisible();
 

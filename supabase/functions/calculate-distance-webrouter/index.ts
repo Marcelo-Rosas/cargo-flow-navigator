@@ -67,14 +67,55 @@ function axesToCategoria(axes?: number): string {
 
 const WEBROUTER_URL = 'https://way.webrouter.com.br/RouterService/router/api/calcular';
 
-function buildAddress(cep: string, ordemPassagem: number) {
+const UA = 'vectra-cargo-flow/1.0 (webrouter; contact: support@vectracargo.com.br)';
+
+async function fetchAddressFromCep(
+  cep: string
+): Promise<{ localidade: string; uf: string } | null> {
+  const sources = [
+    {
+      url: `https://viacep.com.br/ws/${cep}/json/`,
+      get: (j: { erro?: unknown; localidade?: string; uf?: string }) =>
+        !j.erro && j.localidade && j.uf ? { localidade: j.localidade, uf: j.uf } : null,
+    },
+    {
+      url: `https://brasilapi.com.br/api/cep/v2/${cep}`,
+      get: (j: { city?: string; state?: string }) =>
+        j.city && j.state ? { localidade: j.city, uf: j.state } : null,
+    },
+    {
+      url: `https://opencep.com/v1/${cep}.json`,
+      get: (j: { localidade?: string; uf?: string }) =>
+        j.localidade && j.uf ? { localidade: j.localidade, uf: j.uf } : null,
+    },
+  ];
+  for (const s of sources) {
+    try {
+      const res = await fetch(s.url, {
+        headers: { 'User-Agent': UA, Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const j = await res.json();
+        const addr = s.get(j);
+        if (addr) return addr;
+      }
+    } catch {
+      // continue
+    }
+  }
+  return null;
+}
+
+function buildAddress(cep: string, ordemPassagem: number, opts?: { cidade?: string; uf?: string }) {
+  const uf = (opts?.uf || '').trim().toUpperCase().slice(0, 2);
+  const cidade = (opts?.cidade || '').trim().slice(0, 100);
   return {
     ordemPassagem,
     codigo: '',
     logradouro: '',
     numero: '',
     cep,
-    cidade: { pais: 'Brasil', uf: '', cidade: '', codigoIbge: 0 },
+    cidade: { pais: 'Brasil', uf, cidade, codigoIbge: 0 },
     latLng: { latitude: 0, longitude: 0 },
   };
 }
@@ -231,10 +272,31 @@ Deno.serve(async (req) => {
         ? String(categoriaVeiculo)
         : axesToCategoria(axesCount);
 
+    // Buscar origem e destino (cidade, UF) via CEP para enriquecer o payload WebRouter
+    const originUfInput = normalizeUf(body.origin_uf);
+    const destinationUfInput = normalizeUf(body.destination_uf);
+    const [originAddr, destinationAddr] = await Promise.all([
+      fetchAddressFromCep(originCep),
+      fetchAddressFromCep(destinationCep),
+    ]);
+    const originAddrFinal = originAddr
+      ? { cidade: originAddr.localidade, uf: originAddr.uf }
+      : originUfInput
+        ? { cidade: '', uf: originUfInput }
+        : undefined;
+    const destinationAddrFinal = destinationAddr
+      ? { cidade: destinationAddr.localidade, uf: destinationAddr.uf }
+      : destinationUfInput
+        ? { cidade: '', uf: destinationUfInput }
+        : undefined;
+
     const webRouterBody = {
       autenticacao: { chaveAcesso: apiKey },
       rota: {
-        enderecos: [buildAddress(originCep, 0), buildAddress(destinationCep, 1)],
+        enderecos: [
+          buildAddress(originCep, 0, originAddrFinal),
+          buildAddress(destinationCep, 1, destinationAddrFinal),
+        ],
         params: {
           categoriaVeiculo: categoria,
           perfilVeiculo: 'CAMINHAO',
@@ -248,7 +310,7 @@ Deno.serve(async (req) => {
     };
 
     console.log(
-      `[webrouter] CEPs: ${originCep} → ${destinationCep}, categoria: ${categoria}${categoriaVeiculo ? ' (AILOG)' : ` (axes: ${axesCount ?? 'default'})`}`
+      `[webrouter] CEPs: ${originCep} → ${destinationCep}, origem: ${originAddrFinal?.cidade || '—'}/${originAddrFinal?.uf || '—'}, destino: ${destinationAddrFinal?.cidade || '—'}/${destinationAddrFinal?.uf || '—'}, categoria: ${categoria}${categoriaVeiculo ? ' (AILOG)' : ` (axes: ${axesCount ?? 'default'})`}`
     );
 
     const res = await fetch(WEBROUTER_URL, {
@@ -331,11 +393,9 @@ Deno.serve(async (req) => {
 
     const custos = rota?.custos ?? {};
     const tollPlazas = rota ? extractTollPlazas(rota as Record<string, unknown>) : [];
-    const originUf = normalizeUf(body.origin_uf);
-    const destinationUf = normalizeUf(body.destination_uf);
     const kmByUf = extractKmByUf((rota as Record<string, unknown>) ?? {}, km, tollPlazas, {
-      originUf: originUf ?? undefined,
-      destinationUf: destinationUf ?? undefined,
+      originUf: originUfInput ?? undefined,
+      destinationUf: destinationUfInput ?? undefined,
     });
 
     const kmByUfSource = kmByUf

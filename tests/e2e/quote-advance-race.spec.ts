@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  injectFakeSession,
   mockAuthUserRoute,
   mockCurrentUserProfileRoute,
   mockPaymentTermsRoute,
@@ -24,12 +25,11 @@ const conditionalFeesFixture = loadFixture('conditional_fees.json');
 const priceTableRowsFixture = loadFixture('price_table_rows_valid.json');
 const anttRatesFixture = loadFixture('antt_floor_rates.json');
 
-test.use({ storageState: '.auth/user.json' });
-
 test('race selection keeps last choice applied', async ({ page }) => {
+  await injectFakeSession(page);
   await registerFallbackRoutes(page);
   await mockAuthUserRoute(page);
-  await mockCurrentUserProfileRoute(page);
+  await mockCurrentUserProfileRoute(page, 'operacional');
   await mockQuotesRoute(page, quotesFixture, quoteUpdateResponse);
   await mockStaticRoute(page, 'clients', clientsFixture);
   await mockStaticRoute(page, 'shippers', shippersFixture);
@@ -53,6 +53,8 @@ test('race selection keeps last choice applied', async ({ page }) => {
   await page.goto('/comercial');
   await expect(page.getByRole('heading', { name: /Bem-vindo de volta/i })).toHaveCount(0);
   const quoteCard = page.getByTestId('quote-card-quote-test-1');
+  await quoteCard.waitFor({ state: 'visible', timeout: 15_000 });
+  await quoteCard.scrollIntoViewIfNeeded();
   await quoteCard.click();
 
   await page.getByRole('tab', { name: /Doc Fat/i }).click();

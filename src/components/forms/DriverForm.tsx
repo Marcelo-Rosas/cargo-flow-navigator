@@ -26,6 +26,13 @@ import { zodPhone } from '@/lib/validators';
 
 const driverSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(200, 'Nome muito longo'),
+  cpf: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || /^\d{11}$/.test(v.replace(/\D/g, '')),
+      'CPF inválido – informe 11 dígitos'
+    ),
   phone: zodPhone,
   cnh: z
     .string()
@@ -72,6 +79,7 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
     resolver: zodResolver(driverSchema),
     defaultValues: {
       name: '',
+      cpf: '',
       phone: '',
       cnh: '',
       cnh_category: '',
@@ -85,6 +93,7 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
     if (driver) {
       form.reset({
         name: driver.name,
+        cpf: driver.cpf || '',
         phone: driver.phone || '',
         cnh: driver.cnh || '',
         cnh_category: (driver.cnh_category as DriverFormData['cnh_category']) || '',
@@ -95,6 +104,7 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
     } else {
       form.reset({
         name: '',
+        cpf: '',
         phone: '',
         cnh: '',
         cnh_category: '',
@@ -112,6 +122,7 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
           id: driver.id,
           updates: {
             name: data.name,
+            cpf: data.cpf || null,
             phone: data.phone || null,
             cnh: data.cnh || null,
             cnh_category: data.cnh_category || null,
@@ -145,6 +156,7 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
       } else {
         await createDriverMutation.mutateAsync({
           name: data.name,
+          cpf: data.cpf || null,
           phone: data.phone || null,
           cnh: data.cnh || null,
           cnh_category: data.cnh_category || null,
@@ -189,6 +201,36 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
                     <FormLabel>Nome completo *</FormLabel>
                     <FormControl>
                       <Input placeholder="Nome do motorista" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))
+                        }
+                        value={
+                          field.value
+                            ? field.value
+                                .replace(/\D/g, '')
+                                .replace(/(\d{3})(\d)/, '$1.$2')
+                                .replace(/(\d{3})(\d)/, '$1.$2')
+                                .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+                            : ''
+                        }
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

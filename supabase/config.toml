@@ -70,3 +70,6 @@ verify_jwt = false  # Chamado por cron/pg_cron com service role
 
 [functions.notification-hub]
 verify_jwt = false  # Chamado por workflow-orchestrator com service role
+
+[functions.news-agent]
+verify_jwt = false  # Chamado por cron/pg_cron com service role
