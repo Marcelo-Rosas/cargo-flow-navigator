@@ -431,8 +431,73 @@ export function QuoteDetailModal({
       }
       const res = data as { data?: { id?: string; created?: boolean }; error?: string } | null;
       if (res?.error) throw new Error(res.error);
+
+      // --- Create financial_installments for the FAT (mirrors CarreteiroTab logic) ---
+      if (res?.data?.id) {
+        const finDocId = res.data.id;
+        const { data: existingInstallments } = await supabase
+          .from('financial_installments')
+          .select('id')
+          .eq('financial_document_id', asDb(finDocId));
+
+        if (!existingInstallments || existingInstallments.length === 0) {
+          const fatTotal = totalClienteView || Number(quote.value) || 0;
+          const advPercent =
+            (paymentTerm as { advance_percent?: number | null } | null)?.advance_percent ?? 0;
+          const advDate =
+            (quote as { advance_due_date?: string | null }).advance_due_date ||
+            new Date().toISOString().slice(0, 10);
+          const balDate =
+            (quote as { balance_due_date?: string | null }).balance_due_date ||
+            new Date().toISOString().slice(0, 10);
+
+          if (advPercent > 0 && fatTotal > 0) {
+            const advAmount = Math.round(fatTotal * (advPercent / 100) * 100) / 100;
+            const balAmount = Math.round((fatTotal - advAmount) * 100) / 100;
+            const installments = [
+              {
+                financial_document_id: finDocId,
+                amount: advAmount,
+                due_date: advDate,
+                payment_method: `Adiantamento ${advPercent}%`,
+                status: 'pendente' as const,
+              },
+              {
+                financial_document_id: finDocId,
+                amount: balAmount,
+                due_date: balDate,
+                payment_method: `Saldo ${100 - advPercent}%`,
+                status: 'pendente' as const,
+              },
+            ];
+            const { error: insError } = await supabase
+              .from('financial_installments')
+              .insert(installments.map(asInsert));
+            if (insError) {
+              console.error('Error inserting FAT installments:', insError);
+              toast.error('FAT criado, mas erro ao criar parcelas: ' + insError.message);
+            }
+          } else if (fatTotal > 0) {
+            const { error: insError } = await supabase.from('financial_installments').insert(
+              asInsert({
+                financial_document_id: finDocId,
+                amount: fatTotal,
+                due_date: advDate,
+                payment_method: paymentTerm?.name || 'Pagamento Único',
+                status: 'pendente' as const,
+              })
+            );
+            if (insError) {
+              console.error('Error inserting FAT installment:', insError);
+              toast.error('FAT criado, mas erro ao criar parcela: ' + insError.message);
+            }
+          }
+        }
+      }
+
       toast.success(res?.data?.created ? 'FAT criado com sucesso' : 'FAT já existente');
       queryClient.invalidateQueries({ queryKey: ['financial-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao converter para FAT';
       toast.error(msg);
