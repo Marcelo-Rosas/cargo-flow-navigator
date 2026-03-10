@@ -38,10 +38,15 @@ import {
 import {
   useCashFlowSummary,
   usePendingInstallments,
+  useSettledInstallments,
   useSettleInstallments,
   useDeleteInstallments,
 } from '@/hooks/useCashFlowSummary';
-import type { CashFlowByMonth, PendingInstallment } from '@/hooks/useCashFlowSummary';
+import type {
+  CashFlowByMonth,
+  PendingInstallment,
+  SettledInstallment,
+} from '@/hooks/useCashFlowSummary';
 import { formatCurrency } from '@/lib/formatters';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 import { toast } from 'sonner';
@@ -63,14 +68,26 @@ function isOverdue(dueDate: string): boolean {
   return new Date(dueDate) < new Date(new Date().toISOString().slice(0, 10));
 }
 
-function exportToCSV(rows: CashFlowByMonth[]) {
+function exportToCSV(rows: CashFlowByMonth[], settled: SettledInstallment[]) {
+  // Sheet 1: Summary
   const header =
     'Período,Entradas Realizadas,Entradas Previstas,Saídas Realizadas,Saídas Previstas,Saldo,Saldo Acumulado,Docs FAT,Docs PAG';
   const lines = rows.map(
     (r) =>
       `"${r.periodLabel}",${r.entradas},${r.entradasPrevistas},${r.saidas},${r.saidasPrevistas},${r.saldo},${r.saldoAcumulado},${r.fatDocCount},${r.pagDocCount}`
   );
-  const csv = [header, ...lines].join('\n');
+
+  // Sheet 2: Settled installments detail
+  const settledHeader =
+    '\n\nParcelas Baixadas\nDocumento,Tipo,Forma Pagamento,Vencimento,Data Baixa,Valor';
+  const settledLines = settled.map((s) => {
+    const due = new Date(s.due_date + 'T12:00:00').toLocaleDateString('pt-BR');
+    const settledDate = s.settled_at ? new Date(s.settled_at).toLocaleDateString('pt-BR') : '—';
+    const tipo = s.document_type === 'FAT' ? 'Receber' : 'Pagar';
+    return `"${s.document_code ?? '—'}","${tipo}","${s.payment_method ?? '—'}","${due}","${settledDate}",${s.amount}`;
+  });
+
+  const csv = [header, ...lines, settledHeader, ...settledLines].join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -209,10 +226,12 @@ export function CashFlowReport() {
     isError: pendingError,
     error: pendingErrorObj,
   } = usePendingInstallments();
+  const { data: settledInstallments } = useSettledInstallments({ monthFrom, monthTo });
   const settleMutation = useSettleInstallments();
   const deleteMutation = useDeleteInstallments();
 
   const pendingRows = pendingInstallments ?? [];
+  const settledRows = settledInstallments ?? [];
   const items = rows ?? [];
 
   // Chart data in chronological order (reversed from display)
@@ -297,7 +316,7 @@ export function CashFlowReport() {
         <Button
           size="sm"
           variant="outline"
-          onClick={() => exportToCSV(items)}
+          onClick={() => exportToCSV(items, settledRows)}
           disabled={items.length === 0}
           className="gap-1.5"
         >

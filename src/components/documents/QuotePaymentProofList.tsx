@@ -5,6 +5,7 @@ import {
   ExternalLink,
   Loader2,
   Save,
+  Trash2,
   AlertCircle,
   CheckCircle2,
   XCircle,
@@ -15,7 +16,7 @@ import { MaskedInput } from '@/components/ui/masked-input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { openDocument, downloadDocument } from '@/lib/storage';
-import { useDocumentsByQuote } from '@/hooks/useDocuments';
+import { useDocumentsByQuote, useDeleteDocument } from '@/hooks/useDocuments';
 import {
   useQuotePaymentProofsByQuote,
   useQuoteReconciliation,
@@ -47,12 +48,23 @@ const PROOF_LABELS: Record<string, { label: string; color: string }> = {
   a_prazo: { label: 'A prazo', color: 'bg-blue-500/10 text-blue-600' },
 };
 
+const DELTA_REASONS = [
+  { value: 'mao_de_obra', label: 'Abatimento mão de obra' },
+  { value: 'avaria', label: 'Desconto por avaria' },
+  { value: 'atraso', label: 'Desconto por atraso' },
+  { value: 'negociacao', label: 'Renegociação comercial' },
+  { value: 'taxa_banco', label: 'Taxa bancária' },
+  { value: 'arredondamento', label: 'Arredondamento' },
+  { value: 'outro', label: 'Outro' },
+] as const;
+
 export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
   const { data: proofs, isLoading: isLoadingProofs } = useQuotePaymentProofsByQuote(quoteId);
   const { data: quoteDocuments, isLoading: isLoadingDocuments } = useDocumentsByQuote(quoteId);
   const { data: reconciliation } = useQuoteReconciliation(quoteId);
   const updateMutation = useUpdateQuotePaymentProofAmount();
   const upsertMutation = useUpsertQuotePaymentProofAmount();
+  const deleteDocMutation = useDeleteDocument();
   const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
@@ -86,6 +98,43 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
     Number(reconciliation.expected_amount) > 0;
 
   const isSaving = updateMutation.isPending || upsertMutation.isPending;
+
+  // Build per proof-type line breakdown (adiantamento, saldo, a_vista, a_prazo)
+  const proofLines = useMemo(() => {
+    const lines = new Map<
+      string,
+      {
+        proofType: string;
+        expected: number | null;
+        received: number | null;
+        deltaReason: string | null;
+      }
+    >();
+    for (const proof of proofs ?? []) {
+      const pt = proof.proof_type;
+      const existing = lines.get(pt) ?? {
+        proofType: pt,
+        expected: null,
+        received: null,
+        deltaReason: null,
+      };
+      existing.expected = (existing.expected ?? 0) + Number(proof.expected_amount ?? 0);
+      existing.received = (existing.received ?? 0) + Number(proof.amount ?? 0);
+      lines.set(pt, existing);
+    }
+    // Order: adiantamento, saldo, a_vista, a_prazo
+    const order = ['adiantamento', 'saldo', 'a_vista', 'a_prazo'];
+    return order
+      .filter((pt) => lines.has(pt))
+      .map((pt) => ({ ...lines.get(pt)!, deltaReason: deltaReasons[pt] ?? null }));
+  }, [proofs, deltaReasons]);
+
+  const [deltaReasons, setDeltaReasons] = useState<Record<string, string>>({});
+
+  const handleDeltaReasonChange = (proofType: string, reason: string) => {
+    setDeltaReasons((prev) => ({ ...prev, [proofType]: reason }));
+    // TODO: persist to database when reconciliation_notes column exists
+  };
 
   const handleStartEdit = (documentId: string, amount: number | null) => {
     setEditingDocumentId(documentId);
@@ -123,6 +172,16 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
     }
   };
 
+  const handleDeleteDoc = async (docId: string) => {
+    if (!window.confirm('Excluir este documento? Esta ação não pode ser desfeita.')) return;
+    try {
+      await deleteDocMutation.mutateAsync(docId);
+      toast.success('Documento excluído');
+    } catch {
+      toast.error('Erro ao excluir documento');
+    }
+  };
+
   if (isLoadingProofs || isLoadingDocuments) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -133,53 +192,117 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
 
   return (
     <div className="space-y-3">
+      {/* Per-line reconciliation breakdown */}
       {reconciliation && Number(reconciliation.expected_amount) > 0 && (
-        <div className="p-3 rounded-lg bg-muted/30 border border-border">
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground">Esperado</p>
-              <p className="font-semibold">
-                {formatCurrency(Number(reconciliation.expected_amount))}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Recebido</p>
-              <p className="font-semibold">{formatCurrency(Number(reconciliation.paid_amount))}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Delta</p>
-              <p
-                className={cn(
-                  'font-semibold',
-                  reconciliation.is_reconciled ? 'text-success' : 'text-warning-foreground'
-                )}
-              >
-                {formatCurrency(Number(reconciliation.delta_amount))}
-              </p>
-            </div>
-          </div>
-          <div className="mt-2 flex items-center gap-2 text-xs">
+        <div className="p-3 rounded-lg bg-muted/30 border border-border space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold">Conciliação de Recebimento</h4>
             {reconciliation.is_reconciled ? (
-              <span className="inline-flex items-center gap-1 text-success">
+              <span className="inline-flex items-center gap-1 text-xs text-success">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Conciliado
               </span>
             ) : isPendingConfirmation ? (
-              <span className="inline-flex items-center gap-1 text-warning-foreground">
+              <span className="inline-flex items-center gap-1 text-xs text-warning-foreground">
                 <AlertCircle className="w-3.5 h-3.5" />
                 Pendente confirmação
               </span>
             ) : reconciliation.proofs_count > 0 ? (
-              <span className="inline-flex items-center gap-1 text-destructive">
+              <span className="inline-flex items-center gap-1 text-xs text-destructive">
                 <XCircle className="w-3.5 h-3.5" />
                 Divergente
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-warning-foreground">
+              <span className="inline-flex items-center gap-1 text-xs text-warning-foreground">
                 <AlertCircle className="w-3.5 h-3.5" />
                 Pendente
               </span>
             )}
+          </div>
+
+          {/* Per proof-type lines */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b">
+                  <th className="text-left py-1 font-medium">Parcela</th>
+                  <th className="text-right py-1 font-medium">Esperado</th>
+                  <th className="text-right py-1 font-medium">Recebido</th>
+                  <th className="text-right py-1 font-medium">Delta</th>
+                  <th className="text-left py-1 pl-2 font-medium">Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {proofLines.map((line) => {
+                  const delta = (line.received ?? 0) - (line.expected ?? 0);
+                  const hasDelta = Math.abs(delta) > 1;
+                  return (
+                    <tr key={line.proofType} className="border-b last:border-0">
+                      <td className="py-1.5">
+                        <Badge
+                          variant="secondary"
+                          className={cn('text-xs', PROOF_LABELS[line.proofType]?.color)}
+                        >
+                          {PROOF_LABELS[line.proofType]?.label ?? line.proofType}
+                        </Badge>
+                      </td>
+                      <td className="text-right py-1.5 font-medium">
+                        {line.expected != null ? formatCurrency(line.expected) : '—'}
+                      </td>
+                      <td className="text-right py-1.5 font-medium">
+                        {line.received != null ? formatCurrency(line.received) : '—'}
+                      </td>
+                      <td
+                        className={cn(
+                          'text-right py-1.5 font-semibold',
+                          hasDelta ? 'text-destructive' : 'text-success'
+                        )}
+                      >
+                        {line.received != null ? formatCurrency(delta) : '—'}
+                      </td>
+                      <td className="py-1.5 pl-2">
+                        {hasDelta && (
+                          <select
+                            className="text-xs border rounded px-1 py-0.5 bg-background"
+                            value={line.deltaReason ?? ''}
+                            onChange={(e) =>
+                              handleDeltaReasonChange(line.proofType, e.target.value)
+                            }
+                          >
+                            <option value="">Selecionar...</option>
+                            {DELTA_REASONS.map((r) => (
+                              <option key={r.value} value={r.value}>
+                                {r.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="font-semibold border-t">
+                  <td className="py-1.5">Total</td>
+                  <td className="text-right py-1.5">
+                    {formatCurrency(Number(reconciliation.expected_amount))}
+                  </td>
+                  <td className="text-right py-1.5">
+                    {formatCurrency(Number(reconciliation.paid_amount))}
+                  </td>
+                  <td
+                    className={cn(
+                      'text-right py-1.5',
+                      reconciliation.is_reconciled ? 'text-success' : 'text-destructive'
+                    )}
+                  >
+                    {formatCurrency(Number(reconciliation.delta_amount))}
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
       )}
@@ -298,6 +421,16 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
                   </Button>
                 </>
               )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => handleDeleteDoc(doc.id)}
+                disabled={deleteDocMutation.isPending}
+                title="Excluir documento"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         );

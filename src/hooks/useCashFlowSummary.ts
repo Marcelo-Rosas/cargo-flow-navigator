@@ -131,6 +131,62 @@ export function useCashFlowSummary(params?: CashFlowFilters) {
   });
 }
 
+export interface SettledInstallment {
+  id: string;
+  amount: number;
+  due_date: string;
+  settled_at: string | null;
+  payment_method: string | null;
+  document_code: string | null;
+  document_type: 'FAT' | 'PAG';
+}
+
+export function useSettledInstallments(params?: CashFlowFilters) {
+  return useQuery({
+    queryKey: ['settled-installments', params?.monthFrom, params?.monthTo],
+    queryFn: async (): Promise<SettledInstallment[]> => {
+      let query = supabase
+        .from('financial_installments')
+        .select(
+          'id, amount, due_date, settled_at, payment_method, status, financial_documents(code, type)'
+        )
+        .eq('status', 'baixado')
+        .order('settled_at', { ascending: false });
+
+      if (params?.monthFrom) {
+        query = query.gte('due_date', params.monthFrom + '-01');
+      }
+      if (params?.monthTo) {
+        const [y, m] = params.monthTo.split('-').map(Number);
+        const lastDay = new Date(y, m, 0).getDate();
+        query = query.lte('due_date', `${params.monthTo}-${lastDay}`);
+      }
+
+      const { data, error } = await query.limit(500);
+      if (error) throw error;
+
+      return (
+        (data ?? []) as {
+          id: string;
+          amount: number;
+          due_date: string;
+          settled_at: string | null;
+          payment_method: string | null;
+          financial_documents: { code: string | null; type: 'FAT' | 'PAG' } | null;
+        }[]
+      ).map((row) => ({
+        id: row.id,
+        amount: Number(row.amount ?? 0),
+        due_date: row.due_date,
+        settled_at: row.settled_at,
+        payment_method: row.payment_method,
+        document_code: row.financial_documents?.code ?? null,
+        document_type: row.financial_documents?.type ?? 'PAG',
+      }));
+    },
+  });
+}
+
 export interface PendingInstallment {
   id: string;
   amount: number;
