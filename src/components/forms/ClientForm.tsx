@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { zodCnpj, zodPhone, zodCep, validateCpf } from '@/lib/validators';
+import { MaskedInput } from '@/components/ui/masked-input';
 
 type Client = Database['public']['Tables']['clients']['Row'];
 
@@ -244,7 +245,13 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                   <FormItem>
                     <FormLabel>CPF</FormLabel>
                     <FormControl>
-                      <Input placeholder="000.000.000-00" {...field} />
+                      <MaskedInput
+                        mask="cpf"
+                        placeholder="000.000.000-00"
+                        value={field.value || ''}
+                        onValueChange={(raw) => field.onChange(raw ?? '')}
+                        onBlur={field.onBlur}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -259,9 +266,11 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                     <FormLabel>CNPJ</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input
+                        <MaskedInput
+                          mask="cnpj"
                           placeholder="00.000.000/0000-00"
-                          {...field}
+                          value={field.value || ''}
+                          onValueChange={(raw) => field.onChange(raw ?? '')}
                           onBlur={async () => {
                             field.onBlur();
                             await handleCnpjLookup();

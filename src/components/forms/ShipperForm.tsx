@@ -122,6 +122,11 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
     try {
       const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
       if (!res.ok) {
+        if (res.status === 404) {
+          toast.error('CNPJ não encontrado na base da Receita Federal');
+        } else {
+          toast.error(`Erro ao consultar CNPJ (status ${res.status})`);
+        }
         setIsLookingUp(false);
         return;
       }
@@ -147,7 +152,7 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
 
       toast.success('Dados preenchidos automaticamente pelo CNPJ');
     } catch {
-      // Silently fail - API might be unavailable
+      toast.error('Falha ao consultar CNPJ — verifique sua conexão');
     } finally {
       setIsLookingUp(false);
     }
@@ -252,10 +257,12 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
                   <FormLabel>CNPJ</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input
+                      <MaskedInput
+                        mask="cnpj"
                         placeholder="00.000.000/0000-00"
-                        {...field}
-                        onBlur={async (e) => {
+                        value={field.value || ''}
+                        onValueChange={(raw) => field.onChange(raw ?? '')}
+                        onBlur={async () => {
                           field.onBlur();
                           await handleCnpjLookup();
                         }}
@@ -267,9 +274,14 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
                         </div>
                       )}
                       {!isLookingUp && field.value && sanitizeCnpj(field.value).length === 14 && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <Search className="w-4 h-4 text-muted-foreground" />
-                        </div>
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-primary transition-colors"
+                          onClick={handleCnpjLookup}
+                          title="Consultar CNPJ"
+                        >
+                          <Search className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                        </button>
                       )}
                     </div>
                   </FormControl>
