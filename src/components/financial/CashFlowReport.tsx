@@ -4,6 +4,7 @@ import {
   TrendingDown,
   Download,
   CheckSquare,
+  Trash2,
   Calendar,
   BarChart3,
   FileSpreadsheet,
@@ -38,6 +39,7 @@ import {
   useCashFlowSummary,
   usePendingInstallments,
   useSettleInstallments,
+  useDeleteInstallments,
 } from '@/hooks/useCashFlowSummary';
 import type { CashFlowByMonth, PendingInstallment } from '@/hooks/useCashFlowSummary';
 import { formatCurrency } from '@/lib/formatters';
@@ -208,6 +210,7 @@ export function CashFlowReport() {
     error: pendingErrorObj,
   } = usePendingInstallments();
   const settleMutation = useSettleInstallments();
+  const deleteMutation = useDeleteInstallments();
 
   const pendingRows = pendingInstallments ?? [];
   const items = rows ?? [];
@@ -241,6 +244,19 @@ export function CashFlowReport() {
       },
     });
   }, [selectedIds, settleMutation]);
+
+  const handleDeleteSelected = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!window.confirm(`Excluir ${ids.length} parcela(s)? Esta ação não pode ser desfeita.`))
+      return;
+    deleteMutation.mutate(ids, {
+      onSuccess: () => {
+        toast.success(`${ids.length} parcela(s) excluída(s)`);
+        setSelectedIds(new Set());
+      },
+    });
+  }, [selectedIds, deleteMutation]);
 
   // ── Loading / Error ──
   if (isLoading) {
@@ -461,6 +477,16 @@ export function CashFlowReport() {
                 ? 'Processando...'
                 : `Baixar selecionadas (${selectedIds.size})`}
             </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleDeleteSelected}
+              disabled={selectedIds.size === 0 || deleteMutation.isPending}
+              className="gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {deleteMutation.isPending ? 'Excluindo...' : `Excluir (${selectedIds.size})`}
+            </Button>
           </div>
         </div>
 
@@ -552,6 +578,13 @@ export function CashFlowReport() {
             {settleMutation.error instanceof Error
               ? settleMutation.error.message
               : 'Não foi possível baixar as parcelas.'}
+          </p>
+        )}
+        {deleteMutation.isError && (
+          <p className="text-xs text-destructive">
+            {deleteMutation.error instanceof Error
+              ? deleteMutation.error.message
+              : 'Não foi possível excluir as parcelas.'}
           </p>
         )}
       </div>

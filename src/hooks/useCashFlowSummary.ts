@@ -190,6 +190,23 @@ export function useSettleInstallments() {
   });
 }
 
+export function useDeleteInstallments() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (ids.length === 0) return null;
+      const { error } = await supabase.from('financial_installments').delete().in('id', ids);
+      if (error) throw error;
+      return ids;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-installments'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+    },
+  });
+}
+
 function formatPeriodLabel(period: string): string {
   try {
     const d = new Date(period + 'T01:00:00');
