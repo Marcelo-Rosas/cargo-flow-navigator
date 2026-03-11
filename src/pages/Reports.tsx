@@ -9,7 +9,20 @@ import {
   Info,
   FileText,
   CheckCircle2,
+  Download,
+  Receipt,
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -22,8 +35,11 @@ import {
 } from '@/components/ui/table';
 import { useRsKmDetailedReport } from '@/hooks/useDashboardStats';
 import { useReconciliationReport } from '@/hooks/useQuotePaymentProofs';
+import { useDreComparativoReport } from '@/hooks/useDreComparativoReport';
 import { useVehicleTypes } from '@/hooks/usePricingRules';
+import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
+import type { DreComparativoRow, DreGroupBy } from '@/modules/dre';
 
 const DELTA_REASON_LABELS: Record<string, string> = {
   mao_de_obra: 'Abatimento mão de obra',
@@ -96,10 +112,17 @@ function StatCard({
   );
 }
 
+const DRE_GROUP_OPTIONS: { value: DreGroupBy; label: string }[] = [
+  { value: 'order', label: 'Por OS' },
+  { value: 'trip', label: 'Por Viagem (VG)' },
+  { value: 'quote', label: 'Por Cotação (COT)' },
+];
+
 export default function Reports() {
   const [reportYear, setReportYear] = useState<number | null>(REPORT_THIS_YEAR);
   const [reportMonth, setReportMonth] = useState<number | null>(null);
   const [vehicleTypeId, setVehicleTypeId] = useState<string | null>(null);
+  const [dreGroupBy, setDreGroupBy] = useState<DreGroupBy>('order');
   const { data: vehicleTypes } = useVehicleTypes();
   const { data: routes, isLoading } = useRsKmDetailedReport({
     year: reportYear,
@@ -109,6 +132,13 @@ export default function Reports() {
   const { data: reconRows, isLoading: isLoadingRecon } = useReconciliationReport({
     year: reportYear,
     month: reportMonth,
+  });
+  const { data: dreRows, isLoading: isLoadingDre } = useDreComparativoReport({
+    year: reportYear,
+    month: reportMonth,
+    vehicleTypeId,
+    groupBy: dreGroupBy,
+    enabled: true,
   });
 
   // Resumo geral
@@ -339,6 +369,14 @@ export default function Reports() {
             )}
           </motion.div>
 
+          {/* DRE Presumido vs Real */}
+          <DreComparativoSection
+            dreRows={dreRows ?? []}
+            isLoading={isLoadingDre}
+            groupBy={dreGroupBy}
+            onGroupByChange={setDreGroupBy}
+          />
+
           {/* Conciliação de Recebimento */}
           <motion.div
             className="bg-card rounded-xl border border-border shadow-card p-6"
@@ -440,6 +478,192 @@ export default function Reports() {
 
 function formatReconCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+}
+
+function DreComparativoSection({
+  dreRows,
+  isLoading,
+  groupBy,
+  onGroupByChange,
+}: {
+  dreRows: DreComparativoRow[];
+  isLoading: boolean;
+  groupBy: DreGroupBy;
+  onGroupByChange: (v: DreGroupBy) => void;
+}) {
+  const exportDreCsv = () => {
+    const header =
+      'Entidade,Receita Presumida,Receita Real,Custos Diretos Presumidos,Custos Diretos Reais,Resultado Presumido,Resultado Real,Δ Resultado,Δ %,Margem Presumida %,Margem Real %';
+    const lines = dreRows.map(
+      (r) =>
+        `"${r.entityLabel}",${r.receitaPresumida},${r.receitaReal},${r.custosDiretosPresumidos},${r.custosDiretosReais},${r.resultadoPresumido},${r.resultadoReal},${r.deltaResultado},${r.deltaPercent.toFixed(2)},${r.margemPresumidaPercent.toFixed(2)},${r.margemRealPercent.toFixed(2)}`
+    );
+    const csv = ['\uFEFF' + header, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dre-presumido-vs-real-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const chartData = dreRows.slice(0, 10).map((r) => ({
+    name: r.entityLabel.length > 12 ? r.entityLabel.slice(0, 12) + '…' : r.entityLabel,
+    fullName: r.entityLabel,
+    presumido: r.resultadoPresumido,
+    real: r.resultadoReal,
+    delta: r.deltaResultado,
+  }));
+
+  return (
+    <motion.div
+      className="bg-card rounded-xl border border-border shadow-card p-6"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.18 }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-2">
+          <Receipt className="w-5 h-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">
+            DRE Presumido vs Real Operacional
+          </h2>
+          <span
+            className="text-xs text-muted-foreground cursor-help"
+            title="Faturamento e tributos permanecem fixos; apenas custos operacionais reais (carreteiro, pedágio, descarga) alteram a margem."
+          >
+            (i)
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={groupBy}
+            onChange={(e) => onGroupByChange(e.target.value as DreGroupBy)}
+            className="text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground cursor-pointer"
+          >
+            {DRE_GROUP_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={exportDreCsv}
+            disabled={dreRows.length === 0}
+            className="text-sm border border-border rounded px-3 py-1.5 bg-background hover:bg-muted/50 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <Download className="w-4 h-4" />
+            CSV
+          </button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : dreRows.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+          <Info className="w-10 h-10 text-muted-foreground/50" />
+          <p className="text-muted-foreground">
+            Nenhuma OS com <strong>carreteiro real</strong> no período.
+          </p>
+          <p className="text-sm text-muted-foreground max-w-md">
+            Preencha o valor do carreteiro real nas OS do módulo Operacional para comparar margem
+            presumida vs real.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="mb-6" style={{ height: 280 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatCurrency(v)} />
+                <Tooltip
+                  formatter={(v: number) => formatCurrency(Number(v))}
+                  contentStyle={{ fontSize: 12 }}
+                />
+                <Legend />
+                <Bar
+                  dataKey="presumido"
+                  name="Resultado Presumido"
+                  fill="hsl(var(--primary))"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar dataKey="real" name="Resultado Real" radius={[4, 4, 0, 0]}>
+                  {chartData.map((entry, i) => (
+                    <Cell key={i} fill={entry.delta >= 0 ? 'hsl(142 76% 36%)' : 'hsl(0 84% 60%)'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Entidade</TableHead>
+                <TableHead className="text-right">Receita</TableHead>
+                <TableHead className="text-right">Custos Dir. Presumidos</TableHead>
+                <TableHead className="text-right">Custos Dir. Reais</TableHead>
+                <TableHead className="text-right">Resultado Presumido</TableHead>
+                <TableHead className="text-right">Resultado Real</TableHead>
+                <TableHead className="text-right">Δ</TableHead>
+                <TableHead className="text-right">Δ%</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dreRows.map((r) => {
+                const deltaPositive = r.deltaResultado >= 0;
+                return (
+                  <TableRow key={`${r.entityType}-${r.entityId}`}>
+                    <TableCell className="font-medium">{r.entityLabel}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(r.receitaPresumida)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {formatCurrency(r.custosDiretosPresumidos)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {formatCurrency(r.custosDiretosReais)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(r.resultadoPresumido)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {formatCurrency(r.resultadoReal)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        'text-right tabular-nums font-semibold',
+                        deltaPositive ? 'text-green-600 dark:text-green-500' : 'text-destructive'
+                      )}
+                    >
+                      {r.deltaResultado >= 0 ? '+' : ''}
+                      {formatCurrency(r.deltaResultado)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge
+                        variant={deltaPositive ? 'default' : 'destructive'}
+                        className={deltaPositive ? 'bg-green-600' : ''}
+                      >
+                        {r.deltaResultado >= 0 ? '+' : ''}
+                        {r.deltaPercent.toFixed(2)}%
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </>
+      )}
+    </motion.div>
+  );
 }
 
 function ReconReasonSummary({

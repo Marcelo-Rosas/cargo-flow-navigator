@@ -4,6 +4,7 @@ import { FileText, Truck } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { FinancialKanbanBoard } from '@/components/financial/kanban/FinancialKanbanBoard';
 import { CashFlowReport } from '@/components/financial/CashFlowReport';
+import { DreConsolidatedPanel } from '@/components/financial/DreConsolidatedPanel';
 import { TripReconciliationCard } from '@/components/financial/TripReconciliationCard';
 import { TripDetailModal } from '@/components/modals/TripDetailModal';
 import { FinancialDetailModal } from '@/components/modals/FinancialDetailModal';
@@ -19,7 +20,7 @@ import { FAT_COLUMNS, PAG_COLUMNS } from '@/lib/financial-kanban';
 import type { FinancialDocType } from '@/types/financial';
 import type { FinancialKanbanRow } from '@/types/financial';
 
-type TabKey = 'receber' | 'pagar' | 'fluxo';
+type TabKey = 'receber' | 'pagar' | 'fluxo' | 'dre';
 type PagViewMode = 'os' | 'trip';
 
 export default function Financial() {
@@ -89,6 +90,7 @@ export default function Financial() {
               label="Fluxo de Caixa"
               count={0}
             />
+            <TabButton active={tab === 'dre'} onClick={() => setTab('dre')} label="DRE" count={0} />
           </div>
           {tab === 'pagar' && (
             <ToggleGroup
@@ -111,6 +113,8 @@ export default function Financial() {
 
         {tab === 'fluxo' ? (
           <CashFlowReport />
+        ) : tab === 'dre' ? (
+          <DreConsolidatedPanel />
         ) : tab === 'pagar' && pagViewMode === 'trip' ? (
           tripsReconciliation.isLoading ? (
             <TripsGridSkeleton />
