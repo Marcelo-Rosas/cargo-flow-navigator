@@ -113,6 +113,89 @@ export function useUpdatePaymentProofDeltaReason() {
   });
 }
 
+export interface ReconciliationReportRow {
+  quote_id: string;
+  quote_code: string;
+  client_name: string | null;
+  expected_amount: number;
+  paid_amount: number;
+  delta_amount: number;
+  is_reconciled: boolean;
+  delta_reason: string | null;
+  proof_type: string;
+  created_at: string;
+}
+
+export function useReconciliationReport(filter?: { year?: number | null; month?: number | null }) {
+  const year = filter?.year ?? null;
+  const month = filter?.month ?? null;
+  return useQuery({
+    queryKey: ['reconciliation_report', year, month],
+    queryFn: async () => {
+      let query = supabase
+        .from('quote_payment_proofs' as never)
+        .select(
+          `
+          id,
+          quote_id,
+          proof_type,
+          amount,
+          expected_amount,
+          delta_reason,
+          created_at,
+          quote:quotes!inner (id, quote_code, client_name, value, created_at)
+        `
+        )
+        .not('amount', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (year) {
+        const start = `${year}-${month ? String(month).padStart(2, '0') : '01'}-01`;
+        const endMonth = month ? month : 12;
+        const endYear = month ? year : year;
+        const end =
+          endMonth === 12
+            ? `${endYear + 1}-01-01`
+            : `${endYear}-${String(endMonth + 1).padStart(2, '0')}-01`;
+        query = query.gte('created_at', start).lt('created_at', end);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      type RawRow = {
+        id: string;
+        quote_id: string;
+        proof_type: string;
+        amount: number;
+        expected_amount: number | null;
+        delta_reason: string | null;
+        created_at: string;
+        quote: {
+          id: string;
+          quote_code: string;
+          client_name: string | null;
+          value: number | null;
+          created_at: string;
+        };
+      };
+
+      return ((data ?? []) as unknown as RawRow[]).map((row) => ({
+        quote_id: row.quote_id,
+        quote_code: row.quote?.quote_code ?? '',
+        client_name: row.quote?.client_name ?? null,
+        expected_amount: Number(row.expected_amount ?? 0),
+        paid_amount: Number(row.amount ?? 0),
+        delta_amount: Number(row.amount ?? 0) - Number(row.expected_amount ?? 0),
+        is_reconciled: Math.abs(Number(row.amount ?? 0) - Number(row.expected_amount ?? 0)) <= 1,
+        delta_reason: row.delta_reason,
+        proof_type: row.proof_type,
+        created_at: row.created_at,
+      })) as ReconciliationReportRow[];
+    },
+  });
+}
+
 export function useUpsertQuotePaymentProofAmount() {
   const queryClient = useQueryClient();
   return useMutation({

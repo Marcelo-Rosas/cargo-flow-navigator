@@ -22,7 +22,7 @@ export function KanbanReconciliationBadge({
     return (
       <span className="inline-flex items-center gap-1 text-[10px] text-success bg-success/10 rounded px-1.5 py-0.5">
         <CheckCircle2 className="w-3 h-3" />
-        OK
+        Conciliado
       </span>
     );
   }

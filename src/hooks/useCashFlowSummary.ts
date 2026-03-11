@@ -193,6 +193,11 @@ export interface PendingInstallment {
   due_date: string;
   document_code: string | null;
   document_type: 'FAT' | 'PAG';
+  source_id: string | null;
+  recon_paid: number | null;
+  recon_delta: number | null;
+  recon_reconciled: boolean | null;
+  recon_proof_label: string | null;
 }
 
 export function usePendingInstallments(limit = 50) {
@@ -201,27 +206,104 @@ export function usePendingInstallments(limit = 50) {
     queryFn: async (): Promise<PendingInstallment[]> => {
       const { data, error } = await supabase
         .from('financial_installments')
-        .select('id, amount, due_date, status, financial_documents(code, type)')
+        .select('id, amount, due_date, status, financial_documents(code, type, source_id)')
         .eq('status', 'pendente')
         .order('due_date', { ascending: true })
         .limit(limit);
 
       if (error) throw error;
 
-      return (
-        (data ?? []) as {
-          id: string;
-          amount: number;
-          due_date: string;
-          financial_documents: { code: string | null; type: 'FAT' | 'PAG' } | null;
-        }[]
-      ).map((row) => ({
+      type RawRow = {
+        id: string;
+        amount: number;
+        due_date: string;
+        financial_documents: {
+          code: string | null;
+          type: 'FAT' | 'PAG';
+          source_id: string | null;
+        } | null;
+      };
+
+      const rows = ((data ?? []) as RawRow[]).map((row) => ({
         id: row.id,
         amount: Number(row.amount ?? 0),
         due_date: row.due_date,
         document_code: row.financial_documents?.code ?? null,
-        document_type: row.financial_documents?.type ?? 'PAG',
+        document_type: (row.financial_documents?.type ?? 'PAG') as 'FAT' | 'PAG',
+        source_id: row.financial_documents?.source_id ?? null,
       }));
+
+      // Fetch reconciliation for FAT rows
+      const fatSourceIds = [
+        ...new Set(
+          rows.filter((r) => r.document_type === 'FAT' && r.source_id).map((r) => r.source_id!)
+        ),
+      ];
+
+      const reconMap = new Map<
+        string,
+        { paid: number; delta: number; reconciled: boolean; proofLabel: string | null }
+      >();
+
+      if (fatSourceIds.length > 0) {
+        const { data: reconData } = await supabase
+          .from('v_quote_payment_reconciliation' as never)
+          .select('quote_id, paid_amount, delta_amount, is_reconciled')
+          .in('quote_id', fatSourceIds);
+
+        const reconRows = (reconData ?? []) as {
+          quote_id: string;
+          paid_amount: number;
+          delta_amount: number;
+          is_reconciled: boolean;
+        }[];
+
+        // Also fetch proof types per quote for label
+        const { data: proofData } = await supabase
+          .from('quote_payment_proofs' as never)
+          .select('quote_id, proof_type, amount')
+          .in('quote_id', fatSourceIds)
+          .not('amount', 'is', null);
+
+        const proofsByQuote = new Map<string, string[]>();
+        for (const p of (proofData ?? []) as {
+          quote_id: string;
+          proof_type: string;
+          amount: number;
+        }[]) {
+          const arr = proofsByQuote.get(p.quote_id) ?? [];
+          if (!arr.includes(p.proof_type)) arr.push(p.proof_type);
+          proofsByQuote.set(p.quote_id, arr);
+        }
+
+        const PROOF_LABELS: Record<string, string> = {
+          a_vista: 'À vista',
+          adiantamento: 'Adiantamento',
+          saldo: 'Saldo',
+          a_prazo: 'A prazo',
+        };
+
+        for (const r of reconRows) {
+          const types = proofsByQuote.get(r.quote_id) ?? [];
+          reconMap.set(r.quote_id, {
+            paid: Number(r.paid_amount),
+            delta: Number(r.delta_amount),
+            reconciled: r.is_reconciled,
+            proofLabel: types.map((t) => PROOF_LABELS[t] ?? t).join(', ') || null,
+          });
+        }
+      }
+
+      return rows.map((row) => {
+        const recon = row.source_id ? reconMap.get(row.source_id) : undefined;
+        return {
+          ...row,
+          recon_paid: recon?.paid ?? null,
+          recon_delta: recon?.delta ?? null,
+          recon_reconciled: recon?.reconciled ?? null,
+          recon_proof_label: recon?.proofLabel ?? null,
+        };
+      });
     },
   });
 }

@@ -535,6 +535,7 @@ export function CashFlowReport() {
                   <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Vencimento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-right">Conciliação</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -572,6 +573,28 @@ export function CashFlowReport() {
                         }`}
                       >
                         {formatCurrency(row.amount)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.document_type === 'FAT' && row.recon_paid != null ? (
+                          <div className="space-y-0.5">
+                            <span
+                              className={`text-xs font-medium ${
+                                row.recon_reconciled ? 'text-emerald-600' : 'text-destructive'
+                              }`}
+                            >
+                              {row.recon_reconciled
+                                ? 'Conciliado'
+                                : formatCurrency(row.recon_delta ?? 0)}
+                            </span>
+                            {row.recon_proof_label && (
+                              <p className="text-[10px] text-muted-foreground">
+                                {row.recon_proof_label}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         {overdue ? (
