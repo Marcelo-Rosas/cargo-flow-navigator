@@ -40,7 +40,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
-import { QuotePaymentProofList } from '@/components/documents/QuotePaymentProofList';
+import { DocFatUploadedList } from '@/components/documents/DocFatUploadedList';
 import { useProcessQuotePaymentProof } from '@/hooks/useQuotePaymentProofs';
 import {
   QuoteModalHeader,
@@ -869,7 +869,8 @@ export function QuoteDetailModal({
                       onSuccess={() => queryClient.invalidateQueries({ queryKey: ['documents'] })}
                     />
                   )}
-                  <QuotePaymentProofList quoteId={quote.id} />
+                  {/* Leitura apenas — conciliação é executada pelo financeiro */}
+                  <DocFatUploadedList quoteId={quote.id} />
                 </div>
               </TabsContent>
             )}

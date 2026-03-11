@@ -184,7 +184,7 @@ export function useReconciliationReport(filter?: { year?: number | null; month?:
         quote_id: row.quote_id,
         quote_code: row.quote?.quote_code ?? '',
         client_name: row.quote?.client_name ?? null,
-        expected_amount: Number(row.expected_amount ?? 0),
+        expected_amount: Number(row.expected_amount ?? row.quote?.value ?? 0),
         paid_amount: Number(row.amount ?? 0),
         delta_amount: Number(row.amount ?? 0) - Number(row.expected_amount ?? 0),
         is_reconciled: Math.abs(Number(row.amount ?? 0) - Number(row.expected_amount ?? 0)) <= 1,

@@ -1,19 +1,18 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { SectionBlock } from '@/components/ui/section-block';
 import type { FinancialKanbanRow } from '@/types/financial';
 import { FinancialAiAnalysis } from '@/components/financial/FinancialAiAnalysis';
 import { FinancialCargoDetails } from '@/components/financial/modal-sections/FinancialCargoDetails';
-import { FinancialClientHeader } from '@/components/financial/modal-sections/FinancialClientHeader';
 import { FinancialCostBreakdown } from '@/components/financial/modal-sections/FinancialCostBreakdown';
 import { FinancialPricingDetails } from '@/components/financial/modal-sections/FinancialPricingDetails';
 import { FinancialQuoteReconciliation } from '@/components/financial/modal-sections/FinancialQuoteReconciliation';
-import { FinancialDueDate } from '@/components/financial/modal-sections/FinancialDueDate';
 import { FinancialRouteInfo } from '@/components/financial/modal-sections/FinancialRouteInfo';
 import { FinancialTripLink } from '@/components/financial/modal-sections/FinancialTripLink';
-import { FinancialValuesBlock } from '@/components/financial/modal-sections/FinancialValuesBlock';
 import { useTrips, useLinkOrderToTargetTrip } from '@/hooks/useTrips';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 import { toast } from 'sonner';
 
 interface FinancialDetailModalProps {
@@ -61,7 +60,6 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
   const amount = Number(rawAmount);
   const name = (doc.client_name ?? doc.supplier_name ?? '—') as string;
   const dueDate = (doc.next_due_date ?? doc.due_date) as string | null | undefined;
-
   const tollValue = doc.toll_value != null ? Number(doc.toll_value) : 0;
 
   const breakdown = doc.pricing_breakdown as Record<string, unknown> | null;
@@ -84,67 +82,174 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
     custosDescarga?: number;
   } | null;
 
+  const margemPercent = breakdownProfitability?.margemPercent ?? null;
+  const hasBreakdown =
+    breakdownComponents != null || breakdownTotals != null || breakdownProfitability != null;
+  const hasCargo = doc.cargo_type != null || doc.weight != null || doc.volume != null;
+  const hasRoute = !!(doc.origin || doc.destination);
+  const hasOperacao =
+    hasCargo ||
+    tollValue > 0 ||
+    doc.km_distance != null ||
+    doc.vehicle_type_name != null ||
+    doc.payment_term_name != null;
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span className="font-mono">{doc.code ?? doc.id?.slice(0, 8)}</span>
-            <Badge variant={doc.is_overdue ? 'destructive' : 'secondary'}>
-              {doc.status}
-              {doc.is_overdue && ' • Atrasado'}
-            </Badge>
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-5 pt-2">
-          {/* Client + Shipper */}
-          <FinancialClientHeader name={name} shipperName={doc.shipper_name as string} />
+      <DialogContent className="sm:max-w-[740px] max-h-[90vh] p-0 flex flex-col overflow-hidden gap-0">
+        {/* ── Header fixo ──────────────────────────────────── */}
+        <div className="shrink-0 bg-background border-b px-6 pt-5 pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-base font-bold text-foreground">
+                  {doc.code ?? doc.id?.slice(0, 8)}
+                </span>
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-semibold uppercase tracking-wide"
+                >
+                  {doc.type}
+                </Badge>
+                <Badge variant={doc.is_overdue ? 'destructive' : 'secondary'} className="text-xs">
+                  {doc.status}
+                  {doc.is_overdue && ' · Atrasado'}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground truncate">
+                {name}
+                {doc.origin && doc.destination && (
+                  <span className="text-muted-foreground/60">
+                    {' '}
+                    · {doc.origin} → {doc.destination}
+                  </span>
+                )}
+              </p>
+            </div>
+            {dueDate && (
+              <div className="shrink-0 text-right">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
+                  Vencimento
+                </p>
+                <p className="text-sm font-semibold tabular-nums">{formatDate(dueDate)}</p>
+              </div>
+            )}
+          </div>
+        </div>
 
-          {/* Route */}
-          <FinancialRouteInfo
-            origin={doc.origin as string}
-            destination={doc.destination as string}
-            originCep={doc.origin_cep as string}
-            destinationCep={doc.destination_cep as string}
-          />
+        {/* ── Corpo scrollável ─────────────────────────────── */}
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+          {/* VALOR PRINCIPAL */}
+          <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-primary/70 mb-1">
+                  {doc.type === 'FAT' ? 'Valor a Receber' : 'Valor a Pagar'}
+                </p>
+                <p className="text-3xl font-bold text-primary tabular-nums">
+                  {formatCurrency(amount)}
+                </p>
+              </div>
+              <div className="text-right space-y-1.5">
+                {doc.payment_term_name && (
+                  <p className="text-xs text-muted-foreground">{String(doc.payment_term_name)}</p>
+                )}
+                {margemPercent != null && (
+                  <Badge
+                    variant={margemPercent < 15 ? 'destructive' : 'default'}
+                    className={
+                      margemPercent >= 15
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : ''
+                    }
+                  >
+                    Margem {margemPercent.toFixed(1)}%
+                  </Badge>
+                )}
+              </div>
+            </div>
 
-          {/* Cargo Data */}
-          <FinancialCargoDetails
-            cargoType={doc.cargo_type as string | null}
-            weight={doc.weight as number | null}
-            volume={doc.volume as number | null}
-          />
+            {/* Carreteiro (PAG) inline no card de valor */}
+            {(doc.carreteiro_antt != null || doc.carreteiro_real != null) && (
+              <div className="mt-3 pt-3 border-t border-primary/10 grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] text-primary/60 mb-0.5">Carreteiro ANTT</p>
+                  <p className="text-sm font-semibold tabular-nums">
+                    {doc.carreteiro_antt != null
+                      ? formatCurrency(Number(doc.carreteiro_antt))
+                      : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-primary/60 mb-0.5">Carreteiro Real</p>
+                  <p className="text-sm font-semibold tabular-nums">
+                    {doc.carreteiro_real != null
+                      ? formatCurrency(Number(doc.carreteiro_real))
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
-          {/* Pricing Details */}
-          <FinancialPricingDetails
-            vehicleTypeName={doc.vehicle_type_name as string | null}
-            vehicleTypeCode={doc.vehicle_type_code as string | null}
-            paymentTermName={doc.payment_term_name as string | null}
-            kmDistance={doc.km_distance as number | null}
-            tollValue={tollValue}
-          />
+          {/* ROTA */}
+          {hasRoute && (
+            <SectionBlock label="Rota">
+              <FinancialRouteInfo
+                origin={doc.origin as string}
+                destination={doc.destination as string}
+                originCep={doc.origin_cep as string}
+                destinationCep={doc.destination_cep as string}
+              />
+            </SectionBlock>
+          )}
+
+          {/* OPERAÇÃO */}
+          {hasOperacao && (
+            <SectionBlock label="Operação">
+              <div className="space-y-2">
+                {hasCargo && (
+                  <FinancialCargoDetails
+                    cargoType={doc.cargo_type as string | null}
+                    weight={doc.weight as number | null}
+                    volume={doc.volume as number | null}
+                  />
+                )}
+                <FinancialPricingDetails
+                  vehicleTypeName={doc.vehicle_type_name as string | null}
+                  vehicleTypeCode={doc.vehicle_type_code as string | null}
+                  paymentTermName={doc.payment_term_name as string | null}
+                  kmDistance={doc.km_distance as number | null}
+                  tollValue={tollValue}
+                />
+              </div>
+            </SectionBlock>
+          )}
+
+          {/* CUSTOS */}
+          {hasBreakdown && (
+            <>
+              <Separator />
+              <SectionBlock label="Custos da Operação">
+                <FinancialCostBreakdown
+                  components={breakdownComponents}
+                  totals={breakdownTotals}
+                  profitability={breakdownProfitability}
+                />
+              </SectionBlock>
+            </>
+          )}
 
           <Separator />
 
-          {/* Custos detalhados do breakdown */}
-          <FinancialCostBreakdown
-            components={breakdownComponents}
-            totals={breakdownTotals}
-            profitability={breakdownProfitability}
-          />
+          {/* COMPROVANTES DE PAGAMENTO — FAT */}
+          {doc.type === 'FAT' && doc.source_type === 'quote' && doc.source_id && (
+            <SectionBlock label="Comprovantes de Pagamento">
+              <FinancialQuoteReconciliation quoteId={doc.source_id as string} />
+            </SectionBlock>
+          )}
 
-          <Separator />
-
-          {/* Financial Values & Carreteiro */}
-          <FinancialValuesBlock
-            amount={amount}
-            totals={breakdownTotals}
-            profitability={breakdownProfitability}
-            carreteiroAntt={doc.carreteiro_antt as number | null}
-            carreteiroReal={doc.carreteiro_real as number | null}
-          />
-
-          {/* PAG: Vincular à Trip */}
+          {/* VINCULAR VIAGEM — PAG */}
           {canLinkToTrip && (
             <FinancialTripLink
               currentTripNumber={doc.trip_number as string | null}
@@ -156,15 +261,7 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
             />
           )}
 
-          {/* FAT: Conciliação de Recebimento */}
-          {doc.type === 'FAT' && doc.source_type === 'quote' && doc.source_id && (
-            <FinancialQuoteReconciliation quoteId={doc.source_id as string} />
-          )}
-
-          {/* Próximo Vencimento */}
-          {dueDate && <FinancialDueDate dueDate={dueDate} />}
-
-          {/* AI Analysis Section */}
+          {/* IA */}
           <FinancialAiAnalysis entityId={doc.id} entityType="financial_document" />
         </div>
       </DialogContent>

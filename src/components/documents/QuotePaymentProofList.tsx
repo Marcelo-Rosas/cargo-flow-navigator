@@ -23,6 +23,7 @@ import {
   useUpsertQuotePaymentProofAmount,
   useUpdateQuotePaymentProofAmount,
   useUpdatePaymentProofDeltaReason,
+  useProcessQuotePaymentProof,
 } from '@/hooks/useQuotePaymentProofs';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -65,6 +66,7 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
   const { data: reconciliation } = useQuoteReconciliation(quoteId);
   const updateMutation = useUpdateQuotePaymentProofAmount();
   const upsertMutation = useUpsertQuotePaymentProofAmount();
+  const processProofMutation = useProcessQuotePaymentProof();
   const deltaReasonMutation = useUpdatePaymentProofDeltaReason();
   const deleteDocMutation = useDeleteDocument();
   const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null);
@@ -167,12 +169,19 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
       if (existingProofId) {
         await updateMutation.mutateAsync({ id: existingProofId, amount: num });
       } else {
-        await upsertMutation.mutateAsync({
-          quoteId,
-          documentId,
-          proofType: DOC_TYPE_TO_PROOF_TYPE[documentType] ?? 'a_prazo',
-          amount: num,
-        });
+        // Call Edge Function first so expected_amount is always computed
+        const result = await processProofMutation.mutateAsync(documentId);
+        const proofId = (result as { quotePaymentProofId?: string })?.quotePaymentProofId;
+        if (proofId) {
+          await updateMutation.mutateAsync({ id: proofId, amount: num });
+        } else {
+          await upsertMutation.mutateAsync({
+            quoteId,
+            documentId,
+            proofType: DOC_TYPE_TO_PROOF_TYPE[documentType] ?? 'a_prazo',
+            amount: num,
+          });
+        }
       }
       toast.success('Valor recebido salvo');
       handleCancelEdit();
