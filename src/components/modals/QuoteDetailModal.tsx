@@ -1,9 +1,22 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertTriangle, Receipt, FileText, Landmark } from 'lucide-react';
+import {
+  AlertTriangle,
+  Receipt,
+  FileText,
+  Landmark,
+  Truck,
+  Scale,
+  Box,
+  Package,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
+import { SectionBlock } from '@/components/ui/section-block';
+import { DataCard } from '@/components/ui/data-card';
+import { FinancialRouteInfo } from '@/components/financial/modal-sections/FinancialRouteInfo';
 import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
 import type { Database, Json } from '@/integrations/supabase/types';
@@ -45,11 +58,11 @@ import { useProcessQuotePaymentProof } from '@/hooks/useQuotePaymentProofs';
 import {
   QuoteModalHeader,
   QuoteModalFinancialSummary,
-  QuoteModalLogisticsGrid,
   QuoteModalCostCompositionTab,
   QuoteModalEquipmentItemsTab,
   QuoteModalHistoryTab,
 } from '@/components/modals/quote-detail';
+import { formatCurrency } from '@/lib/formatters';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -257,31 +270,6 @@ export function QuoteDetailModal({
   const isBelowTarget =
     marginStatus === 'BELOW_TARGET' ||
     (originalMarginPercent !== undefined && originalMarginPercent < targetMargin);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
-
-  const formatDate = (date: string) => {
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-    }).format(new Date(date));
-  };
-
-  const formatDateTime = (date: string) => {
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(date));
-  };
 
   const handleAdvancePercentChange = async (value: string) => {
     if (!quote) return;
@@ -605,276 +593,372 @@ export function QuoteDetailModal({
     queryClient.invalidateQueries({ queryKey: ['quotes'] });
   };
 
+  const vehicleName = (vehicleType as { name?: string } | null)?.name ?? null;
+  const vehicleCode = (vehicleType as { code?: string } | null)?.code ?? null;
+  const hasOperacao =
+    vehicleType ||
+    quote.cargo_type ||
+    (quote.weight != null && Number(quote.weight) > 0) ||
+    (quote.volume != null && Number(quote.volume) > 0) ||
+    (quote.km_distance != null && Number(quote.km_distance) > 0);
+
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
-          <QuoteModalHeader
-            quoteCode={quote.quote_code ?? 'Cotação'}
-            clientName={quote.client_name}
-            stageLabel={stageInfo.label}
-            stageColor={stageInfo.color}
-            routeUfLabel={routeUfLabel || null}
-            kmBandLabel={kmBandLabel ?? null}
-            canManage={canManage}
-            canConvert={canConvert}
-            isConvertingToFat={isConvertingToFat}
-            isRecalculating={calculateFreightMutation.isPending || updateQuoteMutation.isPending}
-            onConvertToOS={() => setIsConvertModalOpen(true)}
-            onConvertToFAT={handleConvertToFAT}
-            onRecalcular={handleRecalcular}
-            onEdit={() => setIsEditFormOpen(true)}
-            showRecalcular={!!(breakdown && quote?.price_table_id && quote?.km_distance)}
-          />
+        <DialogContent className="sm:max-w-[740px] max-h-[90vh] p-0 flex flex-col overflow-hidden gap-0">
+          {/* ── Header fixo ──────────────────────────────────── */}
+          <div className="shrink-0 bg-background border-b px-6 pt-5 pb-4">
+            <QuoteModalHeader
+              quoteCode={quote.quote_code ?? 'Cotação'}
+              clientName={quote.client_name}
+              stageLabel={stageInfo.label}
+              stageColor={stageInfo.color}
+              routeUfLabel={routeUfLabel || null}
+              kmBandLabel={kmBandLabel ?? null}
+              canManage={canManage}
+              canConvert={canConvert}
+              isConvertingToFat={isConvertingToFat}
+              isRecalculating={calculateFreightMutation.isPending || updateQuoteMutation.isPending}
+              onConvertToOS={() => setIsConvertModalOpen(true)}
+              onConvertToFAT={handleConvertToFAT}
+              onRecalcular={handleRecalcular}
+              onEdit={() => setIsEditFormOpen(true)}
+              showRecalcular={!!(breakdown && quote?.price_table_id && quote?.km_distance)}
+            />
+          </div>
 
-          {kmStatus === 'OUT_OF_RANGE' && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Distância fora da faixa de quilometragem da tabela de preços selecionada
-              </AlertDescription>
-            </Alert>
-          )}
+          {/* ── Corpo scrollável ─────────────────────────────── */}
+          <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+            {kmStatus === 'OUT_OF_RANGE' && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Distância fora da faixa de quilometragem da tabela de preços selecionada
+                </AlertDescription>
+              </Alert>
+            )}
 
-          <QuoteModalFinancialSummary
-            totalCliente={totalClienteView}
-            receitaLiquida={receitaLiquidaView != null ? receitaLiquidaView : undefined}
-            resultadoLiquido={resultadoLiquidoView}
-            margemPercent={margemPercentView}
-            isBelowTarget={isBelowTarget}
-            targetMarginPercent={targetMargin}
-            marginPercentForAlert={marginPercent}
-          />
+            {/* RESUMO FINANCEIRO */}
+            <QuoteModalFinancialSummary
+              totalCliente={totalClienteView}
+              receitaLiquida={receitaLiquidaView != null ? receitaLiquidaView : undefined}
+              resultadoLiquido={resultadoLiquidoView}
+              margemPercent={margemPercentView}
+              isBelowTarget={isBelowTarget}
+              targetMarginPercent={targetMargin}
+              marginPercentForAlert={marginPercent}
+            />
 
-          <QuoteModalLogisticsGrid
-            origin={quote.origin}
-            originCep={quote.origin_cep}
-            destination={quote.destination}
-            destinationCep={quote.destination_cep}
-            vehicleName={(vehicleType as { name?: string } | null)?.name}
-            vehicleCode={(vehicleType as { code?: string } | null)?.code}
-            weight={quote.weight}
-            volume={quote.volume}
-            kmDistance={quote.km_distance}
-            cargoType={quote.cargo_type}
-            custoMotorista={custoMotoristaView != null ? Number(custoMotoristaView) : null}
-            totalCliente={totalClienteView > 0 ? totalClienteView : null}
-          />
+            {/* ROTA */}
+            {(quote.origin || quote.destination) && (
+              <SectionBlock label="Rota">
+                <FinancialRouteInfo
+                  origin={quote.origin}
+                  destination={quote.destination}
+                  originCep={quote.origin_cep}
+                  destinationCep={quote.destination_cep}
+                />
+              </SectionBlock>
+            )}
 
-          <Tabs defaultValue="composicao" className="mt-4">
-            <TabsList
-              className={cn(
-                'grid w-full',
-                showDocFatTab ? 'grid-cols-5' : 'grid-cols-4',
-                'overflow-x-auto'
-              )}
-            >
-              <TabsTrigger value="composicao" className="gap-1.5 text-xs">
-                <Receipt className="w-3.5 h-3.5" />
-                Composição
-              </TabsTrigger>
-              <TabsTrigger value="itens" className="gap-1.5 text-xs">
-                Itens
-              </TabsTrigger>
-              <TabsTrigger value="historico" className="gap-1.5 text-xs">
-                Histórico
-              </TabsTrigger>
-              <TabsTrigger value="pedagios" className="gap-1.5 text-xs">
-                <Landmark className="w-3.5 h-3.5" />
-                Pedágios
-                {tollPlazas.length > 0 && (
-                  <Badge variant="secondary" className="text-[10px] ml-1 px-1">
-                    {tollPlazas.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              {showDocFatTab && (
-                <TabsTrigger value="doc_fat" className="gap-1.5 text-xs">
-                  <FileText className="w-3.5 h-3.5" />
-                  Doc Fat
-                </TabsTrigger>
-              )}
-            </TabsList>
-
-            <TabsContent value="composicao" className="space-y-4 mt-4 m-0">
-              <QuoteModalCostCompositionTab
-                breakdown={breakdown}
-                isSimplesNacional={isSimplesNacional}
-                pisoAnttTotal={pisoAnttView}
-                custosDescarga={cargaDescargaView}
-                conditionalFeesData={conditionalFeesData ?? undefined}
-                margemBruta={margemBrutaView}
-                overhead={overheadView}
-                resultadoLiquido={resultadoLiquidoView}
-                margemPercent={margemPercentView}
-                isBelowTarget={isBelowTarget}
-                targetMarginPercent={targetMargin}
-                canManage={!!canManage}
-                axesCount={axesCount}
-                kmDistance={kmDistance}
-                anttRateCcd={anttRate?.ccd}
-                anttRateCc={anttRate?.cc}
-                hasAnttCalc={!!anttCalc}
-                onSaveAntt={handleSaveAntt}
-                cargoValue={Number(quote?.cargo_value) || 0}
-                onRecalculate={handleRecalcular}
-                isRecalculating={
-                  calculateFreightMutation.isPending || updateQuoteMutation.isPending
-                }
-              />
-            </TabsContent>
-
-            <TabsContent value="itens" className="space-y-4 mt-4 m-0">
-              <QuoteModalEquipmentItemsTab breakdown={breakdown} />
-            </TabsContent>
-
-            <TabsContent value="historico" className="space-y-4 mt-4 m-0">
-              <QuoteModalHistoryTab
-                createdAt={quote.created_at}
-                updatedAt={quote.updated_at}
-                advanceDueDate={
-                  (quote as { advance_due_date?: string | null })?.advance_due_date ?? null
-                }
-                balanceDueDate={
-                  (quote as { balance_due_date?: string | null })?.balance_due_date ?? null
-                }
-                advancePercent={
-                  (paymentTerm as { advance_percent?: number | null } | null)?.advance_percent ??
-                  null
-                }
-                totalCliente={totalClienteView}
-              />
-            </TabsContent>
-
-            <TabsContent value="pedagios" className="space-y-4 mt-4 m-0">
-              {tollPlazas.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <Landmark className="h-4 w-4" />
-                      Praças de Pedágio da Rota
-                    </h4>
-                    <Badge variant="outline" className="text-xs">
-                      {tollPlazas.length} praça{tollPlazas.length !== 1 ? 's' : ''}
-                    </Badge>
-                  </div>
-                  <div className="rounded-md border overflow-auto max-h-[400px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-10 text-center">#</TableHead>
-                          <TableHead>Praça</TableHead>
-                          <TableHead>Cidade/UF</TableHead>
-                          <TableHead className="text-right">Valor</TableHead>
-                          <TableHead className="text-right">TAG</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {tollPlazas.map((plaza, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="text-center text-muted-foreground text-xs">
-                              {plaza.ordemPassagem || idx + 1}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium">{plaza.nome}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {plaza.cidade}
-                              {plaza.uf ? ` - ${plaza.uf}` : ''}
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              {plaza.valor.toLocaleString('pt-BR', {
-                                style: 'currency',
-                                currency: 'BRL',
-                              })}
-                            </TableCell>
-                            <TableCell className="text-right text-sm text-muted-foreground">
-                              {plaza.valorTag.toLocaleString('pt-BR', {
-                                style: 'currency',
-                                currency: 'BRL',
-                              })}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                      <TableFooter>
-                        <TableRow className="font-semibold">
-                          <TableCell colSpan={3} className="text-right">
-                            Total ({tollPlazas.length} praça{tollPlazas.length !== 1 ? 's' : ''})
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {tollPlazas
-                              .reduce((sum, p) => sum + p.valor, 0)
-                              .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {tollPlazas
-                              .reduce((sum, p) => sum + p.valorTag, 0)
-                              .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </TableCell>
-                        </TableRow>
-                      </TableFooter>
-                    </Table>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Landmark className="h-10 w-10 text-muted-foreground/40 mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    Nenhuma praça de pedágio registrada.
-                  </p>
-                  <p className="text-xs text-muted-foreground/70 mt-1">
-                    Edite a cotação e clique &quot;Calcular KM&quot; para carregar as praças da
-                    rota.
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-
-            {showDocFatTab && (
-              <TabsContent value="doc_fat" className="space-y-6 mt-4 m-0">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-2 block">
-                      Condição de recebimento
-                    </label>
-                    <Select
-                      value={selectedAdvancePercent}
-                      onValueChange={handleAdvancePercentChange}
-                      disabled={!canManage || updateQuoteMutation.isPending || isAdvanceChanging}
-                    >
-                      <SelectTrigger
-                        className="w-full max-w-[260px]"
-                        data-testid="advance-select-trigger"
-                      >
-                        <SelectValue placeholder="Selecionar..." />
-                      </SelectTrigger>
-                      <SelectContent data-testid="advance-select-content">
-                        {advanceOptions.map((opt) => (
-                          <SelectItem
-                            key={opt.value}
-                            value={opt.value}
-                            data-testid={`advance-option-${opt.value}`}
-                          >
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {canManage && (
-                    <DocumentUpload
-                      quoteId={quote.id}
-                      financialContext="quote_receivable"
-                      onQuotePaymentDocCreated={handleQuotePaymentDocCreated}
-                      onSuccess={() => queryClient.invalidateQueries({ queryKey: ['documents'] })}
+            {/* OPERAÇÃO */}
+            {hasOperacao && (
+              <SectionBlock label="Operação">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {vehicleName && (
+                    <DataCard
+                      label="Veículo"
+                      value={vehicleName + (vehicleCode ? ` (${vehicleCode})` : '')}
+                      icon={Truck}
                     />
                   )}
-                  {/* Leitura apenas — conciliação é executada pelo financeiro */}
-                  <DocFatUploadedList quoteId={quote.id} />
+                  {quote.cargo_type && (
+                    <DataCard label="Tipo de Carga" value={quote.cargo_type} icon={Package} />
+                  )}
+                  {quote.weight != null && Number(quote.weight) > 0 && (
+                    <DataCard
+                      label="Peso"
+                      value={
+                        Number(quote.weight) >= 1000
+                          ? `${(Number(quote.weight) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} t`
+                          : `${Number(quote.weight).toLocaleString('pt-BR')} kg`
+                      }
+                      icon={Scale}
+                    />
+                  )}
+                  {quote.volume != null && Number(quote.volume) > 0 && (
+                    <DataCard
+                      label="Volume"
+                      value={`${Number(quote.volume).toLocaleString('pt-BR')} m³`}
+                      icon={Box}
+                    />
+                  )}
+                  {quote.km_distance != null && Number(quote.km_distance) > 0 && (
+                    <DataCard
+                      label="Distância"
+                      value={`${Number(quote.km_distance).toLocaleString('pt-BR')} km`}
+                      icon={Package}
+                    />
+                  )}
+                  {custoMotoristaView != null && (
+                    <DataCard
+                      label="Custo Motorista"
+                      value={formatCurrency(Number(custoMotoristaView))}
+                      icon={Truck}
+                      variant="warning"
+                    />
+                  )}
                 </div>
-              </TabsContent>
+
+                {/* Spread R$/KM */}
+                {quote.km_distance != null &&
+                  Number(quote.km_distance) > 0 &&
+                  custoMotoristaView != null &&
+                  totalClienteView > 0 &&
+                  (() => {
+                    const km = Number(quote.km_distance);
+                    const custo = Number(custoMotoristaView);
+                    const spread = (totalClienteView - custo) / km;
+                    return (
+                      <div className="mt-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-0.5">
+                              Spread (Venda — Custo)
+                            </p>
+                            <p className="text-lg font-bold text-primary tabular-nums">
+                              R$ {spread.toFixed(2)}/km
+                            </p>
+                          </div>
+                          <div className="text-right space-y-0.5">
+                            <p className="text-xs text-destructive tabular-nums font-medium">
+                              Custo: R$ {(custo / km).toFixed(2)}/km
+                            </p>
+                            <p className="text-xs text-success tabular-nums font-medium">
+                              Venda: R$ {(totalClienteView / km).toFixed(2)}/km
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+              </SectionBlock>
             )}
-          </Tabs>
+
+            <Separator />
+
+            {/* ABAS */}
+            <Tabs defaultValue="composicao">
+              <TabsList
+                className={cn('grid w-full', showDocFatTab ? 'grid-cols-5' : 'grid-cols-4')}
+              >
+                <TabsTrigger value="composicao" className="gap-1.5 text-xs">
+                  <Receipt className="w-3.5 h-3.5" />
+                  Composição
+                </TabsTrigger>
+                <TabsTrigger value="itens" className="gap-1.5 text-xs">
+                  Itens
+                </TabsTrigger>
+                <TabsTrigger value="historico" className="gap-1.5 text-xs">
+                  Histórico
+                </TabsTrigger>
+                <TabsTrigger value="pedagios" className="gap-1.5 text-xs">
+                  <Landmark className="w-3.5 h-3.5" />
+                  Pedágios
+                  {tollPlazas.length > 0 && (
+                    <Badge variant="secondary" className="text-[10px] ml-1 px-1">
+                      {tollPlazas.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                {showDocFatTab && (
+                  <TabsTrigger value="doc_fat" className="gap-1.5 text-xs">
+                    <FileText className="w-3.5 h-3.5" />
+                    Doc Fat
+                  </TabsTrigger>
+                )}
+              </TabsList>
+
+              <TabsContent value="composicao" className="space-y-4 mt-4 m-0">
+                <QuoteModalCostCompositionTab
+                  breakdown={breakdown}
+                  isSimplesNacional={isSimplesNacional}
+                  pisoAnttTotal={pisoAnttView}
+                  custosDescarga={cargaDescargaView}
+                  conditionalFeesData={conditionalFeesData ?? undefined}
+                  margemBruta={margemBrutaView}
+                  overhead={overheadView}
+                  resultadoLiquido={resultadoLiquidoView}
+                  margemPercent={margemPercentView}
+                  isBelowTarget={isBelowTarget}
+                  targetMarginPercent={targetMargin}
+                  canManage={!!canManage}
+                  axesCount={axesCount}
+                  kmDistance={kmDistance}
+                  anttRateCcd={anttRate?.ccd}
+                  anttRateCc={anttRate?.cc}
+                  hasAnttCalc={!!anttCalc}
+                  onSaveAntt={handleSaveAntt}
+                  cargoValue={Number(quote?.cargo_value) || 0}
+                  onRecalculate={handleRecalcular}
+                  isRecalculating={
+                    calculateFreightMutation.isPending || updateQuoteMutation.isPending
+                  }
+                />
+              </TabsContent>
+
+              <TabsContent value="itens" className="space-y-4 mt-4 m-0">
+                <QuoteModalEquipmentItemsTab breakdown={breakdown} />
+              </TabsContent>
+
+              <TabsContent value="historico" className="space-y-4 mt-4 m-0">
+                <QuoteModalHistoryTab
+                  createdAt={quote.created_at}
+                  updatedAt={quote.updated_at}
+                  advanceDueDate={
+                    (quote as { advance_due_date?: string | null })?.advance_due_date ?? null
+                  }
+                  balanceDueDate={
+                    (quote as { balance_due_date?: string | null })?.balance_due_date ?? null
+                  }
+                  advancePercent={
+                    (paymentTerm as { advance_percent?: number | null } | null)?.advance_percent ??
+                    null
+                  }
+                  totalCliente={totalClienteView}
+                />
+              </TabsContent>
+
+              <TabsContent value="pedagios" className="space-y-4 mt-4 m-0">
+                {tollPlazas.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Landmark className="h-4 w-4" />
+                        Praças de Pedágio da Rota
+                      </h4>
+                      <Badge variant="outline" className="text-xs">
+                        {tollPlazas.length} praça{tollPlazas.length !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                    <div className="rounded-md border overflow-auto max-h-[400px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10 text-center">#</TableHead>
+                            <TableHead>Praça</TableHead>
+                            <TableHead>Cidade/UF</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
+                            <TableHead className="text-right">TAG</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tollPlazas.map((plaza, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="text-center text-muted-foreground text-xs">
+                                {plaza.ordemPassagem || idx + 1}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium">{plaza.nome}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {plaza.cidade}
+                                {plaza.uf ? ` - ${plaza.uf}` : ''}
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                {plaza.valor.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </TableCell>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {plaza.valorTag.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                        <TableFooter>
+                          <TableRow className="font-semibold">
+                            <TableCell colSpan={3} className="text-right">
+                              Total ({tollPlazas.length} praça{tollPlazas.length !== 1 ? 's' : ''})
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {tollPlazas
+                                .reduce((sum, p) => sum + p.valor, 0)
+                                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {tollPlazas
+                                .reduce((sum, p) => sum + p.valorTag, 0)
+                                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </TableCell>
+                          </TableRow>
+                        </TableFooter>
+                      </Table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Landmark className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                    <p className="text-sm text-muted-foreground">
+                      Nenhuma praça de pedágio registrada.
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      Edite a cotação e clique &quot;Calcular KM&quot; para carregar as praças da
+                      rota.
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {showDocFatTab && (
+                <TabsContent value="doc_fat" className="space-y-6 mt-4 m-0">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-2 block">
+                        Condição de recebimento
+                      </label>
+                      <Select
+                        value={selectedAdvancePercent}
+                        onValueChange={handleAdvancePercentChange}
+                        disabled={!canManage || updateQuoteMutation.isPending || isAdvanceChanging}
+                      >
+                        <SelectTrigger
+                          className="w-full max-w-[260px]"
+                          data-testid="advance-select-trigger"
+                        >
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent data-testid="advance-select-content">
+                          {advanceOptions.map((opt) => (
+                            <SelectItem
+                              key={opt.value}
+                              value={opt.value}
+                              data-testid={`advance-option-${opt.value}`}
+                            >
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {canManage && (
+                      <DocumentUpload
+                        quoteId={quote.id}
+                        financialContext="quote_receivable"
+                        onQuotePaymentDocCreated={handleQuotePaymentDocCreated}
+                        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['documents'] })}
+                      />
+                    )}
+                    {/* Leitura apenas — conciliação é executada pelo financeiro */}
+                    <DocFatUploadedList quoteId={quote.id} />
+                  </div>
+                </TabsContent>
+              )}
+            </Tabs>
+          </div>
         </DialogContent>
       </Dialog>
 

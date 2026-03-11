@@ -25,51 +25,51 @@ export function QuoteModalFinancialSummary({
 }: QuoteModalFinancialSummaryProps) {
   return (
     <div className="space-y-3">
-      <div className={cn('grid gap-3', receitaLiquida != null ? 'grid-cols-3' : 'grid-cols-2')}>
-        <div className="rounded-lg border bg-primary/5 border-primary/20 p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-            Faturamento Bruto
-          </p>
-          <p className="text-2xl font-bold text-primary tabular-nums">
-            {formatCurrency(totalCliente)}
-          </p>
-        </div>
-        {receitaLiquida != null && (
-          <div className="rounded-lg border bg-muted/30 p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-              Receita Líquida
+      <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-primary/70 mb-1">
+              Faturamento Bruto
             </p>
-            <p className="text-xl font-bold text-foreground tabular-nums">
-              {formatCurrency(receitaLiquida)}
+            <p className="text-3xl font-bold text-primary tabular-nums">
+              {formatCurrency(totalCliente)}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Após DAS e ICMS</p>
           </div>
-        )}
-        <div
-          className={cn(
-            'rounded-lg border p-4',
-            isBelowTarget
-              ? 'bg-destructive/5 border-destructive/20'
-              : 'bg-success/5 border-success/20'
-          )}
-        >
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-            Resultado Líquido
-          </p>
-          <p
-            className={cn(
-              'text-2xl font-bold tabular-nums',
-              isBelowTarget ? 'text-destructive' : 'text-success'
-            )}
+          <Badge
+            variant={isBelowTarget ? 'destructive' : 'default'}
+            className={
+              !isBelowTarget
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                : ''
+            }
           >
-            {formatCurrency(resultadoLiquido)}
-          </p>
-          <Badge variant={isBelowTarget ? 'destructive' : 'default'} className="mt-2">
             Margem {(margemPercent || 0).toFixed(1)}%
           </Badge>
         </div>
+
+        <div className="mt-3 pt-3 border-t border-primary/10 grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-[10px] text-primary/60 mb-0.5">Resultado Líquido</p>
+            <p
+              className={cn(
+                'text-sm font-semibold tabular-nums',
+                isBelowTarget ? 'text-destructive' : 'text-success'
+              )}
+            >
+              {formatCurrency(resultadoLiquido)}
+            </p>
+          </div>
+          {receitaLiquida != null && (
+            <div>
+              <p className="text-[10px] text-primary/60 mb-0.5">Receita Líquida</p>
+              <p className="text-sm font-semibold tabular-nums">{formatCurrency(receitaLiquida)}</p>
+              <p className="text-[10px] text-primary/40">Após DAS e ICMS</p>
+            </div>
+          )}
+        </div>
       </div>
-      {isBelowTarget && (marginPercentForAlert !== undefined || margemPercent !== undefined) && (
+
+      {isBelowTarget && (
         <Alert variant="destructive" className="bg-destructive/10 border-destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>

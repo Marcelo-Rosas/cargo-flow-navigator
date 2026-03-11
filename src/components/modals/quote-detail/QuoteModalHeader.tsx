@@ -1,8 +1,8 @@
 import { Route, Pencil, ArrowRightLeft, Receipt, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+
 interface QuoteModalHeaderProps {
   quoteCode: string;
   clientName: string;
@@ -39,12 +39,14 @@ export function QuoteModalHeader({
   showRecalcular,
 }: QuoteModalHeaderProps) {
   return (
-    <DialogHeader>
+    <>
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <DialogTitle className="text-xl font-bold">{quoteCode ?? 'Cotação'}</DialogTitle>
-            <Badge className={cn(stageColor)}>{stageLabel}</Badge>
+            <span className="font-mono text-base font-bold text-foreground">{quoteCode}</span>
+            <Badge className={cn('text-[10px] font-semibold uppercase tracking-wide', stageColor)}>
+              {stageLabel}
+            </Badge>
             {routeUfLabel && (
               <Badge variant="outline" className="text-xs font-medium">
                 <Route className="w-3 h-3 mr-1" />
@@ -57,57 +59,56 @@ export function QuoteModalHeader({
               </Badge>
             )}
           </div>
-          <p className="text-sm font-semibold text-foreground">{clientName}</p>
+          <p className="text-sm text-muted-foreground truncate">{clientName}</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {canManage && canConvert && (
-            <>
-              <Button variant="outline" size="sm" onClick={onConvertToOS} className="gap-2">
-                <ArrowRightLeft className="w-4 h-4" />
-                Converter para OS
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onConvertToFAT}
-                disabled={isConvertingToFat}
-                className="gap-2"
-              >
-                {isConvertingToFat ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Receipt className="w-4 h-4" />
-                )}
-                Converter para FAT
-              </Button>
-            </>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {canManage && showRecalcular && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={onRecalcular}
+              disabled={isRecalculating}
+              title="Recalcular memória de cálculo"
+            >
+              {isRecalculating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+            </Button>
           )}
           {canManage && (
-            <>
-              {showRecalcular && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onRecalcular}
-                  disabled={isRecalculating}
-                  className="gap-1.5"
-                  title="Recalcular memória de cálculo"
-                >
-                  {isRecalculating ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  )}
-                  Recalcular
-                </Button>
-              )}
-              <Button variant="ghost" size="icon" onClick={onEdit}>
-                <Pencil className="w-4 h-4" />
-              </Button>
-            </>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
+              <Pencil className="w-4 h-4" />
+            </Button>
           )}
         </div>
       </div>
-    </DialogHeader>
+
+      {canManage && canConvert && (
+        <div className="flex gap-2 mt-3">
+          <Button variant="outline" size="sm" onClick={onConvertToOS} className="gap-1.5">
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            Converter para OS
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onConvertToFAT}
+            disabled={isConvertingToFat}
+            className="gap-1.5"
+          >
+            {isConvertingToFat ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Receipt className="w-3.5 h-3.5" />
+            )}
+            Converter para FAT
+          </Button>
+        </div>
+      )}
+    </>
   );
 }
