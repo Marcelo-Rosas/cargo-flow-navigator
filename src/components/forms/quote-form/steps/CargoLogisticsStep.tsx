@@ -1,5 +1,6 @@
 import type { UseFormReturn } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
+import { SectionBlock } from '@/components/ui/section-block';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import {
@@ -11,7 +12,15 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { QuoteFormData } from '../types';
-import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from '@/types/pricing';
+
+const PAYMENT_METHODS = ['pix', 'boleto', 'cartao', 'transferencia', 'outro'] as const;
+const PAYMENT_METHOD_LABELS: Record<(typeof PAYMENT_METHODS)[number], string> = {
+  pix: 'PIX',
+  boleto: 'Boleto',
+  cartao: 'Cartão',
+  transferencia: 'Transferência',
+  outro: 'Outro',
+};
 
 const kgToUnit = (kg: number, unit: 'kg' | 'ton') => (unit === 'ton' ? kg / 1000 : kg);
 const unitToKg = (value: number, unit: 'kg' | 'ton') => (unit === 'ton' ? value * 1000 : value);
@@ -48,6 +57,7 @@ interface CargoLogisticsStepProps {
   paymentTerms: PaymentTerm[];
   weightUnit: 'kg' | 'ton';
   setWeightUnit: (unit: 'kg' | 'ton') => void;
+  isLegacy?: boolean;
 }
 
 export function CargoLogisticsStep({
@@ -56,6 +66,7 @@ export function CargoLogisticsStep({
   paymentTerms,
   weightUnit,
   setWeightUnit,
+  isLegacy = false,
 }: CargoLogisticsStepProps) {
   const watchedPaymentTermId = form.watch('payment_term_id');
   const selectedTerm = paymentTerms.find((t) => t.id === watchedPaymentTermId) ?? null;
@@ -71,254 +82,293 @@ export function CargoLogisticsStep({
 
   return (
     <div className="space-y-6">
-      {/* Dados da Carga */}
-      <div className="space-y-4">
-        <h3 className="font-semibold text-foreground border-b pb-2">Detalhes da Carga</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            control={form.control}
-            name="cargo_type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo de Carga</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ex: Eletrônicos, Grãos..." {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="weight"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Peso</FormLabel>
-                <div className="flex gap-2">
+      <SectionBlock label="Detalhes da Carga">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="cargo_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de Carga</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Eletrônicos, Grãos..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="weight"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Peso</FormLabel>
+                  <div className="flex gap-2">
+                    <FormControl>
+                      <NumericInput
+                        ref={field.ref}
+                        name={field.name}
+                        value={field.value ?? 0}
+                        placeholder={weightUnit === 'ton' ? '0,000' : '0'}
+                        min={0}
+                        max={weightUnit === 'ton' ? 99_999 : 99_999_999}
+                        step={weightUnit === 'ton' ? 0.001 : 1}
+                        suffix={weightUnit}
+                        onValueChange={(val) => field.onChange(val ?? 0)}
+                        onBlur={field.onBlur}
+                      />
+                    </FormControl>
+                    <ToggleGroup
+                      type="single"
+                      value={weightUnit}
+                      onValueChange={(v) => {
+                        if (!v) return;
+                        const nextUnit = v as 'kg' | 'ton';
+                        const currentUnit = weightUnit;
+                        const currentValue = Number(form.getValues('weight') || 0);
+                        const kg = unitToKg(currentValue, currentUnit);
+                        const nextValue = kgToUnit(kg, nextUnit);
+                        setWeightUnit(nextUnit);
+                        form.setValue('weight', Number.isFinite(nextValue) ? nextValue : 0, {
+                          shouldDirty: true,
+                        });
+                      }}
+                      size="sm"
+                      className="shrink-0"
+                    >
+                      <ToggleGroupItem value="kg" className="text-xs px-2">
+                        kg
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="ton" className="text-xs px-2">
+                        ton
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="volume"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Volume (m³)</FormLabel>
                   <FormControl>
                     <NumericInput
                       ref={field.ref}
                       name={field.name}
                       value={field.value ?? 0}
-                      placeholder={weightUnit === 'ton' ? '0,000' : '0'}
-                      min={0}
-                      max={weightUnit === 'ton' ? 99_999 : 99_999_999}
-                      step={weightUnit === 'ton' ? 0.001 : 1}
-                      suffix={weightUnit}
+                      placeholder="0,00"
+                      step={0.01}
+                      suffix="m³"
                       onValueChange={(val) => field.onChange(val ?? 0)}
                       onBlur={field.onBlur}
                     />
                   </FormControl>
-                  <ToggleGroup
-                    type="single"
-                    value={weightUnit}
-                    onValueChange={(v) => {
-                      if (!v) return;
-                      const nextUnit = v as 'kg' | 'ton';
-                      const currentUnit = weightUnit;
-                      const currentValue = Number(form.getValues('weight') || 0);
-                      const kg = unitToKg(currentValue, currentUnit);
-                      const nextValue = kgToUnit(kg, nextUnit);
-                      setWeightUnit(nextUnit);
-                      form.setValue('weight', Number.isFinite(nextValue) ? nextValue : 0, {
-                        shouldDirty: true,
-                      });
-                    }}
-                    size="sm"
-                    className="shrink-0"
-                  >
-                    <ToggleGroupItem value="kg" className="text-xs px-2">
-                      kg
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="ton" className="text-xs px-2">
-                      ton
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="volume"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Volume (m³)</FormLabel>
-                <FormControl>
-                  <NumericInput
-                    ref={field.ref}
-                    name={field.name}
-                    value={field.value ?? 0}
-                    placeholder="0,00"
-                    step={0.01}
-                    suffix="m³"
-                    onValueChange={(val) => field.onChange(val ?? 0)}
-                    onBlur={field.onBlur}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        {showPesoFaturavel && pesoFaturavelInfo && (
-          <div className="p-3 rounded-lg bg-muted/50 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Peso Cubado (× 300 kg/m³)</span>
-              <span>{pesoFaturavelInfo.cubageWeightKg.toLocaleString('pt-BR')} kg</span>
-            </div>
-            <div className="flex justify-between font-medium">
-              <span>Peso Faturável</span>
-              <span>{pesoFaturavelInfo.billableWeightKg.toLocaleString('pt-BR')} kg</span>
-            </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-        )}
-      </div>
-
-      {/* Configuração Logística */}
-      <div className="space-y-4">
-        <h3 className="font-semibold text-foreground border-b pb-2">Configuração Logística</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="freight_modality"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Modalidade de Frete</FormLabel>
-                <Select
-                  onValueChange={(v) => {
-                    field.onChange(v);
-                    form.setValue('price_table_id', '');
-                  }}
-                  value={field.value || ''}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar modalidade..." />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="lotacao">Lotação</SelectItem>
-                    <SelectItem value="fracionado">Fracionado</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="price_table_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tabela de Preços</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ''}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar tabela..." />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {priceTablesFiltered.map((table) => (
-                      <SelectItem key={table.id} value={table.id}>
-                        {table.name} ({table.modality === 'lotacao' ? 'Lotação' : 'Fracionado'})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {showPesoFaturavel && pesoFaturavelInfo && (
+            <div className="p-3 rounded-lg bg-muted/50 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Peso Cubado (× 300 kg/m³)</span>
+                <span>{pesoFaturavelInfo.cubageWeightKg.toLocaleString('pt-BR')} kg</span>
+              </div>
+              <div className="flex justify-between font-medium">
+                <span>Peso Faturável</span>
+                <span>{pesoFaturavelInfo.billableWeightKg.toLocaleString('pt-BR')} kg</span>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            control={form.control}
-            name="payment_term_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Prazo de Pagamento</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ''}>
+      </SectionBlock>
+
+      <SectionBlock label="Configuração Logística">
+        <div className="space-y-4">
+          {!isLegacy && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="freight_modality"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modalidade de Frete</FormLabel>
+                    <Select
+                      onValueChange={(v) => {
+                        field.onChange(v);
+                        form.setValue('price_table_id', '');
+                      }}
+                      value={field.value || ''}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar modalidade..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="lotacao">Lotação</SelectItem>
+                        <SelectItem value="fracionado">Fracionado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="price_table_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tabela de Preços</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar tabela..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {priceTablesFiltered.map((table) => (
+                          <SelectItem key={table.id} value={table.id}>
+                            {table.name} ({table.modality === 'lotacao' ? 'Lotação' : 'Fracionado'})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="payment_term_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Prazo de Pagamento</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar prazo..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {paymentTerms.map((term) => (
+                        <SelectItem key={term.id} value={term.id}>
+                          {term.name}{' '}
+                          {term.adjustment_percent != null &&
+                            term.adjustment_percent !== 0 &&
+                            `(${term.adjustment_percent > 0 ? '+' : ''}${term.adjustment_percent}%)`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="payment_method"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Forma de Pagamento</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar forma..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {PAYMENT_METHODS.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {PAYMENT_METHOD_LABELS[m]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="km_distance"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Distância (km)</FormLabel>
                   <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar prazo..." />
-                    </SelectTrigger>
+                    <NumericInput
+                      ref={field.ref}
+                      name={field.name}
+                      value={field.value ?? ''}
+                      placeholder="0"
+                      suffix="km"
+                      onValueChange={(val) => field.onChange(val ?? undefined)}
+                      onBlur={field.onBlur}
+                    />
                   </FormControl>
-                  <SelectContent>
-                    {paymentTerms.map((term) => (
-                      <SelectItem key={term.id} value={term.id}>
-                        {term.name}{' '}
-                        {term.adjustment_percent != null &&
-                          term.adjustment_percent !== 0 &&
-                          `(${term.adjustment_percent > 0 ? '+' : ''}${term.adjustment_percent}%)`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="payment_method"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Forma de Pagamento</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ''}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar forma..." />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {PAYMENT_METHODS.map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {PAYMENT_METHOD_LABELS[m]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="km_distance"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Distância (km)</FormLabel>
-                <FormControl>
-                  <NumericInput
-                    ref={field.ref}
-                    name={field.name}
-                    value={field.value ?? ''}
-                    placeholder="0"
-                    suffix="km"
-                    onValueChange={(val) => field.onChange(val ?? undefined)}
-                    onBlur={field.onBlur}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Condição Financeira: datas condicionais ao prazo selecionado */}
+          {selectedTerm && (
+            <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Condição Financeira
+              </p>
+              {advPercent > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="advance_due_date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Data adiantamento ({advPercent}%)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {/* Condição Financeira: datas condicionais ao prazo selecionado */}
-        {selectedTerm && (
-          <div className="space-y-3 rounded-lg border border-dashed p-3">
-            <h4 className="text-sm font-medium">Condição Financeira</h4>
-            {advPercent > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="balance_due_date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Data saldo ({100 - advPercent}%)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              ) : termDays === 0 ? (
                 <FormField
                   control={form.control}
                   name="advance_due_date"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Data adiantamento ({advPercent}%)</FormLabel>
+                      <FormLabel className="text-xs">Data do pagamento (à vista)</FormLabel>
                       <FormControl>
                         <Input
                           type="date"
@@ -330,12 +380,13 @@ export function CargoLogisticsStep({
                     </FormItem>
                   )}
                 />
+              ) : (
                 <FormField
                   control={form.control}
                   name="balance_due_date"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Data saldo ({100 - advPercent}%)</FormLabel>
+                      <FormLabel className="text-xs">Data de vencimento</FormLabel>
                       <FormControl>
                         <Input
                           type="date"
@@ -347,66 +398,30 @@ export function CargoLogisticsStep({
                     </FormItem>
                   )}
                 />
-              </div>
-            ) : termDays === 0 ? (
-              <FormField
-                control={form.control}
-                name="advance_due_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Data do pagamento (à vista)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        value={field.value || ''}
-                        onChange={(e) => field.onChange(e.target.value)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ) : (
-              <FormField
-                control={form.control}
-                name="balance_due_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Data de vencimento</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        value={field.value || ''}
-                        onChange={(e) => field.onChange(e.target.value)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-          </div>
-        )}
-
-        {/* Previsão de Carregamento */}
-        <FormField
-          control={form.control}
-          name="estimated_loading_date"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Previsão de Carregamento</FormLabel>
-              <FormControl>
-                <Input
-                  type="date"
-                  value={field.value || ''}
-                  onChange={(e) => field.onChange(e.target.value)}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+              )}
+            </div>
           )}
-        />
-      </div>
+
+          {/* Previsão de Carregamento */}
+          <FormField
+            control={form.control}
+            name="estimated_loading_date"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Previsão de Carregamento</FormLabel>
+                <FormControl>
+                  <Input
+                    type="date"
+                    value={field.value || ''}
+                    onChange={(e) => field.onChange(e.target.value)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </SectionBlock>
     </div>
   );
 }
