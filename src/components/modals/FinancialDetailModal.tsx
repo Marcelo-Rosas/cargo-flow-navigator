@@ -9,6 +9,7 @@ import { FinancialCargoDetails } from '@/components/financial/modal-sections/Fin
 import { FinancialCostBreakdown } from '@/components/financial/modal-sections/FinancialCostBreakdown';
 import { FinancialPricingDetails } from '@/components/financial/modal-sections/FinancialPricingDetails';
 import { FinancialQuoteReconciliation } from '@/components/financial/modal-sections/FinancialQuoteReconciliation';
+import { FinancialOrderReconciliation } from '@/components/financial/modal-sections/FinancialOrderReconciliation';
 import { FinancialRouteInfo } from '@/components/financial/modal-sections/FinancialRouteInfo';
 import { FinancialTripLink } from '@/components/financial/modal-sections/FinancialTripLink';
 import { useTrips, useLinkOrderToTargetTrip } from '@/hooks/useTrips';
@@ -247,6 +248,16 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
             <SectionBlock label="Comprovantes de Pagamento">
               <FinancialQuoteReconciliation quoteId={doc.source_id as string} />
             </SectionBlock>
+          )}
+
+          {/* COMPROVANTES DE PAGAMENTO — PAG */}
+          {doc.type === 'PAG' && orderId && (
+            <>
+              <Separator />
+              <SectionBlock label="Comprovantes de Pagamento">
+                <FinancialOrderReconciliation orderId={orderId} />
+              </SectionBlock>
+            </>
           )}
 
           {/* VINCULAR VIAGEM — PAG */}
