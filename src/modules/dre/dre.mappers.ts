@@ -17,10 +17,40 @@ function num(obj: unknown, ...keys: string[]): number {
   return Number.isFinite(v) ? v : 0;
 }
 
+/** Retorna número ou undefined se caminho inexistente (para distinguir 0 de ausente) */
+function numOrUndef(obj: unknown, ...keys: string[]): number | undefined {
+  let cur: unknown = obj;
+  for (const k of keys) {
+    if (cur == null || typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string, unknown>)[k];
+  }
+  const v = typeof cur === 'number' ? cur : Number(cur);
+  return Number.isFinite(v) ? v : undefined;
+}
+
+/** Extrai número com fallback camelCase e snake_case */
+function numFallback(obj: unknown, camelKeys: string[], snakeKeys: string[]): number {
+  return numOrUndef(obj, ...camelKeys) ?? numOrUndef(obj, ...snakeKeys) ?? 0;
+}
+
+/** Detecta se o breakdown tem dados de custos (evita legacy/minimal) */
+function hasProfitabilityData(pb: OrderPricingBreakdown | null): boolean {
+  if (!pb?.profitability) return false;
+  const p = pb.profitability as Record<string, unknown>;
+  return (
+    p.custosDiretos != null ||
+    p.custos_diretos != null ||
+    p.custoMotorista != null ||
+    p.custosCarreteiro != null ||
+    p.custo_motorista != null ||
+    p.custos_carreteiro != null
+  );
+}
+
 /** Mapeia uma ordem para DreComparativoRow.
  * Regra: receita, DAS, ICMS, receita líquida e overhead vêm do breakdown e permanecem fixos no real.
  * Custos operacionais reais vêm de carreteiro_real, pedagio_real, descarga_real.
- * Schema orders: não possui aluguel_maquinas_real nem mao_de_obra_real — usamos 0 no real. */
+ * Para legacy/minimal breakdown: usa carreteiro_real, pedagio_real, descarga_real como presumido. */
 export function mapOrderToDreRow(
   order: OrderDreInput,
   entityLabel: string,
@@ -29,35 +59,48 @@ export function mapOrderToDreRow(
   const pb = order.pricing_breakdown as OrderPricingBreakdown | null;
   if (!pb || order.value <= 0) return null;
 
-  const receitaBrutaPresumida = num(pb.totals, 'totalCliente') || order.value;
-  const dasPresumido = num(pb.totals, 'das') ?? 0;
-  const icmsPresumido = num(pb.totals, 'icms') ?? 0;
+  const receitaBrutaPresumida =
+    numFallback(pb, ['totals', 'totalCliente'], ['totals', 'total_cliente']) || order.value;
+  const dasPresumido = num(pb.totals, 'das');
+  const icmsPresumido = num(pb.totals, 'icms');
   const receitaLiquidaPresumida =
-    num(pb.profitability, 'receitaLiquida') ??
+    numFallback(pb, ['profitability', 'receitaLiquida'], ['profitability', 'receita_liquida']) ??
     round2(receitaBrutaPresumida - dasPresumido - icmsPresumido);
 
-  const custoMotoristaPresumido =
-    num(pb.profitability, 'custoMotorista') ?? num(pb.profitability, 'custosCarreteiro') ?? 0;
-  const pedagioPresumido = num(pb.components, 'toll') ?? 0;
+  const hasPb = hasProfitabilityData(pb);
+  const custoMotoristaPresumido = hasPb
+    ? numFallback(pb, ['profitability', 'custoMotorista'], ['profitability', 'custo_motorista']) ||
+      numFallback(pb, ['profitability', 'custosCarreteiro'], ['profitability', 'custos_carreteiro'])
+    : (order.carreteiro_real ?? 0);
+  const pedagioPresumido = hasPb ? num(pb.components, 'toll') || 0 : (order.pedagio_real ?? 0);
   const aluguelMaquinasPresumido = num(pb.components, 'aluguelMaquinas') ?? 0;
-  const descargaPresumida = num(pb.profitability, 'custosDescarga') ?? 0;
+  const descargaPresumida = hasPb
+    ? numFallback(pb, ['profitability', 'custosDescarga'], ['profitability', 'custos_descarga'])
+    : (order.descarga_real ?? 0);
   const maoDeObraPresumida = 0;
 
-  const custosDiretosPresumidos =
-    num(pb.profitability, 'custosDiretos') ??
-    round2(
-      custoMotoristaPresumido +
-        pedagioPresumido +
-        aluguelMaquinasPresumido +
-        descargaPresumida +
-        maoDeObraPresumida
-    );
-  const overheadPresumido = num(pb.profitability, 'overhead') ?? 0;
+  const custosDiretosPresumidos = hasPb
+    ? numFallback(pb, ['profitability', 'custosDiretos'], ['profitability', 'custos_diretos']) ||
+      round2(
+        custoMotoristaPresumido +
+          pedagioPresumido +
+          aluguelMaquinasPresumido +
+          descargaPresumida +
+          maoDeObraPresumida
+      )
+    : round2(
+        custoMotoristaPresumido + pedagioPresumido + aluguelMaquinasPresumido + descargaPresumida
+      );
+  const overheadPresumido =
+    numFallback(pb, ['profitability', 'overhead'], ['profitability', 'overhead']) ?? 0;
   const resultadoPresumido =
-    num(pb.profitability, 'resultadoLiquido') ??
-    round2(receitaLiquidaPresumida - custosDiretosPresumidos - overheadPresumido);
+    numFallback(
+      pb,
+      ['profitability', 'resultadoLiquido'],
+      ['profitability', 'resultado_liquido']
+    ) ?? round2(receitaLiquidaPresumida - custosDiretosPresumidos - overheadPresumido);
   const margemPresumidaPercent =
-    num(pb.profitability, 'margemPercent') ??
+    numFallback(pb, ['profitability', 'margemPercent'], ['profitability', 'margem_percent']) ??
     (receitaBrutaPresumida > 0 ? round2((resultadoPresumido / receitaBrutaPresumida) * 100) : 0);
 
   const custoMotoristaReal =
