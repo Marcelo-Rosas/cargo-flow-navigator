@@ -84,7 +84,7 @@ export function CargoLogisticsStep({
     <div className="space-y-6">
       <SectionBlock label="Detalhes da Carga">
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-w-0">
             <FormField
               control={form.control}
               name="cargo_type"
@@ -173,9 +173,11 @@ export function CargoLogisticsStep({
             />
           </div>
           {showPesoFaturavel && pesoFaturavelInfo && (
-            <div className="p-3 rounded-lg bg-muted/50 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Peso Cubado (× 300 kg/m³)</span>
+            <div className="p-3 rounded-lg bg-muted/50 text-sm min-w-0">
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground truncate" title="Peso cubado (× 300 kg/m³)">
+                  Cubado
+                </span>
                 <span>{pesoFaturavelInfo.cubageWeightKg.toLocaleString('pt-BR')} kg</span>
               </div>
               <div className="flex justify-between font-medium">
@@ -321,18 +323,64 @@ export function CargoLogisticsStep({
 
           {/* Condição Financeira: datas condicionais ao prazo selecionado */}
           {selectedTerm && (
-            <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30">
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Condição Financeira
-              </p>
-              {advPercent > 0 ? (
-                <div className="grid gap-3 sm:grid-cols-2">
+            <SectionBlock label="Datas de Pagamento" collapsible defaultOpen>
+              <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30 min-w-0">
+                {advPercent > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="advance_due_date"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel
+                            className="text-xs truncate"
+                            title={`Adiantamento ${advPercent}%`}
+                          >
+                            Adiant. {advPercent}%
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              value={field.value || ''}
+                              onChange={(e) => field.onChange(e.target.value)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="balance_due_date"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel
+                            className="text-xs truncate"
+                            title={`Saldo ${100 - advPercent}%`}
+                          >
+                            Saldo {100 - advPercent}%
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              value={field.value || ''}
+                              onChange={(e) => field.onChange(e.target.value)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ) : termDays === 0 ? (
                   <FormField
                     control={form.control}
                     name="advance_due_date"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Data adiantamento ({advPercent}%)</FormLabel>
+                        <FormLabel className="text-xs" title="Data do pagamento à vista">
+                          À vista
+                        </FormLabel>
                         <FormControl>
                           <Input
                             type="date"
@@ -344,12 +392,13 @@ export function CargoLogisticsStep({
                       </FormItem>
                     )}
                   />
+                ) : (
                   <FormField
                     control={form.control}
                     name="balance_due_date"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Data saldo ({100 - advPercent}%)</FormLabel>
+                        <FormLabel className="text-xs">Data de vencimento</FormLabel>
                         <FormControl>
                           <Input
                             type="date"
@@ -361,45 +410,9 @@ export function CargoLogisticsStep({
                       </FormItem>
                     )}
                   />
-                </div>
-              ) : termDays === 0 ? (
-                <FormField
-                  control={form.control}
-                  name="advance_due_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Data do pagamento (à vista)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          value={field.value || ''}
-                          onChange={(e) => field.onChange(e.target.value)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ) : (
-                <FormField
-                  control={form.control}
-                  name="balance_due_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Data de vencimento</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          value={field.value || ''}
-                          onChange={(e) => field.onChange(e.target.value)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
+                )}
+              </div>
+            </SectionBlock>
           )}
 
           {/* Previsão de Carregamento */}

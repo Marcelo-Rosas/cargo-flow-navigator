@@ -59,7 +59,7 @@ export function IdentificationStep({
     <div className="space-y-6">
       <SectionBlock label="Dados do Cliente">
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
             <FormField
               control={form.control}
               name="client_id"
@@ -182,8 +182,12 @@ export function IdentificationStep({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="FOB">FOB (Frete por conta do destinatário)</SelectItem>
-                      <SelectItem value="CIF">CIF (Frete por conta do remetente)</SelectItem>
+                      <SelectItem value="FOB" title="Frete por conta do destinatário">
+                        FOB
+                      </SelectItem>
+                      <SelectItem value="CIF" title="Frete por conta do remetente">
+                        CIF
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -222,7 +226,7 @@ export function IdentificationStep({
               )}
             />
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
             <FormField
               control={form.control}
               name="origin_cep"
@@ -280,7 +284,7 @@ export function IdentificationStep({
               )}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
             <FormField
               control={form.control}
               name="origin"

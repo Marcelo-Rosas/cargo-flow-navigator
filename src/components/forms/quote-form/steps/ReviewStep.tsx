@@ -1,6 +1,7 @@
 import type { UseFormReturn } from 'react-hook-form';
-import { CheckCircle2, MapPin, Truck, DollarSign, FileText, CalendarDays } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { SectionBlock } from '@/components/ui/section-block';
 import { formatCurrency } from '@/lib/formatters';
 import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import type { QuoteFormData } from '../types';
@@ -22,6 +23,7 @@ interface ReviewStepProps {
   vehicleTypeName: string;
   clientName: string;
   shipperName: string;
+  isLegacy?: boolean;
 }
 
 export function ReviewStep({
@@ -31,17 +33,20 @@ export function ReviewStep({
   vehicleTypeName,
   clientName,
   shipperName,
+  isLegacy = false,
 }: ReviewStepProps) {
   const values = form.getValues();
   const baseFreight = calculationResult?.components?.baseFreight ?? 0;
-  const totalCliente = calculationResult?.totals?.totalCliente ?? 0;
+  const totalCliente = isLegacy
+    ? (Number(values.value) ?? 0)
+    : (calculationResult?.totals?.totalCliente ?? 0);
   const adicionais = totalCliente - baseFreight;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      {/* Banner de Sucesso Visual */}
+      {/* Banner de Sucesso */}
       <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 p-4 rounded-xl flex items-center gap-4">
-        <div className="bg-emerald-500 p-2 rounded-full">
+        <div className="bg-emerald-500 p-2 rounded-full shrink-0">
           <CheckCircle2 className="w-5 h-5 text-white" />
         </div>
         <div>
@@ -54,103 +59,126 @@ export function ReviewStep({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Card: Logística e Rota */}
-        <div className="border rounded-xl p-5 space-y-4 bg-card/50">
-          <div className="flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
-            <MapPin className="w-4 h-4" /> Rota e Cliente
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
+        <SectionBlock label="Rota e Cliente">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Cliente:</span>
-              <span className="font-medium text-right">{clientName || '—'}</span>
+              <span className="text-muted-foreground">Cliente</span>
+              <span
+                className="font-medium text-right min-w-0 truncate ml-2"
+                title={clientName || undefined}
+              >
+                {clientName || '—'}
+              </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Embarcador:</span>
-              <span className="font-medium text-right">{shipperName || '—'}</span>
+              <span className="text-muted-foreground">Embarcador</span>
+              <span
+                className="font-medium text-right min-w-0 truncate ml-2"
+                title={shipperName || undefined}
+              >
+                {shipperName || '—'}
+              </span>
             </div>
             <Separator />
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Origem:</span>
+              <span className="text-muted-foreground">Origem</span>
               <span className="font-medium text-right">{values.origin || '—'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Destino:</span>
+              <span className="text-muted-foreground">Destino</span>
               <span className="font-medium text-right">{values.destination || '—'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Distância:</span>
+              <span className="text-muted-foreground">Distância</span>
               <span className="font-medium">
                 {values.km_distance != null ? `${values.km_distance} km` : '—'}
               </span>
             </div>
           </div>
-        </div>
+        </SectionBlock>
 
-        {/* Card: Carga e Veículo */}
-        <div className="border rounded-xl p-5 space-y-4 bg-card/50">
-          <div className="flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
-            <Truck className="w-4 h-4" /> Carga e Transporte
-          </div>
+        <SectionBlock label="Carga e Transporte">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Tipo de Carga:</span>
+              <span className="text-muted-foreground">Tipo de Carga</span>
               <span className="font-medium">{values.cargo_type || '—'}</span>
             </div>
+            {!isLegacy && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Veículo</span>
+                <span className="font-medium">{vehicleTypeName || '—'}</span>
+              </div>
+            )}
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Veículo:</span>
-              <span className="font-medium">{vehicleTypeName || '—'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Peso:</span>
+              <span className="text-muted-foreground">Peso</span>
               <span className="font-medium">
                 {values.weight != null ? `${values.weight} ${weightUnit}` : '—'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Volume:</span>
+              <span className="text-muted-foreground">Volume</span>
               <span className="font-medium">
                 {values.volume != null ? `${values.volume} m³` : '—'}
               </span>
             </div>
           </div>
-        </div>
+        </SectionBlock>
       </div>
 
-      {/* Card: Financeiro (Destaque) */}
-      <div className="border rounded-xl p-5 space-y-4 bg-primary/5 border-primary/20">
-        <div className="flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
-          <DollarSign className="w-4 h-4" /> Composição Financeira
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="text-center md:text-left">
-            <p className="text-xs text-muted-foreground mb-1">Frete Base</p>
-            <p className="text-lg font-semibold">{formatCurrency(baseFreight)}</p>
+      {/* Composição Financeira */}
+      <SectionBlock label={isLegacy ? 'FAT + PAG (manual)' : 'Composição Financeira'}>
+        {isLegacy ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-[10px] text-muted-foreground mb-1">Valor Cliente (FAT)</p>
+              <p className="text-lg font-semibold">{formatCurrency(totalCliente)}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-[10px] text-muted-foreground mb-1">Valor Carreteiro (PAG)</p>
+              <p className="text-lg font-semibold">
+                {formatCurrency(Number(values.carreteiro_real) ?? 0)}
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
+              <p className="text-[10px] text-primary/80 mb-1 font-bold uppercase tracking-widest">
+                Margem
+              </p>
+              <p className="text-2xl font-black text-primary">
+                {formatCurrency(totalCliente - (Number(values.carreteiro_real) ?? 0))}
+              </p>
+            </div>
           </div>
-          <div className="text-center md:text-left">
-            <p className="text-xs text-muted-foreground mb-1">Adicionais e Taxas</p>
-            <p className="text-lg font-semibold">{formatCurrency(adicionais)}</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-[10px] text-muted-foreground mb-1">Frete Base</p>
+              <p className="text-lg font-semibold">{formatCurrency(baseFreight)}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-[10px] text-muted-foreground mb-1">Adicionais e Taxas</p>
+              <p className="text-lg font-semibold">{formatCurrency(adicionais)}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
+              <p className="text-[10px] text-primary/80 mb-1 font-bold uppercase tracking-widest">
+                Total Cliente
+              </p>
+              <p className="text-2xl font-black text-primary">{formatCurrency(totalCliente)}</p>
+            </div>
           </div>
-          <div className="text-center md:text-right bg-primary/10 p-3 rounded-lg border border-primary/20">
-            <p className="text-xs text-primary/80 mb-1 font-bold">VALOR TOTAL CLIENTE</p>
-            <p className="text-2xl font-black text-primary">{formatCurrency(totalCliente)}</p>
-          </div>
-        </div>
-      </div>
+        )}
+      </SectionBlock>
 
-      {/* Card: Condição de Pagamento e Previsão */}
+      {/* Pagamento e Datas */}
       {(values.payment_method ||
         values.advance_due_date ||
         values.balance_due_date ||
         values.estimated_loading_date) && (
-        <div className="border rounded-xl p-5 space-y-4 bg-card/50">
-          <div className="flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
-            <CalendarDays className="w-4 h-4" /> Pagamento e Datas
-          </div>
+        <SectionBlock label="Pagamento e Datas">
           <div className="space-y-2 text-sm">
             {values.payment_method && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Forma de Pagamento:</span>
+                <span className="text-muted-foreground">Forma de Pagamento</span>
                 <span className="font-medium">
                   {PAYMENT_METHOD_LABELS[
                     values.payment_method as keyof typeof PAYMENT_METHOD_LABELS
@@ -160,13 +188,13 @@ export function ReviewStep({
             )}
             {values.advance_due_date && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Data Adiantamento/À Vista:</span>
+                <span className="text-muted-foreground">Data Adiantamento / À Vista</span>
                 <span className="font-medium">{formatDateBR(values.advance_due_date)}</span>
               </div>
             )}
             {values.balance_due_date && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Data Saldo/Vencimento:</span>
+                <span className="text-muted-foreground">Data Saldo / Vencimento</span>
                 <span className="font-medium">{formatDateBR(values.balance_due_date)}</span>
               </div>
             )}
@@ -174,7 +202,7 @@ export function ReviewStep({
               <>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Previsão de Carregamento:</span>
+                  <span className="text-muted-foreground">Previsão de Carregamento</span>
                   <span className="font-semibold text-primary">
                     {formatDateBR(values.estimated_loading_date)}
                   </span>
@@ -182,19 +210,16 @@ export function ReviewStep({
               </>
             )}
           </div>
-        </div>
+        </SectionBlock>
       )}
 
       {/* Observações */}
       {values.notes && (
-        <div className="border rounded-xl p-5 space-y-2 bg-muted/20">
-          <div className="flex items-center gap-2 text-muted-foreground font-semibold text-[10px] uppercase">
-            <FileText className="w-3 h-3" /> Observações da Cotação
-          </div>
+        <SectionBlock label="Observações">
           <p className="text-sm italic text-muted-foreground/80 leading-relaxed">
             &ldquo;{values.notes}&rdquo;
           </p>
-        </div>
+        </SectionBlock>
       )}
     </div>
   );
