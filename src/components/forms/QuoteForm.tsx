@@ -913,24 +913,25 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   useEffect(() => {
     if (!quote || !routeStopsData || routeStopsData.length === 0) return;
-    const stops = routeStopsData
+    const stopRows = routeStopsData
       .filter((s) => s.stop_type === 'stop')
-      .map((s) => ({
-        id: s.id,
-        sequence: s.sequence,
-        cep: s.cep ?? '',
-        city_uf: s.city_uf ?? '',
-      }))
       .sort((a, b) => a.sequence - b.sequence);
-    if (stops.length > 0) {
-      form.setValue('route_stops', stops, { shouldDirty: false });
-      // Habilita UI de paradas (1 + N destinatários adicionais)
-      form.setValue(
-        'additional_recipients',
-        stops.map((s) => ({ client_id: undefined, name: s.city_uf?.trim() || 'Parada' })),
-        { shouldDirty: false }
-      );
-    }
+    if (stopRows.length === 0) return;
+    const stops = stopRows.map((s) => ({
+      id: s.id,
+      sequence: s.sequence,
+      cep: s.cep ?? '',
+      city_uf: s.city_uf ?? '',
+    }));
+    const recipients = stopRows.map((s) => {
+      const meta = s.metadata as { client_id?: string } | null | undefined;
+      return {
+        client_id: meta?.client_id ?? undefined,
+        name: s.name?.trim() || s.city_uf?.trim() || 'Parada',
+      };
+    });
+    form.setValue('route_stops', stops, { shouldDirty: false });
+    form.setValue('additional_recipients', recipients, { shouldDirty: false });
   }, [quote, routeStopsData, form]);
 
   useEffect(() => {
@@ -1380,7 +1381,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         estimated_loading_date: data.estimated_loading_date?.trim() || null,
       };
 
-      const stops = data.route_stops ?? [];
+      const routeStops = data.route_stops ?? [];
+      const additionalRecipients = data.additional_recipients ?? [];
+      const stopsForSync = routeStops.map((s, i) => ({
+        ...s,
+        name: additionalRecipients[i]?.name ?? null,
+        client_id: additionalRecipients[i]?.client_id ?? undefined,
+      }));
       let savedQuoteId: string;
 
       if (isEditing && quote) {
@@ -1399,7 +1406,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         toast.success('Cotação criada com sucesso');
       }
 
-      await syncQuoteRouteStops(savedQuoteId, stops);
+      await syncQuoteRouteStops(savedQuoteId, stopsForSync);
 
       onClose();
     } catch (error) {

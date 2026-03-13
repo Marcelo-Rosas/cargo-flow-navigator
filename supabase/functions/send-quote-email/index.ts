@@ -32,7 +32,18 @@ function formatBRL(value: number): string {
 
 const LOGO_URL = 'https://app.vectracargo.com.br/brand/logo_vectra.jpg';
 
-function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm | null): string {
+interface RouteStop {
+  sequence: number;
+  name: string | null;
+  city_uf: string | null;
+  cep: string | null;
+}
+
+function buildEmailHtml(
+  quote: Record<string, unknown>,
+  paymentTerm: PaymentTerm | null,
+  routeStops: RouteStop[] = []
+): string {
   const breakdown = quote.pricing_breakdown as Record<string, unknown> | null;
   const meta = breakdown?.meta as Record<string, unknown> | null;
   const components = breakdown?.components as Record<string, unknown> | null;
@@ -42,8 +53,10 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
   const origin = (quote.origin as string) || '—';
   const destination = (quote.destination as string) || '—';
   const clientName = (quote.client_name as string) || '—';
+  const shipperName = (quote.shipper_name as string) || '—';
   const quoteCode = (quote.quote_code as string) || '—';
   const freightType = ((quote.freight_type as string) || '').toUpperCase();
+  const isCIF = freightType === 'CIF';
   const freightModality = (quote.freight_modality as string) || '';
   const modalityLabel =
     freightModality === 'lotacao'
@@ -133,9 +146,29 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
     </table>`
     : '';
 
-  // Build route info rows
+  // Build client section: CIF = embarcador, FOB = cliente(s) + destinatários
+  const clientRows: string[] = [];
+  if (isCIF) {
+    clientRows.push(infoRow('Cliente (Embarcador)', shipperName || '—', true));
+  } else {
+    clientRows.push(infoRow('Cliente', clientName, routeStops.length === 0));
+    routeStops.forEach((s, i) => {
+      const val = s.name?.trim() || s.city_uf?.trim() || s.cep || '—';
+      clientRows.push(infoRow(`Destinatário ${i + 1}`, val, i === routeStops.length - 1));
+    });
+  }
+  if (clientRows.length > 0) {
+    const lastIdx = clientRows.length - 1;
+    clientRows[lastIdx] = clientRows[lastIdx].replace('border-bottom:1px solid #f0f0f0;', '');
+  }
+
+  // Build route info rows: Origem, Parada(s), Destino, Faixa KM, Tipo Frete
   const routeRows: string[] = [];
   routeRows.push(infoRow('Origem', origin));
+  routeStops.forEach((s, i) => {
+    const val = s.city_uf?.trim() || s.name?.trim() || s.cep || '—';
+    routeRows.push(infoRow(`Parada ${i + 1}`, val));
+  });
   routeRows.push(infoRow('Destino', destination));
   if (routeUf) routeRows.push(infoRow('Rota UF', routeUf));
   if (kmBand) routeRows.push(infoRow('Faixa KM', `${kmBand} km`));
@@ -239,10 +272,10 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
         <tr>
           <td style="padding:28px 32px;">
 
-            <!-- Client Section -->
+            <!-- Client Section: CIF = embarcador, FOB = cliente(s) -->
             ${sectionHeader('Informações do Cliente')}
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
-              ${infoRow('Cliente', clientName, true)}
+              ${clientRows.join('')}
             </table>
 
             <!-- Route Section -->
@@ -371,6 +404,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: routeStops = [] } = await supabase
+      .from('quote_route_stops')
+      .select('sequence, name, city_uf, cep')
+      .eq('quote_id', body.quoteId)
+      .eq('stop_type', 'stop')
+      .order('sequence', { ascending: true });
+
     // Fetch payment term if available
     let paymentTerm: PaymentTerm | null = null;
     if (quote.payment_term_id) {
@@ -383,7 +423,7 @@ Deno.serve(async (req) => {
     }
 
     const quoteCode = quote.quote_code || quote.id.slice(0, 8);
-    const html = buildEmailHtml(quote, paymentTerm);
+    const html = buildEmailHtml(quote, paymentTerm, routeStops ?? []);
 
     // Send email via Resend
     const resendRes = await fetch('https://api.resend.com/emails', {

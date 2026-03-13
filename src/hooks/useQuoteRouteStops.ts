@@ -19,12 +19,16 @@ export interface QuoteRouteStopRow {
   metadata: Record<string, unknown> | null;
 }
 
-/** Formato do form (route_stops no QuoteFormData) */
+/** Formato do form (route_stops no QuoteFormData) + dados do destinatário */
 export interface RouteStopFormItem {
   id?: string;
   sequence: number;
   cep?: string;
   city_uf?: string;
+  /** Nome do cliente/destinatário (de additional_recipients) */
+  name?: string | null;
+  /** client_id para restaurar o Select ao editar */
+  client_id?: string | null;
 }
 
 export function useQuoteRouteStops(quoteId: string | null) {
@@ -68,6 +72,8 @@ export async function syncQuoteRouteStops(
     stop_type: 'stop' as const,
     cep: (s.cep ?? '').replace(/\D/g, '') || null,
     city_uf: s.city_uf?.trim() || null,
+    name: s.name?.trim() || null,
+    metadata: s.client_id ? { client_id: s.client_id } : null,
   }));
 
   const { error: delErr } = await supabase

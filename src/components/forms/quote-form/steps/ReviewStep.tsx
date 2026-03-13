@@ -2,6 +2,7 @@ import type { UseFormReturn } from 'react-hook-form';
 import { CheckCircle2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { SectionBlock } from '@/components/ui/section-block';
+import { FinancialRouteInfo } from '@/components/financial/modal-sections/FinancialRouteInfo';
 import { formatCurrency } from '@/lib/formatters';
 import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import type { QuoteFormData } from '../types';
@@ -81,21 +82,19 @@ export function ReviewStep({
               </span>
             </div>
             <Separator />
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <span className="text-muted-foreground text-xs block">Rota</span>
-              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-medium">
-                <span>{values.origin || '—'}</span>
-                {(values.route_stops ?? [])
-                  .filter((s) => (s.cep ?? '').replace(/\D/g, '').length === 8)
-                  .map((s, i) => (
-                    <span key={i} className="text-muted-foreground shrink-0">
-                      → {s.city_uf?.trim() || s.cep || '—'}
-                    </span>
-                  ))}
-                <span className="text-muted-foreground shrink-0">
-                  → {values.destination || '—'}
-                </span>
-              </div>
+              <FinancialRouteInfo
+                origin={values.origin || '—'}
+                destination={values.destination || '—'}
+                originCep={values.origin_cep || undefined}
+                destinationCep={values.destination_cep || undefined}
+                routeStops={(values.route_stops ?? []).map((s, i) => ({
+                  city_uf: s.city_uf ?? undefined,
+                  cep: s.cep ?? undefined,
+                  name: values.additional_recipients?.[i]?.name ?? undefined,
+                }))}
+              />
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Distância</span>

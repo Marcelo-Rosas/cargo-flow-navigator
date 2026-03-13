@@ -661,7 +661,8 @@ export function QuoteDetailModal({
                   destinationCep={quote.destination_cep}
                   routeStops={(routeStops ?? [])
                     .filter((s) => s.stop_type === 'stop')
-                    .map((s) => ({ city_uf: s.city_uf, cep: s.cep }))}
+                    .sort((a, b) => a.sequence - b.sequence)
+                    .map((s) => ({ city_uf: s.city_uf, cep: s.cep, name: s.name }))}
                 />
               </SectionBlock>
             )}
