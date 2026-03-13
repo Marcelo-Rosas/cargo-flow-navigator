@@ -585,7 +585,7 @@ export function OrderDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[780px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-[900px] max-h-[96vh] overflow-visible flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <div className="flex items-center justify-between gap-3">
               <DialogTitle className="flex items-center gap-3">
@@ -693,8 +693,8 @@ export function OrderDetailModal({
             </div>
           )}
 
-          <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="flex-shrink-0 w-full overflow-x-auto justify-start">
+          <Tabs defaultValue="details" className="flex-1 overflow-visible flex flex-col">
+            <TabsList className="flex-shrink-0 w-full flex flex-wrap justify-start gap-1">
               <TabsTrigger value="details">Detalhes</TabsTrigger>
               <TabsTrigger value="pedagios" className="gap-1.5">
                 <Landmark className="w-3.5 h-3.5" />
@@ -750,7 +750,7 @@ export function OrderDetailModal({
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex-1 overflow-y-auto mt-4">
+            <div className="flex-1 overflow-visible mt-4">
               <TabsContent value="details" className="m-0 space-y-6">
                 {/* Contexto da OS (para continuidade do fluxo) */}
                 <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">

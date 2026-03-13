@@ -61,8 +61,8 @@ export function FinancialRouteInfo({
 
   return (
     <div className="space-y-3">
-      {/* Fluxo visual: Origem → Parada(s) → Destino */}
-      <div className="flex flex-nowrap items-stretch gap-2 overflow-x-auto pb-1">
+      {/* Fluxo visual: Origem → Parada(s) → Destino — sem scroll, cards fluem e quebram linha */}
+      <div className="flex flex-wrap items-stretch gap-2">
         <RoutePointCard label="Origem" address={origin} cep={originCep} />
         {validStops.map((stop, idx) => (
           <div key={idx} className="flex items-center gap-1 shrink-0">

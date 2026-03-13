@@ -210,7 +210,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[96vh] overflow-visible">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}

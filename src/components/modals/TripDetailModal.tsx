@@ -127,7 +127,7 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[900px] max-h-[96vh] overflow-visible">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span className="inline-flex items-center gap-2 font-mono text-lg">

@@ -209,7 +209,7 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[520px] max-h-[96vh] overflow-visible">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Proprietário' : 'Novo Proprietário'}</DialogTitle>
         </DialogHeader>

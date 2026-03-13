@@ -97,7 +97,7 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[740px] max-h-[90vh] p-0 flex flex-col overflow-hidden gap-0">
+      <DialogContent className="sm:max-w-[900px] max-h-[96vh] p-0 flex flex-col overflow-visible gap-0">
         {/* ── Header fixo ──────────────────────────────────── */}
         <div className="shrink-0 bg-background border-b px-6 pt-5 pb-4">
           <div className="flex items-start justify-between gap-4">
@@ -139,7 +139,7 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
         </div>
 
         {/* ── Corpo scrollável ─────────────────────────────── */}
-        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+        <div className="overflow-visible flex-1 px-6 py-5 space-y-5">
           {/* VALOR PRINCIPAL */}
           <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
             <div className="flex items-end justify-between gap-4">
