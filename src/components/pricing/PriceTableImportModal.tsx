@@ -183,7 +183,7 @@ export function PriceTableImportModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
         className={cn(
-          'max-h-[96vh] overflow-visible flex flex-col',
+          'max-h-[96vh] overflow-y-auto flex flex-col',
           modality === 'fracionado' ? 'max-w-6xl' : 'max-w-4xl'
         )}
       >

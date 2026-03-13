@@ -127,7 +127,7 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[96vh] overflow-visible">
+      <DialogContent className="sm:max-w-[900px] max-h-[96vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span className="inline-flex items-center gap-2 font-mono text-lg">
@@ -139,7 +139,7 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 pt-2">
+        <div className="overflow-y-auto space-y-6 pt-2">
           {/* Painel VG — Risco */}
           {(tripRiskEval || vgSummary) && (
             <div className="p-4 rounded-lg border border-border space-y-3 bg-muted/20">

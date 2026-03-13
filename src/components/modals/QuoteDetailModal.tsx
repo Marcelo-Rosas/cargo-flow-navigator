@@ -607,7 +607,7 @@ export function QuoteDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[900px] max-h-[96vh] p-0 flex flex-col overflow-visible gap-0">
+        <DialogContent className="sm:max-w-[900px] max-h-[96vh] p-0 flex flex-col overflow-hidden gap-0">
           {/* ── Header fixo ──────────────────────────────────── */}
           <div className="shrink-0 bg-background border-b px-6 pt-5 pb-4">
             <QuoteModalHeader
@@ -630,7 +630,7 @@ export function QuoteDetailModal({
           </div>
 
           {/* ── Corpo scrollável ─────────────────────────────── */}
-          <div className="overflow-visible flex-1 px-6 py-5 space-y-5">
+          <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
             {kmStatus === 'OUT_OF_RANGE' && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />

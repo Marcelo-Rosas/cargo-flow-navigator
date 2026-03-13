@@ -1435,7 +1435,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[96vh] flex flex-col p-0 gap-0 overflow-visible">
+      <DialogContent className="sm:max-w-[900px] max-h-[96vh] flex flex-col p-0 gap-0 overflow-hidden">
         <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b">
           <div className="flex items-center justify-between">
             <DialogTitle>
@@ -1481,10 +1481,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
           <Form {...form}>
             <form
               onSubmit={(e) => e.preventDefault()}
-              className="flex flex-col flex-1 min-h-0 overflow-visible"
+              className="flex flex-col flex-1 min-h-0 overflow-hidden"
             >
               {/* OUT_OF_RANGE Alert (oculto no modo legacy) */}
-              <div className="flex flex-col flex-1 min-h-0 overflow-visible px-6">
+              <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-6">
                 {!isLegacy && calculationResult.status === 'OUT_OF_RANGE' && (
                   <Alert variant="destructive" className="shrink-0">
                     <AlertTriangle className="h-4 w-4" />
@@ -1528,7 +1528,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 )}
 
                 {USE_WIZARD ? (
-                  <div className="flex flex-col flex-1 min-h-0 overflow-visible py-4">
+                  <div className="flex flex-col flex-1 min-h-0 overflow-hidden py-4">
                     <QuoteFormWizard
                       form={form}
                       onSubmit={onSubmit}

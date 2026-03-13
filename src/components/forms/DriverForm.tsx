@@ -177,7 +177,7 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[460px] max-h-[96vh] overflow-visible">
+      <DialogContent className="sm:max-w-[460px] max-h-[96vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="w-5 h-5 text-primary" />

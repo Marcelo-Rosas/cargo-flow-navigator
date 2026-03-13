@@ -260,7 +260,7 @@ export function QuoteFormWizard({
       </nav>
 
       {/* Step content - scrollable */}
-      <div className="flex-1 min-h-0 overflow-visible">
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
         {step === 0 && (
           <IdentificationStep
             form={form}

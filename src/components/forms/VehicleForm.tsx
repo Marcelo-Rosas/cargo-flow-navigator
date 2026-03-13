@@ -155,7 +155,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[520px] max-h-[96vh] overflow-visible">
+      <DialogContent className="sm:max-w-[520px] max-h-[96vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-primary" />
