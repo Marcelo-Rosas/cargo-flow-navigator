@@ -1,5 +1,3 @@
-
-
 # Documentacao Completa: QuoteDetailModal e OrderDetailModal
 
 Vou criar um arquivo `.md` para download com a documentacao completa de ambos os modais, incluindo diagramas de fluxo em ASCII (flipchart).

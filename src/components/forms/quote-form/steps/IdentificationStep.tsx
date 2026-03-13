@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MaskedInput } from '@/components/ui/masked-input';
@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useFieldArray } from 'react-hook-form';
 import type { UseFormReturn } from 'react-hook-form';
 import type { QuoteFormData } from '../types';
 import { SectionBlock } from '@/components/ui/section-block';
@@ -55,6 +56,11 @@ export function IdentificationStep({
   isLoadingDestinationCep,
   isCalculatingKm,
 }: IdentificationStepProps) {
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'route_stops',
+  });
+
   return (
     <div className="space-y-6">
       <SectionBlock label="Dados do Cliente">
@@ -326,6 +332,74 @@ export function IdentificationStep({
               )}
             />
           </div>
+
+          {/* Paradas intermediárias */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">
+                Paradas intermediárias
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => append({ sequence: fields.length + 1, cep: '', city_uf: '' })}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Adicionar parada
+              </Button>
+            </div>
+            {fields.map((field, index) => (
+              <div
+                key={field.id}
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3 bg-muted/30"
+              >
+                <span className="text-xs text-muted-foreground w-6">{index + 1}.</span>
+                <FormField
+                  control={form.control}
+                  name={`route_stops.${index}.cep`}
+                  render={({ field: f }) => (
+                    <FormItem className="flex-1 min-w-[100px]">
+                      <FormControl>
+                        <MaskedInput
+                          mask="cep"
+                          placeholder="CEP"
+                          value={f.value || ''}
+                          onValueChange={(rawValue) => f.onChange(String(rawValue ?? ''))}
+                          onBlur={f.onBlur}
+                          className="h-9"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`route_stops.${index}.city_uf`}
+                  render={({ field: f }) => (
+                    <FormItem className="flex-1 min-w-[140px]">
+                      <FormControl>
+                        <Input placeholder="Cidade - UF" {...f} className="h-9" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => remove(index)}
+                  title="Remover parada"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+
           <div className="flex justify-end">
             <Button
               type="button"

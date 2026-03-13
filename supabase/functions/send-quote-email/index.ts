@@ -66,6 +66,9 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
   const das = totals?.das as number | null;
   const dasPercent = rates?.dasPercent as number | null;
 
+  // Notes
+  const notes = (quote.notes as string) || '';
+
   // Payment method
   const paymentMethod = (quote.payment_method as string) || '';
   const paymentMethodLabel = PAYMENT_METHOD_LABELS[paymentMethod] || '';
@@ -186,6 +189,17 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
     </table>`
     : '';
 
+  // Notes section
+  const notesHtml = notes
+    ? `
+    ${sectionHeader('Observações')}
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-left:4px solid #e9ecef;border-radius:4px;margin-bottom:24px;">
+      <tr>
+        <td style="padding:14px 16px;color:#555;font-size:13px;line-height:1.7;font-style:italic;">${notes.replace(/\n/g, '<br />')}</td>
+      </tr>
+    </table>`
+    : '';
+
   return `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -259,6 +273,8 @@ function buildEmailHtml(quote: Record<string, unknown>, paymentTerm: PaymentTerm
             ${taxHtml}
 
             ${paymentHtml}
+
+            ${notesHtml}
 
           </td>
         </tr>

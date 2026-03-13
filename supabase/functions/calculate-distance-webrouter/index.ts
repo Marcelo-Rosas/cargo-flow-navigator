@@ -1,8 +1,12 @@
 import { getCorsHeaders } from '../_shared/cors.ts';
 
+type WaypointInput = { cep: string; city_uf?: string; label?: string };
+
 type Input = {
   origin_cep: string;
   destination_cep: string;
+  /** Paradas intermediárias (ordem: entre origem e destino). CEP obrigatório. */
+  waypoints?: WaypointInput[];
   /** UF origem (2 letras). Usado no fallback geográfico 50/50 quando km_by_uf não é extraído. */
   origin_uf?: string;
   /** UF destino (2 letras). Usado no fallback geográfico 50/50 quando km_by_uf não é extraído. */
@@ -249,12 +253,21 @@ Deno.serve(async (req) => {
     const body = (await req.json()) as Partial<Input>;
     const originCep = sanitizeCep(body.origin_cep || '');
     const destinationCep = sanitizeCep(body.destination_cep || '');
+    const waypointsRaw = Array.isArray(body.waypoints)
+      ? (body.waypoints as WaypointInput[]).filter((w) => w && typeof w === 'object')
+      : [];
+    const waypoints = waypointsRaw
+      .map((w) => ({ cep: sanitizeCep(w.cep || ''), city_uf: w.city_uf, label: w.label }))
+      .filter((w) => w.cep.length === 8);
 
     if (originCep.length !== 8 || destinationCep.length !== 8) {
-      return new Response(JSON.stringify({ success: false, error: 'CEPs inválidos' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ success: false, error: 'CEPs de origem e destino inválidos' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const apiKey = getEnv('WEBROUTER_API_KEY');
@@ -272,31 +285,40 @@ Deno.serve(async (req) => {
         ? String(categoriaVeiculo)
         : axesToCategoria(axesCount);
 
-    // Buscar origem e destino (cidade, UF) via CEP para enriquecer o payload WebRouter
+    // Buscar origem, paradas e destino (cidade, UF) via CEP para enriquecer o payload WebRouter
     const originUfInput = normalizeUf(body.origin_uf);
     const destinationUfInput = normalizeUf(body.destination_uf);
-    const [originAddr, destinationAddr] = await Promise.all([
-      fetchAddressFromCep(originCep),
-      fetchAddressFromCep(destinationCep),
-    ]);
-    const originAddrFinal = originAddr
-      ? { cidade: originAddr.localidade, uf: originAddr.uf }
+    const cepsToFetch = [originCep, ...waypoints.map((w) => w.cep), destinationCep];
+    const addrs = await Promise.all(cepsToFetch.map((cep) => fetchAddressFromCep(cep)));
+    const originAddrFinal = addrs[0]
+      ? { cidade: addrs[0].localidade, uf: addrs[0].uf }
       : originUfInput
         ? { cidade: '', uf: originUfInput }
         : undefined;
-    const destinationAddrFinal = destinationAddr
-      ? { cidade: destinationAddr.localidade, uf: destinationAddr.uf }
+    const destinationAddrFinal = addrs[addrs.length - 1]
+      ? { cidade: addrs[addrs.length - 1].localidade, uf: addrs[addrs.length - 1].uf }
       : destinationUfInput
         ? { cidade: '', uf: destinationUfInput }
         : undefined;
 
+    const enderecos: ReturnType<typeof buildAddress>[] = [
+      buildAddress(originCep, 0, originAddrFinal),
+    ];
+    waypoints.forEach((wp, i) => {
+      const addr = addrs[i + 1];
+      const opts = addr
+        ? { cidade: addr.localidade, uf: addr.uf }
+        : wp.city_uf
+          ? { cidade: '', uf: wp.city_uf }
+          : undefined;
+      enderecos.push(buildAddress(wp.cep, i + 1, opts));
+    });
+    enderecos.push(buildAddress(destinationCep, enderecos.length, destinationAddrFinal));
+
     const webRouterBody = {
       autenticacao: { chaveAcesso: apiKey },
       rota: {
-        enderecos: [
-          buildAddress(originCep, 0, originAddrFinal),
-          buildAddress(destinationCep, 1, destinationAddrFinal),
-        ],
+        enderecos,
         params: {
           categoriaVeiculo: categoria,
           perfilVeiculo: 'CAMINHAO',

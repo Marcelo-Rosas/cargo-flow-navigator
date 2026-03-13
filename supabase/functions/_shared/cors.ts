@@ -34,7 +34,7 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   const allowed =
     getEnv('ALLOWED_ORIGINS') ||
     getEnv('ALLOWED_ORIGIN') ||
-    'http://localhost:5173,http://localhost:8080,https://app.vectracargo.com.br,https://*.app.vectracargo.com.br,https://*.cargo-flow-navigator.pages.dev';
+    'http://localhost:5173,http://localhost:8080,https://app.vectracargo.com.br,https://*.app.vectracargo.com.br,https://*.cargo-flow-navigator.pages.dev,https://*.workers.dev';
   const origins = allowed.split(',').map((o) => o.trim());
   const requestOrigin = req.headers.get('Origin');
 

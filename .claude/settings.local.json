@@ -3,7 +3,11 @@
     "allow": [
       "Bash(supabase functions:*)",
       "Bash(git:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(npx wrangler pages deploy dist --project-name cargo-flow-navigator)",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(grep -h \"ALTER TABLE public.orders\" /c/Users/marce/cargo-flow-navigator/supabase/migrations/*.sql)",
+      "Bash(find /c/Users/marce/cargo-flow-navigator/src/components/modals/quote-detail -name *.tsx -type f)"
     ]
   },
   "hooks": {

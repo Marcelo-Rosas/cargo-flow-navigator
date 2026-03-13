@@ -48,9 +48,10 @@ export async function invokeEdgeFunction<T>(
   const execute = (headers: Record<string, string>) =>
     supabase.functions.invoke(functionName, {
       body: options.body,
+      // Keep call-specific headers, but never let them override auth headers.
       headers: {
-        ...headers,
         ...options.headers,
+        ...headers,
       },
     });
 
@@ -74,6 +75,53 @@ export async function invokeEdgeFunction<T>(
   }
 
   if (error) {
+    // Fallback: in rare browser/client-sdk cases, invoke can return 401 even with
+    // valid headers. Retry with direct HTTP call to eliminate SDK transport issues.
+    if (/401|jwt|token|authorization/i.test(error.message || '')) {
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const publishableKey = getPublishableKey();
+      if (url && publishableKey) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        if (accessToken) {
+          const directRes = await fetch(`${url}/functions/v1/${functionName}`, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              apikey: publishableKey,
+              Authorization: `Bearer ${accessToken}`,
+              ...(options.headers ?? {}),
+            },
+            body: options.body != null ? JSON.stringify(options.body) : undefined,
+          });
+
+          if (directRes.ok) {
+            const payload = (await directRes.json()) as T;
+            return payload;
+          }
+
+          try {
+            const payload = (await directRes.json()) as {
+              error?: string;
+              message?: string;
+              errors?: string[];
+            };
+            if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+              throw new Error(payload.errors.join('; '));
+            }
+            if (payload?.error || payload?.message) {
+              throw new Error(payload.error || payload.message);
+            }
+          } catch {
+            const text = await directRes.text().catch(() => null);
+            if (text) throw new Error(text);
+          }
+        }
+      }
+    }
+
     const parsedMessage = await (async () => {
       const context = (error as { context?: Response })?.context;
       if (!context) return null;

@@ -1,0 +1,27 @@
+# Skill: Terminal-First Validation (Frontend Vite)
+
+## Objetivo
+Validar mudanças de frontend com foco em **qualidade + regressões** usando apenas terminal:
+- lint/build
+- e2e (Playwright)
+- (opcional) execução em modo UI/debug e simulação de latência
+
+## Quando usar
+- Antes de abrir PR
+- Antes de merge/release
+- Após mudanças em fluxos críticos (ex.: Wizard, modais, mutations, queries)
+
+## Pré-requisitos
+- Node instalado
+- Dependências instaladas (lockfile respeitado)
+- Playwright configurado no repo (ou pula etapas E2E)
+- Variáveis de ambiente necessárias para rodar o app/testes (ex.: SUPABASE_URL/KEY etc.)
+
+---
+
+## Checklist (Terminal-First)
+
+### 0) Instalação limpa (recomendado em CI)
+**npm**
+```bash
+npm ci

@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
 import { usePricingParameter, useConditionalFees, usePaymentTerms } from '@/hooks/usePricingRules';
 import { useUpdateQuote } from '@/hooks/useQuotes';
+import { useQuoteRouteStops } from '@/hooks/useQuoteRouteStops';
 import {
   useCalculateFreight,
   buildStoredBreakdownFromEdgeResponse,
@@ -113,6 +114,7 @@ export function QuoteDetailModal({
 
   // All hooks MUST be called before any conditional returns
   const { data: priceTable } = usePriceTable(quote?.price_table_id || '');
+  const { data: routeStops } = useQuoteRouteStops(open && quote ? quote.id : null);
   const { data: taxRegimeParam } = usePricingParameter('tax_regime_simples');
   const { data: conditionalFeesData } = useConditionalFees(true);
   const { data: paymentTermsList } = usePaymentTerms(true);
@@ -657,6 +659,9 @@ export function QuoteDetailModal({
                   destination={quote.destination}
                   originCep={quote.origin_cep}
                   destinationCep={quote.destination_cep}
+                  routeStops={(routeStops ?? [])
+                    .filter((s) => s.stop_type === 'stop')
+                    .map((s) => ({ city_uf: s.city_uf, cep: s.cep }))}
                 />
               </SectionBlock>
             )}

@@ -73,3 +73,6 @@ verify_jwt = false  # Chamado por workflow-orchestrator com service role
 
 [functions.news-agent]
 verify_jwt = false  # Chamado por cron/pg_cron com service role
+
+[functions.resend-webhook]
+verify_jwt = false  # Recebe POST do Resend (webhook Svix)

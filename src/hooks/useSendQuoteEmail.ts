@@ -16,18 +16,10 @@ export function useSendQuoteEmail() {
 
   return useMutation({
     mutationFn: async ({ quoteId, recipientEmail, cc, bcc }: SendQuoteEmailParams) => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      let token = sessionData?.session?.access_token;
-      if (!token) {
-        const { data: refreshData } = await supabase.auth.refreshSession();
-        token = refreshData?.session?.access_token ?? undefined;
-      }
-      if (!token) throw new Error('Sessão expirada. Faça login novamente.');
-
-      // 1. Send the email via Edge Function
+      // 1. Send the email via Edge Function.
+      // Auth headers are handled centrally by invokeEdgeFunction (token refresh + retry).
       const data = await invokeEdgeFunction<{ error?: string }>('send-quote-email', {
         body: { quoteId, recipientEmail, cc, bcc },
-        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (data?.error) throw new Error(data.error);

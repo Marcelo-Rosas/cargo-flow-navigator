@@ -81,13 +81,21 @@ export function ReviewStep({
               </span>
             </div>
             <Separator />
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Origem</span>
-              <span className="font-medium text-right">{values.origin || '—'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Destino</span>
-              <span className="font-medium text-right">{values.destination || '—'}</span>
+            <div className="space-y-1.5">
+              <span className="text-muted-foreground text-xs block">Rota</span>
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-medium">
+                <span>{values.origin || '—'}</span>
+                {(values.route_stops ?? [])
+                  .filter((s) => (s.cep ?? '').replace(/\D/g, '').length === 8)
+                  .map((s, i) => (
+                    <span key={i} className="text-muted-foreground shrink-0">
+                      → {s.city_uf?.trim() || s.cep || '—'}
+                    </span>
+                  ))}
+                <span className="text-muted-foreground shrink-0">
+                  → {values.destination || '—'}
+                </span>
+              </div>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Distância</span>

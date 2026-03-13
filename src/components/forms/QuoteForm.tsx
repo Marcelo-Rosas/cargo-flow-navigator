@@ -41,6 +41,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { MaskedInput } from '@/components/ui/masked-input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useCreateQuote, useUpdateQuote, useDeleteQuote } from '@/hooks/useQuotes';
+import { useQuoteRouteStops, syncQuoteRouteStops } from '@/hooks/useQuoteRouteStops';
 import { useCreateLegacyQuote } from '@/hooks/useCreateLegacyQuote';
 import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
@@ -314,6 +315,18 @@ const quoteSchema = z
     quote_code: z.string().optional(),
     quote_date: z.string().optional(),
     os_number: z.string().optional(),
+    /** Paradas intermediárias (ordem: origem → paradas → destino). Usadas para cálculo de km com waypoints. */
+    route_stops: z
+      .array(
+        z.object({
+          id: z.string().optional(),
+          sequence: z.number(),
+          cep: z.string().optional(),
+          city_uf: z.string().optional(),
+        })
+      )
+      .optional()
+      .default([]),
   })
   .superRefine((data, ctx) => {
     // Validação cross-field: se ambas as datas estiverem preenchidas,
@@ -355,6 +368,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: conditionalFeesData } = useConditionalFees(true);
   const createQuoteMutation = useCreateQuote();
   const updateQuoteMutation = useUpdateQuote();
+  const { data: routeStopsData } = useQuoteRouteStops(open && quote ? quote.id : null);
   const deleteQuoteMutation = useDeleteQuote();
   const createLegacyMutation = useCreateLegacyQuote();
   const isEditing = !!quote;
@@ -437,6 +451,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       quote_code: '',
       quote_date: '',
       os_number: '',
+      route_stops: [],
     },
   });
 
@@ -841,6 +856,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         balance_due_date: (quote as { balance_due_date?: string | null })?.balance_due_date || '',
         estimated_loading_date:
           ((quote as unknown as Record<string, unknown>).estimated_loading_date as string) || '',
+        route_stops: [],
       });
     } else {
       setAdditionalFeesSelection(defaultAdditionalFeesSelection);
@@ -877,9 +893,26 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         notes: '',
         advance_due_date: '',
         balance_due_date: '',
+        route_stops: [],
       });
     }
   }, [quote, form, weightUnit, open]);
+
+  useEffect(() => {
+    if (!quote || !routeStopsData || routeStopsData.length === 0) return;
+    const stops = routeStopsData
+      .filter((s) => s.stop_type === 'stop')
+      .map((s) => ({
+        id: s.id,
+        sequence: s.sequence,
+        cep: s.cep ?? '',
+        city_uf: s.city_uf ?? '',
+      }))
+      .sort((a, b) => a.sequence - b.sequence);
+    if (stops.length > 0) {
+      form.setValue('route_stops', stops, { shouldDirty: false });
+    }
+  }, [quote, routeStopsData, form]);
 
   useEffect(() => {
     if (!quote) return;
@@ -997,10 +1030,19 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     const destinationStr = form.getValues('destination') || '';
     const originUfForApi = extractUf(originStr) ?? undefined;
     const destinationUfForApi = extractUf(destinationStr) ?? undefined;
+    const stops = form.getValues('route_stops') ?? [];
 
     if (originCep.length !== 8 || destinationCep.length !== 8) {
       toast.error('Preencha os CEPs de origem e destino para calcular a distância');
       return;
+    }
+
+    const waypoints: { cep: string; city_uf?: string; label?: string }[] = [];
+    for (const s of stops) {
+      const cep = sanitizeCep(s.cep ?? '');
+      if (cep.length === 8) {
+        waypoints.push({ cep, city_uf: s.city_uf?.trim() || undefined });
+      }
     }
 
     setIsCalculatingKm(true);
@@ -1017,6 +1059,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       }>('calculate-distance-webrouter', {
         origin_cep: originCep,
         destination_cep: destinationCep,
+        waypoints: waypoints.length > 0 ? waypoints : undefined,
         origin_uf: originUfForApi,
         destination_uf: destinationUfForApi,
         categoria_veiculo:
@@ -1318,19 +1361,27 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         estimated_loading_date: data.estimated_loading_date?.trim() || null,
       };
 
+      const stops = data.route_stops ?? [];
+      let savedQuoteId: string;
+
       if (isEditing && quote) {
         await updateQuoteMutation.mutateAsync({
           id: quote.id,
           updates: quoteData,
         });
+        savedQuoteId = quote.id;
         toast.success('Cotação atualizada com sucesso');
       } else {
-        await createQuoteMutation.mutateAsync({
+        const created = await createQuoteMutation.mutateAsync({
           ...quoteData,
           created_by: user.id,
         });
+        savedQuoteId = created.id;
         toast.success('Cotação criada com sucesso');
       }
+
+      await syncQuoteRouteStops(savedQuoteId, stops);
+
       onClose();
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';

@@ -60,6 +60,12 @@ const typeLabels: Record<DocumentType, string> = {
   doc_rota: 'Doc. Rota',
   comprovante_vpo: 'VPO',
   outros: 'Outros',
+  comprovante_descarga: '',
+  adiantamento_carreteiro: '',
+  saldo_carreteiro: '',
+  a_vista_fat: '',
+  saldo_fat: '',
+  a_prazo_fat: '',
 };
 
 const typeColors: Record<DocumentType, string> = {
@@ -76,6 +82,12 @@ const typeColors: Record<DocumentType, string> = {
   doc_rota: 'bg-violet-500/10 text-violet-600',
   comprovante_vpo: 'bg-teal-500/10 text-teal-600',
   outros: 'bg-muted text-muted-foreground',
+  comprovante_descarga: '',
+  adiantamento_carreteiro: '',
+  saldo_carreteiro: '',
+  a_vista_fat: '',
+  saldo_fat: '',
+  a_prazo_fat: '',
 };
 
 const statusConfig = {
