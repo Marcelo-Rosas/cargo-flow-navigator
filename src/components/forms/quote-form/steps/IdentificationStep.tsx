@@ -147,41 +147,72 @@ export function IdentificationStep({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => appendRecipient({ name: '' })}
+                onClick={() => appendRecipient({ client_id: '', name: '' })}
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Adicionar cliente
               </Button>
             </div>
-            {recipientFields.map((rf, idx) => (
-              <div
-                key={rf.id}
-                className="flex items-center gap-2 rounded-lg border border-border p-3 bg-muted/20"
-              >
-                <FormField
-                  control={form.control}
-                  name={`additional_recipients.${idx}.name`}
-                  render={({ field: f }) => (
-                    <FormItem className="flex-1 min-w-0">
-                      <FormControl>
-                        <Input placeholder="Nome do destinatário" {...f} className="h-9" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => removeRecipient(idx)}
-                  title="Remover destinatário"
+            {recipientFields.map((rf, idx) => {
+              const mainClientId = form.watch('client_id');
+              const otherRecipientIds = (form.watch('additional_recipients') ?? [])
+                .map((r) => (r as { client_id?: string }).client_id)
+                .filter((id, i) => i !== idx && !!id);
+              const excludedIds = new Set([mainClientId, ...otherRecipientIds].filter(Boolean));
+              const availableClients = clients.filter((c) => !excludedIds.has(c.id));
+              return (
+                <div
+                  key={rf.id}
+                  className="flex items-center gap-2 rounded-lg border border-border p-3 bg-muted/20"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            ))}
+                  <FormField
+                    control={form.control}
+                    name={`additional_recipients.${idx}.client_id`}
+                    render={({ field: f }) => (
+                      <FormItem className="flex-1 min-w-0">
+                        <FormLabel className="text-xs text-muted-foreground">Cliente</FormLabel>
+                        <Select
+                          value={f.value || ''}
+                          onValueChange={(value) => {
+                            f.onChange(value);
+                            const selected = clients.find((c) => c.id === value);
+                            if (selected) {
+                              form.setValue(`additional_recipients.${idx}.name`, selected.name, {
+                                shouldDirty: true,
+                              });
+                            }
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Selecionar cliente..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {availableClients.map((client) => (
+                              <SelectItem key={client.id} value={client.id}>
+                                {client.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive self-end"
+                    onClick={() => removeRecipient(idx)}
+                    title="Remover destinatário"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </SectionBlock>

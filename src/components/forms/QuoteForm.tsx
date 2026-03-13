@@ -317,7 +317,12 @@ const quoteSchema = z
     os_number: z.string().optional(),
     /** Destinatários adicionais (além do cliente principal). Habilita paradas quando length > 0. */
     additional_recipients: z
-      .array(z.object({ name: z.string() }))
+      .array(
+        z.object({
+          client_id: z.string().optional(),
+          name: z.string(),
+        })
+      )
       .optional()
       .default([]),
     /** Paradas intermediárias (ordem: origem → paradas → destino). Usadas para cálculo de km com waypoints. */
@@ -922,7 +927,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       // Habilita UI de paradas (1 + N destinatários adicionais)
       form.setValue(
         'additional_recipients',
-        stops.map((s) => ({ name: s.city_uf?.trim() || 'Parada' })),
+        stops.map((s) => ({ client_id: undefined, name: s.city_uf?.trim() || 'Parada' })),
         { shouldDirty: false }
       );
     }
