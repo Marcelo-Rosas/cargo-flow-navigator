@@ -7,6 +7,13 @@ import { Label } from '@/components/ui/label';
 import { useDreOperacionalReport } from '@/hooks/useDreOperacionalReport';
 import { useVehicleTypes } from '@/hooks/usePricingRules';
 import { DreOperacionalTable } from '@/components/reports/DreOperacionalTable';
+import { DateFilterRange } from '@/components/filters/DateFilterRange';
+import {
+  type DateFilterMode,
+  type DateFilterRange as DateFilterRangeType,
+  getRangeFromMonth,
+  getCurrentMonthYear,
+} from '@/lib/dateFilterUtils';
 import type { PeriodType } from '@/modules/dre';
 
 const PERIOD_OPTIONS: { value: PeriodType; label: string }[] = [
@@ -16,25 +23,22 @@ const PERIOD_OPTIONS: { value: PeriodType; label: string }[] = [
   { value: 'year', label: 'Ano' },
 ];
 
-const REPORT_THIS_YEAR = new Date().getFullYear();
-
-function formatDdMmYyyy(d: Date): string {
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
-
-const DEFAULT_DATE_FROM = formatDdMmYyyy(new Date(REPORT_THIS_YEAR, 0, 1));
-const DEFAULT_DATE_TO = formatDdMmYyyy(new Date());
+const { month: CUR_MONTH, year: CUR_YEAR } = getCurrentMonthYear();
+const DEFAULT_RANGE = getRangeFromMonth(CUR_MONTH, CUR_YEAR);
 
 export default function Reports() {
-  const [dateFrom, setDateFrom] = useState<string>(DEFAULT_DATE_FROM);
-  const [dateTo, setDateTo] = useState<string>(DEFAULT_DATE_TO);
+  const [filterMode, setFilterMode] = useState<DateFilterMode>('month');
+  const [dateFrom, setDateFrom] = useState<string>(DEFAULT_RANGE.dateFrom);
+  const [dateTo, setDateTo] = useState<string>(DEFAULT_RANGE.dateTo);
   const [quoteCode, setQuoteCode] = useState<string>('');
   const [osNumber, setOsNumber] = useState<string>('');
   const [periodType, setPeriodType] = useState<PeriodType>('detail');
   const [vehicleTypeId, setVehicleTypeId] = useState<string | null>(null);
+
+  const handleRangeChange = (range: DateFilterRangeType) => {
+    setDateFrom(range.dateFrom);
+    setDateTo(range.dateTo);
+  };
 
   const { data: vehicleTypes } = useVehicleTypes();
   const { data: dreTables, isLoading: isLoadingDre } = useDreOperacionalReport({
@@ -107,24 +111,13 @@ export default function Reports() {
         transition={{ delay: 0.05 }}
       >
         <div className="flex flex-wrap items-end gap-4 mb-6">
-          <div className="grid gap-1.5">
-            <Label className="text-xs">De (dd/mm/aaaa)</Label>
-            <Input
-              placeholder="dd/mm/aaaa"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="w-32"
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label className="text-xs">Até (dd/mm/aaaa)</Label>
-            <Input
-              placeholder="dd/mm/aaaa"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="w-32"
-            />
-          </div>
+          <DateFilterRange
+            mode={filterMode}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onModeChange={setFilterMode}
+            onRangeChange={handleRangeChange}
+          />
           <div className="grid gap-1.5">
             <Label className="text-xs">COT</Label>
             <Input

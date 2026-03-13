@@ -11,6 +11,7 @@ import {
   type DreTable,
   type PeriodType,
 } from '@/modules/dre';
+import { parseDdMmYyyy } from '@/lib/dateFilterUtils';
 
 export interface UseDreOperacionalReportParams {
   /** Data início no formato dd/mm/yyyy */
@@ -22,17 +23,6 @@ export interface UseDreOperacionalReportParams {
   periodType: PeriodType;
   vehicleTypeId?: string | null;
   enabled?: boolean;
-}
-
-function parseDdMmYyyy(s: string | null): Date | null {
-  if (!s || !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s.trim())) return null;
-  const [day, month, year] = s.trim().split('/').map(Number);
-  if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) return null;
-  const d = new Date(year, month - 1, day);
-  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
-    return null;
-  }
-  return d;
 }
 
 function buildRange(
