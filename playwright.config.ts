@@ -1,6 +1,10 @@
 import 'dotenv/config';
 import { defineConfig, devices } from '@playwright/test';
 
+/**
+ * baseURL: PW_BASE_URL (env) ou produção por padrão.
+ * Para validar build local: PW_BASE_URL=http://localhost:4173 (servir antes com npm run preview:static).
+ */
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,

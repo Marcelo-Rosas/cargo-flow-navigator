@@ -71,7 +71,8 @@ Acesse `http://localhost:5173`.
 | `npm run dev`   | Inicia servidor de desenvolvimento (Vite)  |
 | `npm run build` | Build de produção                          |
 | `npm run build:dev` | Build em modo development              |
-| `npm run preview`   | Preview do build local                  |
+| `npm run preview`   | Preview do build local (Wrangler)       |
+| `npm run preview:static` | Preview estático na porta 4173 (para E2E local) |
 | `npm run lint`      | ESLint                                  |
 | `npm run test:e2e:auth` | Playwright com autenticação         |
 | `npm run test:e2e:mocks` | Specs determinísticas com mocks    |
@@ -137,8 +138,16 @@ Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para padrões de código e fluxo de 
 
 - ### Testes determinísticos (mocks)
   ```bash
-  npx playwright test tests/e2e/quote-wizard-gating.spec.ts --project=chromium
-  npx playwright test tests/e2e/quote-advance-race.spec.ts --project=chromium
+  npx playwright test tests/e2e/quote-wizard-gating.spec.ts --project=chromium-mocks
+  npx playwright test tests/e2e/quote-advance-race.spec.ts --project=chromium-mocks
   ```
 
-Esses comandos usam mocks determinísticos e não dependem do `setup/auth`. Utilize `npm run test:e2e:mocks` para executar ambos de uma vez.
+  Esses comandos usam mocks determinísticos e não dependem do `setup/auth`. Utilize `npm run test:e2e:mocks` para executar ambos de uma vez.
+
+- ### Testes contra build local (não produção)
+  Por padrão, os testes E2E usam `baseURL` = produção. Para validar o build local:
+
+  1. Em um terminal: `npm run build && npm run preview:static`
+  2. Em outro: `npm run test:e2e:local` (toda a suíte) ou `npm run test:e2e:paradas` (específico do round 1 / paradas)
+
+  Útil para validar features novas antes do deploy.

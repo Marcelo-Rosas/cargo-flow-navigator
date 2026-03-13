@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,10 +57,30 @@ export function IdentificationStep({
   isLoadingDestinationCep,
   isCalculatingKm,
 }: IdentificationStepProps) {
+  const {
+    fields: recipientFields,
+    append: appendRecipient,
+    remove: removeRecipient,
+  } = useFieldArray({
+    control: form.control,
+    name: 'additional_recipients',
+  });
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'route_stops',
   });
+
+  const clientCount = 1 + recipientFields.length;
+  const showParadas = clientCount > 1;
+
+  useEffect(() => {
+    if (!showParadas) {
+      const stops = form.getValues('route_stops') ?? [];
+      if (stops.length > 0) {
+        form.setValue('route_stops', [], { shouldDirty: true });
+      }
+    }
+  }, [showParadas, form]);
 
   return (
     <div className="space-y-6">
@@ -117,6 +138,51 @@ export function IdentificationStep({
               </FormItem>
             )}
           />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">
+                Destinatários adicionais
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => appendRecipient({ name: '' })}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Adicionar cliente
+              </Button>
+            </div>
+            {recipientFields.map((rf, idx) => (
+              <div
+                key={rf.id}
+                className="flex items-center gap-2 rounded-lg border border-border p-3 bg-muted/20"
+              >
+                <FormField
+                  control={form.control}
+                  name={`additional_recipients.${idx}.name`}
+                  render={({ field: f }) => (
+                    <FormItem className="flex-1 min-w-0">
+                      <FormControl>
+                        <Input placeholder="Nome do destinatário" {...f} className="h-9" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeRecipient(idx)}
+                  title="Remover destinatário"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
       </SectionBlock>
 
@@ -333,72 +399,74 @@ export function IdentificationStep({
             />
           </div>
 
-          {/* Paradas intermediárias */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">
-                Paradas intermediárias
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => append({ sequence: fields.length + 1, cep: '', city_uf: '' })}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Adicionar parada
-              </Button>
-            </div>
-            {fields.map((field, index) => (
-              <div
-                key={field.id}
-                className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3 bg-muted/30"
-              >
-                <span className="text-xs text-muted-foreground w-6">{index + 1}.</span>
-                <FormField
-                  control={form.control}
-                  name={`route_stops.${index}.cep`}
-                  render={({ field: f }) => (
-                    <FormItem className="flex-1 min-w-[100px]">
-                      <FormControl>
-                        <MaskedInput
-                          mask="cep"
-                          placeholder="CEP"
-                          value={f.value || ''}
-                          onValueChange={(rawValue) => f.onChange(String(rawValue ?? ''))}
-                          onBlur={f.onBlur}
-                          className="h-9"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name={`route_stops.${index}.city_uf`}
-                  render={({ field: f }) => (
-                    <FormItem className="flex-1 min-w-[140px]">
-                      <FormControl>
-                        <Input placeholder="Cidade - UF" {...f} className="h-9" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          {/* Paradas intermediárias — só exibe quando há 2+ clientes/destinatários */}
+          {showParadas && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">
+                  Paradas intermediárias
+                </span>
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => remove(index)}
-                  title="Remover parada"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append({ sequence: fields.length + 1, cep: '', city_uf: '' })}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Plus className="w-4 h-4 mr-1" />
+                  Adicionar parada
                 </Button>
               </div>
-            ))}
-          </div>
+              {fields.map((field, index) => (
+                <div
+                  key={field.id}
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3 bg-muted/30"
+                >
+                  <span className="text-xs text-muted-foreground w-6">{index + 1}.</span>
+                  <FormField
+                    control={form.control}
+                    name={`route_stops.${index}.cep`}
+                    render={({ field: f }) => (
+                      <FormItem className="flex-1 min-w-[100px]">
+                        <FormControl>
+                          <MaskedInput
+                            mask="cep"
+                            placeholder="CEP"
+                            value={f.value || ''}
+                            onValueChange={(rawValue) => f.onChange(String(rawValue ?? ''))}
+                            onBlur={f.onBlur}
+                            className="h-9"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={`route_stops.${index}.city_uf`}
+                    render={({ field: f }) => (
+                      <FormItem className="flex-1 min-w-[140px]">
+                        <FormControl>
+                          <Input placeholder="Cidade - UF" {...f} className="h-9" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => remove(index)}
+                    title="Remover parada"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex justify-end">
             <Button

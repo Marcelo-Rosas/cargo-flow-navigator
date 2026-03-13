@@ -315,6 +315,11 @@ const quoteSchema = z
     quote_code: z.string().optional(),
     quote_date: z.string().optional(),
     os_number: z.string().optional(),
+    /** Destinatários adicionais (além do cliente principal). Habilita paradas quando length > 0. */
+    additional_recipients: z
+      .array(z.object({ name: z.string() }))
+      .optional()
+      .default([]),
     /** Paradas intermediárias (ordem: origem → paradas → destino). Usadas para cálculo de km com waypoints. */
     route_stops: z
       .array(
@@ -451,6 +456,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       quote_code: '',
       quote_date: '',
       os_number: '',
+      additional_recipients: [],
       route_stops: [],
     },
   });
@@ -856,6 +862,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         balance_due_date: (quote as { balance_due_date?: string | null })?.balance_due_date || '',
         estimated_loading_date:
           ((quote as unknown as Record<string, unknown>).estimated_loading_date as string) || '',
+        additional_recipients: [],
         route_stops: [],
       });
     } else {
@@ -893,6 +900,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         notes: '',
         advance_due_date: '',
         balance_due_date: '',
+        additional_recipients: [],
         route_stops: [],
       });
     }
@@ -911,6 +919,12 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       .sort((a, b) => a.sequence - b.sequence);
     if (stops.length > 0) {
       form.setValue('route_stops', stops, { shouldDirty: false });
+      // Habilita UI de paradas (1 + N destinatários adicionais)
+      form.setValue(
+        'additional_recipients',
+        stops.map((s) => ({ name: s.city_uf?.trim() || 'Parada' })),
+        { shouldDirty: false }
+      );
     }
   }, [quote, routeStopsData, form]);
 
