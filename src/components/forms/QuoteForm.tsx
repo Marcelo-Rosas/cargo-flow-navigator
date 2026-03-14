@@ -325,6 +325,17 @@ const quoteSchema = z
       )
       .optional()
       .default([]),
+    /** Embarcadores adicionais (além do embarcador principal). */
+    additional_shippers: z
+      .array(
+        z.object({
+          shipper_id: z.string().optional(),
+          name: z.string(),
+          email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+        })
+      )
+      .optional()
+      .default([]),
     /** Paradas intermediárias (ordem: origem → paradas → destino). Usadas para cálculo de km com waypoints. */
     route_stops: z
       .array(
@@ -462,6 +473,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       quote_date: '',
       os_number: '',
       additional_recipients: [],
+      additional_shippers: [],
       route_stops: [],
     },
   });
@@ -868,6 +880,15 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         estimated_loading_date:
           ((quote as unknown as Record<string, unknown>).estimated_loading_date as string) || '',
         additional_recipients: [],
+        additional_shippers: Array.isArray(
+          (quote as unknown as Record<string, unknown>).additional_shippers
+        )
+          ? ((quote as unknown as Record<string, unknown>).additional_shippers as {
+              shipper_id?: string;
+              name: string;
+              email?: string;
+            }[])
+          : [],
         route_stops: [],
       });
     } else {
@@ -906,6 +927,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         advance_due_date: '',
         balance_due_date: '',
         additional_recipients: [],
+        additional_shippers: [],
         route_stops: [],
       });
     }
@@ -1379,6 +1401,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         advance_due_date: data.advance_due_date?.trim() || null,
         balance_due_date: data.balance_due_date?.trim() || null,
         estimated_loading_date: data.estimated_loading_date?.trim() || null,
+        additional_shippers: (data.additional_shippers ?? []).filter((s) => s.name?.trim()),
       };
 
       const routeStops = data.route_stops ?? [];
@@ -1582,9 +1605,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                         '—'
                       }
                       shipperName={
-                        form.watch('shipper_name') ||
-                        shippers?.find((s) => s.id === form.watch('shipper_id'))?.name ||
-                        '—'
+                        [
+                          form.watch('shipper_name') ||
+                            shippers?.find((s) => s.id === form.watch('shipper_id'))?.name,
+                          ...(form.watch('additional_shippers') ?? []).map((s) => s.name),
+                        ]
+                          .filter(Boolean)
+                          .join(', ') || '—'
                       }
                       priceTableRow={priceTableRow ?? null}
                       isLoadingPriceRow={isLoadingPriceRow}

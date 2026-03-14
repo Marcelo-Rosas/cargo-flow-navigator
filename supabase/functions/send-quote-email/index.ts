@@ -148,8 +148,17 @@ function buildEmailHtml(
 
   // Build client section: CIF = embarcador, FOB = cliente(s) + destinatários
   const clientRows: string[] = [];
+  const additionalShippers = (
+    Array.isArray(quote.additional_shippers) ? quote.additional_shippers : []
+  ) as Array<{ name?: string }>;
   if (isCIF) {
-    clientRows.push(infoRow('Cliente (Embarcador)', shipperName || '—', true));
+    const hasExtraShippers = additionalShippers.length > 0;
+    clientRows.push(infoRow('Cliente (Embarcador)', shipperName || '—', !hasExtraShippers));
+    additionalShippers.forEach((s, i) => {
+      clientRows.push(
+        infoRow(`Embarcador ${i + 2}`, s.name || '—', i === additionalShippers.length - 1)
+      );
+    });
   } else {
     clientRows.push(infoRow('Cliente', clientName, routeStops.length === 0));
     routeStops.forEach((s, i) => {

@@ -65,6 +65,14 @@ export function IdentificationStep({
     control: form.control,
     name: 'additional_recipients',
   });
+  const {
+    fields: shipperFields,
+    append: appendShipper,
+    remove: removeShipper,
+  } = useFieldArray({
+    control: form.control,
+    name: 'additional_shippers',
+  });
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'route_stops',
@@ -297,6 +305,87 @@ export function IdentificationStep({
                 </FormItem>
               )}
             />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">
+                Embarcadores adicionais
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => appendShipper({ shipper_id: '', name: '', email: '' })}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Adicionar embarcador
+              </Button>
+            </div>
+            {shipperFields.map((sf, idx) => {
+              const mainShipperId = form.watch('shipper_id');
+              const otherShipperIds = (form.watch('additional_shippers') ?? [])
+                .map((s) => (s as { shipper_id?: string }).shipper_id)
+                .filter((id, i) => i !== idx && !!id);
+              const excludedIds = new Set([mainShipperId, ...otherShipperIds].filter(Boolean));
+              const availableShippers = shippers.filter((s) => !excludedIds.has(s.id));
+              return (
+                <div
+                  key={sf.id}
+                  className="flex items-center gap-2 rounded-lg border border-border p-3 bg-muted/20"
+                >
+                  <FormField
+                    control={form.control}
+                    name={`additional_shippers.${idx}.shipper_id`}
+                    render={({ field: f }) => (
+                      <FormItem className="flex-1 min-w-0">
+                        <FormLabel className="text-xs text-muted-foreground">Embarcador</FormLabel>
+                        <Select
+                          value={f.value || ''}
+                          onValueChange={(value) => {
+                            f.onChange(value);
+                            const selected = shippers.find((s) => s.id === value);
+                            if (selected) {
+                              form.setValue(`additional_shippers.${idx}.name`, selected.name, {
+                                shouldDirty: true,
+                              });
+                              form.setValue(
+                                `additional_shippers.${idx}.email`,
+                                selected.email || '',
+                                { shouldDirty: true }
+                              );
+                            }
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Selecionar embarcador..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {availableShippers.map((shipper) => (
+                              <SelectItem key={shipper.id} value={shipper.id}>
+                                {shipper.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive self-end"
+                    onClick={() => removeShipper(idx)}
+                    title="Remover embarcador"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </SectionBlock>
