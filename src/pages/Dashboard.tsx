@@ -18,7 +18,6 @@ import { OverviewTab } from '@/components/dashboard/tabs/OverviewTab';
 import { CommercialTab } from '@/components/dashboard/tabs/CommercialTab';
 import { OperationsTab } from '@/components/dashboard/tabs/OperationsTab';
 import { NtcInsightsTab } from '@/components/dashboard/tabs/NtcInsightsTab';
-import { MarketInsightsCard } from '@/components/dashboard/MarketInsightsCard';
 import { NtcIndicesCard } from '@/components/dashboard/NtcIndicesCard';
 import { NewsTab } from '@/components/dashboard/tabs/NewsTab';
 import {
@@ -314,7 +313,7 @@ export default function Dashboard() {
 
         <TabsContent value="ntc-insights" className="space-y-6">
           <NtcIndicesCard />
-          <MarketInsightsCard />
+
           <NtcInsightsTab />
         </TabsContent>
 

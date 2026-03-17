@@ -56,7 +56,7 @@ export function AiInsightsWidget() {
   const { toast } = useToast();
 
   const analysis = insight?.analysis ?? null;
-  const insights = (analysis?.insights as Array<Record<string, string>>) ?? [];
+  const insights = (analysis?.insights as Array<string | Record<string, string>>) ?? [];
   const summary = (analysis?.summary as string) ?? null;
   const risk = (analysis?.risk as string) ?? null;
   const metrics = analysis?.metrics as Record<string, unknown> | null;
@@ -73,8 +73,8 @@ export function AiInsightsWidget() {
       {
         onSuccess: () => {
           toast({
-            title: 'Análise gerada',
-            description: 'Os insights foram atualizados com sucesso.',
+            title: 'Analysis generated',
+            description: 'The insights have been updated successfully.',
           });
         },
         onError: (error) => {
@@ -210,8 +210,13 @@ export function AiInsightsWidget() {
 
           {/* Insight items */}
           {insights.slice(0, 5).map((item, i) => {
-            const IconComponent = typeIcons[item.type] || Lightbulb;
-            const colorClass = typeColors[item.type] || typeColors.opportunity;
+            const isStr = typeof item === 'string';
+            const title = isStr ? item : (item as any).title || (item as any).description || '';
+            const desc = isStr ? '' : (item as any).description || '';
+            const type = isStr ? 'opportunity' : (item as any).type || 'opportunity';
+            const priority = isStr ? null : (item as any).priority;
+            const IconComponent = typeIcons[type] || Lightbulb;
+            const colorClass = typeColors[type] || typeColors.opportunity;
 
             return (
               <motion.div
@@ -226,21 +231,21 @@ export function AiInsightsWidget() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-semibold">{item.title}</p>
-                    {item.priority && (
+                    <p className="text-xs font-semibold">{title}</p>
+                    {priority && (
                       <Badge
                         variant="outline"
-                        className={`text-[9px] px-1 py-0 ${priorityBadge[item.priority] || ''}`}
+                        className={`text-[9px] px-1 py-0 ${priorityBadge[priority] || ''}`}
                       >
-                        {item.priority}
+                        {priority}
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
-                  {item.action_item && (
+                  <p className="text-xs text-muted-foreground line-clamp-2">{desc}</p>
+                  {(item as any).action_item && (
                     <div className="flex items-center gap-1 mt-1 text-[10px] text-primary/70">
                       <ArrowRight className="w-2.5 h-2.5" />
-                      <span className="line-clamp-1">{item.action_item}</span>
+                      <span className="line-clamp-1">{(item as any).action_item}</span>
                     </div>
                   )}
                 </div>

@@ -1,85 +1,101 @@
-// supabase/functions/ai-dashboard-insights-worker/index.ts
-
 import { createClient } from '@supabase/supabase-js';
-import { getCorsHeaders } from '../_shared/cors.ts';
-import { callGemini, type GeminiModel } from '../_shared/gemini.ts';
-
 const Deno = (globalThis as any).Deno;
-
+async function callGemini(prompt: string, model = 'gemini-2.0-flash') {
+  const apiKey = Deno.env.get('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+      }),
+    }
+  );
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return {
+    text: data.candidates?.[0]?.content?.parts?.[0]?.text ?? '',
+    usage: {
+      input_tokens: data.usageMetadata?.promptTokenCount ?? 0,
+      output_tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+    },
+  };
+}
+const cors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+};
 Deno.serve(async (req: Request) => {
-  const corsHeaders = getCorsHeaders(req);
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
-
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   const sb = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
   const start = Date.now();
-
   try {
-    const { model = 'gemini-2.0-flash' }: { model: GeminiModel } = await req.json();
-
-    // Buscar dados do CFN
+    let model = 'gemini-2.0-flash';
+    try {
+      const b = await req.json();
+      model = b.model ?? model;
+    } catch {}
     const [{ data: quotes }, { data: orders }, { data: financial }] = await Promise.all([
       sb
         .from('quotes')
-        .select('id, status, total_value, created_at')
+        .select('id,stage,value,freight_modality,origin,destination,created_at')
         .order('created_at', { ascending: false })
-        .limit(30),
+        .limit(20),
       sb
-        .from('service_orders')
-        .select('id, status, freight_value, created_at')
+        .from('orders')
+        .select('id,stage,value,freight_modality,origin,destination,created_at')
         .order('created_at', { ascending: false })
-        .limit(30),
+        .limit(20),
       sb
-        .from('financial_entries')
-        .select('type, amount, status, category, created_at')
+        .from('financial_documents')
+        .select('type,total_amount,status,category,due_date,created_at')
         .order('created_at', { ascending: false })
-        .limit(50),
+        .limit(20),
     ]);
-
-    const prompt = `Você é o assistente financeiro da Vectra Cargo, transportadora de Navegantes/SC.
-Analise os dados abaixo do TMS e responda SOMENTE com JSON válido neste formato:
-{
-  "risk": "baixo" | "medio" | "alto",
-  "summary": "resumo em 2 frases",
-  "insights": ["insight 1", "insight 2", "insight 3"],
-  "recommendation": "ação principal recomendada",
-  "alerts": ["alerta urgente se houver"] 
-}
-
-Dados do período:
-- Cotações recentes (${quotes?.length ?? 0}): ${JSON.stringify(quotes?.slice(0, 10))}
-- Ordens de serviço (${orders?.length ?? 0}): ${JSON.stringify(orders?.slice(0, 10))}
-- Lançamentos financeiros (${financial?.length ?? 0}): ${JSON.stringify(financial?.slice(0, 15))}
-
-Foque em: tendências de receita, cotações não convertidas, anomalias, e oportunidades.`;
-
+    const totalQ = quotes?.length ?? 0,
+      ganhas = quotes?.filter((q: any) => q.stage === 'ganho').length ?? 0,
+      perdidas = quotes?.filter((q: any) => q.stage === 'perdido').length ?? 0;
+    const receitaOS = orders?.reduce((s: number, o: any) => s + Number(o.value ?? 0), 0) ?? 0;
+    const txConv = totalQ > 0 ? ((ganhas / totalQ) * 100).toFixed(1) : '0';
+    const fallback = {
+      risk: 'medio',
+      summary: `Taxa de conversao ${txConv}%. Receita OS: R$ ${receitaOS.toFixed(2)}.`,
+      insights: [
+        `Taxa de conversao: ${txConv}%`,
+        `${ganhas} cotacoes ganhas de ${totalQ}`,
+        `Receita OS: R$ ${receitaOS.toFixed(2)}`,
+      ],
+      recommendation: 'Revisar cotacoes em aberto.',
+      alerts: [],
+    };
+    const prompt = `Analise os dados da Vectra Cargo e retorne SOMENTE JSON sem markdown:\n{"risk":"baixo","summary":"2 frases.","insights":["a","b","c"],"recommendation":"acao","alerts":[]}\n\nDados: cotacoes=${totalQ} ganhas=${ganhas} perdidas=${perdidas} taxa=${txConv}% receita_os=R$${receitaOS.toFixed(2)}\nCotacoes:${JSON.stringify(quotes?.slice(0, 5))}\nOS:${JSON.stringify(orders?.slice(0, 5))}\nFinanceiro:${JSON.stringify(financial?.slice(0, 5))}`;
     const { text, usage } = await callGemini(prompt, model);
-
-    // Parse seguro do JSON retornado pelo Gemini
-    let analysis: Record<string, unknown>;
+    console.log('[ai-dashboard] raw:', text.substring(0, 150));
+    let analysis = fallback;
     try {
-      analysis = JSON.parse(text.replace(/```json|```/g, '').trim());
-    } catch {
-      analysis = {
-        risk: 'medio',
-        summary: text.substring(0, 200),
-        insights: [],
-        recommendation: '',
-      };
-    }
-
-    // Persistir insight no cache
-    await sb.from('ai_insights').insert({
-      insight_type: 'dashboard_insights',
-      entity_type: null,
-      entity_id: null,
-      analysis,
-      summary_text: String(analysis.summary ?? ''),
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30min cache
-    });
-
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) {
+        const p = JSON.parse(m[0]);
+        if (p.summary) analysis = p;
+      }
+    } catch {}
+    await sb
+      .from('ai_insights')
+      .insert({
+        insight_type: 'dashboard_insights',
+        entity_type: null,
+        entity_id: null,
+        analysis,
+        summary_text: String(analysis.summary ?? ''),
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      });
     return new Response(
       JSON.stringify({
         analysis,
@@ -88,13 +104,13 @@ Foque em: tendências de receita, cotações não convertidas, anomalias, e opor
         usage,
         durationMs: Date.now() - start,
       }),
-      { headers: { ...corsHeaders, 'content-type': 'application/json' } }
+      { headers: { ...cors, 'content-type': 'application/json' } }
     );
-  } catch (e) {
-    console.error('[ai-dashboard-insights-worker]', e);
-    return new Response(JSON.stringify({ error: String(e) }), {
+  } catch (e: any) {
+    console.error('[ai-dashboard-insights-worker]', e.message);
+    return new Response(JSON.stringify({ error: e.message }), {
       status: 500,
-      headers: { ...corsHeaders, 'content-type': 'application/json' },
+      headers: { ...cors, 'content-type': 'application/json' },
     });
   }
 });

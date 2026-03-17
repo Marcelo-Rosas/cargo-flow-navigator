@@ -42,7 +42,7 @@ export function getCorsHeaders(req: Request): Record<string, string> {
     !!requestOrigin && origins.some((pattern) => matchesOrigin(requestOrigin, pattern));
 
   const headers: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   };
 

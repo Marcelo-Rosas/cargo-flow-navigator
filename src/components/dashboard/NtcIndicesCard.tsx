@@ -48,9 +48,14 @@ export function NtcIndicesCard() {
   const { data, isLoading, isError } = useNtcIndices();
   const { data: latestMarket } = useLatestMarketIndex();
 
-  const periodoLabel = data?.inctl_periodo
-    ? new Date(data.inctl_periodo).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-    : '—';
+  const periodoLabel =
+    latestMarket?.periodo_referencia ??
+    (data?.inctl_periodo
+      ? new Date(data.inctl_periodo + 'T12:00:00').toLocaleDateString('pt-BR', {
+          month: 'long',
+          year: 'numeric',
+        })
+      : '—');
 
   if (isLoading)
     return (
