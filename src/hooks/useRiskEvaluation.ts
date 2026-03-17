@@ -406,6 +406,32 @@ export function useEvaluateRisk() {
       return data;
     },
     onSuccess: (data) => {
+      const now = new Date().toISOString();
+      // Optimistic: put evaluation in cache immediately so useRiskEvidence becomes enabled
+      qc.setQueryData<RiskEvaluation | null>(
+        ['risk-evaluation', 'order', data.evaluation.entity_id],
+        {
+          id: data.evaluation.id,
+          entity_type: data.evaluation.entity_type,
+          entity_id: data.evaluation.entity_id,
+          policy_id: null,
+          criticality: data.evaluation.criticality,
+          status: 'pending',
+          cargo_value_evaluated: data.evaluation.cargo_value_evaluated,
+          requirements: data.evaluation.requirements,
+          requirements_met: data.evaluation.requirements_met ?? {},
+          route_municipalities: data.evaluation.route_municipalities ?? [],
+          policy_rules_applied: data.evaluation.policy_rules_applied ?? [],
+          evaluation_notes: null,
+          evaluated_by: null,
+          evaluated_at: null,
+          approval_request_id: null,
+          expires_at: null,
+          created_at: now,
+          updated_at: now,
+        }
+      );
+      // Background refetch for full server data
       qc.invalidateQueries({ queryKey: ['risk-evaluation', 'order', data.evaluation.entity_id] });
       qc.invalidateQueries({ queryKey: ['order-risk-status'] });
       if (data.trip_evaluation) {

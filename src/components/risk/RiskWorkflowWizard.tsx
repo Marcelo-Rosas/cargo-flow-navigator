@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Shield,
   CheckCircle2,
@@ -23,10 +24,11 @@ import {
   useRiskServicesCatalog,
   useUpdateRiskEvaluation,
   useEvaluateRisk,
-  useBuonnyCheck,
+  useAddRiskEvidence,
   evaluateCriticality,
 } from '@/hooks/useRiskEvaluation';
 import { CRITICALITY_CONFIG, REQUIREMENT_LABELS, type RiskCriticality } from '@/types/risk';
+import { BuonnyRegistrationModal, type BuonnyRegistrationData } from './BuonnyRegistrationModal';
 
 interface RiskWorkflowWizardProps {
   orderId: string;
@@ -36,6 +38,7 @@ interface RiskWorkflowWizardProps {
   driverName?: string | null;
   driverCpf?: string | null;
   vehiclePlate?: string | null;
+  vehicleTypeCode?: string | null;
   tripId?: string | null;
 }
 
@@ -56,8 +59,10 @@ export function RiskWorkflowWizard({
   driverName,
   driverCpf,
   vehiclePlate,
+  vehicleTypeCode,
   tripId,
 }: RiskWorkflowWizardProps) {
+  const qc = useQueryClient();
   const [currentStep, setCurrentStep] = useState<StepKey>('buonny');
   const [notes, setNotes] = useState('');
 
@@ -69,8 +74,9 @@ export function RiskWorkflowWizard({
   const { data: servicesCatalog } = useRiskServicesCatalog();
 
   const evaluateRisk = useEvaluateRisk();
-  const buonnyCheck = useBuonnyCheck();
+  const addEvidence = useAddRiskEvidence();
   const updateEvaluation = useUpdateRiskEvaluation();
+  const [buonnyModalOpen, setBuonnyModalOpen] = useState(false);
 
   const isEditable = orderStage === 'documentacao';
   const isTerminal = evaluation?.status === 'approved' || evaluation?.status === 'rejected';
@@ -116,21 +122,46 @@ export function RiskWorkflowWizard({
   const step3Complete = step2Complete && allMet;
 
   // Handlers
-  const handleCreateEvaluation = async () => {
-    await evaluateRisk.mutateAsync({
-      order_id: orderId,
-      trip_id: tripId ?? undefined,
-    });
-  };
+  const handleBuonnyRegistration = async (data: BuonnyRegistrationData) => {
+    let evalId = evaluation?.id;
 
-  const handleBuonnyCheck = async () => {
-    if (!driverCpf) return;
-    await buonnyCheck.mutateAsync({
-      driver_cpf: driverCpf,
-      driver_name: driverName ?? undefined,
-      vehicle_plate: vehiclePlate ?? undefined,
-      evaluation_id: evaluation?.id,
+    // Auto-create evaluation if it doesn't exist yet
+    if (!evalId) {
+      const result = await evaluateRisk.mutateAsync({
+        order_id: orderId,
+        trip_id: tripId ?? undefined,
+      });
+      evalId = result.evaluation.id;
+    }
+
+    // Calculate expiry based on validade type
+    const expiresAt =
+      data.validade === 'data' && data.data_validade
+        ? new Date(data.data_validade + 'T23:59:59').toISOString()
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // um embarque = 7 days default
+
+    await addEvidence.mutateAsync({
+      evaluation_id: evalId,
+      evidence_type: 'buonny_check',
+      status: data.evidenceStatus,
+      expires_at: expiresAt,
+      notes: `Código: ${data.codigo_liberacao} | Conjunto: ${data.numero_conjunto} | Validade: ${data.validade === 'um_embarque' ? 'Um embarque' : data.data_validade}`,
+      payload: {
+        codigo_liberacao: data.codigo_liberacao,
+        numero_conjunto: data.numero_conjunto,
+        status_buonny: data.status_buonny,
+        validade: data.validade,
+        driver_cpf: data.driver_cpf,
+        driver_name: data.driver_name,
+        vehicle_plate: data.vehicle_plate,
+        vehicle_type: data.vehicle_type,
+        proprietario: data.proprietario,
+        registro_manual: true,
+      },
     });
+
+    // Await evidence refetch so buonnyValid updates immediately
+    await qc.refetchQueries({ queryKey: ['risk-evidence', evalId] });
   };
 
   const handleToggleRequirement = async (req: string, met: boolean) => {
@@ -232,18 +263,30 @@ export function RiskWorkflowWizard({
       <Card>
         <CardContent className="pt-6">
           {currentStep === 'buonny' && (
-            <StepBuonny
-              driverName={driverName}
-              driverCpf={driverCpf}
-              vehiclePlate={vehiclePlate}
-              buonnyEvidence={buonnyEvidence}
-              buonnyValid={buonnyValid}
-              isEditable={isEditable}
-              onSimulate={handleBuonnyCheck}
-              isLoading={buonnyCheck.isPending}
-              canAdvance={step1Complete}
-              onNext={() => setCurrentStep('rules')}
-            />
+            <>
+              <StepBuonny
+                driverName={driverName}
+                driverCpf={driverCpf}
+                vehiclePlate={vehiclePlate}
+                vehicleTypeCode={vehicleTypeCode}
+                buonnyEvidence={buonnyEvidence}
+                buonnyValid={buonnyValid}
+                isEditable={isEditable}
+                onOpenRegistration={() => setBuonnyModalOpen(true)}
+                canAdvance={step1Complete}
+                onNext={() => setCurrentStep('rules')}
+              />
+              <BuonnyRegistrationModal
+                open={buonnyModalOpen}
+                onOpenChange={setBuonnyModalOpen}
+                driverName={driverName}
+                driverCpf={driverCpf}
+                vehiclePlate={vehiclePlate}
+                vehicleTypeCode={vehicleTypeCode}
+                onSubmit={handleBuonnyRegistration}
+                isLoading={addEvidence.isPending || evaluateRisk.isPending}
+              />
+            </>
           )}
           {currentStep === 'rules' && (
             <StepRules
@@ -252,8 +295,6 @@ export function RiskWorkflowWizard({
               kmDistance={kmDistance}
               evaluation={evaluation}
               isEditable={isEditable}
-              onCreateEvaluation={handleCreateEvaluation}
-              isLoading={evaluateRisk.isPending}
               canAdvance={step2Complete}
               onNext={() => setCurrentStep('evidence')}
               onBack={() => setCurrentStep('buonny')}
@@ -313,26 +354,30 @@ function StepBuonny({
   driverName,
   driverCpf,
   vehiclePlate,
+  vehicleTypeCode,
   buonnyEvidence,
   buonnyValid,
   isEditable,
-  onSimulate,
-  isLoading,
+  onOpenRegistration,
   canAdvance,
   onNext,
 }: {
   driverName?: string | null;
   driverCpf?: string | null;
   vehiclePlate?: string | null;
+  vehicleTypeCode?: string | null;
   buonnyEvidence: ReturnType<typeof Array.prototype.find>;
   buonnyValid: boolean;
   isEditable: boolean;
-  onSimulate: () => void;
-  isLoading: boolean;
+  onOpenRegistration: () => void;
   canAdvance: boolean;
   onNext: () => void;
 }) {
   const payload = (buonnyEvidence as { payload?: Record<string, unknown> })?.payload;
+  const statusLabel = payload?.status_buonny
+    ? String(payload.status_buonny).replace(/_/g, ' ')
+    : null;
+
   return (
     <div className="space-y-4" data-testid="risk-step-buonny">
       <h3 className="font-semibold">Passo 1: Verificação Buonny</h3>
@@ -346,9 +391,15 @@ function StepBuonny({
           <span className="font-medium">{driverCpf ?? '—'}</span>
         </div>
         <div>
-          <span className="text-muted-foreground">Veículo:</span>{' '}
-          <span className="font-medium">{vehiclePlate ?? '—'}</span>
+          <span className="text-muted-foreground">Placa:</span>{' '}
+          <span className="font-medium">{vehiclePlate ?? 'Não atribuído'}</span>
         </div>
+        {vehicleTypeCode && (
+          <div>
+            <span className="text-muted-foreground">Tipo:</span>{' '}
+            <span className="font-medium">{vehicleTypeCode}</span>
+          </div>
+        )}
       </div>
 
       {buonnyEvidence ? (
@@ -366,19 +417,28 @@ function StepBuonny({
             ) : (
               <XCircle className="h-4 w-4 text-red-600" />
             )}
-            Buonny: {buonnyValid ? 'Válido' : 'Expirado'}
+            Buonny: {buonnyValid ? 'Adequado ao risco' : 'Expirado / Reprovado'}
           </div>
           {payload && (
             <>
-              <div className="text-muted-foreground">
-                Consulta ID: {String(payload.consulta_id ?? '—')}
-              </div>
-              <div className="text-muted-foreground">
-                Cadastro: {payload.cadastro ? 'Sim' : 'Não'}
-              </div>
-              <div className="text-muted-foreground">
-                Monitoramento: {payload.monitoramento ? 'Ativo' : 'Não ativo'}
-              </div>
+              {payload.codigo_liberacao && (
+                <div className="text-muted-foreground">
+                  Código de Liberação: {String(payload.codigo_liberacao)}
+                </div>
+              )}
+              {payload.numero_conjunto && (
+                <div className="text-muted-foreground">
+                  Nº Conjunto: {String(payload.numero_conjunto)}
+                </div>
+              )}
+              {statusLabel && (
+                <div className="text-muted-foreground capitalize">Status: {statusLabel}</div>
+              )}
+              {payload.proprietario && (
+                <div className="text-muted-foreground">
+                  Proprietário: {String(payload.proprietario)}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -389,25 +449,9 @@ function StepBuonny({
       )}
 
       <div className="flex justify-between">
-        {isEditable && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onSimulate}
-            disabled={isLoading || buonnyValid || !driverCpf}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                Consultando...
-              </>
-            ) : buonnyValid ? (
-              'Consulta válida'
-            ) : !driverCpf ? (
-              'CPF não informado'
-            ) : (
-              'Consultar Buonny'
-            )}
+        {isEditable && !buonnyValid && (
+          <Button variant="outline" size="sm" onClick={onOpenRegistration}>
+            Registrar Consulta Buonny
           </Button>
         )}
         <Button size="sm" onClick={onNext} disabled={!canAdvance} className="ml-auto">
@@ -416,7 +460,9 @@ function StepBuonny({
       </div>
 
       {!canAdvance && isEditable && (
-        <p className="text-xs text-muted-foreground">Execute a consulta Buonny para avançar.</p>
+        <p className="text-xs text-muted-foreground">
+          Registre o retorno da consulta Buonny para avançar.
+        </p>
       )}
     </div>
   );
@@ -429,8 +475,6 @@ function StepRules({
   kmDistance,
   evaluation,
   isEditable,
-  onCreateEvaluation,
-  isLoading,
   canAdvance,
   onNext,
   onBack,
@@ -440,8 +484,6 @@ function StepRules({
   kmDistance: number;
   evaluation: unknown;
   isEditable: boolean;
-  onCreateEvaluation: () => void;
-  isLoading: boolean;
   canAdvance: boolean;
   onNext: () => void;
   onBack: () => void;
@@ -492,21 +534,10 @@ function StepRules({
         </div>
       )}
 
-      {!evaluation && isEditable && critResult && (
-        <Button size="sm" onClick={onCreateEvaluation} disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              Criando...
-            </>
-          ) : (
-            'Criar Avaliação de Risco'
-          )}
-        </Button>
-      )}
-
       {!evaluation && isEditable && (
-        <p className="text-xs text-muted-foreground">Crie a avaliação de risco para avançar.</p>
+        <p className="text-xs text-muted-foreground">
+          A avaliação será criada automaticamente ao executar a consulta Buonny.
+        </p>
       )}
 
       <div className="flex justify-between">
