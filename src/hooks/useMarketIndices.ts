@@ -5,28 +5,33 @@ export interface MarketIndex {
   id: string;
   periodo_referencia: string;
   gerado_em: string;
+  fonte_url: string;
   inctf_mensal: number | null;
-  inctf_acumulado: number | null;
+  inctf_12meses: number | null;
+  inctf_ano: number | null;
   inctl_mensal: number | null;
-  inctl_acumulado: number | null;
-  inctl_por_faixa: Record<string, number> | null;
-  diesel_s10: number | null;
-  diesel_s500: number | null;
-  diesel_variacao_mensal: number | null;
-  diesel_variacao_anual: number | null;
-  reajuste_sugerido: number | null;
-  alerta_reajuste: 'estavel' | 'atencao' | 'urgente' | null;
-  justificativa_reajuste: string | null;
-  fonte: string | null;
-  agente_versao: string | null;
-  relatorio_url: string | null;
+  inctl_12meses: number | null;
+  inctl_ano: number | null;
+  diesel_s10_preco: number | null;
+  diesel_s10_mensal: number | null;
+  diesel_s10_12meses: number | null;
+  diesel_comum_preco: number | null;
+  diesel_comum_mensal: number | null;
+  diesel_comum_12meses: number | null;
+  desp_adm_mensal: number | null;
+  desp_adm_12meses: number | null;
+  lotacao_cavalo_12m: number | null;
+  lotacao_semirreboque_12m: number | null;
+  lotacao_pneu_12m: number | null;
+  lotacao_salario_12m: number | null;
+  reajuste_sugerido_pct: number | null;
+  alerta_nivel: 'estavel' | 'atencao' | 'urgente';
+  resumo_whatsapp: string | null;
   created_at: string;
-  updated_at: string;
 }
 
-const STALE_TIME = 5 * 60 * 1000;
+const STALE = 5 * 60 * 1000;
 
-/** Últimos N snapshots do market_indices (ordem decrescente por gerado_em) */
 export function useMarketIndices(limit = 12) {
   return useQuery({
     queryKey: ['market-indices', limit],
@@ -40,13 +45,12 @@ export function useMarketIndices(limit = 12) {
         if (error.code === '42P01') return [];
         throw error;
       }
-      return (data ?? []) as MarketIndex[];
+      return (data as unknown as MarketIndex[]) ?? [];
     },
-    staleTime: STALE_TIME,
+    staleTime: STALE,
   });
 }
 
-/** Snapshot mais recente do market_indices */
 export function useLatestMarketIndex() {
   return useQuery({
     queryKey: ['market-index-latest'],
@@ -61,8 +65,38 @@ export function useLatestMarketIndex() {
         if (error.code === '42P01') return null;
         throw error;
       }
-      return (data as MarketIndex) ?? null;
+      return (data as unknown as MarketIndex) ?? null;
     },
-    staleTime: STALE_TIME,
+    staleTime: STALE,
   });
+}
+
+export function useMarketAlert() {
+  const { data, isLoading } = useLatestMarketIndex();
+  if (!data)
+    return {
+      isLoading,
+      alerta: null,
+      reajuste: null,
+      periodo: null,
+      diesel: null,
+      inctf12m: null,
+      inctl12m: null,
+      salario12m: null,
+      pneu12m: null,
+      resumo: null,
+    };
+  return {
+    isLoading,
+    periodo: data.periodo_referencia,
+    alerta: data.alerta_nivel,
+    reajuste: data.reajuste_sugerido_pct,
+    diesel: data.diesel_s10_preco,
+    inctf12m: data.inctf_12meses != null ? +(data.inctf_12meses * 100).toFixed(2) : null,
+    inctl12m: data.inctl_12meses != null ? +(data.inctl_12meses * 100).toFixed(2) : null,
+    salario12m:
+      data.lotacao_salario_12m != null ? +(data.lotacao_salario_12m * 100).toFixed(2) : null,
+    pneu12m: data.lotacao_pneu_12m != null ? +(data.lotacao_pneu_12m * 100).toFixed(2) : null,
+    resumo: data.resumo_whatsapp,
+  };
 }

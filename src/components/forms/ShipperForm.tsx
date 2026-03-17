@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -113,8 +113,8 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
     form.setValue(key, str, { shouldValidate: true, shouldDirty: true });
   };
 
-  const handleCnpjLookup = async () => {
-    const raw = form.getValues('cnpj') || '';
+  const handleCnpjLookup = async (rawValue?: string) => {
+    const raw = rawValue ?? form.getValues('cnpj') ?? '';
     const cnpj = sanitizeCnpj(raw);
     if (cnpj.length !== 14) return;
 
@@ -170,8 +170,8 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
           id: shipper.id,
           updates: {
             name: data.name,
-            cpf: data.cpf || null,
-            cnpj: data.cnpj || null,
+            cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null,
+            cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
             email: data.email || null,
             phone: data.phone || null,
             address: data.address || null,
@@ -185,8 +185,8 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
       } else {
         await createShipperMutation.mutateAsync({
           name: data.name,
-          cpf: data.cpf || null,
-          cnpj: data.cnpj || null,
+          cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null,
+          cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
           email: data.email || null,
           phone: data.phone || null,
           address: data.address || null,

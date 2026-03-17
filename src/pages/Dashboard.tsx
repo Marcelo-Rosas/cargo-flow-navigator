@@ -18,6 +18,8 @@ import { OverviewTab } from '@/components/dashboard/tabs/OverviewTab';
 import { CommercialTab } from '@/components/dashboard/tabs/CommercialTab';
 import { OperationsTab } from '@/components/dashboard/tabs/OperationsTab';
 import { NtcInsightsTab } from '@/components/dashboard/tabs/NtcInsightsTab';
+import { MarketInsightsCard } from '@/components/dashboard/MarketInsightsCard';
+import { NtcIndicesCard } from '@/components/dashboard/NtcIndicesCard';
 import { NewsTab } from '@/components/dashboard/tabs/NewsTab';
 import {
   useDashboardStats,
@@ -97,6 +99,8 @@ export default function Dashboard() {
     queryClient.invalidateQueries({ queryKey: ['ntc-inctl-series'] });
     queryClient.invalidateQueries({ queryKey: ['ntc-inctf-series'] });
     queryClient.invalidateQueries({ queryKey: ['ntc-fuel-reference'] });
+    queryClient.invalidateQueries({ queryKey: ['market-index-latest'] });
+    queryClient.invalidateQueries({ queryKey: ['market-indices'] });
     queryClient.invalidateQueries({ queryKey: ['ai-usage-stats'] });
     queryClient.invalidateQueries({ queryKey: ['news-items'] });
   };
@@ -309,6 +313,8 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="ntc-insights" className="space-y-6">
+          <NtcIndicesCard />
+          <MarketInsightsCard />
           <NtcInsightsTab />
         </TabsContent>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -121,8 +121,8 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
     form.setValue(key, str, { shouldValidate: true, shouldDirty: true });
   };
 
-  const handleCnpjLookup = async () => {
-    const raw = form.getValues('cpf_cnpj') || '';
+  const handleCnpjLookup = async (rawValue?: string) => {
+    const raw = rawValue ?? form.getValues('cpf_cnpj') ?? '';
     const cnpj = sanitizeCnpj(raw);
     if (cnpj.length !== 14) return;
 
@@ -168,7 +168,7 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
           id: owner.id,
           updates: {
             name: data.name,
-            cpf_cnpj: data.cpf_cnpj || null,
+            cpf_cnpj: data.cpf_cnpj ? data.cpf_cnpj.replace(/\D/g, '') : null,
             rg: data.rg || null,
             rg_emitter: data.rg_emitter || null,
             phone: data.phone || null,
@@ -185,7 +185,7 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
       } else {
         await createOwnerMutation.mutateAsync({
           name: data.name,
-          cpf_cnpj: data.cpf_cnpj || null,
+          cpf_cnpj: data.cpf_cnpj ? data.cpf_cnpj.replace(/\D/g, '') : null,
           rg: data.rg || null,
           rg_emitter: data.rg_emitter || null,
           phone: data.phone || null,

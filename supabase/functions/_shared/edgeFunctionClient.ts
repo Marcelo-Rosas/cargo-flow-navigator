@@ -1,25 +1,31 @@
-/**
- * Shared client for invoking other Edge Functions from within Edge Functions.
- * Uses service role key for server-to-server calls.
- */
+// supabase/functions/ai-orchestrator-agent/index.ts
+
+const Deno = (globalThis as any).Deno;
+
 export async function callEdgeFunction(
-  fnName: string,
-  body: Record<string, unknown>
-): Promise<unknown> {
-  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${fnName}`;
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
-  const res = await fetch(url, {
+  functionName: string,
+  body: Record<string, unknown> | undefined
+): Promise<any> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  }
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-      ...(anonKey ? { apikey: anonKey } : {}),
+      Authorization: `Bearer ${serviceRoleKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
   });
+
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Edge function ${fnName} failed (${res.status}): ${text}`);
+    const errText = await res.text();
+    throw new Error(`Worker ${functionName} failed (${res.status}): ${errText}`);
   }
+
   return res.json();
 }

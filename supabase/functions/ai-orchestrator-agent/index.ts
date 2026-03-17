@@ -1,21 +1,10 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+// supabase/functions/ai-orchestrator-agent/index.ts
+// Alteração: removido selectModel local → usa selectGeminiModel do _shared/gemini.ts
+
+import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { callEdgeFunction } from '../_shared/edgeFunctionClient.ts';
-
-// ─────────────────────────────────────────────────────
-// Model Routing
-// ─────────────────────────────────────────────────────
-function selectModel(analysisType: string): string {
-  switch (analysisType) {
-    case 'approval_summary':
-    case 'dashboard_insights':
-      return 'gpt-4.1';
-    case 'quote_profitability':
-    case 'financial_anomaly':
-    default:
-      return 'gpt-4.1-mini';
-  }
-}
+import { selectGeminiModel } from '../_shared/gemini.ts'; // ← NOVO
 
 // ─────────────────────────────────────────────────────
 // Budget Check
@@ -66,12 +55,11 @@ async function shouldSkipAi(sb: any, analysisType: string, entityId: string) {
         .select('value')
         .eq('id', entityId)
         .maybeSingle();
-      if (quote && Number(quote.value) < minValue) {
+      if (quote && Number(quote.value) < minValue)
         return {
           skip: true,
           reason: `Quote value R$ ${quote.value} below threshold R$ ${minValue}`,
         };
-      }
     }
     if (analysisType === 'financial_anomaly') {
       const minValue = configMap['min_financial_value_brl'] || 10000;
@@ -80,12 +68,11 @@ async function shouldSkipAi(sb: any, analysisType: string, entityId: string) {
         .select('total_amount')
         .eq('id', entityId)
         .maybeSingle();
-      if (doc && Number(doc.total_amount) < minValue) {
+      if (doc && Number(doc.total_amount) < minValue)
         return {
           skip: true,
           reason: `Document value R$ ${doc.total_amount} below threshold R$ ${minValue}`,
         };
-      }
     }
   } catch (e) {
     console.warn('Smart triggering check failed:', e);
@@ -175,14 +162,10 @@ async function logUsage(sb: any, params: Record<string, any>) {
   }
 }
 
-// callWorker delegates to shared callEdgeFunction (workers are edge functions)
 function callWorker(workerName: string, body: Record<string, unknown>) {
   return callEdgeFunction(workerName, body);
 }
 
-// ─────────────────────────────────────────────────────
-// JSON Response Helper
-// ─────────────────────────────────────────────────────
 function jsonResponse(
   body: Record<string, unknown>,
   status: number,
@@ -207,9 +190,8 @@ Deno.serve(async (req) => {
   );
 
   try {
-    if (req.method !== 'POST') {
+    if (req.method !== 'POST')
       return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
-    }
 
     let body: any;
     try {
@@ -218,16 +200,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Invalid JSON body' }, 400, corsHeaders);
     }
 
-    if (!body?.analysisType) {
+    if (!body?.analysisType)
       return jsonResponse({ error: 'Missing analysisType' }, 400, corsHeaders);
-    }
 
     // 1. Budget check
     const budget = await checkBudget(sb);
     if (!budget.allowed) {
       await logUsage(sb, {
         analysisType: body.analysisType,
-        model: selectModel(body.analysisType),
+        model: selectGeminiModel(body.analysisType), // ← era selectModel()
         costUsd: 0,
         status: 'budget_exceeded',
         entityType: body.entityType,
@@ -308,14 +289,14 @@ Deno.serve(async (req) => {
     }
 
     // 4. Select model + fetch previous insights (parallel)
-    const model = selectModel(body.analysisType);
+    const model = selectGeminiModel(body.analysisType); // ← era selectModel()
     const previousInsights = await fetchPreviousInsights(
       sb,
       body.entityType || null,
       body.entityId || null
     );
 
-    // 5. Route to independent worker Edge Function
+    // 5. Route to worker
     let workerResult: any;
     switch (body.analysisType) {
       case 'quote_profitability':
@@ -351,10 +332,11 @@ Deno.serve(async (req) => {
         );
     }
 
-    // 6. Log success
+    // 6. Log success — agora com usage tokens do worker
     await logUsage(sb, {
       analysisType: body.analysisType,
       model,
+      usage: workerResult.usage, // ← tokens reais do Gemini
       costUsd: 0,
       status: 'success',
       entityType: body.entityType,
@@ -366,7 +348,7 @@ Deno.serve(async (req) => {
       {
         success: true,
         analysis: workerResult.analysis,
-        provider: workerResult.provider,
+        provider: 'gemini', // ← era workerResult.provider
         budget: budget.alert
           ? { alert: true, daily_pct: budget.daily_pct, monthly_pct: budget.monthly_pct }
           : undefined,

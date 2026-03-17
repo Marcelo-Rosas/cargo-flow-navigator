@@ -12,6 +12,9 @@ import {
 } from '@/components/ui/dialog';
 import { Database } from '@/integrations/supabase/types';
 import { useSendQuoteEmail } from '@/hooks/useSendQuoteEmail';
+import { Badge } from '@/components/ui/badge';
+import { usePaymentTerms } from '@/hooks/usePricingRules';
+import type { PaymentTerm } from '@/types/pricing';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 
@@ -27,12 +30,11 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
   const [bcc, setBcc] = useState('');
   const [showCcBcc, setShowCcBcc] = useState(false);
   const sendMutation = useSendQuoteEmail();
+  const { data: paymentTerms } = usePaymentTerms(true);
 
   useEffect(() => {
     if (quote && open) {
-      setRecipientEmail(
-        (quote.client_email as string) || (quote.shipper_email as string) || ''
-      );
+      setRecipientEmail((quote.client_email as string) || (quote.shipper_email as string) || '');
       setCc('');
       setBcc('');
       setShowCcBcc(false);
@@ -56,6 +58,24 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
+  const currentPaymentTerm: PaymentTerm | undefined =
+    quote?.payment_term_id && paymentTerms
+      ? paymentTerms.find((term) => term.id === quote.payment_term_id)
+      : undefined;
+
+  const hasBalanceOnUnloading = currentPaymentTerm?.days === 1;
+
+  const paymentTermLabel =
+    currentPaymentTerm &&
+    (() => {
+      const adv = currentPaymentTerm.advance_percent ?? 0;
+      const days = currentPaymentTerm.days;
+
+      if (adv === 0 && days === 0) return 'À vista';
+      if (adv === 0) return `${days} dias`;
+      return `${adv}/${100 - adv} em ${days} dias`;
+    })();
+
   if (!quote) return null;
 
   return (
@@ -74,9 +94,7 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
         {/* Quote Summary */}
         <div className="bg-muted/50 rounded-lg p-4 space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-semibold text-foreground">
-              {quote.quote_code ?? '—'}
-            </span>
+            <span className="text-sm font-semibold text-foreground">{quote.quote_code ?? '—'}</span>
             <span className="text-lg font-bold text-foreground">
               {formatCurrency(Number(quote.value))}
             </span>
@@ -88,6 +106,30 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
             <span>→</span>
             <span>{quote.destination}</span>
           </div>
+          {paymentTermLabel && (
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <span className="text-muted-foreground">Prazo de pagamento:</span>
+              <span className="font-medium text-foreground">{paymentTermLabel}</span>
+              <div className="flex flex-wrap gap-1">
+                {currentPaymentTerm && (
+                  <Badge variant="outline" className="text-[10px]">
+                    {(() => {
+                      const adv = currentPaymentTerm.advance_percent ?? 0;
+                      const days = currentPaymentTerm.days;
+                      if (adv === 0 && days === 0) return 'À vista';
+                      if (adv === 0) return `${days}d`;
+                      return `${adv}% adiant. / ${100 - adv}% saldo`;
+                    })()}
+                  </Badge>
+                )}
+                {hasBalanceOnUnloading && (
+                  <Badge variant="secondary" className="text-[10px]">
+                    Saldo na descarga
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Recipient */}

@@ -45,12 +45,17 @@ export async function invokeEdgeFunction<T>(
   const requireAuth = options.requireAuth ?? true;
   const initialHeaders = await buildAuthHeaders(requireAuth);
 
+  // API Key para chamadas sem sessão (crons, integrações externas)
+  const cfnApiKey = import.meta.env.VITE_CFN_API_KEY;
+  if (cfnApiKey && typeof cfnApiKey === 'string') {
+    initialHeaders['x-api-key'] = cfnApiKey;
+  }
+
   const execute = (headers: Record<string, string>) =>
     supabase.functions.invoke(functionName, {
-      body: options.body,
-      // Keep call-specific headers, but never let them override auth headers.
+      body: options.body as Record<string, unknown> | undefined,
       headers: {
-        ...options.headers,
+        ...(options.headers ?? {}),
         ...headers,
       },
     });

@@ -1,3 +1,6 @@
 name = "cargo-flow-navigator"
 compatibility_date = "2025-01-01"
 pages_build_output_dir = "dist"
+
+[vars]
+VITE_CFN_API_KEY = "cfw_epg_2026_9h5c1d4e3f6a8b2c"

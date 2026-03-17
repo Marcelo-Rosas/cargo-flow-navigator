@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -118,8 +118,8 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
     form.setValue(key, str, { shouldValidate: true, shouldDirty: true });
   };
 
-  const handleCnpjLookup = async () => {
-    const raw = form.getValues('cnpj') || '';
+  const handleCnpjLookup = async (rawValue?: string) => {
+    const raw = rawValue ?? form.getValues('cnpj') ?? '';
     const cnpj = sanitizeCnpj(raw);
     if (cnpj.length !== 14) return;
 
@@ -178,7 +178,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
           updates: {
             name: data.name,
             cpf: cpfNum,
-            cnpj: data.cnpj || null,
+            cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
             email: data.email || null,
             phone: data.phone || null,
             address: data.address || null,
@@ -194,7 +194,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
         await createClientMutation.mutateAsync({
           name: data.name,
           cpf: cpfNum,
-          cnpj: data.cnpj || null,
+          cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
           email: data.email || null,
           phone: data.phone || null,
           address: data.address || null,
