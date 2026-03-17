@@ -117,7 +117,8 @@ function PendingArticlesPanel() {
         if (error.code === '42P01') return [];
         throw error;
       }
-      return (data as unknown as PendingArticle[]) ?? [];
+      const raw: unknown = data ?? [];
+      return raw as PendingArticle[];
     },
     staleTime: 2 * 60 * 1000,
   });
@@ -125,26 +126,25 @@ function PendingArticlesPanel() {
   const promote = useMutation({
     mutationFn: async (article: PendingArticle) => {
       // Insere em news_items
-      const { error: insertError } = await supabase.from('news_items').insert({
+      const { error: insertError } = await supabase.from('news_items' as 'documents').insert({
         title: article.titulo,
-        summary:
-          article.resumo_inferido ??
-          `Artigo detectado automaticamente pelo monitor NTC. Período: ${article.periodo_referencia ?? 'não identificado'}.`,
+        summary: article.resumo_inferido,
         source_name: 'Portal NTC & Logística',
         source_url: article.url,
         source_type: 'agent',
         relevance_score: 8.5,
-        ...(article.tipo_indice && { raw_snippet: article.tipo_indice }),
-      });
+        tags: [
+          ...(article.tipo_indice ? [article.tipo_indice.toLowerCase()] : []),
+          'ntc',
+          'automatico',
+        ],
+      } as never);
       if (insertError) throw insertError;
 
-      // Marca como inserido (ntc_articles_seen não está no schema gerado; tabela existe no DB)
+      // Marca como inserido
       await supabase
         .from('ntc_articles_seen' as 'documents')
-        .update({ precisa_insercao_manual: false, inserido_em: new Date().toISOString() } as Record<
-          string,
-          unknown
-        >)
+        .update({ precisa_insercao_manual: false, inserido_em: new Date().toISOString() } as never)
         .eq('id', article.id);
     },
     onSuccess: (_, article) => {
