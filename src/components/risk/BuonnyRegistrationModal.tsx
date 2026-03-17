@@ -51,7 +51,7 @@ interface BuonnyRegistrationModalProps {
   driverName?: string | null;
   driverCpf?: string | null;
   vehiclePlate?: string | null;
-  vehicleTypeCode?: string | null;
+  vehicleTypeName?: string | null;
   onSubmit: (data: BuonnyRegistrationData) => Promise<void>;
   isLoading: boolean;
 }
@@ -62,7 +62,7 @@ export function BuonnyRegistrationModal({
   driverName,
   driverCpf,
   vehiclePlate,
-  vehicleTypeCode,
+  vehicleTypeName,
   onSubmit,
   isLoading,
 }: BuonnyRegistrationModalProps) {
@@ -88,7 +88,7 @@ export function BuonnyRegistrationModal({
       driver_cpf: driverCpf ?? '',
       driver_name: driverName ?? '',
       vehicle_plate: vehiclePlate ?? '',
-      vehicle_type: vehicleTypeCode ?? '',
+      vehicle_type: vehicleTypeName ?? '',
       proprietario: proprietario.trim(),
     });
     // Reset form
@@ -128,7 +128,7 @@ export function BuonnyRegistrationModal({
             </div>
             <div>
               <span className="text-muted-foreground">Tipo:</span>{' '}
-              <span className="font-medium">{vehicleTypeCode ?? '—'}</span>
+              <span className="font-medium">{vehicleTypeName ?? '—'}</span>
             </div>
           </div>
 

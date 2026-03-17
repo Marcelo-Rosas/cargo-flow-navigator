@@ -38,7 +38,7 @@ interface RiskWorkflowWizardProps {
   driverName?: string | null;
   driverCpf?: string | null;
   vehiclePlate?: string | null;
-  vehicleTypeCode?: string | null;
+  vehicleTypeName?: string | null;
   tripId?: string | null;
 }
 
@@ -59,7 +59,7 @@ export function RiskWorkflowWizard({
   driverName,
   driverCpf,
   vehiclePlate,
-  vehicleTypeCode,
+  vehicleTypeName,
   tripId,
 }: RiskWorkflowWizardProps) {
   const qc = useQueryClient();
@@ -268,7 +268,7 @@ export function RiskWorkflowWizard({
                 driverName={driverName}
                 driverCpf={driverCpf}
                 vehiclePlate={vehiclePlate}
-                vehicleTypeCode={vehicleTypeCode}
+                vehicleTypeName={vehicleTypeName}
                 buonnyEvidence={buonnyEvidence}
                 buonnyValid={buonnyValid}
                 isEditable={isEditable}
@@ -282,7 +282,7 @@ export function RiskWorkflowWizard({
                 driverName={driverName}
                 driverCpf={driverCpf}
                 vehiclePlate={vehiclePlate}
-                vehicleTypeCode={vehicleTypeCode}
+                vehicleTypeName={vehicleTypeName}
                 onSubmit={handleBuonnyRegistration}
                 isLoading={addEvidence.isPending || evaluateRisk.isPending}
               />
@@ -354,7 +354,7 @@ function StepBuonny({
   driverName,
   driverCpf,
   vehiclePlate,
-  vehicleTypeCode,
+  vehicleTypeName,
   buonnyEvidence,
   buonnyValid,
   isEditable,
@@ -365,7 +365,7 @@ function StepBuonny({
   driverName?: string | null;
   driverCpf?: string | null;
   vehiclePlate?: string | null;
-  vehicleTypeCode?: string | null;
+  vehicleTypeName?: string | null;
   buonnyEvidence: ReturnType<typeof Array.prototype.find>;
   buonnyValid: boolean;
   isEditable: boolean;
@@ -394,10 +394,10 @@ function StepBuonny({
           <span className="text-muted-foreground">Placa:</span>{' '}
           <span className="font-medium">{vehiclePlate ?? 'Não atribuído'}</span>
         </div>
-        {vehicleTypeCode && (
+        {vehicleTypeName && (
           <div>
             <span className="text-muted-foreground">Tipo:</span>{' '}
-            <span className="font-medium">{vehicleTypeCode}</span>
+            <span className="font-medium">{vehicleTypeName}</span>
           </div>
         )}
       </div>

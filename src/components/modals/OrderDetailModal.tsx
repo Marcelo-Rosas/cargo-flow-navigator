@@ -1462,7 +1462,7 @@ export function OrderDetailModal({
                   driverName={order.driver_name ?? undefined}
                   driverCpf={order.driver?.cpf ?? undefined}
                   vehiclePlate={order.vehicle_plate ?? undefined}
-                  vehicleTypeCode={order.vehicle_type?.code ?? undefined}
+                  vehicleTypeName={order.vehicle_type?.name ?? undefined}
                   tripId={order.trip_id}
                 />
               </TabsContent>
