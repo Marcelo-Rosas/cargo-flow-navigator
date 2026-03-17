@@ -19,6 +19,7 @@ import type { QuoteFormData } from './types';
 import { IdentificationStep } from './steps/IdentificationStep';
 import { CargoLogisticsStep } from './steps/CargoLogisticsStep';
 import { PricingStep } from './steps/PricingStep';
+import { InsuranceStep } from './steps/InsuranceStep';
 import { ReviewStep } from './steps/ReviewStep';
 import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import type { AdditionalFeesSelection } from '@/components/quotes/AdditionalFeesSection';
@@ -30,6 +31,7 @@ const STEPS = [
   { id: 'identification', label: 'Identificação' },
   { id: 'cargo', label: 'Carga e Logística' },
   { id: 'pricing', label: 'Composição Financeira' },
+  { id: 'insurance', label: 'Seguro' },
   { id: 'review', label: 'Revisão' },
 ] as const;
 
@@ -45,6 +47,7 @@ const STEP_FIELDS: (keyof QuoteFormData)[][] = [
     'km_distance',
   ],
   ['toll', 'cargo_value', 'notes'],
+  ['insurance_coverage_type'], // Insurance step fields
   [],
 ];
 
@@ -52,6 +55,7 @@ const STEP_FIELDS_LEGACY: (keyof QuoteFormData)[][] = [
   ['client_name', 'origin', 'destination'],
   ['cargo_type', 'weight', 'volume', 'km_distance', 'payment_term_id'],
   ['value', 'carreteiro_real', 'carrier_payment_term_id', 'advance_due_date', 'balance_due_date'],
+  ['insurance_coverage_type'], // Insurance step fields
   [],
 ];
 
@@ -208,7 +212,7 @@ export function QuoteFormWizard({
     blockedReason = 'Escolha a faixa correta de km para habilitar o envio.';
   }
 
-  const shortLabels = ['Identificação', 'Carga', 'Financeiro', 'Revisão'];
+  const shortLabels = ['Identificação', 'Carga', 'Financeiro', 'Seguro', 'Revisão'];
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -305,7 +309,8 @@ export function QuoteFormWizard({
             onUnloadingCostChange={onUnloadingCostChange}
           />
         )}
-        {step === 3 && (
+        {step === 3 && <InsuranceStep form={form} />}
+        {step === 4 && (
           <ReviewStep
             form={form}
             calculationResult={calculationResult}

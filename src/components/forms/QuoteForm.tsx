@@ -348,6 +348,18 @@ const quoteSchema = z
       )
       .optional()
       .default([]),
+    // Insurance fields (Buonny integration)
+    insurance_eligible: z.boolean().optional().default(false),
+    insurance_coverage_type: z.enum(['BASIC', 'STANDARD', 'PLUS']).optional(),
+    insurance_estimated_premium: z.number().min(0).optional().default(0),
+    insurance_status: z
+      .enum(['pending', 'active', 'concluded', 'inactive'])
+      .optional()
+      .default('pending'),
+    insurance_policy_number: z.string().optional(),
+    insurance_checked_at: z.string().optional(),
+    insurance_activated_at: z.string().optional(),
+    insurance_check_reason: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     // Validação cross-field: se ambas as datas estiverem preenchidas,
@@ -475,6 +487,15 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       additional_recipients: [],
       additional_shippers: [],
       route_stops: [],
+      // Insurance fields
+      insurance_eligible: false,
+      insurance_coverage_type: undefined,
+      insurance_estimated_premium: 0,
+      insurance_status: 'pending',
+      insurance_policy_number: '',
+      insurance_checked_at: '',
+      insurance_activated_at: '',
+      insurance_check_reason: '',
     },
   });
 
