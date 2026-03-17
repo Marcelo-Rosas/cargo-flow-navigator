@@ -82,3 +82,6 @@ verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization man
 
 [functions.resend-webhook]
 verify_jwt = false  # Recebe POST do Resend (webhook Svix)
+
+[functions.ntc-ingest]
+verify_jwt = false  # Chamado por cron/pg_cron com service role

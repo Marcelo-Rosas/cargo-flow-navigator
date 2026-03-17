@@ -21,6 +21,7 @@ import {
   Legend,
 } from 'recharts';
 import { useNtcInsights, NtcCostIndex } from '@/hooks/useNtcInsights';
+import { useLatestMarketIndex, useMarketIndices } from '@/hooks/useMarketIndices';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -278,8 +279,16 @@ function InctlLatestTable({ inctlSeries }: { inctlSeries: NtcCostIndex[] }) {
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 
+const alertBadgeStyle = {
+  estavel: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-950 dark:text-green-300',
+  atencao: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300',
+  urgente: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-300',
+};
+
 export function NtcInsightsTab() {
   const { inctlSeries, inctfSeries, fuelReference, summary, isLoading, isError } = useNtcInsights();
+  const { data: latestIndex } = useLatestMarketIndex();
+  const { data: marketHistory = [] } = useMarketIndices(6);
 
   if (isLoading) {
     return (
@@ -565,6 +574,207 @@ export function NtcInsightsTab() {
             </LineChart>
           </ResponsiveContainer>
         </motion.div>
+      )}
+
+      {/* ── Market Indices (Agente NTC Semanal) ── */}
+      {latestIndex && (
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+          >
+            <h2 className="text-xl font-semibold text-foreground mt-2">
+              Índices de Mercado — Agente NTC
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Ref. {latestIndex.periodo_referencia} — gerado em{' '}
+              {new Date(latestIndex.gerado_em).toLocaleDateString('pt-BR')}
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <InsightCard
+              title="INCTF Mensal"
+              value={latestIndex.inctf_mensal != null ? fmtPct(latestIndex.inctf_mensal) : '—'}
+              subtitle={
+                latestIndex.inctf_acumulado != null
+                  ? `Acum. ${fmtPct(latestIndex.inctf_acumulado)}`
+                  : undefined
+              }
+              icon={Package}
+              trend={latestIndex.inctf_mensal}
+              color="green"
+              delay={0.5}
+            />
+            <InsightCard
+              title="INCTL Mensal"
+              value={latestIndex.inctl_mensal != null ? fmtPct(latestIndex.inctl_mensal) : '—'}
+              subtitle={
+                latestIndex.inctl_acumulado != null
+                  ? `Acum. ${fmtPct(latestIndex.inctl_acumulado)}`
+                  : undefined
+              }
+              icon={Truck}
+              trend={latestIndex.inctl_mensal}
+              color="blue"
+              delay={0.55}
+            />
+            <InsightCard
+              title="Diesel S10"
+              value={
+                latestIndex.diesel_s10 != null ? `R$ ${latestIndex.diesel_s10.toFixed(2)}/L` : '—'
+              }
+              subtitle={
+                latestIndex.diesel_variacao_mensal != null
+                  ? `Var. mensal: ${fmtPct(latestIndex.diesel_variacao_mensal)}`
+                  : undefined
+              }
+              icon={Fuel}
+              trend={latestIndex.diesel_variacao_anual}
+              color="orange"
+              delay={0.6}
+            />
+            <InsightCard
+              title="Reajuste Sugerido"
+              value={
+                latestIndex.reajuste_sugerido != null ? fmtPct(latestIndex.reajuste_sugerido) : '—'
+              }
+              subtitle={latestIndex.justificativa_reajuste ?? undefined}
+              icon={BarChart3}
+              color="purple"
+              delay={0.65}
+            />
+          </div>
+
+          {/* Alert badge */}
+          {latestIndex.alerta_reajuste && (
+            <motion.div
+              className="flex items-center gap-2"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+            >
+              <Badge variant="outline" className={alertBadgeStyle[latestIndex.alerta_reajuste]}>
+                {latestIndex.alerta_reajuste === 'estavel'
+                  ? 'Estável'
+                  : latestIndex.alerta_reajuste === 'atencao'
+                    ? 'Atenção'
+                    : 'Urgente'}
+              </Badge>
+              {latestIndex.justificativa_reajuste && (
+                <span className="text-sm text-muted-foreground">
+                  {latestIndex.justificativa_reajuste}
+                </span>
+              )}
+            </motion.div>
+          )}
+
+          {/* Historical table */}
+          {marketHistory.length > 1 && (
+            <motion.div
+              className="bg-card rounded-xl border border-border shadow-card p-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.75 }}
+            >
+              <h3 className="text-lg font-semibold text-foreground mb-1">
+                Histórico de Índices de Mercado
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Últimos períodos consolidados pelo agente NTC
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Período</TableHead>
+                    <TableHead className="text-right">INCTF</TableHead>
+                    <TableHead className="text-right">INCTL</TableHead>
+                    <TableHead className="text-right">Diesel S10</TableHead>
+                    <TableHead className="text-right">Reajuste</TableHead>
+                    <TableHead className="text-center">Alerta</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {marketHistory.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium">{row.periodo_referencia}</TableCell>
+                      <TableCell className="text-right">
+                        {row.inctf_mensal != null ? fmtPct(row.inctf_mensal) : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.inctl_mensal != null ? fmtPct(row.inctl_mensal) : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.diesel_s10 != null ? `R$ ${row.diesel_s10.toFixed(2)}` : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.reajuste_sugerido != null ? fmtPct(row.reajuste_sugerido) : '—'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {row.alerta_reajuste ? (
+                          <Badge variant="outline" className={alertBadgeStyle[row.alerta_reajuste]}>
+                            {row.alerta_reajuste === 'estavel'
+                              ? 'Estável'
+                              : row.alerta_reajuste === 'atencao'
+                                ? 'Atenção'
+                                : 'Urgente'}
+                          </Badge>
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </motion.div>
+          )}
+
+          {/* Reajuste trend chart */}
+          {marketHistory.length > 2 && (
+            <motion.div
+              className="bg-card rounded-xl border border-border shadow-card p-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+            >
+              <h3 className="text-lg font-semibold text-foreground mb-1">
+                Evolução do Reajuste Sugerido
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Tendência da sugestão de reajuste do agente NTC
+              </p>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart
+                  data={[...marketHistory]
+                    .reverse()
+                    .filter((r) => r.reajuste_sugerido != null)
+                    .map((r) => ({
+                      label: r.periodo_referencia,
+                      reajuste: r.reajuste_sugerido,
+                    }))}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} unit="%" />
+                  <Tooltip
+                    formatter={(value: number) => [`${value.toFixed(1)}%`, 'Reajuste sugerido']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="reajuste"
+                    name="Reajuste"
+                    stroke="#8b5cf6"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </motion.div>
+          )}
+        </>
       )}
     </div>
   );
