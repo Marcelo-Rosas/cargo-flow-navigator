@@ -1,0 +1,20 @@
+{
+  "gerado_em": "2026-03-18",
+  "periodo_referencia": "Março/2026",
+  "indices": {
+    "inctf_mensal": 0.0037,
+    "inctf_12meses": 0.0482,
+    "inctl_mensal": 0.0136,
+    "inctl_12meses": 0.0521
+  },
+  "combustivel": {
+    "diesel_s10_preco": 6.11,
+    "diesel_s10_12meses": 0.0315,
+    "diesel_comum_preco": 5.87,
+    "diesel_comum_12meses": 0.028
+  },
+  "reajuste_sugerido_pct": 0.0361,
+  "alerta_nivel": "atencao",
+  "alerta_cor": "yellow",
+  "aviso_importante": "Dados em modo offline — Próxima atualização: segunda-feira às 08:00"
+}

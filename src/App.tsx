@@ -23,6 +23,11 @@ const Approvals = lazy(() => import('./pages/Approvals'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const Auth = lazy(() => import('./pages/Auth'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const InsuranceMonitoringDashboard = lazy(() =>
+  import('./pages/InsuranceMonitoringDashboard').then((m) => ({
+    default: m.InsuranceMonitoringDashboard,
+  }))
+);
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -150,6 +155,15 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRoles={['admin']}>
                     <UserManagement />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/monitoramento-seguros"
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'financeiro', 'operacional']}>
+                    <InsuranceMonitoringDashboard />
                   </ProtectedRoute>
                 }
               />

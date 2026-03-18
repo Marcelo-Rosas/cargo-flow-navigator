@@ -29,8 +29,18 @@ export function useInsuranceVolumeMetrics(
   return useQuery({
     queryKey: ['insurance-volume-metrics', timeRange],
     queryFn: async () => {
+      type VolumeRow = {
+        bucket_5m: string;
+        requests_total: number;
+        success_count: number;
+        error_count: number;
+        timeout_count: number;
+        rate_limit_count: number;
+        fallback_count: number;
+      };
+
       const { data, error } = await supabase
-        .from('insurance_metrics_volume')
+        .from('insurance_metrics_volume' as never)
         .select(
           `
           bucket_5m,
@@ -47,27 +57,19 @@ export function useInsuranceVolumeMetrics(
 
       if (error) throw error;
 
+      const rows = (data ?? []) as VolumeRow[];
+
       // Map bucket_5m -> time_bucket and calculate success_rate
-      return (data || []).map(
-        (row: {
-          bucket_5m: string;
-          requests_total: number;
-          success_count: number;
-          error_count: number;
-          timeout_count: number;
-          rate_limit_count: number;
-          fallback_count: number;
-        }) => ({
-          time_bucket: row.bucket_5m,
-          requests_total: row.requests_total,
-          success_count: row.success_count,
-          error_count: row.error_count,
-          timeout_count: row.timeout_count,
-          rate_limit_count: row.rate_limit_count,
-          fallback_count: row.fallback_count,
-          success_rate: row.requests_total > 0 ? row.success_count / row.requests_total : 0,
-        })
-      );
+      return rows.map((row) => ({
+        time_bucket: row.bucket_5m,
+        requests_total: row.requests_total,
+        success_count: row.success_count,
+        error_count: row.error_count,
+        timeout_count: row.timeout_count,
+        rate_limit_count: row.rate_limit_count,
+        fallback_count: row.fallback_count,
+        success_rate: row.requests_total > 0 ? row.success_count / row.requests_total : 0,
+      }));
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
@@ -90,8 +92,15 @@ export function useInsuranceLatencyMetrics(
   return useQuery({
     queryKey: ['insurance-latency-metrics', timeRange],
     queryFn: async () => {
+      type LatencyRow = {
+        bucket_5m: string;
+        p50_ms: number;
+        p95_ms: number;
+        p99_ms: number;
+      };
+
       const { data, error } = await supabase
-        .from('insurance_metrics_latency')
+        .from('insurance_metrics_latency' as never)
         .select(
           `
           bucket_5m,
@@ -104,15 +113,16 @@ export function useInsuranceLatencyMetrics(
         .order('bucket_5m', { ascending: true });
 
       if (error) throw error;
+
+      const rows = (data ?? []) as LatencyRow[];
+
       // Map bucket_5m -> time_bucket
-      return (data || []).map(
-        (row: { bucket_5m: string; p50_ms: number; p95_ms: number; p99_ms: number }) => ({
-          time_bucket: row.bucket_5m,
-          p50_ms: row.p50_ms,
-          p95_ms: row.p95_ms,
-          p99_ms: row.p99_ms,
-        })
-      );
+      return rows.map((row) => ({
+        time_bucket: row.bucket_5m,
+        p50_ms: row.p50_ms,
+        p95_ms: row.p95_ms,
+        p99_ms: row.p99_ms,
+      }));
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -134,12 +144,16 @@ export function useInsuranceErrorBreakdown(
   return useQuery({
     queryKey: ['insurance-error-breakdown', timeRange],
     queryFn: async () => {
+      type ErrorLogRow = { status: string };
+
       const { data, error } = await supabase
-        .from('insurance_logs')
+        .from('insurance_logs' as never)
         .select('status')
         .gte('created_at', new Date(Date.now() - getTimeRangeMs(timeRange)).toISOString());
 
       if (error) throw error;
+
+      const rows = (data ?? []) as ErrorLogRow[];
 
       // Aggregate by status
       const breakdown = {
@@ -150,7 +164,7 @@ export function useInsuranceErrorBreakdown(
         fallback: 0,
       };
 
-      (data || []).forEach((log) => {
+      rows.forEach((log) => {
         const status = log.status as keyof typeof breakdown;
         if (status in breakdown) {
           breakdown[status]++;
@@ -188,8 +202,10 @@ export function useInsuranceFallbackRatio(
   return useQuery({
     queryKey: ['insurance-fallback-ratio', timeRange],
     queryFn: async () => {
+      type FallbackLogRow = { fallback_used: boolean };
+
       const { data, error } = await supabase
-        .from('insurance_logs')
+        .from('insurance_logs' as never)
         .select('fallback_used')
         .gte(
           'created_at',
@@ -198,8 +214,10 @@ export function useInsuranceFallbackRatio(
 
       if (error) throw error;
 
-      const total = data?.length || 0;
-      const fallbackCount = (data || []).filter((log) => log.fallback_used).length;
+      const rows = (data ?? []) as FallbackLogRow[];
+
+      const total = rows.length || 0;
+      const fallbackCount = rows.filter((log) => log.fallback_used).length;
       const ratio = total > 0 ? fallbackCount / total : 0;
 
       let alertLevel: 'green' | 'yellow' | 'red' = 'green';
@@ -235,8 +253,15 @@ export function useInsuranceStatusSummary(): UseQueryResult<StatusSummary, Error
     queryFn: async () => {
       const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
+      type StatusLogRow = {
+        status: string;
+        duration_ms: number | null;
+        fallback_used: boolean;
+        created_at: string;
+      };
+
       const { data, error } = await supabase
-        .from('insurance_logs')
+        .from('insurance_logs' as never)
         .select('status, duration_ms, fallback_used, created_at')
         .gte('created_at', thirtyMinutesAgo)
         .order('created_at', { ascending: false })
@@ -244,7 +269,7 @@ export function useInsuranceStatusSummary(): UseQueryResult<StatusSummary, Error
 
       if (error) throw error;
 
-      const logs = data || [];
+      const logs = (data ?? []) as StatusLogRow[];
       const total = logs.length;
 
       if (total === 0) {

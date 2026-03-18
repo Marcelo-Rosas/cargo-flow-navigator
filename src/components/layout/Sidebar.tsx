@@ -15,6 +15,7 @@ import {
   DollarSign,
   BarChart3,
   ShieldCheck,
+  Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,12 @@ const navItems = [
   },
   { path: '/documentos', icon: FileText, label: 'Documentos' },
   { path: '/relatorios', icon: BarChart3, label: 'Relatórios' },
+  {
+    path: '/monitoramento-seguros',
+    icon: Activity,
+    label: 'Monit. Seguros',
+    roles: ['admin', 'financeiro', 'operacional'] as UserProfile[],
+  },
   { path: '/clientes', icon: Users, label: 'Clientes' },
   { path: '/embarcadores', icon: Ship, label: 'Embarcadores' },
   { path: '/veiculos', icon: Truck, label: 'Veículos' },

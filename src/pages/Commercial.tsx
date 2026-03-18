@@ -30,9 +30,25 @@ import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
 import { QuoteDetailModal } from '@/components/modals/QuoteDetailModal';
 import { SendQuoteEmailModal } from '@/components/modals/SendQuoteEmailModal';
+import { LoadCompositionPanel } from '@/components/LoadCompositionPanel';
+import { MarketIntelligencePanel } from '@/components/market/MarketIntelligencePanel';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
+type CommercialTab = 'kanban' | 'market-intelligence';
+
+const COMMERCIAL_TABS: { id: CommercialTab; label: string }[] = [
+  { id: 'kanban', label: 'Kanban Comercial' },
+  { id: 'market-intelligence', label: 'Inteligência NTC' },
+];
 
 const QUOTE_STAGES: { id: QuoteStage; label: string; color: string }[] = [
   { id: 'novo_pedido', label: 'Novo Pedido', color: 'bg-muted-foreground' },
@@ -49,6 +65,7 @@ export default function Commercial() {
   const { canWrite } = useUserRole();
   const { data: quotes, isLoading, isError, error, refetch } = useQuotes();
   const updateStageMutation = useUpdateQuoteStage();
+  const [activeTab, setActiveTab] = useState<CommercialTab>('kanban');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFollowUp, setShowFollowUp] = useState(false);
@@ -244,6 +261,11 @@ export default function Commercial() {
       .reduce((acc, q) => acc + Number(q.value), 0);
   }, [quotes]);
 
+  const firstShipperId = useMemo(() => {
+    if (!quotes || quotes.length === 0) return null;
+    return quotes[0]?.shipper_id ?? null;
+  }, [quotes]);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -292,7 +314,7 @@ export default function Commercial() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            Board Comercial
+            Comercial
           </motion.h1>
           <motion.p
             className="text-muted-foreground mt-1"
@@ -300,8 +322,9 @@ export default function Commercial() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
-            Pipeline total:{' '}
-            <span className="font-semibold text-primary">{formatCurrency(totalPipelineValue)}</span>
+            {activeTab === 'kanban'
+              ? `Pipeline total: ${formatCurrency(totalPipelineValue)}`
+              : 'Índices e Preços de Transporte'}
           </motion.p>
         </div>
 
@@ -318,14 +341,43 @@ export default function Commercial() {
           <Button variant="outline" size="icon" aria-label="Filtrar cotações">
             <Filter className="w-4 h-4" />
           </Button>
-          <Button
-            variant={showFollowUp ? 'default' : 'outline'}
-            size="icon"
-            aria-label="Follow-up de carregamento"
-            onClick={() => setShowFollowUp((v) => !v)}
-          >
-            <CalendarDays className="w-4 h-4" />
-          </Button>
+          <Sheet open={showFollowUp} onOpenChange={setShowFollowUp}>
+            <SheetTrigger asChild>
+              <Button
+                variant={showFollowUp ? 'default' : 'outline'}
+                size="icon"
+                aria-label="Follow-up de carregamento"
+              >
+                <CalendarDays className="w-4 h-4" />
+              </Button>
+            </SheetTrigger>
+
+            {/* Follow-up + Oportunidades de Consolidação em Sheet lateral */}
+            <SheetContent side="right" className="w-[420px] sm:w-[480px] space-y-4">
+              <SheetHeader>
+                <SheetTitle>Follow-up de Carregamento</SheetTitle>
+                <SheetDescription>
+                  Acompanhe embarques em negociação e oportunidades de consolidação em uma visão
+                  única.
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="space-y-4 overflow-y-auto pr-1 h-full">
+                <LoadingFollowUpPanel />
+                {firstShipperId && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      Oportunidades de Consolidação
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Análise automática de cargas do mesmo embarcador para otimização de rotas.
+                    </p>
+                    <LoadCompositionPanel shipperId={firstShipperId} />
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
           {canManageCommercial && (
             <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
               <Plus className="w-4 h-4" />
@@ -335,52 +387,79 @@ export default function Commercial() {
         </div>
       </div>
 
-      {showFollowUp && <LoadingFollowUpPanel />}
+      {/* Tabs Navigation */}
+      <div className="flex gap-2 mb-6 border-b border-border pb-4">
+        {COMMERCIAL_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === tab.id
+                ? 'text-primary border-b-2 border-primary -mb-4 pb-2'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      {/* Loading State */}
-      {isLoading ? (
-        <KanbanSkeleton columnCount={7} columnLabels={QUOTE_STAGES} />
-      ) : (
-        /* Kanban Board */
-        <DndContext
-          sensors={sensors}
-          collisionDetection={pointerWithin}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
-            {QUOTE_STAGES.map((stage) => {
-              const columnItems = items[stage.id] ?? [];
-              return (
-                <KanbanColumn
-                  key={stage.id}
-                  id={stage.id}
-                  title={stage.label}
-                  count={columnItems.length}
-                  color={stage.color}
-                  items={columnItems.map((q) => q.id)}
-                >
-                  {columnItems.map((quote) => (
-                    <QuoteCard
-                      key={quote.id}
-                      quote={quote}
-                      onEdit={() => setSelectedQuote(quote)}
-                      onSendEmail={() => setEmailingQuote(quote)}
-                      canManageActions={canManageCommercial}
-                    />
-                  ))}
-                </KanbanColumn>
-              );
-            })}
-          </div>
+      {/* Tab Content */}
+      {activeTab === 'kanban' && (
+        <>
+          {/* Kanban Board */}
+          {/* Mantém o board ocupando toda a largura; follow-up/consolidação abre em Sheet flutuante */}
+          {/* Loading State */}
+          {isLoading ? (
+            <KanbanSkeleton columnCount={7} columnLabels={QUOTE_STAGES} />
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={pointerWithin}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
+                {QUOTE_STAGES.map((stage) => {
+                  const columnItems = items[stage.id] ?? [];
+                  return (
+                    <KanbanColumn
+                      key={stage.id}
+                      id={stage.id}
+                      title={stage.label}
+                      count={columnItems.length}
+                      color={stage.color}
+                      items={columnItems.map((q) => q.id)}
+                    >
+                      {columnItems.map((quote) => (
+                        <QuoteCard
+                          key={quote.id}
+                          quote={quote}
+                          onEdit={() => setSelectedQuote(quote)}
+                          onSendEmail={() => setEmailingQuote(quote)}
+                          canManageActions={canManageCommercial}
+                        />
+                      ))}
+                    </KanbanColumn>
+                  );
+                })}
+              </div>
 
-          <DragOverlay>
-            {activeQuote && (
-              <QuoteCard quote={activeQuote} canManageActions={canManageCommercial} />
-            )}
-          </DragOverlay>
-        </DndContext>
+              <DragOverlay>
+                {activeQuote && (
+                  <QuoteCard quote={activeQuote} canManageActions={canManageCommercial} />
+                )}
+              </DragOverlay>
+            </DndContext>
+          )}
+        </>
+      )}
+
+      {activeTab === 'market-intelligence' && (
+        <div className="mb-6">
+          <MarketIntelligencePanel />
+        </div>
       )}
 
       {/* Quote Form Modal */}

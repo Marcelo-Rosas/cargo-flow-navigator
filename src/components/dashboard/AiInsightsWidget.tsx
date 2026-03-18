@@ -56,7 +56,15 @@ export function AiInsightsWidget() {
   const { toast } = useToast();
 
   const analysis = insight?.analysis ?? null;
-  const insights = (analysis?.insights as Array<string | Record<string, string>>) ?? [];
+  type InsightObject = {
+    title?: string;
+    description?: string;
+    type?: string;
+    priority?: string;
+    action_item?: string;
+  };
+  type InsightItem = string | InsightObject;
+  const insights: InsightItem[] = (analysis?.insights as InsightItem[]) ?? [];
   const summary = (analysis?.summary as string) ?? null;
   const risk = (analysis?.risk as string) ?? null;
   const metrics = analysis?.metrics as Record<string, unknown> | null;
@@ -211,10 +219,11 @@ export function AiInsightsWidget() {
           {/* Insight items */}
           {insights.slice(0, 5).map((item, i) => {
             const isStr = typeof item === 'string';
-            const title = isStr ? item : (item as any).title || (item as any).description || '';
-            const desc = isStr ? '' : (item as any).description || '';
-            const type = isStr ? 'opportunity' : (item as any).type || 'opportunity';
-            const priority = isStr ? null : (item as any).priority;
+            const obj: InsightObject | undefined = isStr ? undefined : (item as InsightObject);
+            const title = isStr ? item : obj?.title || obj?.description || '';
+            const desc = isStr ? '' : obj?.description || '';
+            const type = isStr ? 'opportunity' : obj?.type || 'opportunity';
+            const priority = isStr ? null : (obj?.priority ?? null);
             const IconComponent = typeIcons[type] || Lightbulb;
             const colorClass = typeColors[type] || typeColors.opportunity;
 
@@ -242,10 +251,10 @@ export function AiInsightsWidget() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{desc}</p>
-                  {(item as any).action_item && (
+                  {obj?.action_item && (
                     <div className="flex items-center gap-1 mt-1 text-[10px] text-primary/70">
                       <ArrowRight className="w-2.5 h-2.5" />
-                      <span className="line-clamp-1">{(item as any).action_item}</span>
+                      <span className="line-clamp-1">{obj.action_item}</span>
                     </div>
                   )}
                 </div>

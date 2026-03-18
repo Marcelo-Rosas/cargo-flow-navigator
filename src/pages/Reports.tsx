@@ -1,13 +1,24 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, Receipt, Download } from 'lucide-react';
+import { BarChart3, Receipt, Download, TrendingUp } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 import { useDreOperacionalReport } from '@/hooks/useDreOperacionalReport';
 import { useVehicleTypes } from '@/hooks/usePricingRules';
 import { DreOperacionalTable } from '@/components/reports/DreOperacionalTable';
 import { DateFilterRange } from '@/components/filters/DateFilterRange';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useRsPerKmByRoute } from '@/hooks/useRsPerKmByRoute';
+import { RsPerKmTable } from '@/components/reports/RsPerKmTable';
+import {
+  useDeleteRouteMetricsConfig,
+  useRouteMetrics,
+  useRouteMetricsConfig,
+  useUpsertRouteMetricsConfig,
+} from '@/hooks/useRouteMetrics';
+import { RouteMetricsCards } from '@/components/reports/RouteMetricsCards';
 import {
   type DateFilterMode,
   type DateFilterRange as DateFilterRangeType,
@@ -34,6 +45,7 @@ export default function Reports() {
   const [osNumber, setOsNumber] = useState<string>('');
   const [periodType, setPeriodType] = useState<PeriodType>('detail');
   const [vehicleTypeId, setVehicleTypeId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'dre' | 'rs-km' | 'metrics'>('dre');
 
   const handleRangeChange = (range: DateFilterRangeType) => {
     setDateFrom(range.dateFrom);
@@ -50,6 +62,24 @@ export default function Reports() {
     vehicleTypeId,
     enabled: true,
   });
+
+  const rsPerKmQuery = useRsPerKmByRoute({
+    dateFrom,
+    dateTo,
+    vehicleTypeId,
+  });
+
+  const fromIso = new Date(dateFrom.split('/').reverse().join('-') + 'T00:00:00').toISOString();
+  const toIso = new Date(dateTo.split('/').reverse().join('-') + 'T23:59:59.999').toISOString();
+
+  const routeMetricsQuery = useRouteMetrics({
+    fromIso,
+    toIso,
+    vehicleTypeId,
+  });
+  const routeConfigsQuery = useRouteMetricsConfig(vehicleTypeId);
+  const upsertConfig = useUpsertRouteMetricsConfig();
+  const deleteConfig = useDeleteRouteMetricsConfig();
 
   const exportDreCsv = () => {
     if (!dreTables || dreTables.length === 0) return;
@@ -70,7 +100,7 @@ export default function Reports() {
       }
       lines.push('');
     }
-    const csv = ['\uFEFF' + lines.join('\n')];
+    const csv = '\uFEFF' + lines.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -103,7 +133,7 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Tela principal: DRE comparativa tabular */}
+      {/* Conteúdo: abas DRE e R$/KM */}
       <motion.div
         className="bg-card rounded-xl border border-border shadow-card p-6"
         initial={{ opacity: 0, y: 10 }}
@@ -175,19 +205,91 @@ export default function Reports() {
             Exportar CSV
           </button>
         </div>
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as 'dre' | 'rs-km' | 'metrics')}
+        >
+          <TabsList className="mb-4">
+            <TabsTrigger value="dre">DRE Operacional</TabsTrigger>
+            <TabsTrigger value="rs-km">R$/KM por rota (OS reais)</TabsTrigger>
+            <TabsTrigger value="metrics">Métricas</TabsTrigger>
+          </TabsList>
 
-        <div className="flex items-center gap-2 mb-4">
-          <Receipt className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold">DRE Operacional Comparativa</h2>
-          <span
-            className="text-xs text-muted-foreground cursor-help"
-            title="Recomposição por linhas contábeis. Presumido = COT fechada. Real = OS com custos pagos."
-          >
-            (i)
-          </span>
-        </div>
+          <TabsContent value="dre" className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Receipt className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">DRE Operacional Comparativa</h2>
+              <span
+                className="text-xs text-muted-foreground cursor-help"
+                title="Recomposição por linhas contábeis. Presumido = COT fechada. Real = OS com custos pagos."
+              >
+                (i)
+              </span>
+            </div>
+            <DreOperacionalTable tables={dreTables ?? []} isLoading={isLoadingDre} />
+          </TabsContent>
 
-        <DreOperacionalTable tables={dreTables ?? []} isLoading={isLoadingDre} />
+          <TabsContent value="rs-km" className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">R$/KM por rota (OS reais)</h2>
+              <span
+                className="text-xs text-muted-foreground cursor-help"
+                title="Usa apenas OS com valor carreteiro pago e distância válidos, excluindo VG e rotas múltiplas."
+              >
+                (i)
+              </span>
+            </div>
+            <RsPerKmTable rows={rsPerKmQuery.data ?? []} isLoading={rsPerKmQuery.isLoading} />
+          </TabsContent>
+
+          <TabsContent value="metrics" className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">Métricas por rota (UF → UF)</h2>
+              <span
+                className="text-xs text-muted-foreground cursor-help"
+                title="Agregados por UF de origem/destino com média, P50 e P90 de R$/KM. Configure meta/faixa por rota."
+              >
+                (i)
+              </span>
+            </div>
+
+            <RouteMetricsCards
+              metrics={routeMetricsQuery.data ?? []}
+              configs={routeConfigsQuery.data ?? []}
+              vehicleTypeId={vehicleTypeId}
+              isLoading={routeMetricsQuery.isLoading || routeConfigsQuery.isLoading}
+              isError={routeMetricsQuery.isError || routeConfigsQuery.isError}
+              errorMessage={
+                (routeMetricsQuery.error as Error | null)?.message ??
+                (routeConfigsQuery.error as Error | null)?.message ??
+                undefined
+              }
+              isMutating={upsertConfig.isPending || deleteConfig.isPending}
+              onUpsert={async (input) => {
+                try {
+                  await upsertConfig.mutateAsync(input);
+                  await routeConfigsQuery.refetch();
+                  toast.success('Configuração salva');
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : 'Erro ao salvar configuração');
+                  throw e;
+                }
+              }}
+              onDelete={async (id) => {
+                try {
+                  await deleteConfig.mutateAsync({ id });
+                  await routeConfigsQuery.refetch();
+                  toast.success('Configuração removida');
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : 'Erro ao remover configuração');
+                  throw e;
+                }
+              }}
+            />
+          </TabsContent>
+        </Tabs>
       </motion.div>
     </MainLayout>
   );

@@ -1,0 +1,164 @@
+# fix-brasilapi.ps1
+# Executa no terminal do projeto:
+# powershell -ExecutionPolicy Bypass -File fix-brasilapi.ps1
+
+$base = "C:\Users\marce\cargo-flow-navigator\src\components\forms"
+
+function Patch($file, $old, $new) {
+  $content = Get-Content $file -Raw -Encoding UTF8
+  if ($content.Contains($old)) {
+    $patched = $content.Replace($old, $new)
+    Set-Content $file $patched -NoNewline -Encoding UTF8
+    return $true
+  }
+  return $false
+}
+
+# ═══════════════════════════════════════════════════════════
+# ClientForm.tsx
+# ═══════════════════════════════════════════════════════════
+$f = "$base\ClientForm.tsx"
+
+$r = Patch $f `
+  "  const handleCnpjLookup = async () => {`n    const raw = form.getValues('cnpj') || '';" `
+  "  const handleCnpjLookup = async (rawValue?: string) => {`n    const raw = rawValue ?? form.getValues('cnpj') ?? '';"
+Write-Host ("[Client] Fix1 assinatura funcao: " + $(if($r){"OK"}else{"ja aplicado"}))
+
+$r = Patch $f `
+  "                          onValueChange={(raw) => field.onChange(raw ?? '')}
+                          onBlur={async () => {
+                            field.onBlur();
+                            await handleCnpjLookup();
+                          }}" `
+  "                          onValueChange={(raw) => {
+                            field.onChange(raw ?? '');
+                            const d = (raw ?? '').replace(/\D/g, '');
+                            if (d.length === 14) handleCnpjLookup(d);
+                          }}
+                          onBlur={field.onBlur}"
+Write-Host ("[Client] Fix2 onValueChange trigger: " + $(if($r){"OK"}else{"ja aplicado"}))
+
+$c = Get-Content $f -Raw -Encoding UTF8
+$n = ($c -split [regex]::Escape("cnpj: data.cnpj || null,")).Length - 1
+if ($n -gt 0) {
+  Set-Content $f $c.Replace("cnpj: data.cnpj || null,", "cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,") -NoNewline -Encoding UTF8
+  Write-Host ("[Client] Fix3 DB sem mascara: OK ($n ocorrencias)")
+} else { Write-Host "[Client] Fix3 DB sem mascara: ja aplicado" }
+
+Write-Host "-> ClientForm.tsx concluido`n"
+
+# ═══════════════════════════════════════════════════════════
+# OwnerForm.tsx
+# ═══════════════════════════════════════════════════════════
+$f = "$base\OwnerForm.tsx"
+
+$r = Patch $f `
+  "  const handleCnpjLookup = async () => {`n    const raw = form.getValues('cpf_cnpj') || '';" `
+  "  const handleCnpjLookup = async (rawValue?: string) => {`n    const raw = rawValue ?? form.getValues('cpf_cnpj') ?? '';"
+Write-Host ("[Owner] Fix1 assinatura funcao: " + $(if($r){"OK"}else{"ja aplicado"}))
+
+$r = Patch $f `
+  "                          {...field}
+                          onBlur={async (e) => {
+                            field.onBlur();
+                            await handleCnpjLookup();
+                          }}" `
+  "                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            const d = e.target.value.replace(/\D/g, '');
+                            if (d.length === 14) handleCnpjLookup(d);
+                          }}
+                          onBlur={field.onBlur}"
+Write-Host ("[Owner] Fix2 onChange trigger: " + $(if($r){"OK"}else{"ja aplicado"}))
+
+$r = Patch $f `
+  "                        {!isLookingUp && field.value && sanitizeCnpj(field.value).length === 14 && (
+                          <div className=""absolute right-3 top-1/2 -translate-y-1/2"">
+                            <Search className=""w-4 h-4 text-muted-foreground"" />
+                          </div>
+                        )}" `
+  "                        {!isLookingUp && field.value && sanitizeCnpj(field.value).length === 14 && (
+                          <button
+                            type=""button""
+                            className=""absolute right-3 top-1/2 -translate-y-1/2 hover:text-primary transition-colors""
+                            onClick={() => handleCnpjLookup()}
+                            title=""Consultar CNPJ""
+                          >
+                            <Search className=""w-4 h-4 text-muted-foreground hover:text-primary"" />
+                          </button>
+                        )}"
+Write-Host ("[Owner] Fix3 botao Search clicavel: " + $(if($r){"OK"}else{"ja aplicado"}))
+
+$c = Get-Content $f -Raw -Encoding UTF8
+$n = ($c -split [regex]::Escape("cpf_cnpj: data.cpf_cnpj || null,")).Length - 1
+if ($n -gt 0) {
+  Set-Content $f $c.Replace("cpf_cnpj: data.cpf_cnpj || null,", "cpf_cnpj: data.cpf_cnpj ? data.cpf_cnpj.replace(/\D/g, '') : null,") -NoNewline -Encoding UTF8
+  Write-Host ("[Owner] Fix4 DB sem mascara: OK ($n ocorrencias)")
+} else { Write-Host "[Owner] Fix4 DB sem mascara: ja aplicado" }
+
+$r = Patch $f `
+  "    } catch {`n      // API pode estar indisponível`n    }" `
+  "    } catch {`n      toast.error('Falha ao consultar CNPJ — verifique sua conexão');`n    }"
+Write-Host ("[Owner] Fix5 catch com toast: " + $(if($r){"OK"}else{"ja aplicado"}))
+
+$r = Patch $f `
+  "      if (!res.ok) {
+        setIsLookingUp(false);
+        return;
+      }" `
+  "      if (!res.ok) {
+        if (res.status === 404) {
+          toast.error('CNPJ não encontrado na base da Receita Federal');
+        } else {
+          toast.error('Erro ao consultar CNPJ (status ' + res.status + ')');
+        }
+        setIsLookingUp(false);
+        return;
+      }"
+Write-Host ("[Owner] Fix6 erro 400 com toast: " + $(if($r){"OK"}else{"ja aplicado"}))
+
+Write-Host "-> OwnerForm.tsx concluido`n"
+
+# ═══════════════════════════════════════════════════════════
+# ShipperForm.tsx
+# ═══════════════════════════════════════════════════════════
+$f = "$base\ShipperForm.tsx"
+
+$r = Patch $f `
+  "  const handleCnpjLookup = async () => {`n    const raw = form.getValues('cnpj') || '';" `
+  "  const handleCnpjLookup = async (rawValue?: string) => {`n    const raw = rawValue ?? form.getValues('cnpj') ?? '';"
+Write-Host ("[Shipper] Fix1 assinatura funcao: " + $(if($r){"OK"}else{"ja aplicado"}))
+
+$r = Patch $f `
+  "                        onValueChange={(raw) => field.onChange(raw ?? '')}
+                        onBlur={async () => {
+                          field.onBlur();
+                          await handleCnpjLookup();
+                        }}" `
+  "                        onValueChange={(raw) => {
+                          field.onChange(raw ?? '');
+                          const d = (raw ?? '').replace(/\D/g, '');
+                          if (d.length === 14) handleCnpjLookup(d);
+                        }}
+                        onBlur={field.onBlur}"
+Write-Host ("[Shipper] Fix2 onValueChange trigger: " + $(if($r){"OK"}else{"ja aplicado"}))
+
+$c = Get-Content $f -Raw -Encoding UTF8
+$n = ($c -split [regex]::Escape("cnpj: data.cnpj || null,")).Length - 1
+if ($n -gt 0) {
+  Set-Content $f $c.Replace("cnpj: data.cnpj || null,", "cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,") -NoNewline -Encoding UTF8
+  Write-Host ("[Shipper] Fix3 CNPJ DB sem mascara: OK ($n ocorrencias)")
+} else { Write-Host "[Shipper] Fix3 CNPJ DB sem mascara: ja aplicado" }
+
+$c = Get-Content $f -Raw -Encoding UTF8
+$n = ($c -split [regex]::Escape("cpf: data.cpf || null,")).Length - 1
+if ($n -gt 0) {
+  Set-Content $f $c.Replace("cpf: data.cpf || null,", "cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null,") -NoNewline -Encoding UTF8
+  Write-Host ("[Shipper] Fix4 CPF DB sem mascara: OK ($n ocorrencias)")
+} else { Write-Host "[Shipper] Fix4 CPF DB sem mascara: ja aplicado" }
+
+Write-Host "-> ShipperForm.tsx concluido`n"
+Write-Host "================================================"
+Write-Host "PRONTO! Erro 400 BrasilAPI corrigido nos 3 arquivos."
+Write-Host "Reinicie o dev server: npm run dev"
