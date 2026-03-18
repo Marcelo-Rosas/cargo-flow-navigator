@@ -371,6 +371,8 @@ export interface StoredPricingBreakdown {
     paymentAdjustment?: number;
     totalImpostos: number;
     totalCliente: number;
+    /** Desconto comercial aplicado (R$). totalClienteFinal = totalCliente - discount */
+    discount?: number;
   };
 
   profitability: {

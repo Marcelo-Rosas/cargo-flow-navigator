@@ -250,8 +250,14 @@ export async function generateQuotePdf({
     priceRows.push(['Carga e Descarga', fmt(breakdown.profitability.custosDescarga)]);
   }
 
-  const totalCliente =
+  const totalClienteBruto =
     breakdown?.totals?.totalCliente ?? (quote.value != null ? Number(quote.value) : 0);
+  const discountValue = breakdown?.totals?.discount ?? 0;
+  const totalCliente = Math.max(0, totalClienteBruto - discountValue);
+
+  if (discountValue > 0) {
+    priceRows.push(['(-) Desconto Comercial', `-${fmt(discountValue)}`]);
+  }
 
   if (priceRows.length > 0) {
     autoTable(doc, {

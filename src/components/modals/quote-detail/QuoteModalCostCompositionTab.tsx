@@ -80,7 +80,9 @@ export function QuoteModalCostCompositionTab({
       (k) => (breakdown.conditionalFeesBreakdown as Record<string, number>)[k] > 0
     ).length > 0 || (breakdown.components?.waitingTimeCost ?? 0) > 0;
 
-  const totalCliente = breakdown.totals.totalCliente ?? breakdown.totals.receitaBruta ?? 0;
+  const discountValue = breakdown.totals.discount ?? 0;
+  const totalClienteBruto = breakdown.totals.totalCliente ?? breakdown.totals.receitaBruta ?? 0;
+  const totalCliente = Math.max(0, totalClienteBruto - discountValue);
   const receitaLiquida =
     (breakdown.profitability as { receitaLiquida?: number } | undefined)?.receitaLiquida ??
     totalCliente - (breakdown.totals.das ?? 0) - (breakdown.totals.icms ?? 0);
@@ -233,8 +235,20 @@ export function QuoteModalCostCompositionTab({
                     {formatCurrency(isSimplesNacional ? 0 : breakdown.totals.icms || 0)}
                   </TableCell>
                 </TableRow>
+                {discountValue > 0 && (
+                  <TableRow className="bg-orange-50/50 dark:bg-orange-900/10">
+                    <TableCell className="text-orange-700 dark:text-orange-400">
+                      (-) Desconto Comercial
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums text-orange-700 dark:text-orange-400">
+                      -{formatCurrency(discountValue)}
+                    </TableCell>
+                  </TableRow>
+                )}
                 <TableRow className="bg-primary/5">
-                  <TableCell className="font-semibold text-primary">Total Cliente</TableCell>
+                  <TableCell className="font-semibold text-primary">
+                    Total Cliente{discountValue > 0 ? ' (com desconto)' : ''}
+                  </TableCell>
                   <TableCell className="text-right font-bold text-primary tabular-nums">
                     {formatCurrency(totalCliente)}
                   </TableCell>

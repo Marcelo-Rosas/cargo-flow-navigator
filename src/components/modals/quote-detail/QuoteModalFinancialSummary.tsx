@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 
 interface QuoteModalFinancialSummaryProps {
   totalCliente: number;
+  discount?: number;
   receitaLiquida?: number;
   resultadoLiquido: number;
   margemPercent: number;
@@ -16,6 +17,7 @@ interface QuoteModalFinancialSummaryProps {
 
 export function QuoteModalFinancialSummary({
   totalCliente,
+  discount = 0,
   receitaLiquida,
   resultadoLiquido,
   margemPercent,
@@ -34,6 +36,11 @@ export function QuoteModalFinancialSummary({
             <p className="text-3xl font-bold text-primary tabular-nums">
               {formatCurrency(totalCliente)}
             </p>
+            {discount > 0 && (
+              <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">
+                Desconto aplicado: -{formatCurrency(discount)}
+              </p>
+            )}
           </div>
           <Badge
             variant={isBelowTarget ? 'destructive' : 'default'}

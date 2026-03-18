@@ -220,9 +220,11 @@ export function QuoteDetailModal({
   const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
 
   // Visão contábil (DRE Asset-Light):
-  // Total Cliente = Faturamento Bruto | Receita Líquida = Total - Impostos
+  // Total Cliente = Faturamento Bruto - Desconto | Receita Líquida = Total - Impostos
   // Resultado Líquido e Margem % vêm do breakdown quando disponível
-  const totalClienteView = breakdown?.totals?.totalCliente ?? 0;
+  const discountView = breakdown?.totals?.discount ?? 0;
+  const totalClienteBruto = breakdown?.totals?.totalCliente ?? 0;
+  const totalClienteView = Math.max(0, totalClienteBruto - discountView);
   const receitaLiquidaView =
     (breakdown?.profitability as { receitaLiquida?: number } | undefined)?.receitaLiquida ?? null;
 
@@ -669,6 +671,7 @@ export function QuoteDetailModal({
             {/* RESUMO FINANCEIRO */}
             <QuoteModalFinancialSummary
               totalCliente={totalClienteView}
+              discount={discountView}
               receitaLiquida={receitaLiquidaView != null ? receitaLiquidaView : undefined}
               resultadoLiquido={resultadoLiquidoView}
               margemPercent={margemPercentView}

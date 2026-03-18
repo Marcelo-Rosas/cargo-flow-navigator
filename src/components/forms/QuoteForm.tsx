@@ -896,6 +896,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             ?.profitability?.custosDescarga ?? 0,
         tde_enabled: (bd?.components?.tde ?? 0) > 0,
         tear_enabled: (bd?.components?.tear ?? 0) > 0,
+        discount:
+          ((bd?.totals as { discount?: number } | undefined)?.discount ??
+            Number((quote as unknown as Record<string, unknown>).discount_value)) ||
+          0,
         notes: quote.notes || '',
         advance_due_date: (quote as { advance_due_date?: string | null })?.advance_due_date || '',
         balance_due_date: (quote as { balance_due_date?: string | null })?.balance_due_date || '',
@@ -1416,13 +1420,19 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             : null,
         toll_value: data.toll || null,
         cargo_value: data.cargo_value || null,
+        discount_value: data.discount || 0,
         value: Math.max(
           0,
           (useStoredPricing ? storedValue : calculationResult.totals.totalCliente) -
             (data.discount || 0)
         ),
-        pricing_breakdown:
-          pricingBreakdown as unknown as Database['public']['Tables']['quotes']['Row']['pricing_breakdown'],
+        pricing_breakdown: {
+          ...pricingBreakdown,
+          totals: {
+            ...pricingBreakdown.totals,
+            discount: data.discount || 0,
+          },
+        } as unknown as Database['public']['Tables']['quotes']['Row']['pricing_breakdown'],
         notes: data.notes || null,
         advance_due_date: data.advance_due_date?.trim() || null,
         balance_due_date: data.balance_due_date?.trim() || null,
