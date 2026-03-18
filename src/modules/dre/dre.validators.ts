@@ -73,11 +73,50 @@ export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
 
   if (!hasMismatch) return rows;
 
-  return rows.map((row) =>
-    row.line_code === 'custos_diretos' ||
-    row.line_code === 'resultado_liquido' ||
-    row.line_code === 'margem_liquida'
-      ? { ...row, has_formula_warning: true }
-      : row
-  );
+  // Fix derived lines to match accounting formulas AND flag the warning
+  return rows.map((row) => {
+    if (row.line_code === 'custos_diretos') {
+      const pVal = expectedCustosDiretos;
+      const rVal = expectedCustosDiretosReal;
+      const vVal = round2(rVal - pVal);
+      const vPct = Math.abs(pVal) > EPS ? round2((vVal / Math.abs(pVal)) * 100) : 0;
+      return {
+        ...row,
+        presumed_value: pVal,
+        real_value: rVal,
+        variance_value: vVal,
+        variance_percent: vPct,
+        has_formula_warning: true,
+      };
+    }
+    if (row.line_code === 'resultado_liquido') {
+      const pVal = expectedResultado;
+      const rVal = expectedResultadoReal;
+      const vVal = round2(rVal - pVal);
+      const vPct = Math.abs(pVal) > EPS ? round2((vVal / Math.abs(pVal)) * 100) : 0;
+      return {
+        ...row,
+        presumed_value: pVal,
+        real_value: rVal,
+        variance_value: vVal,
+        variance_percent: vPct,
+        has_formula_warning: true,
+      };
+    }
+    if (row.line_code === 'margem_liquida') {
+      const pVal = expectedMargem;
+      const rVal = expectedMargemReal;
+      const vVal = round2(rVal - pVal);
+      const vPct = Math.abs(pVal) > EPS ? round2((vVal / Math.abs(pVal)) * 100) : 0;
+      return {
+        ...row,
+        presumed_value: pVal,
+        real_value: rVal,
+        variance_value: vVal,
+        variance_percent: vPct,
+        has_formula_warning: true,
+      };
+    }
+    return row;
+  });
 }

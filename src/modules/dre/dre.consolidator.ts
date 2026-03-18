@@ -67,11 +67,52 @@ export function consolidateDreTables(tables: DreTable[], periodType: PeriodType)
 
   const result: DreTable[] = [];
   for (const [periodKey, bucket] of byKey.entries()) {
+    // Recalculate derived lines from consolidated atomic sums
+    // (summing derived lines directly produces incorrect results)
+    const p = bucket.presumedSums;
+    const r = bucket.realSums;
+
+    // custos_diretos = sum of atomic cost sublines
+    const pCustosDiretos = round2(
+      (p.get('custo_motorista') ?? 0) +
+        (p.get('pedagio') ?? 0) +
+        (p.get('carga_descarga') ?? 0) +
+        (p.get('espera') ?? 0) +
+        (p.get('taxas_condicionais') ?? 0) +
+        (p.get('outros_custos') ?? 0)
+    );
+    const rCustosDiretos = round2(
+      (r.get('custo_motorista') ?? 0) +
+        (r.get('pedagio') ?? 0) +
+        (r.get('carga_descarga') ?? 0) +
+        (r.get('espera') ?? 0) +
+        (r.get('taxas_condicionais') ?? 0) +
+        (r.get('outros_custos') ?? 0)
+    );
+    p.set('custos_diretos', pCustosDiretos);
+    r.set('custos_diretos', rCustosDiretos);
+
+    // resultado_liquido = receita_liquida - overhead - custos_diretos
+    const pResultado = round2(
+      (p.get('receita_liquida') ?? 0) - (p.get('overhead') ?? 0) - pCustosDiretos
+    );
+    const rResultado = round2(
+      (r.get('receita_liquida') ?? 0) - (r.get('overhead') ?? 0) - rCustosDiretos
+    );
+    p.set('resultado_liquido', pResultado);
+    r.set('resultado_liquido', rResultado);
+
+    // margem_liquida = resultado / faturamento × 100 (percentage, NOT summable)
+    const pFat = p.get('faturamento_bruto') ?? 0;
+    const rFat = r.get('faturamento_bruto') ?? 0;
+    p.set('margem_liquida', pFat > 0 ? round2((pResultado / pFat) * 100) : 0);
+    r.set('margem_liquida', rFat > 0 ? round2((rResultado / rFat) * 100) : 0);
+
     const rows: DreCanonicalRow[] = [];
     for (const mapping of DRE_LINE_MAPPINGS) {
       const code = mapping.line_code;
-      const presumedVal = bucket.presumedSums.get(code) ?? 0;
-      const realVal = bucket.realSums.get(code) ?? 0;
+      const presumedVal = p.get(code) ?? 0;
+      const realVal = r.get(code) ?? 0;
       const varianceValue = round2(realVal - presumedVal);
       let variancePercent = 0;
       if (Math.abs(presumedVal) > 0.01) {
