@@ -34,11 +34,19 @@ Deno.serve(async (req: Request) => {
       sb
         .from('approval_requests')
         .select('*, approval_rules(name, conditions)')
-        .eq('id', entityId)
-        .single(),
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
       entityType === 'quote'
         ? sb.from('quotes').select('*').eq('id', entityId).single()
-        : sb.from('service_orders').select('*').eq('id', entityId).single(),
+        : entityType === 'order'
+          ? sb.from('orders').select('*').eq('id', entityId).single()
+          : entityType === 'financial_document'
+            ? sb.from('financial_documents').select('*').eq('id', entityId).single()
+            : sb.from('orders').select('*').eq('id', entityId).single(),
     ]);
 
     const prompt = `Resuma esta solicitação de aprovação para o gestor da Vectra Cargo.

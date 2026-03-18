@@ -7,7 +7,7 @@
  * 4. Warnings - validation warnings and constraints
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLoadCompositionSuggestion } from '@/hooks/useLoadCompositionSuggestions';
 import {
   Dialog,
@@ -21,9 +21,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, MapPin, DollarSign, CheckCircle, Loader } from 'lucide-react';
+import { AlertCircle, MapPin, DollarSign, CheckCircle, Loader, FileDown } from 'lucide-react';
 import { RouteMapVisualization } from './RouteMapVisualization';
 import { DiscountProposalBreakdown } from './DiscountProposalBreakdown';
+import { generateLoadCompositionProposalPdf } from '@/lib/generateLoadCompositionProposalPdf';
 
 export interface LoadCompositionModalProps {
   compositionId: string;
@@ -44,6 +45,7 @@ export function LoadCompositionModal({
   onApprove,
 }: LoadCompositionModalProps) {
   const { data: composition, isLoading, error } = useLoadCompositionSuggestion(compositionId);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const status = composition ? statusConfig[composition.status] : null;
   const isExecutable = composition?.status === 'pending' && composition?.is_feasible;
@@ -310,6 +312,39 @@ export function LoadCompositionModal({
 
             {/* Tab 4: Discounts */}
             <TabsContent value="discounts" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Descontos propostos</h3>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    !composition.discounts || composition.discounts.length === 0 || isExportingPdf
+                  }
+                  onClick={async () => {
+                    if (!composition.discounts || composition.discounts.length === 0) return;
+                    try {
+                      setIsExportingPdf(true);
+                      await generateLoadCompositionProposalPdf({ suggestion: composition });
+                    } finally {
+                      setIsExportingPdf(false);
+                    }
+                  }}
+                  className="gap-2"
+                >
+                  {isExportingPdf ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Gerando PDF...
+                    </>
+                  ) : (
+                    <>
+                      <FileDown className="w-4 h-4" />
+                      Exportar proposta em PDF
+                    </>
+                  )}
+                </Button>
+              </div>
+
               {composition.discounts && composition.discounts.length > 0 ? (
                 <DiscountProposalBreakdown
                   discounts={composition.discounts}
@@ -319,7 +354,7 @@ export function LoadCompositionModal({
                 />
               ) : (
                 <div className="bg-gray-50 p-8 rounded-lg text-center text-sm text-gray-600">
-                  Descontos ainda não calculados. Clique em "Calcular Descontos" para gerar
+                  Descontos ainda não calculados. Clique em \"Calcular Descontos\" para gerar
                   proposta.
                 </div>
               )}

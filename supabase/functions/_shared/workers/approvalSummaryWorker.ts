@@ -14,6 +14,40 @@ async function fetchEntityData(sb: any, entityId: string, entityType: string) {
   let entityData: any = null;
   let contextInfo = '';
 
+  if (entityType === 'quote') {
+    const { data } = await sb
+      .from('quotes')
+      .select(
+        'id, quote_code, client_name, origin, destination, value, pricing_breakdown, stage, approval_status, created_at'
+      )
+      .eq('id', entityId)
+      .maybeSingle();
+
+    if (data) {
+      const profitability = data.pricing_breakdown?.profitability;
+      const meta = data.pricing_breakdown?.meta;
+
+      contextInfo = `
+Cotacao: ${data.quote_code}
+Cliente: ${data.client_name}
+Rota: ${data.origin} -> ${data.destination}
+Valor da cotacao: R$ ${Number(data.value || 0).toFixed(2)}
+Margem: ${profitability?.margemPercent || 'N/A'}%
+Status margem: ${meta?.marginStatus || 'N/A'}`;
+
+      // Normalize fields used by buildPrompt()
+      entityData = {
+        ...data,
+        code: data.quote_code,
+        type: 'quote',
+        status: data.approval_status ?? data.stage,
+        total_amount: data.value ?? data.cargo_value ?? 0,
+        source_type: 'quote',
+        source_id: data.id,
+      };
+    }
+  }
+
   if (entityType === 'financial_document') {
     const { data } = await sb.from('financial_documents').select('*').eq('id', entityId).single();
     entityData = data;

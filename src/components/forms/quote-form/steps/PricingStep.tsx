@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { NumericInput } from '@/components/ui/numeric-input';
+import { DatePickerString } from '@/components/ui/date-picker';
 import { Loader2, TrendingUp, ReceiptText, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatters';
@@ -187,7 +188,10 @@ export function PricingStep({
                       <FormItem>
                         <FormLabel className="text-xs">Data Adiantamento Carreteiro</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} value={field.value || ''} />
+                          <DatePickerString
+                            value={field.value || ''}
+                            onChange={(val) => field.onChange(val)}
+                          />
                         </FormControl>
                       </FormItem>
                     )}
@@ -199,7 +203,10 @@ export function PricingStep({
                       <FormItem>
                         <FormLabel className="text-xs">Data Saldo Carreteiro</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} value={field.value || ''} />
+                          <DatePickerString
+                            value={field.value || ''}
+                            onChange={(val) => field.onChange(val)}
+                          />
                         </FormControl>
                       </FormItem>
                     )}
@@ -213,7 +220,10 @@ export function PricingStep({
                       <FormItem>
                         <FormLabel>Data da cotação (retro)</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} value={field.value || ''} />
+                          <DatePickerString
+                            value={field.value || ''}
+                            onChange={(val) => field.onChange(val)}
+                          />
                         </FormControl>
                       </FormItem>
                     )}

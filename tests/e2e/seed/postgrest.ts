@@ -1,12 +1,15 @@
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function requireSeedEnv(): { url: string; key: string } {
+  // ✅ Leitura lazy — garante que dotenv já injetou as vars antes de usar
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-function requireSeedEnv(): void {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  if (!url || !key) {
     throw new Error(
       'Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY para usar o PostgREST client de seed.'
     );
   }
+
+  return { url, key };
 }
 
 export type PostgrestMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -24,15 +27,16 @@ export async function postgrest<T = unknown>({
   query = '',
   body,
 }: PostgrestOptions): Promise<T> {
-  requireSeedEnv();
-  const normalizedBase = SUPABASE_URL!.replace(/\\/g, '/').replace(/\/+$/, '');
-  const url = `${normalizedBase.replace(/\/$/, '')}/rest/v1/${table}${query}`;
+  const { url, key } = requireSeedEnv();
 
-  const response = await fetch(url, {
+  const normalizedBase = url.replace(/\\/g, '/').replace(/\/+$/, '');
+  const fullUrl = `${normalizedBase}/rest/v1/${table}${query}`;
+
+  const response = await fetch(fullUrl, {
     method,
     headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY!,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: key,
+      Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
     },

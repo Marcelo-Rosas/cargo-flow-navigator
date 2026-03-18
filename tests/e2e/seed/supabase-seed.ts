@@ -126,6 +126,9 @@ export async function seedGracePeriodQuote({
   const quoteId = randomUUID();
   const clientName = `E2E GracePeriod ${runId}`;
 
+  // Always INSERT as 'enviado' first, then UPDATE to target stage.
+  // The DB trigger fires on UPDATE (not INSERT), so direct INSERT
+  // with stage='ganho' would skip the trigger.
   await postgrest<Array<{ id: string }>>({
     method: 'POST',
     table: 'quotes',
@@ -137,13 +140,18 @@ export async function seedGracePeriodQuote({
         origin: 'Curitiba, PR',
         destination: 'Florianópolis, SC',
         value: 5000,
-        stage,
+        stage: 'enviado',
         notes: quoteNotesMarker(runId),
         quote_code: `GP-${runId}`,
         created_by: createdBy,
       },
     ],
   });
+
+  // Transition to target stage via UPDATE so trigger fires
+  if (stage !== 'enviado') {
+    await updateQuoteStage(quoteId, stage);
+  }
 
   return { runId, quoteId };
 }

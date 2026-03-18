@@ -116,6 +116,20 @@ export function useRequestAiAnalysis() {
       entityId: string;
       entityType: string;
     }) => {
+      // `approval_summary` currently runs into auth issues when routed through
+      // `ai-orchestrator-agent` to `ai-approval-summary-worker`.
+      // To unblock the approvals UX, call the worker directly.
+      if (analysisType === 'approval_summary') {
+        return invokeEdgeFunction('ai-approval-summary-worker', {
+          body: {
+            entityId,
+            entityType,
+            // Worker has default model; pass explicitly for clarity.
+            model: 'gemini-2.5-pro',
+          },
+        });
+      }
+
       const primaryFnName = OPERATIONAL_TYPES.has(analysisType)
         ? 'ai-operational-orchestrator'
         : 'ai-orchestrator-agent';

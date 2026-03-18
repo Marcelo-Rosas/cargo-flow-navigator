@@ -114,7 +114,8 @@ export function useLoadCompositionSuggestions(
       }
 
       let query = supabase
-        .from('load_composition_suggestions')
+        // Cast to never to bypass generated type limitations for this new table
+        .from('load_composition_suggestions' as never)
         .select(
           include_details
             ? `
@@ -143,13 +144,17 @@ export function useLoadCompositionSuggestions(
       // Order by score descending
       query = query.order('consolidation_score', { ascending: false });
 
-      const { data, error } = await query;
+      const { data, error } = (await query) as {
+        data: unknown[] | null;
+        error: { message: string } | null;
+      };
 
       if (error) {
         throw new Error(`Failed to fetch suggestions: ${error.message}`);
       }
 
-      return (data || []) as LoadCompositionSuggestionWithDetails[];
+      const raw = (data ?? []) as unknown;
+      return raw as LoadCompositionSuggestionWithDetails[];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
@@ -168,8 +173,9 @@ export function useLoadCompositionSuggestion(
     queryFn: async () => {
       if (!compositionId) return null;
 
-      const { data, error } = await supabase
-        .from('load_composition_suggestions')
+      const { data, error } = (await supabase
+        // Cast to never to bypass generated type limitations for this new table
+        .from('load_composition_suggestions' as never)
         .select(
           `
           *,
@@ -179,7 +185,10 @@ export function useLoadCompositionSuggestion(
         `
         )
         .eq('id', compositionId)
-        .single();
+        .single()) as {
+        data: unknown | null;
+        error: { message: string; code?: string } | null;
+      };
 
       if (error) {
         if (error.code === 'PGRST116') {
@@ -209,7 +218,7 @@ export function useLoadCompositionSuggestionsRealtime(shipperId?: string) {
   React.useEffect(() => {
     if (!shipperId) return;
 
-    const subscription = supabase
+    const subscription = (supabase as any)
       .from('load_composition_suggestions')
       .on('INSERT', (payload) => {
         if (payload.new.shipper_id === shipperId) {

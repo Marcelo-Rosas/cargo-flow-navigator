@@ -2,9 +2,11 @@ import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { callEdgeFunction } from '../_shared/edgeFunctionClient.ts';
 
-// ─────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────
+// workflow-orchestrator v70
+// Alterações vs v69:
+// - handleQuoteStageChanged: adicionado handler para new_stage === 'pending_approval'
+//   que aciona o auto-approval-worker (LOW/MEDIUM → auto-aprova, HIGH/CRITICAL → manual)
+// - Mantida arquitetura v69: execute_after, quote.ganho_deferred, idempotência de OS
 
 interface WorkflowEvent {
   id: string;
@@ -32,10 +34,6 @@ type DenoLike = {
 
 const deno = (globalThis as unknown as { Deno: DenoLike }).Deno;
 
-// ─────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────
-
 function serviceClient(): SupabaseClient {
   return createClient(deno.env.get('SUPABASE_URL')!, deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 }
@@ -47,38 +45,51 @@ async function logAction(
   agent: string,
   details: Record<string, unknown> = {}
 ) {
-  await sb.from('workflow_event_logs').insert({
-    event_id: eventId,
-    action,
-    agent,
-    details,
-  });
+  await sb.from('workflow_event_logs').insert({ event_id: eventId, action, agent, details });
 }
 
-/** Fire-and-forget: trigger notification-hub to process a pending notification */
 async function triggerNotificationHub(logId: string) {
   try {
     await callEdgeFunction('notification-hub', { logId });
   } catch {
-    // Non-critical — notification stays 'pending' and can be processed in batch later
+    // Non-critical
   }
 }
 
 // ─────────────────────────────────────────────────────
-// Event Handlers
+// Quote Stage Changed
 // ─────────────────────────────────────────────────────
 
 async function handleQuoteStageChanged(
   sb: SupabaseClient,
   event: WorkflowEvent
 ): Promise<EventResult> {
-  const { new_stage, old_stage, client_email } = event.payload;
+  const { new_stage, old_stage, client_email, order_id } = event.payload;
   const actions: string[] = [];
 
-  // Quote won → notify client immediately; OS creation is deferred (24h grace period)
-  // The actual OS + FAT creation happens via 'quote.ganho_deferred' event (see handleQuoteGanhoDeferred)
+  // ── NEW: pending_approval → acionar auto-approval-worker ──────────────────
+  // LOW/MEDIUM  → aprovação automática → quote avança para 'ganho'
+  // HIGH/CRITICAL → cria approval_request manual para admin
+  // PAG: criado depois via ganho_deferred → order.created → handleOrderCreated
+  if (new_stage === 'pending_approval') {
+    try {
+      const result = await callEdgeFunction('auto-approval-worker', {
+        quote_id: event.entity_id,
+        order_id: order_id as string | undefined,
+        triggered_by: 'workflow-orchestrator',
+      });
+      if (result?.auto_approved) {
+        actions.push(`auto_approved:criticality=${result.criticality}`);
+      } else {
+        actions.push(`manual_approval_required:criticality=${result?.criticality ?? 'unknown'}`);
+      }
+    } catch (e) {
+      actions.push(`auto_approval_failed:${(e as Error).message}`);
+    }
+  }
+
+  // ── ganho → notifica cliente; OS criada de forma diferida (ganho_deferred) ─
   if (new_stage === 'ganho') {
-    // Notify client immediately that the quote was won
     const { data: quoteWonLog } = await sb
       .from('notification_logs')
       .insert({
@@ -96,7 +107,7 @@ async function handleQuoteStageChanged(
     actions.push('deferred:os_creation_scheduled_24h');
   }
 
-  // Quote reached pricing stage → trigger AI analysis
+  // ── precificacao → AI profitability analysis ──────────────────────────────
   if (new_stage === 'precificacao') {
     try {
       await callEdgeFunction('ai-orchestrator-agent', {
@@ -110,23 +121,21 @@ async function handleQuoteStageChanged(
     }
   }
 
-  // Quote sent → (email already handled by existing hook, just log)
-  if (new_stage === 'enviado') {
-    actions.push('quote_sent:tracked');
-  }
+  if (new_stage === 'enviado') actions.push('quote_sent:tracked');
 
-  if (actions.length === 0) {
-    actions.push(`no_action:${old_stage}->${new_stage}`);
-  }
+  if (actions.length === 0) actions.push(`no_action:${old_stage}->${new_stage}`);
 
   return { success: true, actions };
 }
+
+// ─────────────────────────────────────────────────────
+// Order Created
+// ─────────────────────────────────────────────────────
 
 async function handleOrderCreated(sb: SupabaseClient, event: WorkflowEvent): Promise<EventResult> {
   const { carreteiro_antt } = event.payload;
   const actions: string[] = [];
 
-  // Auto-create PAG document if order has carreteiro value
   if (carreteiro_antt && Number(carreteiro_antt) > 0) {
     const { error: pagErr } = await sb.rpc('ensure_financial_document', {
       doc_type: 'PAG',
@@ -137,7 +146,6 @@ async function handleOrderCreated(sb: SupabaseClient, event: WorkflowEvent): Pro
     else actions.push(`pag_failed:${pagErr.message}`);
   }
 
-  // Queue notification + trigger immediate send
   const { data: orderCreatedLog } = await sb
     .from('notification_logs')
     .insert({
@@ -155,6 +163,10 @@ async function handleOrderCreated(sb: SupabaseClient, event: WorkflowEvent): Pro
   return { success: true, actions };
 }
 
+// ─────────────────────────────────────────────────────
+// Order Stage Changed
+// ─────────────────────────────────────────────────────
+
 async function handleOrderStageChanged(
   sb: SupabaseClient,
   event: WorkflowEvent
@@ -162,7 +174,6 @@ async function handleOrderStageChanged(
   const { new_stage, driver_phone, quote_id } = event.payload;
   const actions: string[] = [];
 
-  // Driver assigned (moved to busca_motorista with driver info)
   if (new_stage === 'busca_motorista' && driver_phone) {
     const { data: driverLog } = await sb
       .from('notification_logs')
@@ -179,7 +190,6 @@ async function handleOrderStageChanged(
     if (driverLog) await triggerNotificationHub(driverLog.id);
     actions.push('notification_queued:driver_assigned_whatsapp');
 
-    // Trigger AI driver qualification
     try {
       await callEdgeFunction('ai-operational-agent', {
         analysisType: 'driver_qualification',
@@ -193,7 +203,6 @@ async function handleOrderStageChanged(
     }
   }
 
-  // Entered documentacao stage — trigger pre-coleta compliance check
   if (new_stage === 'documentacao') {
     try {
       await callEdgeFunction('ai-operational-agent', {
@@ -208,9 +217,7 @@ async function handleOrderStageChanged(
     }
   }
 
-  // Delivery confirmed
   if (new_stage === 'entregue') {
-    // Advance FAT to GERADO (find FAT via source quote)
     if (quote_id) {
       const { data: fatDoc } = await sb
         .from('financial_documents')
@@ -218,27 +225,23 @@ async function handleOrderStageChanged(
         .eq('source_type', 'quote')
         .eq('source_id', quote_id as string)
         .maybeSingle();
-
       if (fatDoc && fatDoc.status === 'INCLUIR') {
         await sb.from('financial_documents').update({ status: 'GERADO' }).eq('id', fatDoc.id);
         actions.push('fat_advanced:GERADO');
       }
     }
 
-    // Advance PAG to GERADO
     const { data: pagDoc } = await sb
       .from('financial_documents')
       .select('id, status')
       .eq('source_type', 'order')
       .eq('source_id', event.entity_id)
       .maybeSingle();
-
     if (pagDoc && pagDoc.status === 'INCLUIR') {
       await sb.from('financial_documents').update({ status: 'GERADO' }).eq('id', pagDoc.id);
       actions.push('pag_advanced:GERADO');
     }
 
-    // Notify client of delivery
     const { data: deliveryLog } = await sb
       .from('notification_logs')
       .insert({
@@ -254,12 +257,13 @@ async function handleOrderStageChanged(
     actions.push('notification_queued:delivery_confirmed');
   }
 
-  if (actions.length === 0) {
-    actions.push(`no_action:stage_${new_stage}`);
-  }
-
+  if (actions.length === 0) actions.push(`no_action:stage_${new_stage}`);
   return { success: true, actions };
 }
+
+// ─────────────────────────────────────────────────────
+// Financial Status Changed
+// ─────────────────────────────────────────────────────
 
 async function handleFinancialStatusChanged(
   sb: SupabaseClient,
@@ -270,8 +274,6 @@ async function handleFinancialStatusChanged(
 
   if (new_status === 'GERADO') {
     const amount = Number(total_amount) || 0;
-
-    // Check approval rules
     const { data: rules } = await sb
       .from('approval_rules')
       .select('*')
@@ -284,27 +286,18 @@ async function handleFinancialStatusChanged(
       for (const rule of rules) {
         const condition = rule.trigger_condition as Record<string, unknown>;
 
-        // Simple field-value comparison
         if (condition.field === 'total_amount') {
           const threshold = Number(condition.value) || 0;
           const operator = condition.operator as string;
-
           if (
             (operator === '>' && amount > threshold) ||
             (operator === '>=' && amount >= threshold)
           ) {
-            // Check additional conditions if any
             const additional = condition.additional as Record<string, unknown> | undefined;
             if (additional) {
-              const addField = additional.field as string;
-              const addValue = additional.value as string;
-              const entityValue = event.payload[addField];
-              if (entityValue !== addValue) continue;
+              if (event.payload[additional.field as string] !== additional.value) continue;
             }
-
             needsApproval = true;
-
-            // Create approval request
             await sb.from('approval_requests').insert({
               entity_type: 'financial_document',
               entity_id: event.entity_id,
@@ -315,8 +308,6 @@ async function handleFinancialStatusChanged(
               requested_by: event.created_by,
             });
             actions.push(`approval_created:${rule.approval_type}`);
-
-            // Request AI analysis for the approval
             try {
               await callEdgeFunction('ai-orchestrator-agent', {
                 analysisType: 'approval_summary',
@@ -327,9 +318,7 @@ async function handleFinancialStatusChanged(
             } catch (e) {
               actions.push(`ai_analysis_failed:${(e as Error).message}`);
             }
-
-            // Notify approver
-            const { data: approvalReqLog1 } = await sb
+            const { data: log1 } = await sb
               .from('notification_logs')
               .insert({
                 template_key: 'approval_requested',
@@ -340,16 +329,14 @@ async function handleFinancialStatusChanged(
               })
               .select('id')
               .single();
-            if (approvalReqLog1) await triggerNotificationHub(approvalReqLog1.id);
+            if (log1) await triggerNotificationHub(log1.id);
             actions.push('notification_queued:approval_requested');
             break;
           }
         }
 
-        // Simple type match (e.g. all PAGs need approval)
         if (condition.field === 'type' && condition.operator === '=' && condition.value === type) {
           needsApproval = true;
-
           await sb.from('approval_requests').insert({
             entity_type: 'financial_document',
             entity_id: event.entity_id,
@@ -360,8 +347,7 @@ async function handleFinancialStatusChanged(
             requested_by: event.created_by,
           });
           actions.push(`approval_created:${rule.approval_type}`);
-
-          const { data: approvalReqLog2 } = await sb
+          const { data: log2 } = await sb
             .from('notification_logs')
             .insert({
               template_key: 'approval_requested',
@@ -372,14 +358,13 @@ async function handleFinancialStatusChanged(
             })
             .select('id')
             .single();
-          if (approvalReqLog2) await triggerNotificationHub(approvalReqLog2.id);
+          if (log2) await triggerNotificationHub(log2.id);
           actions.push('notification_queued:approval_requested');
           break;
         }
       }
     }
 
-    // If no approval needed, auto-advance to AGUARDANDO
     if (!needsApproval) {
       await sb
         .from('financial_documents')
@@ -389,12 +374,13 @@ async function handleFinancialStatusChanged(
     }
   }
 
-  if (actions.length === 0) {
-    actions.push(`no_action:status_${new_status}`);
-  }
-
+  if (actions.length === 0) actions.push(`no_action:status_${new_status}`);
   return { success: true, actions };
 }
+
+// ─────────────────────────────────────────────────────
+// Approval Decided
+// ─────────────────────────────────────────────────────
 
 async function handleApprovalDecided(
   sb: SupabaseClient,
@@ -403,58 +389,41 @@ async function handleApprovalDecided(
   const { decision, entity_type, entity_id } = event.payload;
   const actions: string[] = [];
 
-  if (decision === 'approved') {
-    // Auto-advance the financial document
-    if (entity_type === 'financial_document') {
-      const { data: doc } = await sb
+  if (decision === 'approved' && entity_type === 'financial_document') {
+    const { data: doc } = await sb
+      .from('financial_documents')
+      .select('status')
+      .eq('id', entity_id as string)
+      .maybeSingle();
+    if (doc && doc.status === 'GERADO') {
+      await sb
         .from('financial_documents')
-        .select('status')
-        .eq('id', entity_id as string)
-        .maybeSingle();
-
-      if (doc && doc.status === 'GERADO') {
-        await sb
-          .from('financial_documents')
-          .update({ status: 'AGUARDANDO' })
-          .eq('id', entity_id as string);
-        actions.push('auto_advanced:AGUARDANDO');
-      }
+        .update({ status: 'AGUARDANDO' })
+        .eq('id', entity_id as string);
+      actions.push('auto_advanced:AGUARDANDO');
     }
-
-    // Notify requestor
-    const { data: approvedLog } = await sb
-      .from('notification_logs')
-      .insert({
-        template_key: 'approval_decided',
-        channel: 'email',
-        status: 'pending',
-        entity_type: entity_type as string,
-        entity_id: entity_id as string,
-      })
-      .select('id')
-      .single();
-    if (approvedLog) await triggerNotificationHub(approvedLog.id);
-    actions.push('notification_queued:approval_approved');
   }
 
-  if (decision === 'rejected') {
-    const { data: rejectedLog } = await sb
-      .from('notification_logs')
-      .insert({
-        template_key: 'approval_decided',
-        channel: 'email',
-        status: 'pending',
-        entity_type: entity_type as string,
-        entity_id: entity_id as string,
-      })
-      .select('id')
-      .single();
-    if (rejectedLog) await triggerNotificationHub(rejectedLog.id);
-    actions.push('notification_queued:approval_rejected');
-  }
+  const { data: log } = await sb
+    .from('notification_logs')
+    .insert({
+      template_key: 'approval_decided',
+      channel: 'email',
+      status: 'pending',
+      entity_type: entity_type as string,
+      entity_id: entity_id as string,
+    })
+    .select('id')
+    .single();
+  if (log) await triggerNotificationHub(log.id);
+  actions.push(`notification_queued:approval_${decision}`);
 
   return { success: true, actions };
 }
+
+// ─────────────────────────────────────────────────────
+// Document Uploaded
+// ─────────────────────────────────────────────────────
 
 async function handleDocumentUploaded(
   sb: SupabaseClient,
@@ -462,10 +431,8 @@ async function handleDocumentUploaded(
 ): Promise<EventResult> {
   const { type, order_id } = event.payload;
   const actions: string[] = [];
-
   if (!order_id) return { success: true, actions: ['no_action:no_order_id'] };
 
-  // Update document flags on the order
   const flagMap: Record<string, string> = {
     nfe: 'has_nfe',
     cte: 'has_cte',
@@ -479,7 +446,6 @@ async function handleDocumentUploaded(
     doc_rota: 'has_doc_rota',
     comprovante_vpo: 'has_vpo',
   };
-
   const flag = flagMap[type as string];
   if (flag) {
     await sb
@@ -489,7 +455,6 @@ async function handleDocumentUploaded(
     actions.push(`flag_set:${flag}`);
   }
 
-  // Comprovantes de pagamento (adiantamento/saldo carreteiro) → process-payment-proof
   if (['adiantamento_carreteiro', 'saldo_carreteiro'].includes(type as string)) {
     try {
       await callEdgeFunction('process-payment-proof', { documentId: event.entity_id });
@@ -499,7 +464,6 @@ async function handleDocumentUploaded(
     }
   }
 
-  // Check if order can auto-advance
   const { data: order } = await sb
     .from('orders')
     .select(
@@ -509,7 +473,6 @@ async function handleDocumentUploaded(
     .maybeSingle();
 
   if (order) {
-    // documentacao → coleta_realizada: requires NF-e + CT-e + Análise GR + Doc Rota + VPO
     if (
       order.stage === 'documentacao' &&
       order.has_nfe &&
@@ -524,8 +487,6 @@ async function handleDocumentUploaded(
         .eq('id', order_id as string);
       actions.push('auto_advanced:coleta_realizada');
     }
-
-    // em_transito → entregue: requires POD
     if (order.stage === 'em_transito' && order.has_pod) {
       await sb
         .from('orders')
@@ -539,7 +500,7 @@ async function handleDocumentUploaded(
 }
 
 // ─────────────────────────────────────────────────────
-// Driver Qualified Handler
+// Driver Qualified
 // ─────────────────────────────────────────────────────
 
 async function handleDriverQualified(
@@ -548,12 +509,17 @@ async function handleDriverQualified(
 ): Promise<EventResult> {
   const { status } = event.payload;
   const actions: string[] = [];
-
-  if (status === 'aprovado') {
-    const { data: approvedLog } = await sb
+  const tmap: Record<string, string> = {
+    aprovado: 'driver_qualification_approved',
+    bloqueado: 'driver_qualification_blocked',
+    em_analise: 'driver_qualification_review',
+  };
+  const tmpl = tmap[status as string];
+  if (tmpl) {
+    const { data: log } = await sb
       .from('notification_logs')
       .insert({
-        template_key: 'driver_qualification_approved',
+        template_key: tmpl,
         channel: 'whatsapp',
         status: 'pending',
         entity_type: 'order',
@@ -561,47 +527,15 @@ async function handleDriverQualified(
       })
       .select('id')
       .single();
-    if (approvedLog) await triggerNotificationHub(approvedLog.id);
-    actions.push('notification_queued:driver_qualification_approved');
-  } else if (status === 'bloqueado') {
-    const { data: blockedLog } = await sb
-      .from('notification_logs')
-      .insert({
-        template_key: 'driver_qualification_blocked',
-        channel: 'whatsapp',
-        status: 'pending',
-        entity_type: 'order',
-        entity_id: event.entity_id,
-      })
-      .select('id')
-      .single();
-    if (blockedLog) await triggerNotificationHub(blockedLog.id);
-    actions.push('notification_queued:driver_qualification_blocked');
-  } else if (status === 'em_analise') {
-    const { data: reviewLog } = await sb
-      .from('notification_logs')
-      .insert({
-        template_key: 'driver_qualification_review',
-        channel: 'whatsapp',
-        status: 'pending',
-        entity_type: 'order',
-        entity_id: event.entity_id,
-      })
-      .select('id')
-      .single();
-    if (reviewLog) await triggerNotificationHub(reviewLog.id);
-    actions.push('notification_queued:driver_qualification_review');
+    if (log) await triggerNotificationHub(log.id);
+    actions.push(`notification_queued:${tmpl}`);
   }
-
-  if (actions.length === 0) {
-    actions.push(`no_action:driver_status_${status}`);
-  }
-
+  if (actions.length === 0) actions.push(`no_action:driver_status_${status}`);
   return { success: true, actions };
 }
 
 // ─────────────────────────────────────────────────────
-// Compliance Violation Handler
+// Compliance Violation
 // ─────────────────────────────────────────────────────
 
 async function handleComplianceViolation(
@@ -610,8 +544,6 @@ async function handleComplianceViolation(
 ): Promise<EventResult> {
   const { check_type, os_number } = event.payload;
   const actions: string[] = [];
-
-  // Create approval request for operational manager
   await sb.from('approval_requests').insert({
     entity_type: 'order',
     entity_id: event.entity_id,
@@ -622,9 +554,7 @@ async function handleComplianceViolation(
     requested_by: event.created_by,
   });
   actions.push('approval_created:compliance_override');
-
-  // Notify via WhatsApp + Email
-  const { data: violationLog } = await sb
+  const { data: log } = await sb
     .from('notification_logs')
     .insert({
       template_key: 'compliance_violation',
@@ -635,14 +565,13 @@ async function handleComplianceViolation(
     })
     .select('id')
     .single();
-  if (violationLog) await triggerNotificationHub(violationLog.id);
+  if (log) await triggerNotificationHub(log.id);
   actions.push('notification_queued:compliance_violation');
-
   return { success: true, actions };
 }
 
 // ─────────────────────────────────────────────────────
-// Deferred: Quote Ganho Grace Period (24h)
+// Deferred: Quote Ganho (24h grace period → cria OS + FAT)
 // ─────────────────────────────────────────────────────
 
 async function handleQuoteGanhoDeferred(
@@ -651,34 +580,25 @@ async function handleQuoteGanhoDeferred(
 ): Promise<EventResult> {
   const actions: string[] = [];
 
-  // 1. Verify quote is STILL in 'ganho' stage (defensive check)
-  const { data: quote, error: quoteErr } = await sb
+  const { data: quote } = await sb
     .from('quotes')
     .select('id, stage')
     .eq('id', event.entity_id)
     .single();
 
-  if (quoteErr || !quote) {
-    return { success: true, actions: ['skipped:quote_not_found'] };
-  }
-
-  if (quote.stage !== 'ganho') {
-    // Quote reverted — trigger should have cancelled this, but handle defensively
+  if (!quote) return { success: true, actions: ['skipped:quote_not_found'] };
+  if (quote.stage !== 'ganho')
     return { success: true, actions: [`skipped:quote_stage_is_${quote.stage}`] };
-  }
 
-  // 2. Idempotency: check if an order already exists for this quote
+  // Idempotência: não cria OS se já existe
   const { data: existingOrder } = await sb
     .from('orders')
     .select('id')
     .eq('quote_id', event.entity_id)
     .maybeSingle();
-
-  if (existingOrder) {
+  if (existingOrder)
     return { success: true, actions: [`skipped:order_already_exists:${existingOrder.id}`] };
-  }
 
-  // 3. Auto-create order from quote
   const { data: orderResult, error: orderErr } = await sb.rpc('auto_create_order_from_quote', {
     p_quote_id: event.entity_id,
   });
@@ -691,8 +611,6 @@ async function handleQuoteGanhoDeferred(
     }
   } else {
     actions.push(`order_created:${orderResult}`);
-
-    // 4. Auto-create FAT document
     const { error: fatErr } = await sb.rpc('ensure_financial_document', {
       doc_type: 'FAT',
       source_id_in: event.entity_id,
@@ -714,7 +632,6 @@ async function processEvents(
   processed: number;
   results: Array<{ eventId: string; event_type: string; result: EventResult }>;
 }> {
-  // Fetch pending events (respects execute_after for deferred/grace-period events)
   const now = new Date().toISOString();
   let query = sb
     .from('workflow_events')
@@ -735,13 +652,11 @@ async function processEvents(
   const results: Array<{ eventId: string; event_type: string; result: EventResult }> = [];
 
   for (const event of events as WorkflowEvent[]) {
-    // Mark as processing
     await sb.from('workflow_events').update({ status: 'processing' }).eq('id', event.id);
 
     try {
       let result: EventResult;
 
-      // Route to handler
       switch (true) {
         case event.event_type === 'quote.stage_changed':
           result = await handleQuoteStageChanged(sb, event);
@@ -774,13 +689,11 @@ async function processEvents(
           result = { success: true, actions: [`unhandled:${event.event_type}`] };
       }
 
-      // Mark as completed
       await sb
         .from('workflow_events')
         .update({ status: 'completed', processed_at: new Date().toISOString() })
         .eq('id', event.id);
 
-      // Log all actions
       for (const action of result.actions) {
         await logAction(sb, event.id, action, 'workflow-orchestrator');
       }
@@ -820,31 +733,23 @@ async function processEvents(
 
 deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
-
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
 
   try {
     const sb = serviceClient();
-
     let eventId: string | undefined;
+
     if (req.method === 'POST') {
       try {
         const body = await req.json();
         eventId = body?.eventId;
-
-        // Support Supabase Database Webhook format
-        if (body?.type === 'INSERT' && body?.record?.id) {
-          eventId = body.record.id;
-        }
+        if (body?.type === 'INSERT' && body?.record?.id) eventId = body.record.id;
       } catch {
-        // empty body is fine (process all pending)
+        // empty body ok
       }
     }
 
     const result = await processEvents(sb, eventId);
-
     return new Response(JSON.stringify(result), {
       status: 200,
       headers: { ...corsHeaders, 'content-type': 'application/json' },

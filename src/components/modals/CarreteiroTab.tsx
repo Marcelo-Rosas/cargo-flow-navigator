@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { MaskedInput } from '@/components/ui/masked-input';
+import { DatePickerString } from '@/components/ui/date-picker';
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { CarrierPaymentProofList } from '@/components/documents/CarrierPaymentProofList';
 import { useUpdateOrder } from '@/hooks/useOrders';
@@ -537,13 +538,13 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
               {formatCurrency(advanceAmount)}
             </p>
             <label className="text-xs text-muted-foreground block mb-1">Data</label>
-            <Input
-              type="date"
+            <DatePickerString
               value={advanceDate}
-              onChange={(e) => setAdvanceDate(e.target.value)}
-              onBlur={() => handleSaveDate('carrier_advance_date', advanceDate)}
+              onChange={(val) => {
+                setAdvanceDate(val);
+                handleSaveDate('carrier_advance_date', val);
+              }}
               disabled={!canManage}
-              className="h-9"
             />
           </div>
 
@@ -556,13 +557,13 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
               {formatCurrency(balanceAmount)}
             </p>
             <label className="text-xs text-muted-foreground block mb-1">Data</label>
-            <Input
-              type="date"
+            <DatePickerString
               value={balanceDate}
-              onChange={(e) => setBalanceDate(e.target.value)}
-              onBlur={() => handleSaveDate('carrier_balance_date', balanceDate)}
+              onChange={(val) => {
+                setBalanceDate(val);
+                handleSaveDate('carrier_balance_date', val);
+              }}
               disabled={!canManage}
-              className="h-9"
             />
           </div>
         </div>
@@ -580,13 +581,13 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
             </div>
             <div className="w-48">
               <label className="text-xs text-muted-foreground block mb-1">Data de Pagamento</label>
-              <Input
-                type="date"
+              <DatePickerString
                 value={balanceDate}
-                onChange={(e) => setBalanceDate(e.target.value)}
-                onBlur={() => handleSaveDate('carrier_balance_date', balanceDate)}
+                onChange={(val) => {
+                  setBalanceDate(val);
+                  handleSaveDate('carrier_balance_date', val);
+                }}
                 disabled={!canManage}
-                className="h-9"
               />
             </div>
           </div>

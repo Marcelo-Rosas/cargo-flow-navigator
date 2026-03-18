@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { Loader2, Calculator, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePickerString } from '@/components/ui/date-picker';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -2203,10 +2204,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                                               Data adiantamento
                                             </FormLabel>
                                             <FormControl>
-                                              <Input
-                                                type="date"
+                                              <DatePickerString
                                                 value={field.value || ''}
-                                                onChange={(e) => field.onChange(e.target.value)}
+                                                onChange={(val) => field.onChange(val)}
                                               />
                                             </FormControl>
                                           </FormItem>
@@ -2224,10 +2224,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                                           <FormItem>
                                             <FormLabel className="text-xs">Data saldo</FormLabel>
                                             <FormControl>
-                                              <Input
-                                                type="date"
+                                              <DatePickerString
                                                 value={field.value || ''}
-                                                onChange={(e) => field.onChange(e.target.value)}
+                                                onChange={(val) => field.onChange(val)}
                                               />
                                             </FormControl>
                                           </FormItem>
@@ -2248,10 +2247,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                                           Data do pagamento (à vista)
                                         </FormLabel>
                                         <FormControl>
-                                          <Input
-                                            type="date"
+                                          <DatePickerString
                                             value={field.value || ''}
-                                            onChange={(e) => field.onChange(e.target.value)}
+                                            onChange={(val) => field.onChange(val)}
                                           />
                                         </FormControl>
                                       </FormItem>
@@ -2268,10 +2266,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                                     <FormItem>
                                       <FormLabel className="text-xs">Data de vencimento</FormLabel>
                                       <FormControl>
-                                        <Input
-                                          type="date"
+                                        <DatePickerString
                                           value={field.value || ''}
-                                          onChange={(e) => field.onChange(e.target.value)}
+                                          onChange={(val) => field.onChange(val)}
                                         />
                                       </FormControl>
                                     </FormItem>

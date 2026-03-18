@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePickerString } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import {
   Table,
@@ -238,11 +239,7 @@ function TacRateForm({
       <div className="space-y-4 py-4">
         <div className="space-y-2">
           <Label>Data de Referência</Label>
-          <Input
-            type="date"
-            value={referenceDate}
-            onChange={(e) => setReferenceDate(e.target.value)}
-          />
+          <DatePickerString value={referenceDate} onChange={(val) => setReferenceDate(val)} />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">

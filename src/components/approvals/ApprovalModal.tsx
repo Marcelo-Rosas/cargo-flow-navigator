@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   ShieldCheck,
@@ -10,6 +10,7 @@ import {
   Loader2,
   Clock,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +24,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { formatCurrency } from '@/lib/utils';
 import { useDecideApproval, type ApprovalRequest } from '@/hooks/useApprovalRequests';
-import { useEntityInsights } from '@/hooks/useAiInsights';
+import { supabase } from '@/integrations/supabase/client';
+import { useEntityInsights, useRequestAiAnalysis } from '@/hooks/useAiInsights';
 
 interface Props {
   approval: ApprovalRequest | null;
@@ -46,22 +48,82 @@ const riskIcons: Record<string, typeof CheckCircle2> = {
 export function ApprovalModal({ approval, open, onOpenChange }: Props) {
   const [notes, setNotes] = useState('');
   const decide = useDecideApproval();
+  const requestAi = useRequestAiAnalysis();
+  const requestedForRef = useRef<string | null>(null);
 
-  const { data: insights = [] } = useEntityInsights(
+  const { data: insights = [], isLoading: isInsightsLoading } = useEntityInsights(
     approval?.entity_type ?? '',
     approval?.entity_id ?? ''
   );
 
-  if (!approval) return null;
+  const quoteUuidFromDescription = useMemo(() => {
+    const desc = approval?.description;
+    if (!desc) return null;
+    const m = desc.match(/Quote\s+([0-9a-fA-F-]{36})/);
+    return m?.[1] ?? null;
+  }, [approval?.description]);
 
-  const aiAnalysis = approval.ai_analysis ?? insights?.[0]?.analysis ?? null;
+  const { data: quoteCode } = useQuery({
+    queryKey: ['approval-quote-code', quoteUuidFromDescription],
+    enabled: open && !!quoteUuidFromDescription,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('quotes' as 'documents')
+        .select('quote_code')
+        .eq('id', quoteUuidFromDescription!)
+        .maybeSingle();
+
+      if (error) return null;
+      return (data as unknown as { quote_code: string } | null)?.quote_code ?? null;
+    },
+  });
+
+  const aiAnalysis = approval?.ai_analysis ?? insights?.[0]?.analysis ?? null;
   const risk = (aiAnalysis?.risk as string) || 'medio';
   const RiskIcon = riskIcons[risk] || AlertTriangle;
   const recommendation = (aiAnalysis?.recommendation as string) || null;
   const summary = (aiAnalysis?.summary as string) || null;
   const metrics = (aiAnalysis?.metrics as Record<string, unknown>) || null;
+  const renderedDescription = useMemo(() => {
+    const desc = approval?.description ?? null;
+    const uuid = quoteUuidFromDescription;
+    if (!desc || !uuid || !quoteCode) return desc;
+    // Matches UI pattern currently stored: "Quote <uuid> ..."
+    return desc.replace(`Quote ${uuid}`, `Quote ${quoteCode}`);
+  }, [approval?.description, quoteUuidFromDescription, quoteCode]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!approval) return;
+    if (approval.status !== 'pending') return;
+    if (aiAnalysis) return;
+    if (requestAi.isPending) return;
+    if (isInsightsLoading) return;
+
+    if (!approval.entity_type || !approval.entity_id) return;
+    if (requestedForRef.current === approval.id) return;
+
+    requestedForRef.current = approval.id;
+    requestAi.mutate({
+      analysisType: 'approval_summary',
+      entityId: approval.entity_id,
+      entityType: approval.entity_type,
+    });
+  }, [
+    open,
+    approval?.id,
+    approval?.status,
+    aiAnalysis,
+    requestAi.isPending,
+    requestAi.mutate,
+    approval?.entity_type,
+    approval?.entity_id,
+    insights?.length,
+    isInsightsLoading,
+  ]);
 
   const handleDecision = (decision: 'approved' | 'rejected') => {
+    if (!approval) return;
     decide.mutate(
       { id: approval.id, decision, notes },
       {
@@ -73,7 +135,9 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
     );
   };
 
-  const isPending = approval.status === 'pending';
+  const isPending = approval?.status === 'pending';
+
+  if (!approval) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -107,14 +171,14 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
           </div>
 
           {/* Description */}
-          {approval.description && (
-            <p className="text-sm text-muted-foreground">{approval.description}</p>
+          {renderedDescription && (
+            <p className="text-sm text-muted-foreground">{renderedDescription}</p>
           )}
 
           <Separator />
 
           {/* AI Analysis Section */}
-          {aiAnalysis && (
+          {aiAnalysis ? (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -129,7 +193,9 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
 
               {/* Risk Badge */}
               <div className="flex items-center gap-2">
-                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${riskColors[risk]}`}>
+                <div
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${riskColors[risk]}`}
+                >
                   <RiskIcon className="w-3.5 h-3.5" />
                   Risco {risk}
                 </div>
@@ -150,7 +216,9 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
                       </p>
                       <p className="text-sm font-semibold">
                         {typeof val === 'number'
-                          ? key.includes('revenue') || key.includes('margin') || key.includes('amount')
+                          ? key.includes('revenue') ||
+                            key.includes('margin') ||
+                            key.includes('amount')
                             ? formatCurrency(val)
                             : val.toFixed(1)
                           : String(val)}
@@ -169,9 +237,24 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
                 </div>
               )}
             </motion.div>
-          )}
-
-          {!aiAnalysis && (
+          ) : requestAi.isPending ? (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Gerando análise AI...
+            </div>
+          ) : requestAi.error ? (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 text-sm text-red-700 border border-red-200">
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <div className="space-y-1">
+                <p className="font-medium">Falha ao gerar análise AI</p>
+                <p className="text-xs text-red-600">
+                  {requestAi.error instanceof Error
+                    ? requestAi.error.message
+                    : String(requestAi.error)}
+                </p>
+              </div>
+            </div>
+          ) : (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
               <Brain className="w-4 h-4" />
               Análise AI ainda não disponível para esta solicitação.
@@ -210,7 +293,7 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
               variant="outline"
               className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
               onClick={() => handleDecision('rejected')}
-              disabled={decide.isPending}
+              disabled={decide.isPending || requestAi.isPending}
             >
               {decide.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-1" />
@@ -222,7 +305,7 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
             <Button
               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
               onClick={() => handleDecision('approved')}
-              disabled={decide.isPending}
+              disabled={decide.isPending || requestAi.isPending}
             >
               {decide.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-1" />

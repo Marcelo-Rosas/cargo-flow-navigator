@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Truck, DollarSign, Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Truck, DollarSign, Loader2, ShieldCheck, ShieldAlert, Plus, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -11,13 +11,28 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useTrip, useTripCostItems, useTripOrdersWithOrders } from '@/hooks/useTrips';
+import {
+  useTrip,
+  useTripCostItems,
+  useTripOrdersWithOrders,
+  useAddOrderToTrip,
+  useRemoveOrderFromTrip,
+  useSearchOrdersForTrip,
+} from '@/hooks/useTrips';
 import { useTripReconciliation } from '@/hooks/useReconciliation';
 import { useTripFinancialSummary } from '@/hooks/useTripFinancialSummary';
 import { useTripFinancialDetails } from '@/hooks/useTripFinancialDetails';
 import { useRiskEvaluationByEntity, useTripOrdersRiskStatus } from '@/hooks/useRiskEvaluation';
 import { CRITICALITY_CONFIG, REQUIREMENT_LABELS } from '@/types/risk';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog as InlineDialog,
+  DialogContent as InlineDialogContent,
+  DialogHeader as InlineDialogHeader,
+  DialogTitle as InlineDialogTitle,
+} from '@/components/ui/dialog';
 
 interface TripDetailModalProps {
   open: boolean;
@@ -61,6 +76,16 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
   const { data: reconciliation } = useTripReconciliation(tripId);
   const { data: summary } = useTripFinancialSummary(tripId);
   const { data: financialDetails } = useTripFinancialDetails(tripId);
+  const addOrderMutation = useAddOrderToTrip();
+  const removeOrderMutation = useRemoveOrderFromTrip();
+
+  const [showAddOsDialog, setShowAddOsDialog] = useState(false);
+  const [osSearch, setOsSearch] = useState('');
+
+  const { data: osSearchResults, isLoading: isSearchingOs } = useSearchOrdersForTrip(
+    tripId,
+    osSearch
+  );
 
   // VG Risk
   const orderIds = useMemo(
@@ -475,6 +500,86 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
             </div>
           )}
 
+          {/* CRUD de OS vinculadas à viagem */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-foreground">Ordens de Serviço da viagem</h4>
+              <Button size="sm" className="gap-2" onClick={() => setShowAddOsDialog(true)}>
+                <Plus className="w-4 h-4" />
+                Adicionar OS
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Gerencie quais OS estão vinculadas a esta viagem. Adicionar ou remover aqui atualiza o
+              rateio e os resumos financeiros automaticamente.
+            </p>
+
+            <div className="rounded-lg border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>OS</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-right">Fator rateio</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tripOrders && tripOrders.length > 0 ? (
+                    tripOrders.map((to) => (
+                      <TableRow key={to.id}>
+                        <TableCell className="font-mono">
+                          {to.order?.os_number ?? to.order_id?.slice(0, 8) ?? '—'}
+                        </TableCell>
+                        <TableCell className="truncate max-w-[180px] text-xs text-muted-foreground">
+                          {to.order?.id ?? '—'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(Number(to.order?.value ?? 0))}
+                        </TableCell>
+                        <TableCell className="text-right text-xs">
+                          {(Number(to.apportion_factor ?? 0) * 100).toFixed(1)}%
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive"
+                            disabled={removeOrderMutation.isPending}
+                            onClick={() => {
+                              if (!tripId || !to.order_id) return;
+                              if (
+                                !window.confirm(
+                                  'Remover esta OS da viagem? O rateio e os custos serão atualizados.'
+                                )
+                              ) {
+                                return;
+                              }
+                              removeOrderMutation.mutate({
+                                tripOrderId: to.id,
+                                tripId,
+                                orderId: to.order_id,
+                              });
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-xs text-muted-foreground text-center">
+                        Nenhuma OS vinculada a esta viagem ainda.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
           {/* Custos por OS (pivot: OS=linhas, Categoria=colunas) */}
           {tripOrders && tripOrders.length > 0 && (
             <div>
@@ -534,6 +639,82 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
             </div>
           )}
         </div>
+
+        {/* Dialog interno para adicionar OS à viagem */}
+        <InlineDialog open={showAddOsDialog} onOpenChange={setShowAddOsDialog}>
+          <InlineDialogContent className="sm:max-w-[700px]">
+            <InlineDialogHeader>
+              <InlineDialogTitle>Adicionar OS à viagem</InlineDialogTitle>
+            </InlineDialogHeader>
+            <div className="space-y-4">
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="block text-xs text-muted-foreground mb-1">
+                    Buscar OS (mínimo 3 caracteres)
+                  </label>
+                  <Input
+                    placeholder="OS-2026-03-0001"
+                    value={osSearch}
+                    onChange={(e) => setOsSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>OS</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-right">Ação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isSearchingOs ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-xs text-muted-foreground py-4">
+                          Buscando OS...
+                        </TableCell>
+                      </TableRow>
+                    ) : osSearchResults && osSearchResults.length > 0 ? (
+                      osSearchResults.map((o) => (
+                        <TableRow key={o.id}>
+                          <TableCell className="font-mono">{o.os_number ?? o.id}</TableCell>
+                          <TableCell className="truncate max-w-[200px] text-xs text-muted-foreground">
+                            {o.client_name ?? '—'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(Number(o.value ?? 0))}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={addOrderMutation.isPending || !tripId}
+                              onClick={() => {
+                                if (!tripId) return;
+                                addOrderMutation.mutate({ orderId: o.id, tripId });
+                              }}
+                            >
+                              Vincular
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-xs text-muted-foreground py-4">
+                          Nenhuma OS encontrada. Digite ao menos 3 caracteres do número da OS.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </InlineDialogContent>
+        </InlineDialog>
       </DialogContent>
     </Dialog>
   );

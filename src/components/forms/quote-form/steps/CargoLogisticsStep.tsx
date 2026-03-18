@@ -1,5 +1,6 @@
 import type { UseFormReturn } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
+import { DatePickerString } from '@/components/ui/date-picker';
 import { SectionBlock } from '@/components/ui/section-block';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -339,10 +340,9 @@ export function CargoLogisticsStep({
                             Adiant. {advPercent}%
                           </FormLabel>
                           <FormControl>
-                            <Input
-                              type="date"
+                            <DatePickerString
                               value={field.value || ''}
-                              onChange={(e) => field.onChange(e.target.value)}
+                              onChange={(val) => field.onChange(val)}
                             />
                           </FormControl>
                           <FormMessage />
@@ -361,10 +361,9 @@ export function CargoLogisticsStep({
                             Saldo {100 - advPercent}%
                           </FormLabel>
                           <FormControl>
-                            <Input
-                              type="date"
+                            <DatePickerString
                               value={field.value || ''}
-                              onChange={(e) => field.onChange(e.target.value)}
+                              onChange={(val) => field.onChange(val)}
                             />
                           </FormControl>
                           <FormMessage />
@@ -382,10 +381,9 @@ export function CargoLogisticsStep({
                           À vista
                         </FormLabel>
                         <FormControl>
-                          <Input
-                            type="date"
+                          <DatePickerString
                             value={field.value || ''}
-                            onChange={(e) => field.onChange(e.target.value)}
+                            onChange={(val) => field.onChange(val)}
                           />
                         </FormControl>
                         <FormMessage />
@@ -400,10 +398,9 @@ export function CargoLogisticsStep({
                       <FormItem>
                         <FormLabel className="text-xs">Data de vencimento</FormLabel>
                         <FormControl>
-                          <Input
-                            type="date"
+                          <DatePickerString
                             value={field.value || ''}
-                            onChange={(e) => field.onChange(e.target.value)}
+                            onChange={(val) => field.onChange(val)}
                           />
                         </FormControl>
                         <FormMessage />
@@ -423,10 +420,9 @@ export function CargoLogisticsStep({
               <FormItem>
                 <FormLabel>Previsão de Carregamento</FormLabel>
                 <FormControl>
-                  <Input
-                    type="date"
+                  <DatePickerString
                     value={field.value || ''}
-                    onChange={(e) => field.onChange(e.target.value)}
+                    onChange={(val) => field.onChange(val)}
                   />
                 </FormControl>
                 <FormMessage />

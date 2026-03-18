@@ -1,4 +1,6 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+config({ path: '.env' });
+config({ path: '.env.e2e', override: true });
 import { defineConfig, devices } from '@playwright/test';
 
 /**

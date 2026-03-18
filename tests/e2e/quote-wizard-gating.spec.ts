@@ -57,6 +57,18 @@ const fillBaseQuoteForm = async (page: Page, km: string) => {
   const newQuoteBtn = page.getByRole('button', { name: 'Nova Cotação' });
   await newQuoteBtn.waitFor({ state: 'visible', timeout: 15_000 });
   await newQuoteBtn.click();
+  // Modal "Tipo de cotação" — selecionar fluxo 360
+  const novaCotacaoOption = page
+    .getByRole('button', { name: 'Nova cotação' })
+    .or(page.getByText('Fluxo 360 com motor de cálculo'));
+  if (
+    await novaCotacaoOption
+      .first()
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false)
+  ) {
+    await novaCotacaoOption.first().click();
+  }
   await page.getByLabel('Nome do Cliente *').fill('E2E Cliente');
   await page.getByLabel('Origem *').fill('São Paulo, SP');
   await page.getByLabel('Destino *').fill('Rio de Janeiro, RJ');
@@ -71,6 +83,9 @@ const fillBaseQuoteForm = async (page: Page, km: string) => {
   await page.getByRole('button', { name: /Próximo/i }).click();
 
   await page.getByLabel('Valor da Carga').fill('1000');
+  await page.getByRole('button', { name: /Próximo/i }).click();
+
+  // Step 4 — Seguro (skip)
   await page.getByRole('button', { name: /Próximo/i }).click();
 };
 

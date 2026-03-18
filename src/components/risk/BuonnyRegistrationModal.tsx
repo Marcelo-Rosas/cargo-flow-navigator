@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { DatePickerString } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -185,10 +186,9 @@ export function BuonnyRegistrationModal({
               </SelectContent>
             </Select>
             {validade === 'data' && (
-              <Input
-                type="date"
+              <DatePickerString
                 value={dataValidade}
-                onChange={(e) => setDataValidade(e.target.value)}
+                onChange={(val) => setDataValidade(val)}
                 className="mt-1.5"
               />
             )}

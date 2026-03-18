@@ -6,6 +6,7 @@ import { Database } from '@/integrations/supabase/types';
 type Trip = Database['public']['Tables']['trips']['Row'];
 type TripInsert = Database['public']['Tables']['trips']['Insert'];
 type TripUpdate = Database['public']['Tables']['trips']['Update'];
+type TripOrderRow = Database['public']['Tables']['trip_orders']['Row'];
 
 export function useTrips() {
   return useQuery({
@@ -240,12 +241,113 @@ export function useLinkOrderToTargetTrip() {
       if (error) throw error;
       return data as string;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const tripId = variables.tripId;
       queryClient.invalidateQueries({ queryKey: ['trips'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
       queryClient.invalidateQueries({ queryKey: ['trip_cost_items'] });
+      if (tripId) {
+        queryClient.invalidateQueries({ queryKey: ['trip_orders', tripId] });
+        queryClient.invalidateQueries({ queryKey: ['trip_financial_summary', tripId] });
+        queryClient.invalidateQueries({ queryKey: ['v_trip_financial_details', tripId] });
+      }
+    },
+  });
+}
+
+export function useAddOrderToTrip() {
+  const base = useLinkOrderToTargetTrip();
+  return base;
+}
+
+export function useRemoveOrderFromTrip() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      tripOrderId,
+      tripId,
+      orderId,
+    }: {
+      tripOrderId: string;
+      tripId: string;
+      orderId: string;
+    }) => {
+      const { error: deleteError } = await supabase
+        .from('trip_orders')
+        .delete()
+        .eq('id', asDb(tripOrderId));
+      if (deleteError) throw deleteError;
+
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({ trip_id: null })
+        .eq('id', asDb(orderId));
+      if (orderError) throw orderError;
+
+      // Recalcula itens de custo a partir do breakdown
+      const { error: syncError } = await supabase.rpc('sync_cost_items_from_breakdown', {
+        p_trip_id: tripId,
+      });
+      if (syncError) throw syncError;
+    },
+    onSuccess: (_data, variables) => {
+      const tripId = variables.tripId;
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      if (tripId) {
+        queryClient.invalidateQueries({ queryKey: ['trip_orders', tripId] });
+        queryClient.invalidateQueries({ queryKey: ['trip_financial_summary', tripId] });
+        queryClient.invalidateQueries({ queryKey: ['v_trip_financial_details', tripId] });
+        queryClient.invalidateQueries({ queryKey: ['trip_cost_items', tripId] });
+      }
+    },
+  });
+}
+
+export function useUpdateOrderDriverForTrip() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ orderId, driverId }: { orderId: string; driverId: string | null }) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ driver_id: driverId })
+        .eq('id', asDb(orderId));
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      const tripId = variables?.orderId ? null : null;
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidation específica por trip será feita no modal quando soubermos o tripId
+      if (tripId) {
+        queryClient.invalidateQueries({ queryKey: ['v_trip_financial_details', tripId] });
+      }
+    },
+  });
+}
+
+export function useSearchOrdersForTrip(tripId: string | null | undefined, searchTerm: string) {
+  return useQuery({
+    queryKey: ['orders', 'search-trip', tripId, searchTerm],
+    enabled: !!tripId && searchTerm.trim().length >= 3,
+    queryFn: async () => {
+      if (!tripId || searchTerm.trim().length < 3) return [];
+      const term = `${searchTerm.trim()}%`;
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, os_number, client_name, value, driver_id, trip_id')
+        .ilike('os_number', term)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      const rows = filterSupabaseRows<Database['public']['Tables']['orders']['Row']>(data);
+      // Filtra fora OS já vinculadas à trip alvo
+      return rows.filter((o) => o.trip_id === null || o.trip_id !== tripId);
     },
   });
 }
