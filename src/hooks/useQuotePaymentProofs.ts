@@ -83,15 +83,25 @@ export function useUpdateQuotePaymentProofAmount() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, amount }: { id: string; amount: number }) => {
+      // Fetch expected_amount to compute status
+      const { data: proof } = await supabase
+        .from('quote_payment_proofs' as never)
+        .select('expected_amount')
+        .eq('id', asDb(id))
+        .maybeSingle();
+      const expected = (proof as { expected_amount: number | null } | null)?.expected_amount ?? 0;
+      const status = Math.abs(amount - expected) <= 1 ? 'matched' : 'mismatch';
+
       const { error } = await supabase
         .from('quote_payment_proofs' as never)
-        .update({ amount, updated_at: new Date().toISOString() } as never)
+        .update({ amount, status, updated_at: new Date().toISOString() } as never)
         .eq('id', asDb(id));
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quote_payment_proofs'] });
       queryClient.invalidateQueries({ queryKey: ['quote_reconciliation'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
     },
   });
 }
@@ -204,19 +214,25 @@ export function useUpsertQuotePaymentProofAmount() {
       documentId,
       proofType,
       amount,
+      expectedAmount,
     }: {
       quoteId: string;
       documentId: string;
       proofType: 'a_vista' | 'adiantamento' | 'saldo' | 'a_prazo';
       amount: number;
+      expectedAmount?: number;
     }) => {
+      // Compute status from delta between amount and expected
+      const expected = expectedAmount ?? 0;
+      const status = Math.abs(amount - expected) <= 1 ? 'matched' : 'mismatch';
+
       const { error } = await supabase.from('quote_payment_proofs' as never).upsert(
         {
           quote_id: quoteId,
           document_id: documentId,
           proof_type: proofType,
           amount,
-          status: 'pending',
+          status,
           updated_at: new Date().toISOString(),
         } as never,
         { onConflict: 'document_id', ignoreDuplicates: false } as never

@@ -42,7 +42,11 @@ export default function Financial() {
   const columnsConfig = activeType === 'FAT' ? FAT_COLUMNS : PAG_COLUMNS;
   const updateStatusMutation = useUpdateFinancialDocumentStatus();
 
-  useRealtimeSubscription(['financial_documents', 'financial_installments']);
+  useRealtimeSubscription([
+    'financial_documents',
+    'financial_installments',
+    'quote_payment_proofs',
+  ]);
 
   const totalReceber = receber.rows.length;
   const totalPagar = pagar.rows.length;
