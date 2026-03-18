@@ -49,12 +49,13 @@ export function useDreOperacionalReport({
 }: UseDreOperacionalReportParams) {
   return useQuery({
     queryKey: ['dre-operacional', dateFrom, dateTo, quoteCode, osNumber, periodType, vehicleTypeId],
-    queryFn: async (): Promise<DreTable[]> => {
+    queryFn: async function (): Promise<DreTable[]> {
       const { from, to } = buildRange(dateFrom, dateTo);
 
       let quotesQuery = supabase
         .from('quotes')
-        .select('id, quote_code, created_at, value, pricing_breakdown, vehicle_type_id');
+        .select('id, quote_code, created_at, value, pricing_breakdown, vehicle_type_id')
+        .eq('stage', 'ganho');
       if (vehicleTypeId) {
         quotesQuery = quotesQuery.eq('vehicle_type_id', vehicleTypeId);
       }
@@ -101,11 +102,16 @@ export function useDreOperacionalReport({
         ordersQuery = ordersQuery.ilike('os_number', `%${osNumber.trim()}%`);
       }
 
-      if (quoteIds.length > 0) {
-        ordersQuery = ordersQuery.in('quote_id', quoteIds);
-      } else if (quoteCode?.trim()) {
+      if (quoteCode?.trim() && quoteIds.length === 0) {
+        // User filtrou por quote code mas nenhuma cotação ganho foi encontrada
         return [];
       }
+      if (!osNumber?.trim() && quoteIds.length > 0) {
+        // Sem filtro de OS: restringir orders às quotes ganhas encontradas
+        ordersQuery = ordersQuery.in('quote_id', quoteIds);
+      }
+      // Quando osNumber preenchido: não restringir por quoteIds,
+      // o presumido vem do join order.quote
 
       const { data: ordersData, error: ordersError } = await ordersQuery;
       if (ordersError) throw ordersError;
@@ -130,8 +136,7 @@ export function useDreOperacionalReport({
         } | null;
       };
 
-      let orders = (ordersData ?? []) as OrderRow[];
-
+      const orders = (ordersData ?? []) as OrderRow[];
       const orderIds = orders.map((o) => o.id);
       const tripCostItemsByOrderId = new Map<
         string,
@@ -159,12 +164,18 @@ export function useDreOperacionalReport({
       const grisByOrderId = new Map<string, number>();
       if (orderIds.length > 0) {
         const { data: grisRows } = await supabase
-          .from('order_gris_services')
-          .select('order_id, amount_real')
+          // view 'gris_service_items' ainda não está nos tipos gerados do supabase (workaround temporário)
+          .from('gris_service_items' as never)
+          .select('order_id, amount')
           .in('order_id', orderIds);
-        for (const row of grisRows ?? []) {
-          const prev = grisByOrderId.get(row.order_id) ?? 0;
-          grisByOrderId.set(row.order_id, prev + (row.amount_real ?? 0));
+        for (const row of (grisRows ?? []) as Array<{
+          order_id: string | null;
+          amount: number | null;
+        }>) {
+          const orderId = row.order_id ?? '';
+          if (!orderId) continue;
+          const prev = grisByOrderId.get(orderId) ?? 0;
+          grisByOrderId.set(orderId, prev + (row.amount ?? 0));
         }
       }
 
