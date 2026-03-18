@@ -1,8 +1,10 @@
 import type { UseFormReturn } from 'react-hook-form';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Tag } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { SectionBlock } from '@/components/ui/section-block';
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { FinancialRouteInfo } from '@/components/financial/modal-sections/FinancialRouteInfo';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { formatCurrency } from '@/lib/formatters';
 import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import type { QuoteFormData } from '../types';
@@ -37,11 +39,13 @@ export function ReviewStep({
   isLegacy = false,
 }: ReviewStepProps) {
   const values = form.getValues();
+  const discount = form.watch('discount') ?? 0;
   const baseFreight = calculationResult?.components?.baseFreight ?? 0;
-  const totalCliente = isLegacy
-    ? (Number(values.value) ?? 0)
+  const totalBruto = isLegacy
+    ? Number(values.value) || 0
     : (calculationResult?.totals?.totalCliente ?? 0);
-  const adicionais = totalCliente - baseFreight;
+  const totalCliente = Math.max(0, totalBruto - discount);
+  const adicionais = totalBruto - baseFreight;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -144,7 +148,7 @@ export function ReviewStep({
             <div className="p-3 rounded-lg bg-muted/30 border border-border">
               <p className="text-[10px] text-muted-foreground mb-1">Valor Carreteiro (PAG)</p>
               <p className="text-lg font-semibold">
-                {formatCurrency(Number(values.carreteiro_real) ?? 0)}
+                {formatCurrency(Number(values.carreteiro_real) || 0)}
               </p>
             </div>
             <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
@@ -152,7 +156,7 @@ export function ReviewStep({
                 Margem
               </p>
               <p className="text-2xl font-black text-primary">
-                {formatCurrency(totalCliente - (Number(values.carreteiro_real) ?? 0))}
+                {formatCurrency(totalCliente - (Number(values.carreteiro_real) || 0))}
               </p>
             </div>
           </div>
@@ -174,6 +178,40 @@ export function ReviewStep({
             </div>
           </div>
         )}
+
+        {/* Desconto */}
+        <div className="mt-4 p-4 rounded-lg border border-dashed border-orange-300 bg-orange-50/50 dark:bg-orange-950/10 dark:border-orange-800">
+          <FormField
+            control={form.control}
+            name="discount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs font-semibold flex items-center gap-1.5 text-orange-700 dark:text-orange-400">
+                  <Tag className="w-3.5 h-3.5" />
+                  Desconto
+                </FormLabel>
+                <FormControl>
+                  <NumericInput
+                    ref={field.ref}
+                    name={field.name}
+                    value={field.value}
+                    onBlur={field.onBlur}
+                    prefix="R$ "
+                    placeholder="0,00"
+                    onValueChange={(v) => field.onChange(v ?? 0)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {discount > 0 && (
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Total com desconto</span>
+              <span className="text-lg font-bold text-primary">{formatCurrency(totalCliente)}</span>
+            </div>
+          )}
+        </div>
       </SectionBlock>
 
       {/* Pagamento e Datas */}

@@ -64,6 +64,7 @@ import {
   QuoteModalHistoryTab,
 } from '@/components/modals/quote-detail';
 import { formatCurrency } from '@/lib/formatters';
+import { generateQuotePdf } from '@/lib/generateQuotePdf';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -597,6 +598,30 @@ export function QuoteDetailModal({
 
   const vehicleName = (vehicleType as { name?: string } | null)?.name ?? null;
   const vehicleCode = (vehicleType as { code?: string } | null)?.code ?? null;
+
+  const handleDownloadPdf = async () => {
+    if (!quote) return;
+    const ptLabel =
+      paymentTerm &&
+      (() => {
+        const adv = (paymentTerm as { advance_percent?: number | null }).advance_percent ?? 0;
+        const days = (paymentTerm as { days?: number | null }).days;
+        if (adv === 0 && days === 0) return 'À vista';
+        if (adv === 0) return `${days} dias`;
+        return `${adv}% Adiantamento / ${100 - adv}% Saldo em ${days} dias`;
+      })();
+
+    await generateQuotePdf({
+      quote,
+      breakdown,
+      vehicleName: vehicleName ? vehicleName + (vehicleCode ? ` (${vehicleCode})` : '') : null,
+      paymentTermLabel: ptLabel || null,
+      routeStops: (routeStops ?? [])
+        .filter((s) => s.stop_type === 'stop')
+        .sort((a, b) => a.sequence - b.sequence)
+        .map((s) => ({ city_uf: s.city_uf, cep: s.cep, name: s.name })),
+    });
+  };
   const hasOperacao =
     vehicleType ||
     quote.cargo_type ||
@@ -625,6 +650,7 @@ export function QuoteDetailModal({
               onConvertToFAT={handleConvertToFAT}
               onRecalcular={handleRecalcular}
               onEdit={() => setIsEditFormOpen(true)}
+              onDownloadPdf={handleDownloadPdf}
               showRecalcular={!!(breakdown && quote?.price_table_id && quote?.km_distance)}
             />
           </div>

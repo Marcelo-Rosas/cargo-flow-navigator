@@ -301,6 +301,7 @@ const quoteSchema = z
     // NTC flags
     tde_enabled: z.boolean().optional().default(false),
     tear_enabled: z.boolean().optional().default(false),
+    discount: z.number().min(0, 'Desconto não pode ser negativo').optional().default(0),
     notes: z.string().max(500, 'Observações muito longas').optional(),
     // Condição financeira: datas manuais (adiantamento, à vista, saldo)
     advance_due_date: z.string().optional(),
@@ -1210,8 +1211,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
     // Modo legacy: fluxo FAT + PAG em um único submit
     if (isLegacy) {
-      const value = Number(data.value) ?? 0;
-      const carreteiro = Number(data.carreteiro_real) ?? 0;
+      const value = Number(data.value) || 0;
+      const carreteiro = Number(data.carreteiro_real) || 0;
       if (value <= 0 || carreteiro < 0) {
         toast.error('Informe o valor cliente (FAT) e o valor carreteiro (PAG).');
         return;
@@ -1415,7 +1416,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             : null,
         toll_value: data.toll || null,
         cargo_value: data.cargo_value || null,
-        value: useStoredPricing ? storedValue : calculationResult.totals.totalCliente,
+        value: Math.max(
+          0,
+          (useStoredPricing ? storedValue : calculationResult.totals.totalCliente) -
+            (data.discount || 0)
+        ),
         pricing_breakdown:
           pricingBreakdown as unknown as Database['public']['Tables']['quotes']['Row']['pricing_breakdown'],
         notes: data.notes || null,

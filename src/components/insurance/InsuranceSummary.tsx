@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Check, AlertCircle, Shield } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -50,7 +51,15 @@ const riskLevelConfig = {
   high: { label: 'Alto Risco', badge: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100' },
 };
 
-export function InsuranceSummary({
+/**
+ * Memoized insurance summary component
+ * Phase D Optimization: Wrapped with React.memo to prevent unnecessary re-renders
+ * when parent re-renders but props remain unchanged
+ *
+ * Memoization benefit: Avoids re-rendering feature/restriction lists and
+ * formatting when form state changes but coverage/premium haven't changed
+ */
+function InsuranceSummaryComponent({
   coverage,
   premium,
   features,
@@ -62,6 +71,24 @@ export function InsuranceSummary({
 }: InsuranceSummaryProps) {
   const statusInfo = statusConfig[status];
   const riskInfo = riskLevel && riskLevelConfig[riskLevel];
+
+  // Memoize feature list rendering
+  const featuresList = useMemo(
+    () =>
+      features.map((feature, idx) => (
+        <li key={idx} className="flex items-start gap-2 text-sm">
+          <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+          <span>{feature}</span>
+        </li>
+      )),
+    [features]
+  );
+
+  // Memoize restriction list rendering
+  const restrictionsList = useMemo(
+    () => restrictions.map((restriction, idx) => <li key={idx}>• {restriction}</li>),
+    [restrictions]
+  );
 
   if (compact) {
     // Inline summary for quick display
@@ -119,14 +146,7 @@ export function InsuranceSummary({
       {/* Features */}
       <div>
         <h4 className="text-sm font-medium mb-2">Cobertura Inclusa:</h4>
-        <ul className="space-y-1.5">
-          {features.map((feature, idx) => (
-            <li key={idx} className="flex items-start gap-2 text-sm">
-              <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-              <span>{feature}</span>
-            </li>
-          ))}
-        </ul>
+        <ul className="space-y-1.5">{featuresList}</ul>
       </div>
 
       {/* Restrictions */}
@@ -136,11 +156,7 @@ export function InsuranceSummary({
           <AlertDescription className="text-amber-700 dark:text-amber-400">
             <div className="space-y-1">
               <p className="text-xs font-medium mb-1">Limitações:</p>
-              <ul className="text-xs space-y-0.5">
-                {restrictions.map((restriction, idx) => (
-                  <li key={idx}>• {restriction}</li>
-                ))}
-              </ul>
+              <ul className="text-xs space-y-0.5">{restrictionsList}</ul>
             </div>
           </AlertDescription>
         </Alert>
@@ -148,3 +164,9 @@ export function InsuranceSummary({
     </div>
   );
 }
+
+/**
+ * Exported memoized component
+ * Only re-renders when one of the props actually changes (shallow comparison)
+ */
+export const InsuranceSummary = memo(InsuranceSummaryComponent);

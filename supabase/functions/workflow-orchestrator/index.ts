@@ -16,6 +16,7 @@ interface WorkflowEvent {
   retry_count: number;
   max_retries: number;
   created_by: string | null;
+  execute_after: string | null;
 }
 
 interface EventResult {
@@ -74,46 +75,25 @@ async function handleQuoteStageChanged(
   const { new_stage, old_stage, client_email } = event.payload;
   const actions: string[] = [];
 
-  // Quote won → auto-create order + financial documents
+  // Quote won → notify client immediately; OS creation is deferred (24h grace period)
+  // The actual OS + FAT creation happens via 'quote.ganho_deferred' event (see handleQuoteGanhoDeferred)
   if (new_stage === 'ganho') {
-    // 1. Auto-create order from quote
-    const { data: orderResult, error: orderErr } = await sb.rpc('auto_create_order_from_quote', {
-      p_quote_id: event.entity_id,
-    });
-
-    if (orderErr) {
-      // If RPC doesn't exist yet, try manual creation
-      if (orderErr.message.includes('does not exist')) {
-        actions.push('skipped:auto_create_order (RPC not yet created)');
-      } else {
-        throw new Error(`Failed to create order: ${orderErr.message}`);
-      }
-    } else {
-      actions.push(`order_created:${orderResult}`);
-
-      // 2. Auto-create FAT document
-      const { error: fatErr } = await sb.rpc('ensure_financial_document', {
-        doc_type: 'FAT',
-        source_id_in: event.entity_id,
-      });
-      if (!fatErr) actions.push('fat_created');
-
-      // 3. Log notification for client + trigger immediate send
-      const { data: quoteWonLog } = await sb
-        .from('notification_logs')
-        .insert({
-          template_key: 'quote_won',
-          channel: 'email',
-          recipient_email: client_email as string,
-          status: 'pending',
-          entity_type: 'quote',
-          entity_id: event.entity_id,
-        })
-        .select('id')
-        .single();
-      if (quoteWonLog) await triggerNotificationHub(quoteWonLog.id);
-      actions.push('notification_queued:quote_won');
-    }
+    // Notify client immediately that the quote was won
+    const { data: quoteWonLog } = await sb
+      .from('notification_logs')
+      .insert({
+        template_key: 'quote_won',
+        channel: 'email',
+        recipient_email: client_email as string,
+        status: 'pending',
+        entity_type: 'quote',
+        entity_id: event.entity_id,
+      })
+      .select('id')
+      .single();
+    if (quoteWonLog) await triggerNotificationHub(quoteWonLog.id);
+    actions.push('notification_queued:quote_won');
+    actions.push('deferred:os_creation_scheduled_24h');
   }
 
   // Quote reached pricing stage → trigger AI analysis
@@ -662,6 +642,68 @@ async function handleComplianceViolation(
 }
 
 // ─────────────────────────────────────────────────────
+// Deferred: Quote Ganho Grace Period (24h)
+// ─────────────────────────────────────────────────────
+
+async function handleQuoteGanhoDeferred(
+  sb: SupabaseClient,
+  event: WorkflowEvent
+): Promise<EventResult> {
+  const actions: string[] = [];
+
+  // 1. Verify quote is STILL in 'ganho' stage (defensive check)
+  const { data: quote, error: quoteErr } = await sb
+    .from('quotes')
+    .select('id, stage')
+    .eq('id', event.entity_id)
+    .single();
+
+  if (quoteErr || !quote) {
+    return { success: true, actions: ['skipped:quote_not_found'] };
+  }
+
+  if (quote.stage !== 'ganho') {
+    // Quote reverted — trigger should have cancelled this, but handle defensively
+    return { success: true, actions: [`skipped:quote_stage_is_${quote.stage}`] };
+  }
+
+  // 2. Idempotency: check if an order already exists for this quote
+  const { data: existingOrder } = await sb
+    .from('orders')
+    .select('id')
+    .eq('quote_id', event.entity_id)
+    .maybeSingle();
+
+  if (existingOrder) {
+    return { success: true, actions: [`skipped:order_already_exists:${existingOrder.id}`] };
+  }
+
+  // 3. Auto-create order from quote
+  const { data: orderResult, error: orderErr } = await sb.rpc('auto_create_order_from_quote', {
+    p_quote_id: event.entity_id,
+  });
+
+  if (orderErr) {
+    if (orderErr.message.includes('does not exist')) {
+      actions.push('skipped:auto_create_order (RPC not yet created)');
+    } else {
+      throw new Error(`Failed to create order: ${orderErr.message}`);
+    }
+  } else {
+    actions.push(`order_created:${orderResult}`);
+
+    // 4. Auto-create FAT document
+    const { error: fatErr } = await sb.rpc('ensure_financial_document', {
+      doc_type: 'FAT',
+      source_id_in: event.entity_id,
+    });
+    if (!fatErr) actions.push('fat_created');
+  }
+
+  return { success: true, actions };
+}
+
+// ─────────────────────────────────────────────────────
 // Main: Event Dispatcher
 // ─────────────────────────────────────────────────────
 
@@ -672,11 +714,13 @@ async function processEvents(
   processed: number;
   results: Array<{ eventId: string; event_type: string; result: EventResult }>;
 }> {
-  // Fetch pending events
+  // Fetch pending events (respects execute_after for deferred/grace-period events)
+  const now = new Date().toISOString();
   let query = sb
     .from('workflow_events')
     .select('*')
     .eq('status', 'pending')
+    .or(`execute_after.is.null,execute_after.lte.${now}`)
     .order('created_at', { ascending: true })
     .limit(20);
 
@@ -701,6 +745,9 @@ async function processEvents(
       switch (true) {
         case event.event_type === 'quote.stage_changed':
           result = await handleQuoteStageChanged(sb, event);
+          break;
+        case event.event_type === 'quote.ganho_deferred':
+          result = await handleQuoteGanhoDeferred(sb, event);
           break;
         case event.event_type === 'order.created':
           result = await handleOrderCreated(sb, event);

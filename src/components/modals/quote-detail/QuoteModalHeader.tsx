@@ -1,4 +1,5 @@
-import { Route, Pencil, ArrowRightLeft, Receipt, Loader2, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Route, Pencil, ArrowRightLeft, Receipt, Loader2, RefreshCw, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,7 @@ interface QuoteModalHeaderProps {
   onConvertToFAT: () => void;
   onRecalcular: () => void;
   onEdit: () => void;
+  onDownloadPdf?: () => Promise<void>;
   showRecalcular: boolean;
 }
 
@@ -36,8 +38,21 @@ export function QuoteModalHeader({
   onConvertToFAT,
   onRecalcular,
   onEdit,
+  onDownloadPdf,
   showRecalcular,
 }: QuoteModalHeaderProps) {
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!onDownloadPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      await onDownloadPdf();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <>
       <div className="flex items-start justify-between gap-4">
@@ -63,6 +78,22 @@ export function QuoteModalHeader({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {onDownloadPdf && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              title="Baixar PDF da cotação"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+            </Button>
+          )}
           {canManage && showRecalcular && (
             <Button
               variant="ghost"

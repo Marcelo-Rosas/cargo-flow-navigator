@@ -1,13 +1,12 @@
 import type { UseFormReturn } from 'react-hook-form';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { AlertCircle, Shield } from 'lucide-react';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SectionBlock } from '@/components/ui/section-block';
-import { cn } from '@/lib/utils';
-import { useInsuranceOptions } from '@/hooks/useInsuranceOptions';
-import { InsuranceSelector } from '@/components/insurance/InsuranceSelector';
+import { useInsuranceOptions } from '@/hooks/useInsuranceOptionsRefactored';
+import { InsuranceSelectorLazy } from '@/components/insurance/InsuranceSelectorLazy';
 import { InsuranceSummary } from '@/components/insurance/InsuranceSummary';
 import type { QuoteFormData } from '../types';
 
@@ -71,6 +70,20 @@ export function InsuranceStep({ form }: InsuranceStepProps) {
   const isEligible = originUf && destinationUf && insuranceOptions.length > 0;
   const insuranceEligible = form.watch('insurance_eligible') ?? false;
 
+  /**
+   * Memoized callback for handling coverage selection
+   * Phase D Optimization: Prevents creating new function on every render
+   */
+  const handleSelectCoverage = useCallback(
+    (coverageType: string) => {
+      const option = insuranceOptions.find((opt) => opt.coverage_type === coverageType);
+      if (option) {
+        setSelectedOption(option);
+      }
+    },
+    [insuranceOptions, setSelectedOption]
+  );
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
       <div className="flex items-center justify-between">
@@ -93,7 +106,7 @@ export function InsuranceStep({ form }: InsuranceStepProps) {
       {isEligible && (
         <>
           {/* Checkbox: Incluir Seguro */}
-          <SectionBlock>
+          <SectionBlock label="Proteção de Carga">
             <div className="flex items-center space-x-2">
               <FormField
                 control={form.control}
@@ -117,7 +130,7 @@ export function InsuranceStep({ form }: InsuranceStepProps) {
 
           {/* Insurance Selector (visible if checked) */}
           {insuranceEligible && (
-            <SectionBlock className="space-y-4">
+            <SectionBlock label="Nível de Cobertura" className="space-y-4">
               <div>
                 <h3 className="font-semibold text-sm mb-4">Selecione o nível de cobertura</h3>
 
@@ -145,17 +158,10 @@ export function InsuranceStep({ form }: InsuranceStepProps) {
                     render={() => (
                       <FormItem>
                         <FormControl>
-                          <InsuranceSelector
+                          <InsuranceSelectorLazy
                             options={insuranceOptions}
                             selectedCoverage={selectedOption?.coverage_type}
-                            onSelectCoverage={(coverageType) => {
-                              const option = insuranceOptions.find(
-                                (opt) => opt.coverage_type === coverageType
-                              );
-                              if (option) {
-                                setSelectedOption(option);
-                              }
-                            }}
+                            onSelectCoverage={handleSelectCoverage}
                             loading={isLoadingOptions}
                             error={optionsError ? 'Erro ao carregar opções' : undefined}
                           />

@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Check, AlertCircle, Loader2 } from 'lucide-react';
@@ -14,71 +15,56 @@ interface InsuranceSelectorProps {
   error?: string;
 }
 
-export function InsuranceSelector({
+/**
+ * Memoized insurance option selector component
+ * Phase D Optimization: Wrapped with React.memo to prevent unnecessary re-renders
+ * when parent re-renders but props (options, selectedCoverage, etc.) remain unchanged
+ *
+ * Memoization benefit: Avoids re-rendering 3 large TabsContent sections when
+ * form state changes but insurance options haven't changed
+ */
+function InsuranceSelectorComponent({
   options,
   selectedCoverage,
   onSelectCoverage,
   loading = false,
   error,
 }: InsuranceSelectorProps) {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
-        <span className="text-sm text-muted-foreground">Carregando opções...</span>
-      </div>
-    );
-  }
+  // Memoize rendered tabs - prevents recalculating style/layout on every render
+  const tabsList = useMemo(
+    () =>
+      options.map((option) => {
+        const isSelected = selectedCoverage === option.coverage_type;
+        const isStandard = option.coverage_type === 'STANDARD';
 
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
-    );
-  }
+        return (
+          <TabsTrigger
+            key={option.coverage_type}
+            value={option.coverage_type}
+            className={cn(
+              'flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all',
+              isSelected
+                ? 'border-primary bg-primary/5'
+                : 'border-muted bg-muted/50 hover:border-primary/50'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">{option.coverage_type}</span>
+              {isStandard && <Badge className="text-[10px]">⭐ Recomendado</Badge>}
+            </div>
+            <span className="text-sm font-medium text-primary">
+              {formatCurrency(option.estimated_premium)}
+            </span>
+          </TabsTrigger>
+        );
+      }),
+    [options, selectedCoverage]
+  );
 
-  if (options.length === 0) {
-    return (
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>Nenhuma opção de seguro disponível para esta rota.</AlertDescription>
-      </Alert>
-    );
-  }
-
-  return (
-    <Tabs value={selectedCoverage || ''} onValueChange={onSelectCoverage} className="w-full">
-      <TabsList className="grid w-full grid-cols-3 gap-2 h-auto bg-transparent p-0">
-        {options.map((option) => {
-          const isSelected = selectedCoverage === option.coverage_type;
-          const isStandard = option.coverage_type === 'STANDARD';
-
-          return (
-            <TabsTrigger
-              key={option.coverage_type}
-              value={option.coverage_type}
-              className={cn(
-                'flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all',
-                isSelected
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted bg-muted/50 hover:border-primary/50'
-              )}
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">{option.coverage_type}</span>
-                {isStandard && <Badge className="text-[10px]">⭐ Recomendado</Badge>}
-              </div>
-              <span className="text-sm font-medium text-primary">
-                {formatCurrency(option.estimated_premium)}
-              </span>
-            </TabsTrigger>
-          );
-        })}
-      </TabsList>
-
-      {options.map((option) => (
+  // Memoize content tabs - prevents recalculating features/restrictions layout
+  const contentTabs = useMemo(
+    () =>
+      options.map((option) => (
         <TabsContent key={option.coverage_type} value={option.coverage_type} className="mt-6">
           <div className="space-y-4">
             {/* Features */}
@@ -126,7 +112,49 @@ export function InsuranceSelector({
             </div>
           </div>
         </TabsContent>
-      ))}
+      )),
+    [options]
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
+        <span className="text-sm text-muted-foreground">Carregando opções...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (options.length === 0) {
+    return (
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>Nenhuma opção de seguro disponível para esta rota.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <Tabs value={selectedCoverage || ''} onValueChange={onSelectCoverage} className="w-full">
+      <TabsList className="grid w-full grid-cols-3 gap-2 h-auto bg-transparent p-0">
+        {tabsList}
+      </TabsList>
+      {contentTabs}
     </Tabs>
   );
 }
+
+/**
+ * Exported memoized component
+ * Only re-renders when one of the props actually changes (shallow comparison)
+ */
+export const InsuranceSelector = memo(InsuranceSelectorComponent);
