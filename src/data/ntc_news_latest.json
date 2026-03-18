@@ -1,0 +1,28 @@
+{
+  "noticias": [
+    {
+      "id": "ntc-20260318-001",
+      "titulo": "Presidente da NTC&Logística recebe representantes da PRF para fortalecer ações de combate ao roubo de cargas",
+      "data": "2026-03-18",
+      "categoria": "Segurança",
+      "resumo": "Eduardo Rebuzzi recebeu inspetores da Polícia Rodoviária Federal em São Paulo para integrar estratégias no enfrentamento aos crimes contra o patrimônio.",
+      "url": "https://www.portalntc.org.br/noticias/",
+      "relevancia": "alta",
+      "emoji": "🚔",
+      "cor": "red"
+    },
+    {
+      "id": "ntc-20260318-002",
+      "titulo": "NTC&Logística entrega troféu do Prêmio NTC Fornecedores do Transporte 2025 à Vipal Borrachas",
+      "data": "2026-03-18",
+      "categoria": "Mercado",
+      "resumo": "Reconhecimento baseado em pesquisa do Instituto Datafolha, reforçando a importância dos fornecedores para o desempenho do transporte rodoviário.",
+      "url": "https://www.portalntc.org.br/noticias/",
+      "relevancia": "media",
+      "emoji": "🏆",
+      "cor": "blue"
+    }
+  ],
+  "atualizado_em": "2026-03-18T14:30:00Z",
+  "proxima_atualizacao": "2026-03-19T08:00:00Z"
+}

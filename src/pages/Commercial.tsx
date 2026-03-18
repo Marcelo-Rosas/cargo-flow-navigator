@@ -32,6 +32,7 @@ import { QuoteDetailModal } from '@/components/modals/QuoteDetailModal';
 import { SendQuoteEmailModal } from '@/components/modals/SendQuoteEmailModal';
 import { LoadCompositionPanel } from '@/components/LoadCompositionPanel';
 import { MarketIntelligencePanel } from '@/components/market/MarketIntelligencePanel';
+import { NTCNewsWidget } from '@/components/market/NTCNewsWidget';
 import {
   Sheet,
   SheetContent,
@@ -43,11 +44,12 @@ import {
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
-type CommercialTab = 'kanban' | 'market-intelligence';
+type CommercialTab = 'kanban' | 'market-intelligence' | 'news';
 
 const COMMERCIAL_TABS: { id: CommercialTab; label: string }[] = [
   { id: 'kanban', label: 'Kanban Comercial' },
   { id: 'market-intelligence', label: 'Inteligência NTC' },
+  { id: 'news', label: 'Notícias NTC' },
 ];
 
 const QUOTE_STAGES: { id: QuoteStage; label: string; color: string }[] = [
@@ -459,6 +461,12 @@ export default function Commercial() {
       {activeTab === 'market-intelligence' && (
         <div className="mb-6">
           <MarketIntelligencePanel />
+        </div>
+      )}
+
+      {activeTab === 'news' && (
+        <div className="mb-6">
+          <NTCNewsWidget />
         </div>
       )}
 
