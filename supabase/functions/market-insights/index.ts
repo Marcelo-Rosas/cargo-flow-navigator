@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
     'Content-Type': 'application/json',
     'Cache-Control': 'max-age=3600', // 1 hour cache
   };
