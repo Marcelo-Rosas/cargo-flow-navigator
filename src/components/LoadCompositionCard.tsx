@@ -1,6 +1,6 @@
 /**
  * Component: LoadCompositionCard
- * Individual suggestion card for display in LoadCompositionPanel
+ * Individual suggestion card for LoadCompositionOverlay / LoadCompositionPanel
  * Shows consolidation opportunity with score, savings, and action buttons
  */
 
@@ -18,6 +18,8 @@ export interface LoadCompositionCardProps {
   onCalculateDiscounts?: (compositionId: string) => void;
   isApproving?: boolean;
   isCalculatingDiscounts?: boolean;
+  /** Compact layout for overlay/list contexts */
+  compact?: boolean;
 }
 
 const statusConfig = {
@@ -34,11 +36,85 @@ export function LoadCompositionCard({
   onCalculateDiscounts,
   isApproving = false,
   isCalculatingDiscounts = false,
+  compact = false,
 }: LoadCompositionCardProps) {
   const savingsBRL = suggestion.estimated_savings_brl / 100; // Convert from centavos to BRL
   const status = statusConfig[suggestion.status];
   const isExecutable = suggestion.status === 'pending' && suggestion.is_feasible;
   const hasDiscounts = suggestion.discounts && suggestion.discounts.length > 0;
+
+  if (compact) {
+    return (
+      <Card className="hover:shadow-sm transition-shadow">
+        <CardContent className="p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-medium text-sm truncate">
+                {suggestion.quote_ids.length} cargas
+              </span>
+              <Badge variant={status.variant} className="shrink-0">
+                {status.label}
+              </Badge>
+              {suggestion.is_feasible ? (
+                <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              )}
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-sm font-semibold text-green-600">
+                R$ {savingsBRL.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                +{suggestion.distance_increase_percent.toFixed(0)}% km
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => onView?.(suggestion.id)}
+            >
+              Detalhes
+            </Button>
+            {suggestion.status === 'pending' && !hasDiscounts && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-7 text-xs gap-1"
+                onClick={() => onCalculateDiscounts?.(suggestion.id)}
+                disabled={isCalculatingDiscounts}
+              >
+                {isCalculatingDiscounts ? (
+                  <Loader className="w-3 h-3 animate-spin" />
+                ) : (
+                  <DollarSign className="w-3 h-3" />
+                )}
+                Descontos
+              </Button>
+            )}
+            {isExecutable && (
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => onApprove?.(suggestion.id)}
+                disabled={isApproving}
+              >
+                {isApproving ? 'Aprovando...' : 'Aprovar'}
+              </Button>
+            )}
+            {hasDiscounts && suggestion.status === 'pending' && (
+              <Badge variant="secondary" className="text-xs">
+                Descontos OK
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="hover:shadow-md transition-shadow">

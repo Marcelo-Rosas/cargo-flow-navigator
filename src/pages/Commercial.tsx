@@ -11,7 +11,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
-import { Plus, Filter, Search, CalendarDays } from 'lucide-react';
+import { Plus, Filter, Search, CalendarDays, Sparkles } from 'lucide-react';
 import { LoadingFollowUpPanel } from '@/components/commercial/LoadingFollowUpPanel';
 import { KanbanSkeleton } from '@/components/skeletons/KanbanSkeleton';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -20,6 +20,7 @@ import { QuoteCard } from '@/components/boards/QuoteCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useQuotes, useUpdateQuoteStage } from '@/hooks/useQuotes';
+import { useShippers } from '@/hooks/useShippers';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
@@ -30,7 +31,7 @@ import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
 import { QuoteDetailModal } from '@/components/modals/QuoteDetailModal';
 import { SendQuoteEmailModal } from '@/components/modals/SendQuoteEmailModal';
-import { LoadCompositionPanel } from '@/components/LoadCompositionPanel';
+import { LoadCompositionOverlay } from '@/components/LoadCompositionOverlay';
 import { MarketIntelligencePanel } from '@/components/market/MarketIntelligencePanel';
 import { NTCNewsWidget } from '@/components/market/NTCNewsWidget';
 import {
@@ -76,6 +77,10 @@ export default function Commercial() {
   const [emailingQuote, setEmailingQuote] = useState<Quote | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const canManageCommercial = canWrite;
+
+  const { data: shippers } = useShippers(undefined, {
+    enabled: !!user && activeTab === 'kanban',
+  });
 
   type QuoteItemsState = ItemsState<Quote>;
 
@@ -263,10 +268,12 @@ export default function Commercial() {
       .reduce((acc, q) => acc + Number(q.value), 0);
   }, [quotes]);
 
-  const firstShipperId = useMemo(() => {
-    if (!quotes || quotes.length === 0) return null;
-    return quotes[0]?.shipper_id ?? null;
-  }, [quotes]);
+  /** Embarcador para análise de consolidação: qualquer cotação com shipper, senão primeiro cadastrado */
+  const consolidationShipperId = useMemo(() => {
+    const fromQuote = quotes?.find((q) => q.shipper_id)?.shipper_id;
+    if (fromQuote) return fromQuote;
+    return shippers?.[0]?.id ?? null;
+  }, [quotes, shippers]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -343,6 +350,34 @@ export default function Commercial() {
           <Button variant="outline" size="icon" aria-label="Filtrar cotações">
             <Filter className="w-4 h-4" />
           </Button>
+          {activeTab === 'kanban' &&
+            (consolidationShipperId ? (
+              <LoadCompositionOverlay
+                shipperId={consolidationShipperId}
+                trigger={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 shrink-0"
+                    aria-label="Oportunidades de consolidação de cargas"
+                  >
+                    <Sparkles className="w-4 h-4 shrink-0" />
+                    <span className="truncate">Consolidação</span>
+                  </Button>
+                }
+              />
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 shrink-0"
+                disabled
+                title="Cadastre um embarcador ou vincule um às cotações para analisar consolidação"
+              >
+                <Sparkles className="w-4 h-4 shrink-0 opacity-50" />
+                <span className="truncate">Consolidação</span>
+              </Button>
+            ))}
           <Sheet open={showFollowUp} onOpenChange={setShowFollowUp}>
             <SheetTrigger asChild>
               <Button
@@ -354,29 +389,14 @@ export default function Commercial() {
               </Button>
             </SheetTrigger>
 
-            {/* Follow-up + Oportunidades de Consolidação em Sheet lateral */}
             <SheetContent side="right" className="w-[420px] sm:w-[480px] space-y-4">
               <SheetHeader>
                 <SheetTitle>Follow-up de Carregamento</SheetTitle>
-                <SheetDescription>
-                  Acompanhe embarques em negociação e oportunidades de consolidação em uma visão
-                  única.
-                </SheetDescription>
+                <SheetDescription>Acompanhe embarques em negociação.</SheetDescription>
               </SheetHeader>
 
               <div className="space-y-4 overflow-y-auto pr-1 h-full">
                 <LoadingFollowUpPanel />
-                {firstShipperId && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-foreground">
-                      Oportunidades de Consolidação
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Análise automática de cargas do mesmo embarcador para otimização de rotas.
-                    </p>
-                    <LoadCompositionPanel shipperId={firstShipperId} />
-                  </div>
-                )}
               </div>
             </SheetContent>
           </Sheet>
