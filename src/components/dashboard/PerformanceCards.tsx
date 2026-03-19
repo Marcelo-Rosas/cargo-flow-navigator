@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 import { usePerformanceMetrics } from '@/hooks/useAdvancedDashboardStats';
-import { TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const formatCurrency = (value: number) => {
@@ -11,6 +10,12 @@ const formatCurrency = (value: number) => {
     maximumFractionDigits: 1,
   }).format(value);
 };
+
+function formatTrendPct(value: number): string {
+  const sign = value > 0 ? '+' : '';
+  const formatted = Math.abs(value).toFixed(2).replace('.', ',');
+  return `${sign}${value < 0 ? '-' : ''}${formatted}%`;
+}
 
 interface MetricCardProps {
   title: string;
@@ -39,7 +44,7 @@ function MetricCard({
       case 'currency':
         return formatCurrency(value);
       case 'percent':
-        return `${value.toFixed(1)}%`;
+        return `${value.toFixed(1).replace('.', ',')}%`;
       default:
         return value.toLocaleString('pt-BR');
     }
@@ -52,29 +57,24 @@ function MetricCard({
       transition={{ duration: 0.4, delay }}
       className="bg-card rounded-xl border border-border shadow-card p-5"
     >
-      <p className="text-sm font-medium text-muted-foreground mb-2">{title}</p>
-      <div className="flex items-end justify-between">
-        <span className="text-2xl font-bold text-foreground">
-          {typeof currentValue === 'string' ? currentValue : formatValue(current)}
-        </span>
-        {previousValue !== undefined && (
-          <div
+      {/* Top row: label + trend */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        {previousValue !== undefined && !isNeutral && (
+          <span
             className={cn(
-              'flex items-center text-sm font-medium',
-              isNeutral ? 'text-muted-foreground' : isPositive ? 'text-success' : 'text-destructive'
+              'text-sm font-medium tabular-nums whitespace-nowrap',
+              isPositive ? 'text-[#16a34a]' : 'text-[#dc2626]'
             )}
           >
-            {isNeutral ? (
-              <Minus className="w-4 h-4 mr-1" />
-            ) : isPositive ? (
-              <ArrowUpRight className="w-4 h-4 mr-1" />
-            ) : (
-              <ArrowDownRight className="w-4 h-4 mr-1" />
-            )}
-            {Math.abs(percentChange).toFixed(1)}%
-          </div>
+            {formatTrendPct(percentChange)}
+          </span>
         )}
       </div>
+      {/* Big value */}
+      <span className="text-2xl font-bold text-foreground tabular-nums">
+        {typeof currentValue === 'string' ? currentValue : formatValue(current)}
+      </span>
     </motion.div>
   );
 }

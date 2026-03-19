@@ -23,6 +23,12 @@ const iconVariantStyles = {
   destructive: 'bg-destructive/10 text-destructive',
 };
 
+function formatTrendPct(value: number, isPositive: boolean): string {
+  const sign = isPositive ? '+' : '';
+  const formatted = value.toFixed(2).replace('.', ',');
+  return `${sign}${formatted}%`;
+}
+
 export function KPICard({
   title,
   value,
@@ -41,32 +47,32 @@ export function KPICard({
     >
       <div className="flex items-start justify-between gap-4 h-full">
         <div className="flex flex-col gap-2 min-w-0 flex-1">
-          <p className="text-sm font-medium text-muted-foreground truncate">{title}</p>
-
-          <div className="flex items-baseline gap-2">
-            <motion.span
-              className="text-3xl font-bold text-foreground tabular-nums"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: delay + 0.2 }}
-            >
-              {value}
-            </motion.span>
-
+          {/* Top row: label + trend */}
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-muted-foreground truncate">{title}</p>
             {trend && (
               <span
                 className={cn(
-                  'text-sm font-medium tabular-nums',
-                  trend.isPositive ? 'text-success' : 'text-destructive'
+                  'text-sm font-medium tabular-nums whitespace-nowrap',
+                  trend.isPositive ? 'text-[#16a34a]' : 'text-[#dc2626]'
                 )}
               >
-                {trend.isPositive ? '+' : ''}
-                {trend.value}%
+                {formatTrendPct(trend.value, trend.isPositive)}
               </span>
             )}
           </div>
 
-          {/* reserva sempre a linha para manter equidade de altura */}
+          {/* Big value */}
+          <motion.span
+            className="text-2xl font-bold text-foreground tabular-nums"
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: delay + 0.2 }}
+          >
+            {value}
+          </motion.span>
+
+          {/* Subtitle line */}
           <p className="text-sm text-muted-foreground min-h-[20px]">{subtitle ?? ' '}</p>
         </div>
 

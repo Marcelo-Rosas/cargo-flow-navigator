@@ -4,7 +4,7 @@
 
 import { useNtcIndices } from '@/hooks/useNtcIndices';
 import { useLatestMarketIndex } from '@/hooks/useMarketIndices';
-import { TrendingUp, AlertTriangle, Info, Loader2 } from 'lucide-react';
+import { AlertTriangle, Info, Loader2 } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -74,31 +74,39 @@ export function NtcIndicesCard() {
   const cards = [
     {
       label: 'INCTF 12M',
-      value: `+${data.inctf_pct.toFixed(2)}%`,
+      mainValue: `+${data.inctf_pct.toFixed(2).replace('.', ',')}%`,
+      trendPct: null as string | null,
       sub: 'Carga Fracionada',
-      color: 'emerald',
-      arrow: true,
+      trendColor: data.inctf_pct > 5 ? 'text-[#dc2626]' : 'text-[#16a34a]',
+      valueColor: 'text-emerald-700',
+      borderColor: 'border-l-emerald-600',
     },
     {
       label: 'INCTL 12M',
-      value: `+${data.inctl_pct.toFixed(2)}%`,
+      mainValue: `+${data.inctl_pct.toFixed(2).replace('.', ',')}%`,
+      trendPct: null as string | null,
       sub: 'Carga Lotação',
-      color: 'emerald',
-      arrow: true,
+      trendColor: data.inctl_pct > 5 ? 'text-[#dc2626]' : 'text-[#16a34a]',
+      valueColor: 'text-emerald-700',
+      borderColor: 'border-l-emerald-600',
     },
     {
       label: 'Diesel S-10',
-      value: `R$ ${data.diesel_price.toFixed(2)}/L`,
+      mainValue: `R$ ${data.diesel_price.toFixed(2).replace('.', ',')}/L`,
+      trendPct: null as string | null,
       sub: 'Preço médio nacional',
-      color: 'amber',
-      arrow: false,
+      trendColor: '',
+      valueColor: 'text-amber-700',
+      borderColor: 'border-l-amber-600',
     },
     {
       label: 'Reajuste sugerido',
-      value: `${data.reajuste_sugerido.toFixed(2)}%`,
+      mainValue: `${data.reajuste_sugerido.toFixed(2).replace('.', ',')}%`,
+      trendPct: null as string | null,
       sub: 'Acumulado 12 meses',
-      color: 'blue',
-      arrow: true,
+      trendColor: data.reajuste_sugerido > 5 ? 'text-[#dc2626]' : 'text-[#16a34a]',
+      valueColor: 'text-blue-700',
+      borderColor: 'border-l-blue-500',
     },
   ];
 
@@ -140,32 +148,17 @@ export function NtcIndicesCard() {
 
       {/* 4 metric cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-2.5">
-        {cards.map(({ label, value, sub, color, arrow }) => (
+        {cards.map(({ label, mainValue, sub, valueColor, borderColor }) => (
           <div
             key={label}
-            className={`rounded-r-xl border-y border-r border-l-[2.5px] border-zinc-200 pl-3.5 pr-3 py-3 ${
-              color === 'emerald'
-                ? 'border-l-emerald-600'
-                : color === 'amber'
-                  ? 'border-l-amber-600'
-                  : 'border-l-blue-500'
-            }`}
+            className={`rounded-r-xl border-y border-r border-l-[2.5px] border-zinc-200 pl-3.5 pr-3 py-3 ${borderColor}`}
           >
             <p className="text-[10px] font-medium tracking-widest text-zinc-400 uppercase mb-1.5">
               {label}
             </p>
-            <div
-              className={`flex items-center gap-1.5 text-[22px] font-medium leading-none mb-1 ${
-                color === 'emerald'
-                  ? 'text-emerald-700'
-                  : color === 'amber'
-                    ? 'text-amber-700'
-                    : 'text-blue-700'
-              }`}
-            >
-              {value}
-              {arrow && <TrendingUp size={16} strokeWidth={2} />}
-            </div>
+            <p className={`text-2xl font-bold leading-none mb-1 tabular-nums ${valueColor}`}>
+              {mainValue}
+            </p>
             <p className="text-[12px] text-zinc-500">{sub}</p>
           </div>
         ))}

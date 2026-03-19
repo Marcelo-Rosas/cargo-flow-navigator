@@ -1,12 +1,4 @@
-import {
-  TrendingUp,
-  TrendingDown,
-  Fuel,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  RefreshCw,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import { useMarketAlert, useMarketIndices } from '@/hooks/useMarketIndices';
 
 const ALERTA = {
@@ -32,36 +24,39 @@ const ALERTA = {
 
 function fmtPct(v: number | null): string {
   if (v == null) return '--';
-  return `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
+  return `${v > 0 ? '+' : ''}${v.toFixed(2).replace('.', ',')}%`;
 }
 
 function MetricBox({
   label,
   value,
   sub,
-  trend,
-  icon,
+  trendPct,
+  trendFavorable,
 }: {
   label: string;
   value: string;
   sub: string;
-  trend?: 'up' | 'down' | 'neutral';
-  icon?: React.ReactNode;
+  trendPct?: string | null;
+  /** true = green (favorable), false = red (unfavorable) */
+  trendFavorable?: boolean;
 }) {
-  const color =
-    trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-red-500' : 'text-foreground';
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-1 shadow-sm">
-      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      <div className="flex items-center gap-1.5">
-        {icon}
-        <span className={`text-xl font-bold font-mono leading-none ${color}`}>{value}</span>
-        {trend === 'up' && <TrendingUp size={14} className="text-emerald-500" />}
-        {trend === 'down' && <TrendingDown size={14} className="text-red-500" />}
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+      {/* Top row: label + trend */}
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        {trendPct && (
+          <span
+            className={`text-sm font-medium tabular-nums whitespace-nowrap ${trendFavorable ? 'text-[#16a34a]' : 'text-[#dc2626]'}`}
+          >
+            {trendPct}
+          </span>
+        )}
       </div>
-      <p className="text-[10px] text-muted-foreground">{sub}</p>
+      {/* Big value */}
+      <p className="text-2xl font-bold text-foreground tabular-nums">{value}</p>
+      <p className="text-xs text-muted-foreground mt-1">{sub}</p>
     </div>
   );
 }
@@ -159,26 +154,24 @@ export function MarketInsightsCard() {
           label="INCTF 12m"
           value={fmtPct(alert.inctf12m)}
           sub="Carga Fracionada"
-          trend={alert.inctf12m != null ? (alert.inctf12m > 7 ? 'down' : 'up') : 'neutral'}
+          trendFavorable={alert.inctf12m != null ? alert.inctf12m <= 7 : undefined}
         />
         <MetricBox
           label="INCTL 12m"
           value={fmtPct(alert.inctl12m)}
           sub="Carga Lotacao"
-          trend={alert.inctl12m != null ? (alert.inctl12m > 7 ? 'down' : 'up') : 'neutral'}
+          trendFavorable={alert.inctl12m != null ? alert.inctl12m <= 7 : undefined}
         />
         <MetricBox
           label="Diesel S-10"
-          value={alert.diesel ? `R$ ${alert.diesel.toFixed(2)}/L` : '--'}
+          value={alert.diesel ? `R$ ${alert.diesel.toFixed(2).replace('.', ',')}/L` : '--'}
           sub="Preco medio nacional"
-          trend="neutral"
-          icon={<Fuel size={14} className="text-orange-500" />}
         />
         <MetricBox
           label="Reajuste sugerido"
-          value={alert.reajuste != null ? `${alert.reajuste.toFixed(2)}%` : '--'}
+          value={alert.reajuste != null ? `${alert.reajuste.toFixed(2).replace('.', ',')}%` : '--'}
           sub="Acumulado 12 meses"
-          trend={alert.reajuste != null ? (alert.reajuste > 8 ? 'down' : 'up') : 'neutral'}
+          trendFavorable={alert.reajuste != null ? alert.reajuste <= 8 : undefined}
         />
       </div>
 
