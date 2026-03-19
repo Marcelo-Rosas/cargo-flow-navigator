@@ -16,18 +16,6 @@ export function MarketIntelligencePanel() {
   } = usePetrobrasDiesel('BR');
   const [refreshing, setRefreshing] = useState(false);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-48 w-full rounded-lg" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Skeleton className="h-32 w-full rounded-lg" />
-          <Skeleton className="h-32 w-full rounded-lg" />
-        </div>
-      </div>
-    );
-  }
-
   // Card Diesel Petrobras — renderiza independente do market-insights
   const dieselPetrobrasCard = (
     <Card className="border-blue-200 bg-blue-50/30">
@@ -93,6 +81,19 @@ export function MarketIntelligencePanel() {
       </CardContent>
     </Card>
   );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-48 w-full rounded-lg" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Skeleton className="h-32 w-full rounded-lg" />
+          <Skeleton className="h-32 w-full rounded-lg" />
+        </div>
+        {dieselPetrobrasCard}
+      </div>
+    );
+  }
 
   if (isError || !insights) {
     return (
