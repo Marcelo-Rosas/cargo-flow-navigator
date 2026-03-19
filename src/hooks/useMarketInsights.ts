@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface MarketInsights {
   gerado_em: string;
@@ -66,9 +67,16 @@ export function useMarketInsights() {
   return useQuery<MarketInsights>({
     queryKey: ['market-insights', 'latest'],
     queryFn: async () => {
-      const response = await fetch('/api/market-insights/latest', {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? '';
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/market-insights`, {
         method: 'GET',
         headers: {
+          Authorization: `Bearer ${token ?? anonKey}`,
+          apikey: anonKey,
           'Content-Type': 'application/json',
         },
       });
