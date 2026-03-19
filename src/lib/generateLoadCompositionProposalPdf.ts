@@ -27,6 +27,18 @@ export async function generateLoadCompositionProposalPdf({
   }
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  type JsPdfWithAutoTable = jsPDF & {
+    lastAutoTable?: {
+      finalY?: number;
+    };
+  };
+  const docWithAutoTable = doc as JsPdfWithAutoTable;
+
+  type JsPdfWithPageCount = jsPDF & {
+    getNumberOfPages: () => number;
+  };
+  const docWithPageCount = doc as JsPdfWithPageCount;
+
   const pageWidth = doc.internal.pageSize.getWidth();
   const marginL = 15;
   const marginR = 15;
@@ -85,7 +97,7 @@ export async function generateLoadCompositionProposalPdf({
       1: { cellWidth: contentWidth - 60 },
     },
   });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = (docWithAutoTable.lastAutoTable?.finalY ?? y) + 8;
 
   // Descontos por cotação
   doc.setFontSize(12);
@@ -135,7 +147,7 @@ export async function generateLoadCompositionProposalPdf({
       5: { cellWidth: 52 },
     },
   });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = (docWithAutoTable.lastAutoTable?.finalY ?? y) + 8;
 
   // Resumo de margens
   const finalMargins = discounts.map((d) => d.final_margin_percent);
@@ -169,7 +181,7 @@ export async function generateLoadCompositionProposalPdf({
       1: { cellWidth: contentWidth - 60 },
     },
   });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = (docWithAutoTable.lastAutoTable?.finalY ?? y) + 8;
 
   // Observações finais
   if (y > 260) {
@@ -186,7 +198,7 @@ export async function generateLoadCompositionProposalPdf({
   doc.text(obsLines, marginL, y);
 
   // Footer com página
-  const pageCount = (doc as any).getNumberOfPages();
+  const pageCount = docWithPageCount.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     const pageH = doc.internal.pageSize.getHeight();

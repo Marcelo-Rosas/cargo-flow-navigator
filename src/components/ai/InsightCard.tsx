@@ -67,19 +67,12 @@ export function InsightCard({ insight }: InsightCardProps) {
         recommendationDetail={analysis.recommendation_detail}
       />
 
-      <div className="flex items-center justify-between pt-1">
-        <InsightFeedback insightId={insight.id} currentRating={insight.user_rating} />
-        <p className="text-[10px] text-muted-foreground/60">
-          Análise em{' '}
-          {new Date(insight.created_at).toLocaleString('pt-BR', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </p>
-      </div>
+      <InsightFeedback
+        insightId={insight.id}
+        currentRating={insight.user_rating}
+        currentFeedback={insight.user_feedback}
+        createdAt={insight.created_at}
+      />
     </motion.div>
   );
 }

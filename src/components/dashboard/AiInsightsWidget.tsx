@@ -10,8 +10,6 @@ import {
   Loader2,
   XCircle,
   ArrowRight,
-  ThumbsUp,
-  ThumbsDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,9 +17,9 @@ import {
   useDashboardInsights,
   useOperationalInsights,
   useRequestAiAnalysis,
-  useRateInsight,
 } from '@/hooks/useAiInsights';
 import { useToast } from '@/hooks/use-toast';
+import { InsightFeedback } from '@/components/ai/InsightFeedback';
 
 const typeIcons: Record<string, typeof TrendingUp> = {
   opportunity: Lightbulb,
@@ -263,70 +261,14 @@ export function AiInsightsWidget() {
           })}
 
           {/* Feedback + Timestamp */}
-          <DashboardFeedback
+          <InsightFeedback
             insightId={insight.id}
             currentRating={insight.user_rating}
+            currentFeedback={insight.user_feedback}
             createdAt={insight.created_at}
           />
         </div>
       )}
     </motion.div>
-  );
-}
-
-function DashboardFeedback({
-  insightId,
-  currentRating,
-  createdAt,
-}: {
-  insightId: string;
-  currentRating: number | null;
-  createdAt: string;
-}) {
-  const rateInsight = useRateInsight();
-  const handleRate = (rating: number) => {
-    if (currentRating === rating) return;
-    rateInsight.mutate({ insightId, rating });
-  };
-
-  return (
-    <div className="flex items-center justify-between pt-1">
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] text-muted-foreground mr-1">Util?</span>
-        <button
-          onClick={() => handleRate(5)}
-          disabled={rateInsight.isPending}
-          className={`p-1 rounded transition-colors ${
-            currentRating === 5
-              ? 'text-green-600 bg-green-50 dark:bg-green-900/30'
-              : 'text-muted-foreground/50 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
-          }`}
-        >
-          <ThumbsUp className="w-3 h-3" />
-        </button>
-        <button
-          onClick={() => handleRate(1)}
-          disabled={rateInsight.isPending}
-          className={`p-1 rounded transition-colors ${
-            currentRating === 1
-              ? 'text-red-600 bg-red-50 dark:bg-red-900/30'
-              : 'text-muted-foreground/50 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-          }`}
-        >
-          <ThumbsDown className="w-3 h-3" />
-        </button>
-      </div>
-      {createdAt && (
-        <p className="text-[10px] text-muted-foreground">
-          Atualizado em{' '}
-          {new Date(createdAt).toLocaleString('pt-BR', {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </p>
-      )}
-    </div>
   );
 }

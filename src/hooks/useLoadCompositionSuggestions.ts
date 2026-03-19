@@ -207,6 +207,8 @@ export function useLoadCompositionSuggestion(
 
 /**
  * Hook to watch for new suggestions (real-time)
+ * Uses Supabase JS v2 channel API (postgres_changes)
+ * Note: load_composition_suggestions must be in supabase_realtime publication
  */
 export function useLoadCompositionSuggestionsRealtime(shipperId?: string) {
   const query = useLoadCompositionSuggestions({
@@ -214,26 +216,27 @@ export function useLoadCompositionSuggestionsRealtime(shipperId?: string) {
     status: 'pending',
   });
 
-  // Subscribe to real-time changes
   React.useEffect(() => {
     if (!shipperId) return;
 
-    const subscription = (supabase as any)
-      .from('load_composition_suggestions')
-      .on('INSERT', (payload) => {
-        if (payload.new.shipper_id === shipperId) {
+    const channel = supabase
+      .channel(`load-composition-${shipperId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'load_composition_suggestions',
+          filter: `shipper_id=eq.${shipperId}`,
+        },
+        () => {
           query.refetch();
         }
-      })
-      .on('UPDATE', (payload) => {
-        if (payload.new.shipper_id === shipperId) {
-          query.refetch();
-        }
-      })
+      )
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [shipperId, query]);
 

@@ -169,15 +169,18 @@ Deno.serve(async (req: Request) => {
       0
     );
 
+    const savingsPercent =
+      totalOriginalCost > 0
+        ? Math.round(((totalOriginalCost - estimatedConsolidatedCost) / totalOriginalCost) * 1000) /
+          10
+        : 0;
+
     const { error: metricsError } = await supabase.from('load_composition_metrics').insert({
       composition_id,
       original_total_cost: Math.round(totalOriginalCost),
       composed_total_cost: Math.round(estimatedConsolidatedCost),
       savings_brl: Math.round(totalOriginalCost - estimatedConsolidatedCost),
-      savings_percent: (
-        ((totalOriginalCost - estimatedConsolidatedCost) / totalOriginalCost) *
-        100
-      ).toFixed(1),
+      savings_percent: savingsPercent,
       original_km_total: 0, // Would calculate from separate quote routes
       composed_km_total:
         (routings as RoutingLeg[])?.reduce((sum, r) => sum + (r.leg_distance_km || 0), 0) || 0,

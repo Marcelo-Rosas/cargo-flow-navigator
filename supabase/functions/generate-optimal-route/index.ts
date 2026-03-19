@@ -222,7 +222,7 @@ function solveTSP(locations: Location[]): {
 
   // Nearest neighbor
   const visited = Array(n).fill(false);
-  const path = [0]; // Start at warehouse
+  let path: number[] = [0]; // Start at warehouse
   visited[0] = true;
   let totalDistance = 0;
   let current = 0;
@@ -398,17 +398,33 @@ function calculateArrivalTime(
 }
 
 /**
- * Save routings to DB
+ * Save routings to DB (replaces existing legs for this composition)
  */
 async function saveRoutingsToDB(
   supabase: ReturnType<typeof createClient>,
   compositionId: string,
   legs: RouteLeg[]
 ): Promise<void> {
-  const routingData = legs.map((leg) => ({
+  // Delete existing routings for this composition before inserting
+  const { error: deleteError } = await supabase
+    .from('load_composition_routings')
+    .delete()
+    .eq('composition_id', compositionId);
+
+  if (deleteError) {
+    throw new Error(`Failed to clear existing routings: ${deleteError.message}`);
+  }
+
+  // Filter to legs with quote_id for schema compliance (depot legs may have null)
+  const legsToInsert = legs.filter((leg) => leg.quote_id != null);
+  if (legsToInsert.length === 0) {
+    return;
+  }
+
+  const routingData = legsToInsert.map((leg) => ({
     composition_id: compositionId,
     route_sequence: leg.sequence_number,
-    quote_id: leg.quote_id || null,
+    quote_id: leg.quote_id!,
     leg_distance_km: leg.distance_km,
     leg_duration_min: leg.duration_min,
     leg_polyline: leg.polyline,

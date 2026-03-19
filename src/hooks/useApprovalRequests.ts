@@ -50,7 +50,9 @@ export function useApprovalRequests(status?: string) {
         if (error.code === '42P01') return []; // table doesn't exist yet
         throw error;
       }
-      return (data ?? []) as ApprovalRequest[];
+      const list = (data ?? []) as unknown as ApprovalRequest[];
+      // Esconde aprovações fora da regra: risk_gate é só para OS/trip, não para cotação
+      return list.filter((a) => !(a.entity_type === 'quote' && a.approval_type === 'risk_gate'));
     },
   });
 }
@@ -59,16 +61,24 @@ export function usePendingApprovalsCount() {
   return useQuery({
     queryKey: ['approval-requests', 'pending-count'],
     queryFn: async () => {
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from('approval_requests' as 'documents')
-        .select('*', { count: 'exact', head: true })
+        .select('id, entity_type, approval_type')
         .eq('status', 'pending');
 
       if (error) {
         if (error.code === '42P01') return 0;
         throw error;
       }
-      return count ?? 0;
+      const list = (data ?? []) as unknown as {
+        id: string;
+        entity_type: string;
+        approval_type: string;
+      }[];
+      const filtered = list.filter(
+        (a) => !(a.entity_type === 'quote' && a.approval_type === 'risk_gate')
+      );
+      return filtered.length;
     },
     refetchInterval: 30_000, // Refetch every 30s
   });
@@ -108,7 +118,9 @@ export function useDecideApproval() {
       decision: ApprovalDecision;
       notes?: string;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase

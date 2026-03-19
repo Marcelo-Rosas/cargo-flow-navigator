@@ -130,7 +130,7 @@ export function useRequestAiAnalysis() {
         });
       }
 
-      const primaryFnName = OPERATIONAL_TYPES.has(analysisType)
+      const primaryFnName: string = OPERATIONAL_TYPES.has(analysisType)
         ? 'ai-operational-orchestrator'
         : 'ai-orchestrator-agent';
 
@@ -183,9 +183,14 @@ export function useRateInsight() {
       rating: number;
       feedback?: string;
     }) => {
+      const normalizedFeedback = feedback && feedback.trim().length > 0 ? feedback.trim() : null;
+
       const { error } = await supabase
         .from('ai_insights' as 'documents')
-        .update({ user_rating: rating, user_feedback: feedback || null } as Record<string, unknown>)
+        .update({
+          user_rating: rating,
+          user_feedback: normalizedFeedback,
+        } as Record<string, unknown>)
         .eq('id', insightId);
 
       if (error) throw error;

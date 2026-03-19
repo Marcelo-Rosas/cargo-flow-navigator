@@ -7,8 +7,9 @@
  * 4. Warnings - validation warnings and constraints
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLoadCompositionSuggestion } from '@/hooks/useLoadCompositionSuggestions';
+import { useGenerateOptimalRoute } from '@/hooks/useGenerateOptimalRoute';
 import {
   Dialog,
   DialogContent,
@@ -44,8 +45,42 @@ export function LoadCompositionModal({
   onClose,
   onApprove,
 }: LoadCompositionModalProps) {
-  const { data: composition, isLoading, error } = useLoadCompositionSuggestion(compositionId);
+  const {
+    data: composition,
+    isLoading,
+    error,
+    refetch: refetchComposition,
+  } = useLoadCompositionSuggestion(compositionId);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const generateRoute = useGenerateOptimalRoute();
+
+  // When details open and there are no routings, trigger route generation (once per composition)
+  const hasTriggeredRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !compositionId ||
+      !composition ||
+      generateRoute.isPending ||
+      (composition.routings && composition.routings.length > 0) ||
+      composition.quote_ids.length < 2 ||
+      hasTriggeredRef.current === compositionId
+    ) {
+      return;
+    }
+    hasTriggeredRef.current = compositionId;
+    generateRoute.mutate(
+      {
+        quote_ids: composition.quote_ids,
+        composition_id: compositionId,
+        save_to_db: true,
+      },
+      {
+        onSuccess: () => {
+          refetchComposition();
+        },
+      }
+    );
+  }, [compositionId, composition, generateRoute, refetchComposition]);
 
   const status = composition ? statusConfig[composition.status] : null;
   const isExecutable = composition?.status === 'pending' && composition?.is_feasible;
@@ -223,7 +258,12 @@ export function LoadCompositionModal({
 
             {/* Tab 2: Route */}
             <TabsContent value="route" className="space-y-4">
-              {composition.routings && composition.routings.length > 0 ? (
+              {generateRoute.isPending ? (
+                <div className="bg-gray-50 p-8 rounded-lg text-center">
+                  <Loader className="w-8 h-8 animate-spin mx-auto mb-3 text-primary" />
+                  <p className="text-sm text-gray-600">Gerando rota otimizada...</p>
+                </div>
+              ) : composition.routings && composition.routings.length > 0 ? (
                 <>
                   <RouteMapVisualization routings={composition.routings} />
 
@@ -256,8 +296,34 @@ export function LoadCompositionModal({
                   </div>
                 </>
               ) : (
-                <div className="bg-gray-50 p-8 rounded-lg text-center text-sm text-gray-600">
-                  Rota não disponível
+                <div className="bg-gray-50 p-8 rounded-lg text-center">
+                  <p className="text-sm text-gray-600 mb-3">
+                    Rota não disponível. Clique para gerar.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={generateRoute.isPending || composition.quote_ids.length < 2}
+                    onClick={() =>
+                      generateRoute.mutate(
+                        {
+                          quote_ids: composition.quote_ids,
+                          composition_id: compositionId,
+                          save_to_db: true,
+                        },
+                        { onSuccess: () => refetchComposition() }
+                      )
+                    }
+                  >
+                    {generateRoute.isPending ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin mr-2" />
+                        Gerando...
+                      </>
+                    ) : (
+                      'Gerar rota'
+                    )}
+                  </Button>
                 </div>
               )}
             </TabsContent>

@@ -14,6 +14,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
 interface CompositionRequest {
   shipper_id: string;
+  user_id?: string; // UUID of requesting user (for created_by audit)
   date_window_days?: number;
   min_viable_score?: number;
 }
@@ -66,11 +67,18 @@ Deno.serve(async (req: Request) => {
 
     const body = (await req.json()) as CompositionRequest;
     const shipperId = body.shipper_id;
+    const userId = body.user_id; // From client for created_by audit
     const dateWindowDays = body.date_window_days || DEFAULT_DATE_WINDOW_DAYS;
     const minViableScore = body.min_viable_score || MIN_VIABLE_SCORE;
 
     if (!shipperId) {
       return new Response(JSON.stringify({ error: 'Missing shipper_id' }), { status: 400 });
+    }
+
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Missing user_id (required for audit)' }), {
+        status: 400,
+      });
     }
 
     // Initialize Supabase client
@@ -83,12 +91,12 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Fetch all pending quotes for this shipper
+    // 1. Fetch quotes in pipeline for this shipper (stage: precificacao, enviado, negociacao)
     const { data: quotes, error: quoteError } = await supabase
       .from('quotes')
       .select('*')
       .eq('shipper_id', shipperId)
-      .in('status', ['pending_approval', 'negotiation'])
+      .in('stage', ['precificacao', 'enviado', 'negociacao'])
       .gte('pickup_date', new Date().toISOString().split('T')[0])
       .lte(
         'pickup_date',
@@ -144,7 +152,7 @@ Deno.serve(async (req: Request) => {
         distance_increase_percent: sugg.distance_increase_percent,
         validation_warnings: sugg.validation_warnings,
         is_feasible: sugg.is_feasible,
-        created_by: supabaseKey, // Service role
+        created_by: userId,
         status: 'pending',
       });
 

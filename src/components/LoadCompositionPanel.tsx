@@ -7,13 +7,14 @@
 import React, { useState } from 'react';
 import { useLoadCompositionSuggestions } from '@/hooks/useLoadCompositionSuggestions';
 import { useApproveComposition } from '@/hooks/useApproveComposition';
+import { useAnalyzeLoadComposition } from '@/hooks/useAnalyzeLoadComposition';
 import { useCalculateDiscounts } from '@/hooks/useCalculateDiscounts';
 import { LoadCompositionCard } from './LoadCompositionCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw, Sparkles, Loader2 } from 'lucide-react';
 import { LoadCompositionModal } from './LoadCompositionModal';
 
 export interface LoadCompositionPanelProps {
@@ -47,6 +48,9 @@ export function LoadCompositionPanel({ shipperId, dateRange }: LoadCompositionPa
 
   // Approve mutation
   const { mutate: approve, isPending: isApproving } = useApproveComposition();
+
+  // Analyze (generate suggestions) mutation
+  const { mutate: analyzeComposition, isPending: isAnalyzing } = useAnalyzeLoadComposition();
 
   // Calculate discounts mutation
   const { mutate: calculateDiscounts, isPending: isCalculatingDiscounts } = useCalculateDiscounts();
@@ -98,16 +102,37 @@ export function LoadCompositionPanel({ shipperId, dateRange }: LoadCompositionPa
                 Análise automática de cargas do mesmo embarcador para otimização de rotas
               </CardDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              disabled={isLoading}
-              className="gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Atualizar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => analyzeComposition({ shipper_id: shipperId })}
+                disabled={isAnalyzing}
+                className="gap-2"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Gerar sugestões
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isLoading}
+                className="gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Atualizar
+              </Button>
+            </div>
           </div>
         </CardHeader>
 

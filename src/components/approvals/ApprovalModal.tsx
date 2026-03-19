@@ -56,21 +56,16 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
     approval?.entity_id ?? ''
   );
 
-  const quoteUuidFromDescription = useMemo(() => {
-    const desc = approval?.description;
-    if (!desc) return null;
-    const m = desc.match(/Quote\s+([0-9a-fA-F-]{36})/);
-    return m?.[1] ?? null;
-  }, [approval?.description]);
+  const quoteIdForCode = approval?.entity_type === 'quote' ? (approval?.entity_id ?? null) : null;
 
   const { data: quoteCode } = useQuery({
-    queryKey: ['approval-quote-code', quoteUuidFromDescription],
-    enabled: open && !!quoteUuidFromDescription,
+    queryKey: ['approval-quote-code', quoteIdForCode],
+    enabled: open && !!quoteIdForCode,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('quotes' as 'documents')
         .select('quote_code')
-        .eq('id', quoteUuidFromDescription!)
+        .eq('id', quoteIdForCode!)
         .maybeSingle();
 
       if (error) return null;
@@ -85,12 +80,14 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
   const summary = (aiAnalysis?.summary as string) || null;
   const metrics = (aiAnalysis?.metrics as Record<string, unknown>) || null;
   const renderedDescription = useMemo(() => {
-    const desc = approval?.description ?? null;
-    const uuid = quoteUuidFromDescription;
-    if (!desc || !uuid || !quoteCode) return desc;
-    // Matches UI pattern currently stored: "Quote <uuid> ..."
-    return desc.replace(`Quote ${uuid}`, `Quote ${quoteCode}`);
-  }, [approval?.description, quoteUuidFromDescription, quoteCode]);
+    const desc = approval?.description ?? '';
+    const entityId = approval?.entity_id;
+    if (!quoteCode) return desc || null;
+    if (approval?.entity_type === 'quote' && entityId) {
+      return desc.replace(new RegExp(entityId, 'g'), quoteCode).trim() || `Cotação ${quoteCode}`;
+    }
+    return desc || null;
+  }, [approval?.description, approval?.entity_type, approval?.entity_id, quoteCode]);
 
   useEffect(() => {
     if (!open) return;
@@ -174,6 +171,12 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
           {renderedDescription && (
             <p className="text-sm text-muted-foreground">{renderedDescription}</p>
           )}
+          {aiAnalysis && (
+            <p className="text-xs text-muted-foreground mt-1">
+              A classificação de risco e a recomendação abaixo foram geradas pela Análise AI com
+              base nos dados da cotação e da solicitação, para apoiar sua decisão.
+            </p>
+          )}
 
           <Separator />
 
@@ -184,20 +187,26 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-3"
             >
-              <div className="flex items-center gap-2">
-                <Brain className="w-4 h-4 text-violet-500" />
-                <span className="text-sm font-semibold text-violet-700 dark:text-violet-400">
-                  Análise AI
-                </span>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-violet-500" />
+                  <span className="text-sm font-semibold text-violet-700 dark:text-violet-400">
+                    Análise AI
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground pl-6">
+                  Classificação e recomendação geradas automaticamente com base na cotação e no
+                  contexto da solicitação.
+                </p>
               </div>
 
-              {/* Risk Badge */}
+              {/* Risk Badge — explicitamente da Análise AI */}
               <div className="flex items-center gap-2">
                 <div
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${riskColors[risk]}`}
                 >
                   <RiskIcon className="w-3.5 h-3.5" />
-                  Risco {risk}
+                  Risco (Análise AI): {risk === 'medio' ? 'médio' : risk}
                 </div>
               </div>
 
