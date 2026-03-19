@@ -5,7 +5,45 @@ import { AlertCircle, TrendingUp, Zap, RefreshCw, Fuel } from 'lucide-react';
 import { useMarketInsights, getAlertStyles } from '@/hooks/useMarketInsights';
 import { usePetrobrasDiesel } from '@/hooks/usePetrobrasDiesel';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useState } from 'react';
+
+const UF_OPTIONS = [
+  { value: 'BR', label: 'Brasil (Média)' },
+  { value: 'AC', label: 'Acre' },
+  { value: 'AL', label: 'Alagoas' },
+  { value: 'AM', label: 'Amazonas' },
+  { value: 'AP', label: 'Amapá' },
+  { value: 'BA', label: 'Bahia' },
+  { value: 'CE', label: 'Ceará' },
+  { value: 'DF', label: 'Distrito Federal' },
+  { value: 'ES', label: 'Espírito Santo' },
+  { value: 'GO', label: 'Goiás' },
+  { value: 'MA', label: 'Maranhão' },
+  { value: 'MG', label: 'Minas Gerais' },
+  { value: 'MS', label: 'Mato Grosso do Sul' },
+  { value: 'MT', label: 'Mato Grosso' },
+  { value: 'PA', label: 'Pará' },
+  { value: 'PB', label: 'Paraíba' },
+  { value: 'PE', label: 'Pernambuco' },
+  { value: 'PI', label: 'Piauí' },
+  { value: 'PR', label: 'Paraná' },
+  { value: 'RJ', label: 'Rio de Janeiro' },
+  { value: 'RN', label: 'Rio Grande do Norte' },
+  { value: 'RO', label: 'Rondônia' },
+  { value: 'RR', label: 'Roraima' },
+  { value: 'RS', label: 'Rio Grande do Sul' },
+  { value: 'SC', label: 'Santa Catarina' },
+  { value: 'SE', label: 'Sergipe' },
+  { value: 'SP', label: 'São Paulo' },
+  { value: 'TO', label: 'Tocantins' },
+];
 
 export function MarketIntelligencePanel() {
   const { data: insights, isLoading, isError, error } = useMarketInsights();
@@ -15,6 +53,19 @@ export function MarketIntelligencePanel() {
     refresh: refreshPetrobras,
   } = usePetrobrasDiesel('BR');
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedUf, setSelectedUf] = useState('BR');
+  const {
+    data: petrobrasUf,
+    isLoading: petrobrasUfLoading,
+    refresh: refreshPetrobrasUf,
+  } = usePetrobrasDiesel(selectedUf);
+
+  // Usa dados do UF selecionado (fallback para BR)
+  const activePetrobras = selectedUf === 'BR' ? petrobras : petrobrasUf;
+  const activePetrobrasLoading = selectedUf === 'BR' ? petrobrasLoading : petrobrasUfLoading;
+  const activeRefresh = selectedUf === 'BR' ? refreshPetrobras : refreshPetrobrasUf;
+
+  const ufLabel = UF_OPTIONS.find((o) => o.value === selectedUf)?.label ?? selectedUf;
 
   // Card Diesel Petrobras — renderiza independente do market-insights
   const dieselPetrobrasCard = (
@@ -33,7 +84,7 @@ export function MarketIntelligencePanel() {
             onClick={async () => {
               setRefreshing(true);
               try {
-                await refreshPetrobras();
+                await activeRefresh();
               } finally {
                 setRefreshing(false);
               }
@@ -43,35 +94,49 @@ export function MarketIntelligencePanel() {
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
-        <Badge variant="outline" className="text-[10px] w-fit text-blue-600 border-blue-300">
-          Atualização diária
-        </Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="text-[10px] w-fit text-blue-600 border-blue-300">
+            Atualização diária
+          </Badge>
+          <Select value={selectedUf} onValueChange={setSelectedUf}>
+            <SelectTrigger className="h-7 w-[160px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[280px]">
+              {UF_OPTIONS.map((uf) => (
+                <SelectItem key={uf.value} value={uf.value} className="text-xs">
+                  {uf.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {petrobrasLoading ? (
+        {activePetrobrasLoading ? (
           <Skeleton className="h-8 w-24" />
-        ) : petrobras ? (
+        ) : activePetrobras ? (
           <>
             <div>
-              <p className="text-xs text-muted-foreground">Preço Médio Brasil</p>
+              <p className="text-xs text-muted-foreground">Preço Médio {ufLabel}</p>
               <p className="text-2xl font-semibold text-primary">
-                R$ {petrobras.preco_medio.toFixed(2).replace('.', ',')}/L
+                R$ {activePetrobras.preco_medio.toFixed(2).replace('.', ',')}/L
               </p>
             </div>
-            {petrobras.variacao_pct != null && (
+            {activePetrobras.variacao_pct != null && (
               <div>
                 <p className="text-xs text-muted-foreground">Variação vs anterior</p>
                 <p
-                  className={`text-lg font-medium ${petrobras.variacao_pct >= 0 ? 'text-red-600' : 'text-green-600'}`}
+                  className={`text-lg font-medium ${activePetrobras.variacao_pct >= 0 ? 'text-red-600' : 'text-green-600'}`}
                 >
-                  {petrobras.variacao_pct >= 0 ? '+' : ''}
-                  {petrobras.variacao_pct.toFixed(2)}%
+                  {activePetrobras.variacao_pct >= 0 ? '+' : ''}
+                  {activePetrobras.variacao_pct.toFixed(2)}%
                 </p>
               </div>
             )}
-            {petrobras.periodo_coleta && (
+            {activePetrobras.periodo_coleta && (
               <p className="text-[10px] text-muted-foreground">
-                Coleta: {petrobras.periodo_coleta}
+                Coleta: {activePetrobras.periodo_coleta}
               </p>
             )}
           </>
