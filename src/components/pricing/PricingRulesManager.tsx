@@ -85,9 +85,11 @@ const DEFAULT_VALUE_TYPE = 'percentage';
 function formatValue(rule: PricingRuleConfig): string {
   const v = Number(rule.value);
   if (rule.value_type === 'percentage') return `${v.toFixed(2)}%`;
-  if (rule.value_type === 'per_km') return `R$ ${v.toFixed(2)}/km`;
-  if (rule.value_type === 'per_ton') return `R$ ${v.toFixed(2)}/ton`;
-  return `R$ ${v.toFixed(2)}`;
+  if (rule.value_type === 'per_km')
+    return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/km`;
+  if (rule.value_type === 'per_ton')
+    return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/ton`;
+  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function PricingRulesManager() {

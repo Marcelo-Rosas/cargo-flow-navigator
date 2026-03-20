@@ -14,6 +14,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { corsHeaders } from '../_shared/cors.ts';
 
 interface ApproveCompositionRequest {
   composition_id: string;
@@ -44,9 +45,16 @@ interface RoutingLeg {
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   try {
     if (req.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const body = (await req.json()) as ApproveCompositionRequest;
@@ -203,7 +211,7 @@ Deno.serve(async (req: Request) => {
         const notificationPayload = {
           type: 'composition_approved',
           shipper_id: comp.shipper_id,
-          message: `✅ Sua composição de ${comp.quote_ids.length} cargas foi aprovada! Economia: R$ ${(comp.estimated_savings_brl / 100).toFixed(2)} | Ordem de Serviço: ${createdOrder.id}`,
+          message: `✅ Sua composição de ${comp.quote_ids.length} cargas foi aprovada! Economia: R$ ${(comp.estimated_savings_brl / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Ordem de Serviço: ${createdOrder.id}`,
           cta_url: `/operacional?order=${createdOrder.id}`,
           channels: ['whatsapp', 'email'],
         };
@@ -246,7 +254,7 @@ Deno.serve(async (req: Request) => {
         },
       }),
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
@@ -258,7 +266,7 @@ Deno.serve(async (req: Request) => {
         timestamp: new Date().toISOString(),
       }),
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
       }
     );

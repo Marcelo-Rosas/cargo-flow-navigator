@@ -106,18 +106,7 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
       entityId: approval.entity_id,
       entityType: approval.entity_type,
     });
-  }, [
-    open,
-    approval?.id,
-    approval?.status,
-    aiAnalysis,
-    requestAi.isPending,
-    requestAi.mutate,
-    approval?.entity_type,
-    approval?.entity_id,
-    insights?.length,
-    isInsightsLoading,
-  ]);
+  }, [open, approval, aiAnalysis, requestAi, insights?.length, isInsightsLoading]);
 
   const handleDecision = (decision: 'approved' | 'rejected') => {
     if (!approval) return;

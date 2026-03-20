@@ -72,6 +72,3 @@ export function InsuranceSelectorLazy(props: InsuranceSelectorLazyProps) {
     </Suspense>
   );
 }
-
-// Utilities exported from InsuranceSelectorLazy.utils.ts
-export { preloadInsuranceSelectorLazy, withPreload } from './InsuranceSelectorLazy.utils';

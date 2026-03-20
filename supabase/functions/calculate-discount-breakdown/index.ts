@@ -89,10 +89,10 @@ Deno.serve(async (req) => {
       simulate_only = false,
     } = body;
 
-    // 1. Fetch composition & quotes
+    // 1. Fetch composition (left join — metrics may not exist yet)
     const { data: composition, error: compositionError } = await supabase
       .from('load_composition_suggestions')
-      .select('*, load_composition_metrics!inner(original_total_cost, composed_total_cost)')
+      .select('*, load_composition_metrics(original_total_cost, composed_total_cost)')
       .eq('id', composition_id)
       .single();
 
@@ -100,22 +100,34 @@ Deno.serve(async (req) => {
       throw new Error(`Composition not found: ${compositionError?.message}`);
     }
 
-    // 2. Fetch quote details with costs
+    if (!Array.isArray(composition.quote_ids) || composition.quote_ids.length === 0) {
+      throw new Error('Composition has no associated quotes');
+    }
+
+    // 2. Fetch quote details with costs (use real column names)
     const { data: quotes, error: quotesError } = await supabase
       .from('quotes')
-      .select('id, shipper_id, price_brl, weight_kg')
+      .select('id, shipper_id, value, weight')
       .in('id', composition.quote_ids);
 
     if (quotesError) {
       throw new Error(`Failed to fetch quotes: ${quotesError.message}`);
     }
 
-    // 3. Calculate freight cost for each quote (using freightCalculator logic)
-    // For MVP: assume freight_cost ≈ 60% of price (adjust based on your pricing model)
-    const quotesWithCost: QuoteWithCost[] = quotes.map((q: any) => ({
-      ...q,
-      freight_cost_brl: Math.round(q.price_brl * 0.6), // 60% cost assumption
-    }));
+    // 3. Map real column names (value/weight) to internal names (price_brl/weight_kg)
+    // value is in BRL decimal (e.g. 16523.29), convert to centavos
+    const quotesWithCost: QuoteWithCost[] = (
+      quotes as { id: string; shipper_id: string; value: number; weight: number }[]
+    ).map((q) => {
+      const priceCentavos = Math.round((Number(q.value) || 0) * 100);
+      return {
+        id: q.id,
+        shipper_id: q.shipper_id,
+        price_brl: priceCentavos,
+        weight_kg: Number(q.weight) || 0,
+        freight_cost_brl: Math.round(priceCentavos * 0.6), // 60% cost assumption
+      };
+    });
 
     // 4. Calculate metrics for each quote
     const metricsPerQuote = quotesWithCost.map((q) => ({
@@ -129,9 +141,17 @@ Deno.serve(async (req) => {
     }));
 
     // 5. Calculate total economy and max discounts
-    const totalOriginalCost = composition.load_composition_metrics[0]?.original_total_cost || 0;
-    const composedTotalCost = composition.load_composition_metrics[0]?.composed_total_cost || 0;
-    const totalEconomy = Math.max(0, totalOriginalCost - composedTotalCost);
+    // Metrics may not exist yet (left join) — use suggestion's estimated_savings as fallback
+    const metricsRow = Array.isArray(composition.load_composition_metrics)
+      ? composition.load_composition_metrics[0]
+      : null;
+    const totalOriginalCost = metricsRow?.original_total_cost || 0;
+    const composedTotalCost = metricsRow?.composed_total_cost || 0;
+    // Use metrics if available, otherwise fall back to estimated_savings from the suggestion
+    const totalEconomy =
+      totalOriginalCost > 0
+        ? Math.max(0, totalOriginalCost - composedTotalCost)
+        : Math.max(0, composition.estimated_savings_brl || 0);
 
     // 6. Calculate max discount per quote (respecting margin rule)
     const discountProposals: DiscountProposal[] = metricsPerQuote.map((m) => {
@@ -171,20 +191,21 @@ Deno.serve(async (req) => {
 
     // 8. Save to database (if not simulate_only)
     if (!simulate_only) {
+      // Round all monetary values to integers (centavos) — DB columns are integer
       const recordsToInsert = discountProposals.map((dp) => ({
         composition_id,
         quote_id: dp.quote_id,
         shipper_id: dp.shipper_id,
-        original_quote_price_brl: dp.original_price,
+        original_quote_price_brl: Math.round(dp.original_price),
         original_freight_cost_brl: Math.round(dp.original_price * 0.6),
-        original_margin_brl: dp.original_margin,
-        original_margin_percent: dp.original_margin_percent,
-        max_discount_allowed_brl: dp.max_discount_allowed,
-        discount_offered_brl: dp.discount_offered,
-        discount_percent: dp.discount_percent,
-        final_quote_price_brl: dp.final_price,
-        final_margin_brl: dp.final_margin,
-        final_margin_percent: dp.final_margin_percent,
+        original_margin_brl: Math.round(dp.original_margin),
+        original_margin_percent: Math.round(dp.original_margin_percent * 100) / 100,
+        max_discount_allowed_brl: Math.round(dp.max_discount_allowed),
+        discount_offered_brl: Math.round(dp.discount_offered),
+        discount_percent: Math.round(dp.discount_percent * 100) / 100,
+        final_quote_price_brl: Math.round(dp.final_price),
+        final_margin_brl: Math.round(dp.final_margin),
+        final_margin_percent: Math.round(dp.final_margin_percent * 100) / 100,
         margin_rule_source: 'global',
         minimum_margin_percent_applied: minimum_margin_percent,
         discount_strategy,
@@ -275,7 +296,7 @@ function allocateEqualShare(proposals: DiscountProposal[], totalEconomy: number)
 
     if (discountToOffer < discountPerQuote) {
       p.validation_warnings.push(
-        `Desconto reduzido de R$ ${(discountPerQuote / 100).toFixed(2)} para R$ ${(discountToOffer / 100).toFixed(2)} - limite de margem`
+        `Desconto reduzido de R$ ${(discountPerQuote / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} para R$ ${(discountToOffer / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} - limite de margem`
       );
     }
   });

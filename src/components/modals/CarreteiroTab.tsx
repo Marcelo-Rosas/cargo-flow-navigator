@@ -43,7 +43,12 @@ interface CarreteiroTabProps {
 }
 
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 
 export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
   const updateOrderMutation = useUpdateOrder();
@@ -341,7 +346,9 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
               <div>
                 <p className="text-xs text-muted-foreground">ANTT R$/km</p>
                 <p className="font-semibold text-foreground">
-                  {anttValue != null ? `R$ ${(anttValue / kmDistance).toFixed(2)}/km` : '—'}
+                  {anttValue != null
+                    ? `R$ ${(anttValue / kmDistance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/km`
+                    : '—'}
                 </p>
               </div>
               <div>
@@ -355,7 +362,12 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
                         : 'text-success'
                     )}
                   >
-                    R$ {(Number(order.carreteiro_real) / kmDistance).toFixed(2)}/km
+                    R${' '}
+                    {(Number(order.carreteiro_real) / kmDistance).toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                    /km
                   </p>
                 ) : (
                   <p className="font-semibold text-foreground">—</p>

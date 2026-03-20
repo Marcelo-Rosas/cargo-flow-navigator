@@ -6,7 +6,12 @@ import type {
 } from '@/hooks/useLoadCompositionSuggestions';
 
 const fmtCurrency = (v: number) =>
-  (v / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  (v / 100).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const fmtPercent = (v: number, decimals = 2) => `${(v * 100).toFixed(decimals).replace('.', ',')}%`;
 

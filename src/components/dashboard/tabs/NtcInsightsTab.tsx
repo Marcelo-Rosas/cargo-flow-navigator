@@ -133,7 +133,11 @@ export function NtcInsightsTab() {
         />
         <InsightCard
           title="Diesel S10"
-          value={latest.diesel_s10_preco ? `R$ ${latest.diesel_s10_preco.toFixed(2)}/L` : '—'}
+          value={
+            latest.diesel_s10_preco
+              ? `R$ ${latest.diesel_s10_preco.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/L`
+              : '—'
+          }
           subtitle={`Var. 12m: ${pct(latest.diesel_s10_12meses)}`}
           icon={Fuel}
           trend={latest.diesel_s10_12meses}
@@ -220,7 +224,9 @@ export function NtcInsightsTab() {
                   {pct(m.inctl_12meses)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
-                  {m.diesel_s10_preco ? `R$ ${Number(m.diesel_s10_preco).toFixed(2)}` : '—'}
+                  {m.diesel_s10_preco
+                    ? `R$ ${Number(m.diesel_s10_preco).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : '—'}
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
                   {m.reajuste_sugerido_pct ? `${Number(m.reajuste_sugerido_pct).toFixed(2)}%` : '—'}

@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { LayoutProvider, useLayout } from './LayoutContext';
+import { LayoutProvider } from './LayoutContext';
+import { useLayout } from './useLayout';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 

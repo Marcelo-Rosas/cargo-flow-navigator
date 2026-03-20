@@ -1,3 +1,4 @@
+/// <reference path="../_shared/deno.d.ts" />
 // supabase/functions/ai-orchestrator-agent/index.ts
 // Alteração: removido selectModel local → usa selectGeminiModel do _shared/gemini.ts
 

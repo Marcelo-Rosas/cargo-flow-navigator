@@ -14,5 +14,7 @@ export function formatCurrency(
     style: 'currency',
     currency: 'BRL',
     ...intlOptions,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }

@@ -30,9 +30,9 @@ function buildReceiptHtml(trip: TripReconciliationRow): string {
 <h1>Recibo de Fechamento - ${trip.trip_number}</h1>
 <p>Data: ${new Date().toLocaleString('pt-BR')}</p>
 <p>Status: Fechado</p>
-<p>Valor esperado: R$ ${Number(trip.expected_amount).toFixed(2)}</p>
-<p>Valor pago: R$ ${Number(trip.paid_amount).toFixed(2)}</p>
-<p>Delta: R$ ${Number(trip.delta_amount).toFixed(2)}</p>
+<p>Valor esperado: R$ ${Number(trip.expected_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+<p>Valor pago: R$ ${Number(trip.paid_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+<p>Delta: R$ ${Number(trip.delta_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
 </body>
 </html>`;
 }

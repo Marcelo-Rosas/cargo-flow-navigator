@@ -56,7 +56,12 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
   };
 
   const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
 
   const currentPaymentTerm: PaymentTerm | undefined =
     quote?.payment_term_id && paymentTerms

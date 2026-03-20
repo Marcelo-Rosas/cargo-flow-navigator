@@ -8,7 +8,20 @@
       "mcp__claude_ai_Supabase__execute_sql",
       "Bash(grep -h \"ALTER TABLE public.orders\" /c/Users/marce/cargo-flow-navigator/supabase/migrations/*.sql)",
       "Bash(find /c/Users/marce/cargo-flow-navigator/src/components/modals/quote-detail -name *.tsx -type f)",
-      "Bash(claude remote-control:*)"
+      "Bash(claude remote-control:*)",
+      "mcp__claude_ai_Cloudflare_Developer_Platform__set_active_account",
+      "mcp__claude_ai_Cloudflare_Developer_Platform__workers_list",
+      "mcp__claude_ai_Cloudflare_Developer_Platform__workers_get_worker",
+      "Bash(npx wrangler:*)",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"const pkg = require\\(''./node_modules/@sentry/react/package.json''\\); console.log\\(pkg.version\\)\")",
+      "Bash(node -e \"const s = require\\(''./node_modules/@sentry/react''\\); console.log\\(Object.keys\\(s\\).filter\\(k => k.toLowerCase\\(\\).includes\\(''router''\\) || k.toLowerCase\\(\\).includes\\(''boundary''\\) || k.toLowerCase\\(\\).includes\\(''tracing''\\)\\)\\)\")",
+      "Bash(node -e \"const s = require\\(''./node_modules/@sentry/react''\\); console.log\\(typeof s.replayIntegration, typeof s.reactRouterV6BrowserTracingIntegration\\)\")",
+      "Bash(npx tsc:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(command -v npm)",
+      "Bash(node -e \"const {execSync} = require\\(''child_process''\\); console.log\\(execSync\\(''where npm''\\).toString\\(\\).trim\\(\\)\\)\")"
     ]
   },
   "hooks": {

@@ -34,7 +34,7 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   const allowed =
     getEnv('ALLOWED_ORIGINS') ||
     getEnv('ALLOWED_ORIGIN') ||
-    'http://localhost:5173,http://localhost:8080,https://app.vectracargo.com.br,https://*.app.vectracargo.com.br,https://*.cargo-flow-navigator.pages.dev,https://*.workers.dev';
+    'http://localhost:5173,http://localhost:8080,http://localhost:8081,https://app.vectracargo.com.br,https://*.app.vectracargo.com.br,https://*.cargo-flow-navigator.pages.dev,https://*.workers.dev';
   const origins = allowed.split(',').map((o) => o.trim());
   const requestOrigin = req.headers.get('Origin');
 
@@ -53,3 +53,14 @@ export function getCorsHeaders(req: Request): Record<string, string> {
 
   return headers;
 }
+
+/**
+ * Static CORS headers with wildcard origin.
+ * Use getCorsHeaders(req) for origin-restricted responses.
+ * This is kept for backward compatibility with functions that import { corsHeaders }.
+ */
+export const corsHeaders: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+};

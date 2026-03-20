@@ -146,7 +146,12 @@ export function QuoteModalLogisticsGrid({
                       Spread de Operação (Venda — Custo)
                     </p>
                     <p className="text-xl font-bold text-primary tabular-nums">
-                      R$ {spreadPerKm.toFixed(2)}/km
+                      R${' '}
+                      {spreadPerKm.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                      /km
                     </p>
                   </div>
                   <Badge variant="outline" className="bg-background">
@@ -158,13 +163,23 @@ export function QuoteModalLogisticsGrid({
                 <div>
                   <p className="mb-1 text-xs text-muted-foreground">Custo (pago ao motorista)</p>
                   <p className="text-base font-bold tabular-nums text-destructive">
-                    R$ {custoPerKm.toFixed(2)}/km
+                    R${' '}
+                    {custoPerKm.toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                    /km
                   </p>
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-muted-foreground">Venda (cobrado do cliente)</p>
                   <p className="text-base font-bold tabular-nums text-green-600 dark:text-green-500">
-                    R$ {vendaPerKm.toFixed(2)}/km
+                    R${' '}
+                    {vendaPerKm.toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                    /km
                   </p>
                 </div>
               </div>

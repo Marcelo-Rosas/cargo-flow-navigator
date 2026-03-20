@@ -13,7 +13,13 @@ interface QuotePdfInput {
   routeStops?: { city_uf: string; cep?: string | null; name?: string | null }[];
 }
 
-const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const fmt = (v: number) =>
+  v.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const fmtNum = (v: number, decimals = 0) =>
   v.toLocaleString('pt-BR', { maximumFractionDigits: decimals });

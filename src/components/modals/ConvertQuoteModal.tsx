@@ -42,6 +42,8 @@ export function ConvertQuoteModal({ open, onClose, quote }: ConvertQuoteModalPro
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 

@@ -66,16 +66,16 @@ Deno.serve(async (req: Request) => {
     const txConv = totalQ > 0 ? ((ganhas / totalQ) * 100).toFixed(1) : '0';
     const fallback = {
       risk: 'medio',
-      summary: `Taxa de conversao ${txConv}%. Receita OS: R$ ${receitaOS.toFixed(2)}.`,
+      summary: `Taxa de conversao ${txConv}%. Receita OS: R$ ${receitaOS.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`,
       insights: [
         `Taxa de conversao: ${txConv}%`,
         `${ganhas} cotacoes ganhas de ${totalQ}`,
-        `Receita OS: R$ ${receitaOS.toFixed(2)}`,
+        `Receita OS: R$ ${receitaOS.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       ],
       recommendation: 'Revisar cotacoes em aberto.',
       alerts: [],
     };
-    const prompt = `Analise os dados da Vectra Cargo e retorne SOMENTE JSON sem markdown:\n{"risk":"baixo","summary":"2 frases.","insights":["a","b","c"],"recommendation":"acao","alerts":[]}\n\nDados: cotacoes=${totalQ} ganhas=${ganhas} perdidas=${perdidas} taxa=${txConv}% receita_os=R$${receitaOS.toFixed(2)}\nCotacoes:${JSON.stringify(quotes?.slice(0, 5))}\nOS:${JSON.stringify(orders?.slice(0, 5))}\nFinanceiro:${JSON.stringify(financial?.slice(0, 5))}`;
+    const prompt = `Analise os dados da Vectra Cargo e retorne SOMENTE JSON sem markdown:\n{"risk":"baixo","summary":"2 frases.","insights":["a","b","c"],"recommendation":"acao","alerts":[]}\n\nDados: cotacoes=${totalQ} ganhas=${ganhas} perdidas=${perdidas} taxa=${txConv}% receita_os=R$${receitaOS.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nCotacoes:${JSON.stringify(quotes?.slice(0, 5))}\nOS:${JSON.stringify(orders?.slice(0, 5))}\nFinanceiro:${JSON.stringify(financial?.slice(0, 5))}`;
     const { text, usage } = await callGemini(prompt, model);
     console.log('[ai-dashboard] raw:', text.substring(0, 150));
     let analysis = fallback;
@@ -86,16 +86,14 @@ Deno.serve(async (req: Request) => {
         if (p.summary) analysis = p;
       }
     } catch {}
-    await sb
-      .from('ai_insights')
-      .insert({
-        insight_type: 'dashboard_insights',
-        entity_type: null,
-        entity_id: null,
-        analysis,
-        summary_text: String(analysis.summary ?? ''),
-        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      });
+    await sb.from('ai_insights').insert({
+      insight_type: 'dashboard_insights',
+      entity_type: null,
+      entity_id: null,
+      analysis,
+      summary_text: String(analysis.summary ?? ''),
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    });
     return new Response(
       JSON.stringify({
         analysis,

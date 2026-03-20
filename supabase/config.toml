@@ -56,6 +56,9 @@ verify_jwt = false  # Orquestrador de workers; usa service role para chamadas in
 [functions.ai-operational-orchestrator]
 verify_jwt = false  # Orquestrador operacional; evita 401 de gateway em chamadas autenticadas
 
+[functions.ai-approval-summary-worker]
+verify_jwt = false  # Chamado pelo front (Aprovações); gateway 401 Invalid JWT com Bearer do cliente
+
 [functions.invite-user]
 verify_jwt = false  # Função valida admin via is_admin() RPC
 
@@ -82,6 +85,18 @@ verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization man
 
 [functions.resend-webhook]
 verify_jwt = false  # Recebe POST do Resend (webhook Svix)
+
+[functions.analyze-load-composition]
+verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente via resolveUserIdFromJwt
+
+[functions.approve-composition]
+verify_jwt = false  # Gateway 401 Invalid JWT; chamado pelo front com Bearer de usuário
+
+[functions.generate-optimal-route]
+verify_jwt = false  # Gateway 401 Invalid JWT; chamado pelo front com Bearer de usuário
+
+[functions.calculate-discount-breakdown]
+verify_jwt = false  # Gateway 401 Invalid JWT; chamado pelo front com Bearer de usuário
 
 [functions.ntc-ingest]
 verify_jwt = false  # Chamado por cron/pg_cron com service role

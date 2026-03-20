@@ -1,19 +1,21 @@
 import { motion } from 'framer-motion';
 import { usePerformanceMetrics } from '@/hooks/useAdvancedDashboardStats';
 import { cn } from '@/lib/utils';
+import { formatNumber as formatNumberHelper } from '@/lib/formatters';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
     notation: 'compact',
-    maximumFractionDigits: 1,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 };
 
 function formatTrendPct(value: number): string {
   const sign = value > 0 ? '+' : '';
-  const formatted = Math.abs(value).toFixed(2).replace('.', ',');
+  const formatted = formatNumberHelper(Math.abs(value));
   return `${sign}${value < 0 ? '-' : ''}${formatted}%`;
 }
 

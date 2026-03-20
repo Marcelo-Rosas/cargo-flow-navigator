@@ -73,7 +73,12 @@ export function QuotePaymentProofList({ quoteId }: { quoteId: string }) {
   const [editValue, setEditValue] = useState('');
 
   const formatCurrency = (v: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(v);
 
   const formatDate = (date: string) =>
     new Intl.DateTimeFormat('pt-BR', {

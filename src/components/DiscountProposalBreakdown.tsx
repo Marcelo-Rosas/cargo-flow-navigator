@@ -139,7 +139,8 @@ export function DiscountProposalBreakdown({
                         <span className="text-xs text-gray-600">
                           (R$
                           {(discount.original_margin_brl / 100).toLocaleString('pt-BR', {
-                            maximumFractionDigits: 0,
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
                           })}
                           )
                         </span>
@@ -185,7 +186,8 @@ export function DiscountProposalBreakdown({
                           <span className="text-xs text-gray-600">
                             R$
                             {(discount.final_margin_brl / 100).toLocaleString('pt-BR', {
-                              maximumFractionDigits: 0,
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
                             })}
                           </span>
                         </div>

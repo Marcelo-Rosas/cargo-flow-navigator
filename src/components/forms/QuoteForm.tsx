@@ -44,6 +44,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useCreateQuote, useUpdateQuote, useDeleteQuote } from '@/hooks/useQuotes';
 import { useQuoteRouteStops, syncQuoteRouteStops } from '@/hooks/useQuoteRouteStops';
 import { useCreateLegacyQuote } from '@/hooks/useCreateLegacyQuote';
+import { useAnalyzeLoadComposition } from '@/hooks/useAnalyzeLoadComposition';
 import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { usePriceTables } from '@/hooks/usePriceTables';
@@ -406,6 +407,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: routeStopsData } = useQuoteRouteStops(open && quote ? quote.id : null);
   const deleteQuoteMutation = useDeleteQuote();
   const createLegacyMutation = useCreateLegacyQuote();
+  const analyzeCompositionMutation = useAnalyzeLoadComposition();
   const isEditing = !!quote;
 
   // Escolha do tipo ao criar: nova (360) ou antiga (manual)
@@ -831,7 +833,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       if (quote) setLegacyChoice('nova');
       else setLegacyChoice(null);
     }
-  }, [open, !!quote]);
+  }, [open, quote]);
 
   useEffect(() => {
     // Reset user edit flags when form opens/closes
@@ -1468,6 +1470,17 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
       await syncQuoteRouteStops(savedQuoteId, stopsForSync);
 
+      // On-save composition analysis: async, non-blocking
+      const shipperId = quoteData.shipper_id;
+      if (shipperId) {
+        analyzeCompositionMutation.mutate({
+          shipper_id: shipperId,
+          trigger_source: 'on_save',
+          anchor_quote_id: savedQuoteId,
+          silent: true,
+        });
+      }
+
       onClose();
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
@@ -1488,6 +1501,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -2326,7 +2341,12 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                             </span>
                           </div>
                           <span className="font-bold text-primary text-sm">
-                            R$ {anttRsKm.toFixed(2)}/km
+                            R${' '}
+                            {anttRsKm.toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                            /km
                           </span>
                         </div>
                       )}

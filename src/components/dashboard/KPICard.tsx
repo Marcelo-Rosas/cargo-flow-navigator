@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatNumber } from '@/lib/formatters';
 
 interface KPICardProps {
   title: string;
@@ -25,7 +26,7 @@ const iconVariantStyles = {
 
 function formatTrendPct(value: number, isPositive: boolean): string {
   const sign = isPositive ? '+' : '';
-  const formatted = value.toFixed(2).replace('.', ',');
+  const formatted = formatNumber(value);
   return `${sign}${formatted}%`;
 }
 

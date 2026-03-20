@@ -14,7 +14,7 @@ export function useFinancialBoardData(type: FinancialDocType, options: Options =
     enabled: options.enabled ?? true,
   });
 
-  const rows = query.data ?? [];
+  const rows = useMemo(() => query.data ?? [], [query.data]);
 
   const columns = useMemo(() => groupFinancialKanbanColumns(rows, type), [rows, type]);
 

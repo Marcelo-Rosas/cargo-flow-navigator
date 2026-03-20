@@ -66,6 +66,8 @@ export function QuoteModalHistoryTab({
                 {new Intl.NumberFormat('pt-BR', {
                   style: 'currency',
                   currency: 'BRL',
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
                 }).format(advanceVal)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
@@ -80,6 +82,8 @@ export function QuoteModalHistoryTab({
                 {new Intl.NumberFormat('pt-BR', {
                   style: 'currency',
                   currency: 'BRL',
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
                 }).format(balanceVal)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">

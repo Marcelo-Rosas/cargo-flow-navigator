@@ -108,7 +108,12 @@ export function MarketIntelligencePanel() {
         ) : activePetrobras ? (
           <>
             <p className="text-2xl font-bold text-foreground tabular-nums">
-              R$ {activePetrobras.preco_medio.toFixed(2).replace('.', ',')}/L
+              R${' '}
+              {activePetrobras.preco_medio.toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+              /L
             </p>
             <div className="flex items-center gap-2 mt-1">
               <p className="text-xs text-muted-foreground">{ufLabel}</p>
@@ -274,7 +279,12 @@ export function MarketIntelligencePanel() {
                 </span>
               </div>
               <p className="text-2xl font-bold text-foreground tabular-nums">
-                R$ {insights.combustivel.diesel_s10_preco.toFixed(2).replace('.', ',')}/L
+                R${' '}
+                {insights.combustivel.diesel_s10_preco.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+                /L
               </p>
               <p className="text-xs text-muted-foreground mt-1">Preço médio nacional</p>
             </CardContent>
@@ -291,7 +301,12 @@ export function MarketIntelligencePanel() {
                 </span>
               </div>
               <p className="text-2xl font-bold text-foreground tabular-nums">
-                R$ {insights.combustivel.diesel_comum_preco.toFixed(2).replace('.', ',')}/L
+                R${' '}
+                {insights.combustivel.diesel_comum_preco.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+                /L
               </p>
               <p className="text-xs text-muted-foreground mt-1">Preço médio nacional</p>
             </CardContent>

@@ -73,6 +73,7 @@ export function LoadCompositionPanel({ shipperId, dateRange }: LoadCompositionPa
             totalSuggestions={ctrl.totalSuggestions}
             totalSavingsCents={ctrl.totalSavingsCents}
             feasibleCount={ctrl.feasibleCount}
+            realizableCount={ctrl.realizableCount}
             layout="grid"
           />
 

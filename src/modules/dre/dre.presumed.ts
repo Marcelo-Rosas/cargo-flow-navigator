@@ -143,7 +143,7 @@ export function computePresumedFromBreakdown(
     ) ?? 0;
   const hasFormulaWarning = Math.abs(resultadoRecomputado - resultadoJSON) > EPS;
   const formulaWarningMessage = hasFormulaWarning
-    ? `Divergência: resultado recomputado R$ ${resultadoRecomputado.toFixed(2)} vs JSON R$ ${resultadoJSON.toFixed(2)}`
+    ? `Divergência: resultado recomputado R$ ${resultadoRecomputado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vs JSON R$ ${resultadoJSON.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : undefined;
 
   return { values, hasFormulaWarning, formulaWarningMessage };

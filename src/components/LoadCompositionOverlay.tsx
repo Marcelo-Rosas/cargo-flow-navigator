@@ -9,6 +9,7 @@ import { useLoadCompositionController } from '@/hooks/useLoadCompositionControll
 import { LoadCompositionSummary } from './load-composition/LoadCompositionSummary';
 import { LoadCompositionSuggestionList } from './load-composition/LoadCompositionSuggestionList';
 import { LoadCompositionFooter } from './load-composition/LoadCompositionFooter';
+import { ManualQuoteSelector } from './load-composition/ManualQuoteSelector';
 import { LoadCompositionModal } from './LoadCompositionModal';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
 import {
@@ -46,6 +47,7 @@ export function LoadCompositionOverlay({
 }: LoadCompositionOverlayProps) {
   const isDesktop = useIsDesktop();
   const [open, setOpen] = useState(false);
+  const [showManualSelector, setShowManualSelector] = useState(false);
   const ctrl = useLoadCompositionController({ shipperId, dateRange });
 
   const content = (
@@ -89,6 +91,14 @@ export function LoadCompositionOverlay({
               <RefreshCw className="w-4 h-4" />
               Atualizar
             </Button>
+            <Button
+              variant={showManualSelector ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => setShowManualSelector((v) => !v)}
+              className="gap-2"
+            >
+              Manual
+            </Button>
           </div>
         </div>
 
@@ -96,6 +106,7 @@ export function LoadCompositionOverlay({
           totalSuggestions={ctrl.totalSuggestions}
           totalSavingsCents={ctrl.totalSavingsCents}
           feasibleCount={ctrl.feasibleCount}
+          realizableCount={ctrl.realizableCount}
           layout="inline"
         />
 
@@ -113,6 +124,19 @@ export function LoadCompositionOverlay({
           <ToggleGroupItem value="executed">Executadas</ToggleGroupItem>
         </ToggleGroup>
       </div>
+
+      {/* Manual selector */}
+      {showManualSelector && (
+        <div className="border rounded-lg p-3 bg-muted/30">
+          <ManualQuoteSelector
+            shipperId={shipperId}
+            onAnalysisComplete={() => {
+              setShowManualSelector(false);
+              ctrl.refetch();
+            }}
+          />
+        </div>
+      )}
 
       {/* Body */}
       <div className="flex-1 min-h-0 overflow-hidden">

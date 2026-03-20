@@ -31,7 +31,7 @@ async function fetchEntityData(sb: any, entityId: string, entityType: string) {
 Cotacao: ${data.quote_code}
 Cliente: ${data.client_name}
 Rota: ${data.origin} -> ${data.destination}
-Valor da cotacao: R$ ${Number(data.value || 0).toFixed(2)}
+Valor da cotacao: R$ ${Number(data.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 Margem: ${profitability?.margemPercent || 'N/A'}%
 Status margem: ${meta?.marginStatus || 'N/A'}`;
 
@@ -65,7 +65,7 @@ Status margem: ${meta?.marginStatus || 'N/A'}`;
 Cotacao relacionada: ${quote.quote_code}
 Cliente: ${quote.client_name}
 Rota: ${quote.origin} -> ${quote.destination}
-Valor da cotacao: R$ ${Number(quote.value || 0).toFixed(2)}
+Valor da cotacao: R$ ${Number(quote.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 Margem: ${profitability?.margemPercent || 'N/A'}%
 Status margem: ${meta?.marginStatus || 'N/A'}`;
       }
@@ -84,11 +84,11 @@ Status margem: ${meta?.marginStatus || 'N/A'}`;
 OS relacionada: ${order.os_number}
 Cliente: ${order.client_name}
 Rota: ${order.origin} -> ${order.destination}
-Valor: R$ ${Number(order.value || 0).toFixed(2)}
+Valor: R$ ${Number(order.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 Motorista: ${order.driver_name || 'Nao atribuido'}`;
         if (order.carreteiro_real != null) {
           contextInfo += `
-Carreteiro real: R$ ${Number(order.carreteiro_real).toFixed(2)}`;
+Carreteiro real: R$ ${Number(order.carreteiro_real).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }
         const pb = order.pricing_breakdown as {
           components?: { toll?: number };
@@ -98,11 +98,11 @@ Carreteiro real: R$ ${Number(order.carreteiro_real).toFixed(2)}`;
           contextInfo += `\nPrevisto vs Real:`;
           if (order.pedagio_real != null) {
             const prevToll = pb?.components?.toll ?? 0;
-            contextInfo += `\n- Pedagogio: previsto R$ ${prevToll.toFixed(2)} / real R$ ${Number(order.pedagio_real).toFixed(2)}`;
+            contextInfo += `\n- Pedagogio: previsto R$ ${prevToll.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / real R$ ${Number(order.pedagio_real).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
           }
           if (order.descarga_real != null) {
             const prevDesc = pb?.profitability?.custosDescarga ?? 0;
-            contextInfo += `\n- Descarga: previsto R$ ${prevDesc.toFixed(2)} / real R$ ${Number(order.descarga_real).toFixed(2)}`;
+            contextInfo += `\n- Descarga: previsto R$ ${prevDesc.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / real R$ ${Number(order.descarga_real).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
           }
         }
       }

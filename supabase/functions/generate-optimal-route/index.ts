@@ -1,442 +1,296 @@
 /**
- * Edge Function: generate-optimal-route
- * Calculates optimal route for a set of quotes using TSP solver
+ * Edge Function: generate-optimal-route (v2)
+ *
+ * Generates route for a load composition using WebRouter (real distances + polyline).
+ * Replaces the v1 mock TSP with real CEP-based routing.
  *
  * Input:
- *   - quote_ids: UUID[] — quotes to route
- *   - composition_id: UUID (optional) — if creating/updating suggestion
- *   - use_google_maps: boolean (default: false) — use real distances vs haversine
+ *   - quote_ids: UUID[] — quotes to route (min 2)
+ *   - composition_id: UUID (optional) — saves routings to DB
+ *   - save_to_db: boolean (default: true)
  *
  * Output:
- *   - routings: array of legs with distance, duration, polyline, arrival times
- *   - total_distance_km: number
- *   - total_duration_min: number
- *   - waypoints: ordered list of pickup locations
+ *   - route.legs: RouteLeg[] with real km, duration, toll, polyline
+ *   - route.total_distance_km, total_duration_min, total_toll_centavos
+ *   - route.polyline_coords: full route coordinates for map rendering
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { corsHeaders } from '../_shared/cors.ts';
+import {
+  calculateRouteDistanceFull,
+  calculateRouteDistance,
+  type RouteDistanceFullResult,
+  type TollPlaza,
+} from '../_shared/webrouter-client.ts';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface GenerateRouteRequest {
   quote_ids: string[];
   composition_id?: string;
-  use_google_maps?: boolean;
   save_to_db?: boolean;
 }
 
-interface Quote {
+interface QuoteRow {
   id: string;
-  pickup_address: string;
-  destination_address: string;
-  pickup_date: string;
-  pickup_window_start?: string;
-  pickup_window_end?: string;
-  weight_kg: number;
   origin: string;
   destination: string;
-}
-
-interface Location {
-  id: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  weight_kg?: number;
-  address?: string;
+  origin_cep: string | null;
+  destination_cep: string | null;
+  weight: number | null;
+  km_distance: number | null;
+  quote_code: string | null;
+  client_name: string;
+  estimated_loading_date: string | null;
 }
 
 interface RouteLeg {
-  from_location: Location;
-  to_location: Location;
+  from_label: string;
+  to_label: string;
   distance_km: number;
   duration_min: number;
-  polyline: string;
+  quote_id: string | null;
   sequence_number: number;
-  quote_id?: string;
-  pickup_window_start?: string;
-  pickup_window_end?: string;
-  estimated_arrival?: string;
+  toll_centavos: number;
 }
 
-// Mock warehouse coordinates (São Bernardo do Campo)
-const WAREHOUSE_ORIGIN = {
-  id: 'warehouse_origin',
-  name: 'Warehouse (Origin)',
-  latitude: -23.6955,
-  longitude: -46.5639,
-};
-
-const WAREHOUSE_DESTINATION = {
-  id: 'warehouse_dest',
-  name: 'Warehouse (Destination)',
-  latitude: -23.6955,
-  longitude: -46.5639,
-};
-
-const EARTH_RADIUS_KM = 6371;
+// ---------------------------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------------------------
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   try {
     if (req.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+      return jsonResponse({ error: 'Method not allowed' }, 405);
     }
 
     const body = (await req.json()) as GenerateRouteRequest;
-    const { quote_ids, composition_id, use_google_maps = false, save_to_db = true } = body;
+    const { quote_ids, composition_id, save_to_db = true } = body;
 
     if (!quote_ids || quote_ids.length < 2) {
-      return new Response(JSON.stringify({ error: 'At least 2 quote_ids required' }), {
-        status: 400,
-      });
+      return jsonResponse({ error: 'At least 2 quote_ids required' }, 400);
     }
 
-    // Initialize Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase configuration');
-    }
+    if (!supabaseUrl || !supabaseKey) throw new Error('Missing Supabase configuration');
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Fetch quotes
+    // 1. Fetch quotes with real columns
     const { data: quotes, error: quoteError } = await supabase
       .from('quotes')
       .select(
-        'id, pickup_address, destination_address, pickup_date, pickup_window_start, pickup_window_end, weight_kg, origin, destination'
+        'id, origin, destination, origin_cep, destination_cep, weight, km_distance, quote_code, client_name, estimated_loading_date'
       )
       .in('id', quote_ids);
 
-    if (quoteError || !quotes) {
-      throw new Error(`Failed to fetch quotes: ${quoteError?.message}`);
+    if (quoteError || !quotes || quotes.length < 2) {
+      return jsonResponse(
+        {
+          error: `Failed to fetch quotes: ${quoteError?.message ?? 'not enough quotes found'}`,
+        },
+        400
+      );
     }
 
-    console.log(`[generate-optimal-route] Fetched ${quotes.length} quotes`);
+    const typedQuotes = quotes as QuoteRow[];
+    console.log(`[generate-optimal-route] Fetched ${typedQuotes.length} quotes`);
 
-    // 2. Convert to locations
-    const locations = buildLocations(quotes as Quote[]);
+    // 2. Sort by km_distance desc — longest route = main, others = waypoints
+    const sorted = [...typedQuotes].sort(
+      (a, b) => (Number(b.km_distance) || 0) - (Number(a.km_distance) || 0)
+    );
+    const mainQuote = sorted[0];
+    const secondaryQuotes = sorted.slice(1);
 
-    // 3. Solve TSP
-    const solution = solveTSP(locations);
+    // Check CEPs
+    const originCep = (mainQuote.origin_cep ?? '').replace(/\D/g, '');
+    const destCep = (mainQuote.destination_cep ?? '').replace(/\D/g, '');
 
-    // 4. Build route legs with arrival times
-    const legs = buildRoutingLegs(solution, quotes as Quote[]);
+    if (originCep.length !== 8 || destCep.length !== 8) {
+      return jsonResponse(
+        {
+          error: 'Cotação principal sem CEPs válidos de origem/destino',
+          route: buildFallbackRoute(typedQuotes),
+        },
+        200
+      );
+    }
+
+    // 3. Build waypoints from secondary quote destinations
+    const waypointCeps: string[] = [];
+    for (const q of secondaryQuotes) {
+      const cep = (q.destination_cep ?? '').replace(/\D/g, '');
+      if (cep.length === 8) waypointCeps.push(cep);
+    }
+
+    // 4. Call WebRouter Full
+    const routeResult = await calculateRouteDistanceFull(originCep, destCep, waypointCeps);
+
+    let legs: RouteLeg[];
+    let totalDistanceKm: number;
+    let totalDurationMin: number;
+    let totalTollCentavos: number;
+    let tollPlazas: TollPlaza[] = [];
+    let polylineCoords: [number, number][] = [];
+
+    if (routeResult.success) {
+      const fullResult = routeResult as RouteDistanceFullResult;
+      totalDistanceKm = fullResult.km_distance;
+      totalDurationMin = Math.round((totalDistanceKm / 60) * 60); // 60 km/h avg
+      totalTollCentavos = fullResult.toll_total_centavos;
+      tollPlazas = fullResult.toll_plazas;
+      polylineCoords = fullResult.polyline_coords;
+
+      // Build legs: origin → each waypoint → destination
+      legs = buildLegsFromRoute(mainQuote, secondaryQuotes, totalDistanceKm, totalTollCentavos);
+
+      console.log(
+        `[generate-optimal-route] WebRouter OK: ${totalDistanceKm}km, toll: ${totalTollCentavos}, coords: ${polylineCoords.length}`
+      );
+    } else {
+      // Fallback: use stored km_distance
+      console.warn(
+        `[generate-optimal-route] WebRouter failed: ${'error' in routeResult ? routeResult.error : 'unknown'}, using fallback`
+      );
+      const fallback = buildFallbackRoute(typedQuotes);
+      legs = fallback.legs;
+      totalDistanceKm = fallback.total_distance_km;
+      totalDurationMin = fallback.total_duration_min;
+      totalTollCentavos = 0;
+    }
 
     // 5. Save to DB if composition_id provided
     if (composition_id && save_to_db) {
       await saveRoutingsToDB(supabase, composition_id, legs);
     }
 
-    console.log(
-      `[generate-optimal-route] Generated route: ${solution.totalDistance.toFixed(1)}km, ${solution.totalDuration}min`
-    );
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        route: {
-          legs,
-          total_distance_km: solution.totalDistance,
-          total_duration_min: solution.totalDuration,
-          waypoints: solution.path.map((idx) => locations[idx]),
-          composition_id: composition_id || null,
-        },
-        timestamp: new Date().toISOString(),
-      }),
-      {
-        headers: { 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
+    return jsonResponse({
+      success: true,
+      route: {
+        legs,
+        total_distance_km: totalDistanceKm,
+        total_duration_min: totalDurationMin,
+        total_toll_centavos: totalTollCentavos,
+        toll_plazas: tollPlazas,
+        polyline_coords: polylineCoords,
+        composition_id: composition_id || null,
+        route_source: routeResult.success ? 'webrouter' : 'fallback_km',
+      },
+      timestamp: new Date().toISOString(),
+    });
   } catch (error) {
     console.error('[generate-optimal-route] Error:', error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }),
-      {
-        headers: { 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    );
+    return jsonResponse({ error: error instanceof Error ? error.message : 'Unknown error' }, 500);
   }
 });
 
-/**
- * Convert quotes to locations with coordinates
- */
-function buildLocations(quotes: Quote[]): Location[] {
-  const locations: Location[] = [WAREHOUSE_ORIGIN];
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-  for (const quote of quotes) {
-    const coords = approximateCoordinates(quote.pickup_address);
-    locations.push({
-      id: quote.id,
-      name: `${quote.origin} - Coleta`,
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      weight_kg: quote.weight_kg,
-      address: quote.pickup_address,
-    });
-  }
-
-  locations.push(WAREHOUSE_DESTINATION);
-  return locations;
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 }
 
-/**
- * Approximate coordinates from address (mock)
- * In production: use Google Geocoding API
- */
-function approximateCoordinates(address: string): { latitude: number; longitude: number } {
-  const mockCoordinates: Record<string, { latitude: number; longitude: number }> = {
-    barueri: { latitude: -23.5059, longitude: -46.8681 },
-    'são bernardo': { latitude: -23.6955, longitude: -46.5639 },
-    itapevi: { latitude: -23.5947, longitude: -46.95 },
-    diadema: { latitude: -23.6733, longitude: -46.6179 },
-    'santo andré': { latitude: -23.6637, longitude: -46.5277 },
-    guarulhos: { latitude: -23.4569, longitude: -46.4346 },
-    osasco: { latitude: -23.5308, longitude: -46.7937 },
-  };
-
-  const normalized = address.toLowerCase();
-  for (const [key, coords] of Object.entries(mockCoordinates)) {
-    if (normalized.includes(key)) {
-      return coords;
-    }
-  }
-
-  return { latitude: -23.6955, longitude: -46.5639 }; // Default
-}
-
-/**
- * Simple TSP solver using Nearest Neighbor + 2-opt
- */
-function solveTSP(locations: Location[]): {
-  path: number[];
-  totalDistance: number;
-  totalDuration: number;
-} {
-  const n = locations.length;
-  const distances = buildDistanceMatrix(locations);
-
-  // Nearest neighbor
-  const visited = Array(n).fill(false);
-  let path: number[] = [0]; // Start at warehouse
-  visited[0] = true;
-  let totalDistance = 0;
-  let current = 0;
-
-  for (let i = 1; i < n - 1; i++) {
-    let nearest = -1;
-    let minDist = Infinity;
-
-    for (let j = 0; j < n; j++) {
-      if (!visited[j] && distances[current][j] < minDist) {
-        minDist = distances[current][j];
-        nearest = j;
-      }
-    }
-
-    if (nearest === -1) break;
-    path.push(nearest);
-    visited[nearest] = true;
-    totalDistance += minDist;
-    current = nearest;
-  }
-
-  // Add end warehouse
-  path.push(n - 1);
-  totalDistance += distances[current][n - 1];
-
-  // 2-opt optimization (simplified)
-  let improved = true;
-  let iterations = 0;
-  while (improved && iterations < 50) {
-    improved = false;
-    iterations++;
-
-    for (let i = 1; i < path.length - 2; i++) {
-      for (let j = i + 1; j < path.length - 1; j++) {
-        const a = path[i - 1];
-        const b = path[i];
-        const c = path[j];
-        const d = path[j + 1];
-
-        const currentDist = distances[a][b] + distances[c][d];
-        const newDist = distances[a][c] + distances[b][d];
-
-        if (newDist < currentDist) {
-          path = [...path.slice(0, i), ...path.slice(i, j + 1).reverse(), ...path.slice(j + 1)];
-          totalDistance = totalDistance - currentDist + newDist;
-          improved = true;
-        }
-      }
-    }
-  }
-
-  const totalDuration = Math.round((totalDistance / 60) * 60); // avg 60 km/h
-
-  return { path, totalDistance, totalDuration };
-}
-
-/**
- * Build distance matrix using haversine
- */
-function buildDistanceMatrix(locations: Location[]): number[][] {
-  const n = locations.length;
-  const distances = Array(n)
-    .fill(null)
-    .map(() => Array(n).fill(0));
-
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      if (i === j) {
-        distances[i][j] = 0;
-      } else {
-        distances[i][j] = haversineDistance(
-          locations[i].latitude,
-          locations[i].longitude,
-          locations[j].latitude,
-          locations[j].longitude
-        );
-      }
-    }
-  }
-
-  return distances;
-}
-
-/**
- * Haversine distance in km
- */
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return EARTH_RADIUS_KM * c;
-}
-
-/**
- * Build routing legs from solution
- */
-function buildRoutingLegs(
-  solution: { path: number[]; totalDistance: number; totalDuration: number },
-  quotes: Quote[]
+function buildLegsFromRoute(
+  mainQuote: QuoteRow,
+  secondaryQuotes: QuoteRow[],
+  totalKm: number,
+  totalTollCentavos: number
 ): RouteLeg[] {
   const legs: RouteLeg[] = [];
-  const locations = buildLocations(quotes);
+  const allStops = [
+    { label: mainQuote.origin.split(',')[0], quoteId: null as string | null, km: 0 },
+    ...secondaryQuotes.map((q) => ({
+      label: q.destination.split(',')[0],
+      quoteId: q.id,
+      km: Number(q.km_distance) || 0,
+    })),
+    {
+      label: mainQuote.destination.split(',')[0],
+      quoteId: mainQuote.id,
+      km: Number(mainQuote.km_distance) || 0,
+    },
+  ];
 
-  for (let i = 0; i < solution.path.length - 1; i++) {
-    const fromIdx = solution.path[i];
-    const toIdx = solution.path[i + 1];
-    const from = locations[fromIdx];
-    const to = locations[toIdx];
+  // Distribute km proportionally
+  const totalStoredKm = allStops.reduce((s, st) => s + st.km, 0) || totalKm;
+  const tollPerKm = totalStoredKm > 0 ? totalTollCentavos / totalStoredKm : 0;
 
-    const distKm = haversineDistance(from.latitude, from.longitude, to.latitude, to.longitude);
-    const durationMin = Math.round((distKm / 60) * 60);
-
-    // Find quote if it's a pickup
-    let quoteId: string | undefined;
-    let pickupWindow: { start?: string; end?: string } = {};
-
-    if (toIdx > 0 && toIdx < quotes.length + 1) {
-      quoteId = quotes[toIdx - 1]?.id;
-      pickupWindow.start = quotes[toIdx - 1]?.pickup_window_start;
-      pickupWindow.end = quotes[toIdx - 1]?.pickup_window_end;
-    }
+  for (let i = 0; i < allStops.length - 1; i++) {
+    const from = allStops[i];
+    const to = allStops[i + 1];
+    // Estimate leg km proportionally
+    const legKm =
+      totalStoredKm > 0 ? (to.km / totalStoredKm) * totalKm : totalKm / (allStops.length - 1);
 
     legs.push({
-      from_location: from,
-      to_location: to,
-      distance_km: parseFloat(distKm.toFixed(1)),
-      duration_min: durationMin,
-      polyline: encodeSimplePolyline(from.latitude, from.longitude, to.latitude, to.longitude),
+      from_label: from.label,
+      to_label: to.label,
+      distance_km: Math.round(legKm * 10) / 10,
+      duration_min: Math.round((legKm / 60) * 60),
+      quote_id: to.quoteId,
       sequence_number: i + 1,
-      quote_id: quoteId,
-      pickup_window_start: pickupWindow.start,
-      pickup_window_end: pickupWindow.end,
-      estimated_arrival: calculateArrivalTime(i, legs, durationMin),
+      toll_centavos: Math.round(legKm * tollPerKm),
     });
   }
 
   return legs;
 }
 
-/**
- * Encode polyline (simplified)
- */
-function encodeSimplePolyline(lat1: number, lon1: number, lat2: number, lon2: number): string {
-  return `[(${lat1.toFixed(4)},${lon1.toFixed(4)}),(${lat2.toFixed(4)},${lon2.toFixed(4)})]`;
+function buildFallbackRoute(quotes: QuoteRow[]) {
+  const sorted = [...quotes].sort(
+    (a, b) => (Number(b.km_distance) || 0) - (Number(a.km_distance) || 0)
+  );
+  const mainQuote = sorted[0];
+  const secondaryQuotes = sorted.slice(1);
+
+  const totalKm = sorted.reduce((s, q) => s + (Number(q.km_distance) || 0), 0);
+  const legs = buildLegsFromRoute(mainQuote, secondaryQuotes, totalKm, 0);
+
+  return {
+    legs,
+    total_distance_km: totalKm,
+    total_duration_min: Math.round((totalKm / 60) * 60),
+    total_toll_centavos: 0,
+  };
 }
 
-/**
- * Calculate estimated arrival time
- */
-function calculateArrivalTime(
-  legIndex: number,
-  previousLegs: RouteLeg[],
-  currentDuration: number
-): string {
-  const startHour = 9; // Start at 9 AM
-  let totalMinutes = currentDuration;
-
-  for (const leg of previousLegs) {
-    totalMinutes += leg.duration_min;
-  }
-
-  const hours = startHour + Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-}
-
-/**
- * Save routings to DB (replaces existing legs for this composition)
- */
 async function saveRoutingsToDB(
   supabase: ReturnType<typeof createClient>,
   compositionId: string,
   legs: RouteLeg[]
 ): Promise<void> {
-  // Delete existing routings for this composition before inserting
-  const { error: deleteError } = await supabase
-    .from('load_composition_routings')
-    .delete()
-    .eq('composition_id', compositionId);
+  // Clear existing
+  await supabase.from('load_composition_routings').delete().eq('composition_id', compositionId);
 
-  if (deleteError) {
-    throw new Error(`Failed to clear existing routings: ${deleteError.message}`);
-  }
+  const legsWithQuote = legs.filter((l) => l.quote_id != null);
+  if (legsWithQuote.length === 0) return;
 
-  // Filter to legs with quote_id for schema compliance (depot legs may have null)
-  const legsToInsert = legs.filter((leg) => leg.quote_id != null);
-  if (legsToInsert.length === 0) {
-    return;
-  }
-
-  const routingData = legsToInsert.map((leg) => ({
+  const rows = legsWithQuote.map((leg) => ({
     composition_id: compositionId,
     route_sequence: leg.sequence_number,
     quote_id: leg.quote_id!,
     leg_distance_km: leg.distance_km,
     leg_duration_min: leg.duration_min,
-    leg_polyline: leg.polyline,
-    pickup_window_start: leg.pickup_window_start,
-    pickup_window_end: leg.pickup_window_end,
-    estimated_arrival: leg.estimated_arrival,
+    leg_polyline: '', // polyline stored at route level, not per leg
     is_feasible: true,
   }));
 
-  const { error } = await supabase.from('load_composition_routings').insert(routingData);
-
+  const { error } = await supabase.from('load_composition_routings').insert(rows);
   if (error) {
-    throw new Error(`Failed to save routings: ${error.message}`);
+    console.error('[generate-optimal-route] DB insert error:', error.message);
   }
 }

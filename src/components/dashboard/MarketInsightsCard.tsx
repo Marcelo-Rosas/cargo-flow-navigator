@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import { useMarketAlert, useMarketIndices } from '@/hooks/useMarketIndices';
+import { formatNumber, formatCurrency } from '@/lib/formatters';
 
 const ALERTA = {
   estavel: {
@@ -24,7 +25,7 @@ const ALERTA = {
 
 function fmtPct(v: number | null): string {
   if (v == null) return '--';
-  return `${v > 0 ? '+' : ''}${v.toFixed(2).replace('.', ',')}%`;
+  return `${v > 0 ? '+' : ''}${formatNumber(v)}%`;
 }
 
 function MetricBox({
@@ -164,12 +165,16 @@ export function MarketInsightsCard() {
         />
         <MetricBox
           label="Diesel S-10"
-          value={alert.diesel ? `R$ ${alert.diesel.toFixed(2).replace('.', ',')}/L` : '--'}
+          value={
+            alert.diesel
+              ? `R$ ${alert.diesel.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/L`
+              : '--'
+          }
           sub="Preco medio nacional"
         />
         <MetricBox
           label="Reajuste sugerido"
-          value={alert.reajuste != null ? `${alert.reajuste.toFixed(2).replace('.', ',')}%` : '--'}
+          value={alert.reajuste != null ? `${formatNumber(alert.reajuste)}%` : '--'}
           sub="Acumulado 12 meses"
           trendFavorable={alert.reajuste != null ? alert.reajuste <= 8 : undefined}
         />
