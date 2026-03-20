@@ -38,7 +38,8 @@ export async function debugComponent(input: {
     const hooksFound: string[] = [];
     let renderCalls = 0;
 
-    const shouldCheck = (check: string) => checks.includes('all') || checks.includes(check as any);
+    const shouldCheck = (check: 'hooks' | 'renders' | 'performance') =>
+      checks.includes('all') || checks.includes(check);
 
     // Extract component name
     const componentNameMatch = code.match(/(?:function|const)\s+(\w+)\s*(?:=|:|\()/);
