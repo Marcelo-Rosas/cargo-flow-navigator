@@ -1,3 +1,6 @@
 dist
 node_modules
 *.min.js
+
+# GitHub Actions: hand-edited YAML; Prettier would rewrite jobs (line width/quoting) and create noisy diffs
+.github/workflows/

@@ -38,6 +38,12 @@
     "*.{js,cjs,mjs}": [
       "prettier --write",
       "eslint --fix"
+    ],
+    "*.{yml,yaml}": [
+      "prettier --write"
+    ],
+    "package.json": [
+      "prettier --write"
     ]
   },
   "dependencies": {
