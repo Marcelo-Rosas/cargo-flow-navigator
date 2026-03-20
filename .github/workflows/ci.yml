@@ -31,9 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-    # Só roda se o secret estiver configurado; usa env pois o contexto `secrets`
-    # não é suportado diretamente neste `if` em alguns cenários (ex.: forks).
-    if: ${{ env.SUPABASE_DB_URL != '' }}
+    # Só roda se o secret estiver configurado
+    if: ${{ secrets.SUPABASE_DB_URL != '' }}
     steps:
       - uses: actions/checkout@v4
 
