@@ -199,19 +199,21 @@ async function discoverCandidates(
 
   const allEligible = (data ?? []) as QuoteRow[];
 
-  // Filter: only future dates or recent past (up to 3 days ago)
-  // All quotes here already have estimated_loading_date (filtered in query)
+  // Filter: recent past (up to 3 days ago) AND within dateWindowDays into the future.
+  // This ensures shippers with date_window_days: 7 don't miss nearby loads,
+  // while excluding loads too far in the future that wouldn't be combinable.
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const threeDaysAgo = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
+  const lowerBound = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
+  const upperBound = new Date(today.getTime() + dateWindowDays * 24 * 60 * 60 * 1000);
 
   const result = allEligible.filter((q) => {
     const loadDate = new Date(q.estimated_loading_date! + 'T12:00:00');
-    return loadDate >= threeDaysAgo; // future + recent past (3 days)
+    return loadDate >= lowerBound && loadDate <= upperBound;
   });
 
   console.log(
-    `[discovery] ${allEligible.length} eligible for shipper, ${result.length} after date filter (window=${dateWindowDays}d)`
+    `[discovery] ${allEligible.length} eligible for shipper, ${result.length} after date filter (past=3d, future=${dateWindowDays}d)`
   );
 
   return result;
@@ -518,13 +520,28 @@ async function analyzeCombo(
 
   if (rate) {
     // Cost if each quote is shipped separately (N trucks, N × CC)
-    const separateTrips = quotes.map((q) => ({ km: Number(q.km_distance) || 0 }));
+    // IMPORTANT: Only include quotes WITH valid km_distance. Quotes with km=0 or null
+    // would be treated as free trips, systematically overstating savings.
+    const quotesWithValidKm = quotes.filter((q) => q.km_distance != null && q.km_distance > 0);
+
+    if (quotesWithValidKm.length === 0) {
+      warnings.push('Nenhuma cotação com km_distance preenchido — economia ANTT não calculada');
+    }
+
+    const separateTrips = quotesWithValidKm.map((q) => ({ km: Number(q.km_distance)! }));
     const separated = calculateSeparateCost(separateTrips, rate);
 
     // Cost if consolidated (1 truck, 1 × CC, composed km)
     const consolidated = calculateConsolidatedCost(routeEval.composed_km_total, rate);
 
     estimatedSavings = Math.max(0, separated.total_centavos - consolidated);
+
+    const quotesWithoutKm = quotes.length - quotesWithValidKm.length;
+    if (quotesWithoutKm > 0) {
+      warnings.push(
+        `${quotesWithoutKm} cotação(ões) sem km_distance — excluída(s) do cálculo ANTT separado`
+      );
+    }
 
     const separadoBrl = (separated.total_centavos / 100).toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
