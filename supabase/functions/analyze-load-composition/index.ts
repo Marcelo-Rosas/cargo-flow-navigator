@@ -20,6 +20,19 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { calculateRouteDistance } from '../_shared/webrouter-client.ts';
+import {
+  inferAxesFromWeight,
+  getAnttFloorRate,
+  calculateSeparateCost,
+  calculateConsolidatedCost,
+} from '../_shared/antt-utils.ts';
+import {
+  checkDataQuality,
+  enrichQuoteKmData,
+  shouldProceedWithAnalysis,
+  getQualityGateReason,
+  INSUFFICIENT_DATA_MODEL,
+} from '../_shared/composition-data-quality.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,14 +101,23 @@ const MIN_VIABLE_SCORE = 60;
 const MIN_SAVINGS_CENTAVOS = 50000; // R$ 500,00
 const DEFAULT_DATE_WINDOW_DAYS = 14;
 const MAX_TRUCK_CAPACITY_KG = 30000;
+/** Hard rule: max days between loading dates for feasibility */
+const MAX_DATE_SPREAD_DAYS = 3;
 const MAX_QUOTES_FOR_COMBINATORICS = 25;
 const MAX_COMBINATION_EVALUATIONS = 8000;
 /** How many top candidates get real WebRouter evaluation */
 const MAX_WEBROUTER_EVALUATIONS = 10;
 /** Max delta-km % to consider the stop a natural corridor fit */
 const MAX_CORRIDOR_DELTA_PERCENT = 20;
+/** Min fraction of quotes that must have km_distance for route evaluation */
+const KM_DATA_THRESHOLD = 0.7;
 /** Eligible stages for composition analysis */
 const ELIGIBLE_STAGES = ['precificacao', 'enviado', 'negociacao'];
+
+/** Check if a route evaluation model should be rejected from results */
+function shouldSkipResult(routeModel: string): boolean {
+  return routeModel === INSUFFICIENT_DATA_MODEL || routeModel === 'mock_v1';
+}
 
 const QUOTE_SELECT =
   'id, shipper_id, origin, destination, origin_cep, destination_cep, km_distance, weight, value, estimated_loading_date, stage, quote_code, client_name, route_stops:quote_route_stops(cep, city_uf, sequence)';
@@ -106,7 +128,7 @@ const QUOTE_SELECT =
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, x-api-key, content-type',
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -152,24 +174,20 @@ async function discoverCandidates(
   dateWindowDays: number,
   excludeQuoteIds?: string[]
 ): Promise<QuoteRow[]> {
-  const today = new Date().toISOString().split('T')[0];
-  const futureDate = new Date(Date.now() + dateWindowDays * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split('T')[0];
+  // Strategy: fetch ALL eligible quotes for this shipper, then filter in-memory.
+  // This handles quotes with NULL estimated_loading_date (included with warning)
+  // and avoids the rigid 14-day window excluding valid candidates.
 
+  // Hard filter: only quotes WITH estimated_loading_date are eligible for consolidation
   let query = supabase
     .from('quotes')
     .select(QUOTE_SELECT)
     .eq('shipper_id', shipperId)
     .in('stage', ELIGIBLE_STAGES)
-    .gte('estimated_loading_date', today)
-    .lte('estimated_loading_date', futureDate)
+    .not('estimated_loading_date', 'is', null)
     .order('estimated_loading_date', { ascending: true });
 
-  // For on_save, exclude the anchor quote from the candidate pool
-  // (it will be paired with each candidate separately)
   if (excludeQuoteIds && excludeQuoteIds.length > 0) {
-    // PostgREST doesn't support NOT IN directly; use .not('id', 'in', ...)
     query = query.not('id', 'in', `(${excludeQuoteIds.join(',')})`);
   }
 
@@ -178,7 +196,25 @@ async function discoverCandidates(
     console.error('[discovery] Query error:', error);
     return [];
   }
-  return (data ?? []) as QuoteRow[];
+
+  const allEligible = (data ?? []) as QuoteRow[];
+
+  // Filter: only future dates or recent past (up to 3 days ago)
+  // All quotes here already have estimated_loading_date (filtered in query)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const threeDaysAgo = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+  const result = allEligible.filter((q) => {
+    const loadDate = new Date(q.estimated_loading_date! + 'T12:00:00');
+    return loadDate >= threeDaysAgo; // future + recent past (3 days)
+  });
+
+  console.log(
+    `[discovery] ${allEligible.length} eligible for shipper, ${result.length} after date filter (window=${dateWindowDays}d)`
+  );
+
+  return result;
 }
 
 function generatePairTripleCombinations(quotes: QuoteRow[]): QuoteRow[][] {
@@ -214,7 +250,7 @@ interface RouteEvaluation {
   delta_km_abs: number;
   delta_km_percent: number;
   is_corridor_fit: boolean;
-  model: 'webrouter_v1' | 'stored_km_v1' | 'mock_v1';
+  model: 'webrouter_v1' | 'stored_km_v1' | 'mock_v1' | 'insufficient_data';
   explanation: string;
 }
 
@@ -236,6 +272,23 @@ async function evaluateRouteFit(
   const secondaryQuotes = sorted.slice(1);
 
   const baseKmTotal = quotes.reduce((sum, q) => sum + (q.km_distance ?? 0), 0);
+
+  // Phase 3: Check minimum km data threshold before route evaluation
+  const quotesWithKm = quotes.filter((q) => q.km_distance && q.km_distance > 0).length;
+  const kmDataAvailable = quotesWithKm / quotes.length >= KM_DATA_THRESHOLD;
+
+  if (!kmDataAvailable) {
+    const needed = Math.ceil(quotes.length * KM_DATA_THRESHOLD);
+    return {
+      base_km_total: 0,
+      composed_km_total: 0,
+      delta_km_abs: 0,
+      delta_km_percent: 0,
+      is_corridor_fit: false,
+      model: INSUFFICIENT_DATA_MODEL,
+      explanation: `Dados insuficientes de distância. ${quotesWithKm}/${needed} cotações com km preenchido. Preencha o campo "Distância (km)" nas cotações.`,
+    };
+  }
 
   // Check if all quotes share the same origin CEP
   const originCeps = quotes
@@ -312,7 +365,10 @@ async function evaluateRouteFit(
           explanation,
         };
       }
-      console.warn('[route-fit] WebRouter failed, falling back to stored_km:', result.error);
+      console.warn(
+        '[route-fit] WebRouter failed, falling back to stored_km:',
+        'error' in result ? result.error : 'unknown'
+      );
     }
   }
 
@@ -330,10 +386,14 @@ async function evaluateRouteFit(
       // Estimate: 30% of secondary km as extra (70% is shared corridor)
       estimatedComposedKm = (mainQuote.km_distance ?? 0) + secondaryKmSum * 0.3;
     } else {
-      // Different origins: less efficient consolidation
-      estimatedComposedKm = baseKmTotal * 0.75; // rough 25% savings from route optimization
+      // Different origins: composed ≈ main route + 40% of secondary distances
+      // More conservative than shared origin (less corridor overlap)
+      const secondaryKmSum = secondaryQuotes.reduce((s, q) => s + (q.km_distance ?? 0), 0);
+      estimatedComposedKm = (mainQuote.km_distance ?? 0) + secondaryKmSum * 0.4;
     }
 
+    // Delta = how much longer the composed route is vs the main route alone
+    // This represents the additional km needed to pick up secondary loads
     const deltaAbs = estimatedComposedKm - (mainQuote.km_distance ?? 0);
     const deltaPercent =
       (mainQuote.km_distance ?? 0) > 0 ? (deltaAbs / (mainQuote.km_distance ?? 1)) * 100 : 0;
@@ -364,7 +424,7 @@ async function evaluateRouteFit(
     delta_km_abs: 0,
     delta_km_percent: 0,
     is_corridor_fit: false,
-    model: 'mock_v1',
+    model: INSUFFICIENT_DATA_MODEL,
     explanation: `Sem dados de distância para avaliar rota ${cities}. Preencha CEPs e calcule km nas cotações para análise precisa.`,
   };
 }
@@ -391,7 +451,8 @@ function calculateScore(metrics: {
 
 async function analyzeCombo(
   quotes: QuoteRow[],
-  useWebRouter: boolean
+  useWebRouter: boolean,
+  supabase: SupabaseClient
 ): Promise<SuggestionRow & { _preScore: number }> {
   const warnings: string[] = [];
 
@@ -410,18 +471,33 @@ async function analyzeCombo(
     );
   }
 
-  // Date proximity
-  const dates = quotes
-    .map((q) => (q.estimated_loading_date ? new Date(q.estimated_loading_date).getTime() : NaN))
-    .filter((t) => Number.isFinite(t));
-  const daySpread =
-    dates.length >= 2 ? (Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24) : 0;
-  if (daySpread > 7) {
+  // Date proximity — hard rule: all quotes must have date, max spread = MAX_DATE_SPREAD_DAYS
+  const quotesWithDate = quotes.filter((q) => !!q.estimated_loading_date);
+  const quotesWithoutDate = quotes.filter((q) => !q.estimated_loading_date);
+  let dateFeasible = true;
+
+  if (quotesWithoutDate.length > 0) {
+    dateFeasible = false;
+    const codes = quotesWithoutDate.map((q) => q.quote_code || q.id.slice(0, 8)).join(', ');
     warnings.push(
-      `Datas de carregamento espaçadas em ${daySpread.toFixed(0)} dias (>7 é subótimo)`
+      `${quotesWithoutDate.length === 1 ? 'Cotação' : 'Cotações'} sem data de carregamento: ${codes}. Consolidação requer datas definidas.`
     );
   }
-  const dateProximity = Math.max(0, Math.min(100, 100 - daySpread * 5));
+
+  const dates = quotesWithDate.map((q) =>
+    new Date(q.estimated_loading_date! + 'T12:00:00').getTime()
+  );
+  const daySpread =
+    dates.length >= 2 ? (Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24) : 0;
+
+  if (daySpread > MAX_DATE_SPREAD_DAYS) {
+    dateFeasible = false;
+    warnings.push(
+      `Datas de carregamento espaçadas em ${daySpread.toFixed(0)} dias (máximo: ${MAX_DATE_SPREAD_DAYS} dias)`
+    );
+  }
+
+  const dateProximity = dateFeasible ? Math.max(0, Math.min(100, 100 - daySpread * 15)) : 0;
 
   // Route evaluation
   const routeEval = await evaluateRouteFit(quotes, useWebRouter);
@@ -433,10 +509,46 @@ async function analyzeCombo(
       : 0;
   const kmSavingsPercent = Math.max(0, Math.min(100, kmSavings));
 
-  // Estimated monetary savings (proportional to km savings)
-  // If km savings is X%, assume cost savings ~X% (simplified)
-  const savingsRatio = kmSavingsPercent / 100;
-  const estimatedSavings = Math.round(totalValueCentavos * savingsRatio);
+  // --- ANTT-based savings: real cost difference (separated vs consolidated) ---
+  let estimatedSavings = 0;
+  let anttExplanation = '';
+
+  const vehicle = await inferAxesFromWeight(supabase, totalWeight);
+  const rate = await getAnttFloorRate(supabase, vehicle.axes_count);
+
+  if (rate) {
+    // Cost if each quote is shipped separately (N trucks, N × CC)
+    const separateTrips = quotes.map((q) => ({ km: Number(q.km_distance) || 0 }));
+    const separated = calculateSeparateCost(separateTrips, rate);
+
+    // Cost if consolidated (1 truck, 1 × CC, composed km)
+    const consolidated = calculateConsolidatedCost(routeEval.composed_km_total, rate);
+
+    estimatedSavings = Math.max(0, separated.total_centavos - consolidated);
+
+    const separadoBrl = (separated.total_centavos / 100).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const consolidadoBrl = (consolidated / 100).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+    anttExplanation =
+      ` Veículo: ${vehicle.vehicle_code} (${vehicle.axes_count} eixos). ` +
+      `Custo ANTT separado: R$ ${separadoBrl} (${quotes.length} viagens). ` +
+      `Custo ANTT consolidado: R$ ${consolidadoBrl} (1 viagem). ` +
+      `Tabela A, Carga Geral, Res. 6.076/2026.`;
+  } else {
+    // Fallback: old heuristic if ANTT rates not available
+    const ESTIMATED_COST_RATIO = 0.6;
+    const estimatedTotalCostCentavos = Math.round(totalValueCentavos * ESTIMATED_COST_RATIO);
+    const savingsRatio = kmSavingsPercent / 100;
+    estimatedSavings = Math.round(estimatedTotalCostCentavos * savingsRatio);
+    anttExplanation = ` Economia estimada por heurística (sem tabela ANTT).`;
+    warnings.push('Tabela ANTT não disponível — economia estimada por heurística de km.');
+  }
 
   // Route fit score (0-100)
   const routeFitScore = routeEval.is_corridor_fit
@@ -454,14 +566,17 @@ async function analyzeCombo(
   if (!Number.isFinite(score)) score = 0;
   score = Math.min(100, Math.max(0, score));
 
-  const isFeasible = totalWeight <= MAX_TRUCK_CAPACITY_KG && routeEval.is_corridor_fit;
+  const isFeasible =
+    totalWeight <= MAX_TRUCK_CAPACITY_KG && routeEval.is_corridor_fit && dateFeasible;
 
   // Build technical explanation
   let explanation = routeEval.explanation;
   if (warnings.length > 0) {
     explanation += ` Alertas: ${warnings.join('; ')}.`;
   }
-  explanation += ` Economia estimada: R$ ${(estimatedSavings / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${kmSavingsPercent.toFixed(1)}% de km).`;
+  explanation +=
+    ` Economia: R$ ${(estimatedSavings / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.` +
+    anttExplanation;
 
   return {
     quote_ids: quotes.map((q) => q.id).sort(), // sort for dedup
@@ -662,8 +777,21 @@ Deno.serve(async (req: Request) => {
     }
 
     const quotesTotalInWindow = allQuotes.length;
-    const quotesForAnalysis = allQuotes.slice(0, MAX_QUOTES_FOR_COMBINATORICS);
+    let quotesForAnalysis = allQuotes.slice(0, MAX_QUOTES_FOR_COMBINATORICS);
     const truncated = quotesTotalInWindow > MAX_QUOTES_FOR_COMBINATORICS;
+
+    // Phase 2: Enrich km_distance from WebRouter if missing
+    console.log(`[phase-2] Enriching km_distance for quotes without it...`);
+    const enrichmentResult = await enrichQuoteKmData(supabase, quotesForAnalysis, false);
+    quotesForAnalysis = enrichmentResult.enriched;
+
+    if (enrichmentResult.updated > 0) {
+      console.log(`[phase-2] ✓ Updated ${enrichmentResult.updated} quotes with km_distance`);
+    }
+
+    if (enrichmentResult.errors.length > 0) {
+      console.warn(`[phase-2] Enrichment errors:`, enrichmentResult.errors);
+    }
 
     console.log(
       `[analyze] ${triggerSource} — ${quotesForAnalysis.length}/${quotesTotalInWindow} quotes analyzed`
@@ -710,9 +838,26 @@ Deno.serve(async (req: Request) => {
 
     for (const combo of combinations) {
       try {
-        const result = await analyzeCombo(combo, false);
+        // Phase 1: Data Quality Gate
+        const qualityCheck = checkDataQuality(combo);
+
+        if (!shouldProceedWithAnalysis(qualityCheck)) {
+          const reason = getQualityGateReason(qualityCheck);
+          console.log(`[phase-1] Combo rejected (quality=${qualityCheck.totalScore}%): ${reason}`);
+          continue;
+        }
+
+        const result = await analyzeCombo(combo, false, supabase);
         result.trigger_source = triggerSource;
         result.anchor_quote_id = anchorQuoteId;
+
+        // Phase 3: Filter out insufficient_data / mock_v1 results
+        if (shouldSkipResult(result.route_evaluation_model)) {
+          console.warn(
+            `[phase-3] Rejecting ${result.route_evaluation_model} result for combo: ${combo.map((q) => q.id).join(',')}`
+          );
+          continue;
+        }
 
         if (
           result.consolidation_score >= minViableScore * 0.7 && // looser threshold for phase 1
@@ -744,9 +889,17 @@ Deno.serve(async (req: Request) => {
       if (quotes.length < 2) continue;
 
       try {
-        const refined = await analyzeCombo(quotes, true);
+        const refined = await analyzeCombo(quotes, true, supabase);
         refined.trigger_source = triggerSource;
         refined.anchor_quote_id = anchorQuoteId;
+
+        // Phase 3: Filter insufficient_data results
+        if (shouldSkipResult(refined.route_evaluation_model)) {
+          console.warn(
+            `[phase-3] Skipping ${refined.route_evaluation_model} result in WebRouter pass`
+          );
+          continue;
+        }
 
         if (
           refined.consolidation_score >= minViableScore &&
@@ -758,8 +911,9 @@ Deno.serve(async (req: Request) => {
         }
       } catch (e) {
         console.error('[analyze] WebRouter refinement error:', e);
-        // Keep the pre-scored version if it passes thresholds
+        // Keep the pre-scored version if it passes thresholds, but skip bad models
         if (
+          !shouldSkipResult(candidate.route_evaluation_model) &&
           candidate.consolidation_score >= minViableScore &&
           candidate.estimated_savings_brl >= MIN_SAVINGS_CENTAVOS
         ) {
@@ -772,6 +926,11 @@ Deno.serve(async (req: Request) => {
 
     // Also keep non-top candidates that passed final thresholds (phase 1 only)
     for (const candidate of allResults.slice(MAX_WEBROUTER_EVALUATIONS)) {
+      // Phase 3: Skip insufficient_data/mock results
+      if (shouldSkipResult(candidate.route_evaluation_model)) {
+        continue;
+      }
+
       if (
         candidate.consolidation_score >= minViableScore &&
         candidate.estimated_savings_brl >= MIN_SAVINGS_CENTAVOS
@@ -829,7 +988,7 @@ Deno.serve(async (req: Request) => {
         console.error('[analyze] Insert error:', insertError);
         // Dedup index conflict — concurrent request may have inserted first
         if (insertError.code === '23505') {
-          console.log('[analyze] Duplicate key conflict (expected with concurrent requests)');
+          // Duplicate key conflict expected with concurrent requests
         } else {
           return jsonResponse(
             {
