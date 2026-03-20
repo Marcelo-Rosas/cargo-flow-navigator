@@ -133,6 +133,10 @@ Deno.serve(async (req: Request) => {
     }
 
     // 4. Call WebRouter Full
+    console.log(
+      `[generate-optimal-route] Calling WebRouter with: origin=${originCep}, dest=${destCep}, waypoints=${waypointCeps.length}`
+    );
+
     const routeResult = await calculateRouteDistanceFull(originCep, destCep, waypointCeps);
 
     let legs: RouteLeg[];
@@ -154,12 +158,20 @@ Deno.serve(async (req: Request) => {
       legs = buildLegsFromRoute(mainQuote, secondaryQuotes, totalDistanceKm, totalTollCentavos);
 
       console.log(
-        `[generate-optimal-route] WebRouter OK: ${totalDistanceKm}km, toll: ${totalTollCentavos}, coords: ${polylineCoords.length}`
+        `[generate-optimal-route] WebRouter SUCCESS ✓ | distance=${totalDistanceKm}km | toll=${totalTollCentavos}¢ (R$${(totalTollCentavos / 100).toFixed(2)}) | plazas=${tollPlazas.length} | coords=${polylineCoords.length}`
       );
+
+      // Diagnostic: warn if toll is zero despite successful call
+      if (totalTollCentavos === 0) {
+        console.warn(
+          `[generate-optimal-route] ⚠️ WebRouter returned ZERO TOLL despite success. Possible causes: 1) Route has no toll plazas, 2) custos.pedagio = 0, 3) informacaoPedagios empty`
+        );
+      }
     } else {
       // Fallback: use stored km_distance
+      const errorMsg = 'error' in routeResult ? routeResult.error : 'unknown error';
       console.warn(
-        `[generate-optimal-route] WebRouter failed: ${'error' in routeResult ? routeResult.error : 'unknown'}, using fallback`
+        `[generate-optimal-route] WebRouter FAILED ✗ | error="${errorMsg}" | using fallback with zero toll`
       );
       const fallback = buildFallbackRoute(typedQuotes);
       legs = fallback.legs;

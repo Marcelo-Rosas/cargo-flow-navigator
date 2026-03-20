@@ -1,5 +1,11 @@
 /**
- * RouteMapVisualization (v2)
+ * RouteMapVisualization (v3 - Refactored)
+ *
+ * Follows TollRoutesSection methodology:
+ * - Separates concerns (map, summary, stats)
+ * - Uses custom hooks for route logic
+ * - Standardizes data handling (centavos format)
+ * - Composable sub-components
  *
  * Renders a Leaflet map with the consolidated route:
  * - Polyline from WebRouter coordinates
@@ -13,8 +19,13 @@ import { useMemo } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin, Route, Clock, DollarSign } from 'lucide-react';
+import { MapPin } from 'lucide-react';
+import {
+  useCompositionRouteMetrics,
+  type CompositionRouteLeg,
+} from '@/hooks/useCompositionRouteMetrics';
 import { formatCurrencyFromCents } from '@/lib/formatters';
+import { RouteStats } from './RouteStats';
 
 // Fix Leaflet default marker icons (broken with bundlers)
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -55,19 +66,15 @@ const destinationIcon = new L.Icon({
 export interface RouteMapVisualizationProps {
   /** Full route polyline coordinates [lat, lng][] from WebRouter */
   polylineCoords?: [number, number][];
-  /** Route legs from generate-optimal-route */
-  legs?: {
-    from_label: string;
-    to_label: string;
-    distance_km: number;
-    duration_min: number;
-    quote_id: string | null;
-    sequence_number: number;
-    toll_centavos: number;
-  }[];
+  /** Route legs from generate-optimal-route (standardized with toll_centavos) */
+  legs?: CompositionRouteLeg[];
+  /** Total distance in km */
   totalDistanceKm?: number;
+  /** Total duration in minutes */
   totalDurationMin?: number;
+  /** Total toll in centavos (integer) */
   totalTollCentavos?: number;
+  /** Route source (for diagnostics) */
   routeSource?: 'webrouter' | 'fallback_km' | string;
   /** Legacy routings from DB (backwards compat with LoadCompositionModal) */
   routings?: {
@@ -92,31 +99,21 @@ export function RouteMapVisualization({
   routeSource,
   routings,
 }: RouteMapVisualizationProps) {
-  // Compute summary from legs or routings
-  const summary = useMemo(() => {
-    if (totalDistanceKm != null) {
-      return {
-        distance: totalDistanceKm,
-        duration: totalDurationMin ?? Math.round((totalDistanceKm / 60) * 60),
-        toll: totalTollCentavos ?? 0,
-        stops: (legs?.length ?? routings?.length ?? 0),
-      };
-    }
-    // Fallback: compute from routings
-    if (routings && routings.length > 0) {
-      const dist = routings.reduce((s, r) => s + (r.leg_distance_km || 0), 0);
-      const dur = routings.reduce((s, r) => s + (r.leg_duration_min || 0), 0);
-      return { distance: dist, duration: dur, toll: 0, stops: routings.length };
-    }
-    return { distance: 0, duration: 0, toll: 0, stops: 0 };
-  }, [totalDistanceKm, totalDurationMin, totalTollCentavos, legs, routings]);
+  const metrics = useCompositionRouteMetrics({
+    legs,
+    totalDistanceKm,
+    totalDurationMin,
+    totalTollCentavos,
+    polylineCoords,
+    routings,
+  });
 
-  const hasMap = polylineCoords && polylineCoords.length >= 2;
+  const hasMap = metrics.hasValidCoordinates && polylineCoords && polylineCoords.length >= 2;
 
-  // Center map on polyline bounds
+  // Center map on polyline bounds (using memoized metrics to avoid recalculation)
   const bounds = useMemo(() => {
-    if (!hasMap) return undefined;
-    return L.latLngBounds(polylineCoords!.map(([lat, lng]) => [lat, lng]));
+    if (!hasMap || !polylineCoords || polylineCoords.length < 2) return undefined;
+    return L.latLngBounds(polylineCoords.map(([lat, lng]) => [lat, lng]));
   }, [polylineCoords, hasMap]);
 
   return (
@@ -155,23 +152,27 @@ export function RouteMapVisualization({
               </Popup>
             </Marker>
             {/* Waypoint markers (intermediate) */}
-            {legs && legs.length > 1 && legs.slice(0, -1).map((leg, i) => {
-              // Estimate waypoint position proportionally along polyline
-              const fraction = (i + 1) / legs.length;
-              const idx = Math.min(
-                Math.floor(fraction * (polylineCoords!.length - 1)),
-                polylineCoords!.length - 1
-              );
-              return (
-                <Marker key={i} position={polylineCoords![idx]}>
-                  <Popup>
-                    <strong>Parada {i + 1}</strong><br />
-                    {leg.to_label}<br />
-                    {leg.distance_km.toFixed(1)}km
-                  </Popup>
-                </Marker>
-              );
-            })}
+            {legs &&
+              legs.length > 1 &&
+              legs.slice(0, -1).map((leg, i) => {
+                // Estimate waypoint position proportionally along polyline
+                const fraction = (i + 1) / legs.length;
+                const idx = Math.min(
+                  Math.floor(fraction * (polylineCoords!.length - 1)),
+                  polylineCoords!.length - 1
+                );
+                return (
+                  <Marker key={i} position={polylineCoords![idx]}>
+                    <Popup>
+                      <strong>Parada {i + 1}</strong>
+                      <br />
+                      {leg.to_label}
+                      <br />
+                      {leg.distance_km.toFixed(1)}km
+                    </Popup>
+                  </Marker>
+                );
+              })}
           </MapContainer>
         </div>
       ) : (
@@ -185,35 +186,8 @@ export function RouteMapVisualization({
         </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-center">
-          <Route className="w-4 h-4 text-blue-600 mx-auto mb-1" />
-          <div className="text-lg font-bold text-blue-700">{summary.distance.toFixed(1)}km</div>
-          <div className="text-[10px] text-blue-600">Distância</div>
-        </div>
-        <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 text-center">
-          <Clock className="w-4 h-4 text-purple-600 mx-auto mb-1" />
-          <div className="text-lg font-bold text-purple-700">
-            {summary.duration >= 60
-              ? `${Math.floor(summary.duration / 60)}h${summary.duration % 60 > 0 ? `${summary.duration % 60}m` : ''}`
-              : `${summary.duration}min`}
-          </div>
-          <div className="text-[10px] text-purple-600">Duração est.</div>
-        </div>
-        <div className="bg-green-50 p-3 rounded-lg border border-green-100 text-center">
-          <DollarSign className="w-4 h-4 text-green-600 mx-auto mb-1" />
-          <div className="text-lg font-bold text-green-700">
-            {summary.toll > 0 ? formatCurrencyFromCents(summary.toll) : '—'}
-          </div>
-          <div className="text-[10px] text-green-600">Pedágio</div>
-        </div>
-        <div className="bg-orange-50 p-3 rounded-lg border border-orange-100 text-center">
-          <MapPin className="w-4 h-4 text-orange-600 mx-auto mb-1" />
-          <div className="text-lg font-bold text-orange-700">{summary.stops}</div>
-          <div className="text-[10px] text-orange-600">Paradas</div>
-        </div>
-      </div>
+      {/* ✅ Use RouteStats component (standardized format) */}
+      <RouteStats metrics={metrics} />
 
       {/* Leg details */}
       {legs && legs.length > 0 && (
@@ -230,9 +204,7 @@ export function RouteMapVisualization({
               </div>
               <div className="text-right shrink-0 text-xs text-muted-foreground">
                 {leg.distance_km.toFixed(1)}km • {leg.duration_min}min
-                {leg.toll_centavos > 0 && (
-                  <> • {formatCurrencyFromCents(leg.toll_centavos)}</>
-                )}
+                {leg.toll_centavos > 0 && <> • {formatCurrencyFromCents(leg.toll_centavos)}</>}
               </div>
             </div>
           ))}
