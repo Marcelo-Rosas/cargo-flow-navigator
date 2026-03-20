@@ -15,16 +15,22 @@ interface GenerateOptimalRouteParams {
 }
 
 interface RouteLeg {
-  from_location: unknown;
-  to_location: unknown;
+  from_label: string;
+  to_label: string;
   distance_km: number;
   duration_min: number;
-  polyline: string;
+  quote_id?: string | null;
   sequence_number: number;
-  quote_id?: string;
-  pickup_window_start?: string;
-  pickup_window_end?: string;
-  estimated_arrival?: string;
+  toll_centavos: number;
+}
+
+interface TollPlaza {
+  nome: string;
+  cidade: string;
+  uf: string;
+  valor: number;
+  valorTag: number;
+  ordemPassagem: number;
 }
 
 interface GenerateOptimalRouteResponse {
@@ -33,8 +39,12 @@ interface GenerateOptimalRouteResponse {
     legs: RouteLeg[];
     total_distance_km: number;
     total_duration_min: number;
-    waypoints: unknown[];
+    total_toll_centavos: number;
+    toll_plazas?: TollPlaza[];
+    polyline_coords?: [number, number][];
     composition_id: string | null;
+    route_source?: 'webrouter' | 'fallback_km';
+    waypoints?: unknown[];
   };
   timestamp: string;
 }

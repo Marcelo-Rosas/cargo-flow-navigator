@@ -1,1 +1,5 @@
+# Sem ficheiros no índice → Git vai recusar o commit; não correr lint-staged (evita mensagem confusa).
+if [ -z "$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)" ]; then
+  exit 0
+fi
 npx lint-staged

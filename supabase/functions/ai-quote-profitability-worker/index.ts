@@ -52,8 +52,8 @@ Cotação:
 - Origem→Destino: ${quote.origin_city} → ${quote.destination_city}
 - Cliente: ${quote.client?.name ?? 'N/A'}
 - Tipo de carga: ${quote.cargo_type ?? 'N/A'} | Peso: ${quote.weight_kg ?? 0}kg
-- Valor total: R$ ${(quote.total_value / 100).toFixed(2)}
-- Custo frete: R$ ${(quote.freight_cost / 100).toFixed(2)}
+- Valor total: R$ ${(quote.total_value / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Custo frete: R$ ${(quote.freight_cost / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 - Margem calculada: ${margin ?? 'N/A'}%
 - Status: ${quote.status}
 ${previousInsights ? `\nHistórico desta entidade:\n${previousInsights}` : ''}`;

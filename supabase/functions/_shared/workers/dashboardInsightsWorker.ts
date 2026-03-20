@@ -111,7 +111,7 @@ function buildPrompt(
 **Pipeline Comercial (30 dias)**:
 - Total de cotacoes: ${totalQuotes}
 - Cotacoes por stage: ${JSON.stringify(quotesByStage)}
-- Valor total das cotacoes: R$ ${totalQuoteValue.toFixed(2)}
+- Valor total das cotacoes: R$ ${totalQuoteValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 - Taxa de conversao: ${conversionRate}%
 - Margem media das cotacoes: ${avgMargin}%
 
@@ -120,9 +120,9 @@ function buildPrompt(
 - Ordens por stage: ${JSON.stringify(ordersByStage)}
 
 **Financeiro**:
-- Total a receber (FAT): R$ ${totalReceivable.toFixed(2)}
-- Total a pagar (PAG): R$ ${totalPayable.toFixed(2)}
-- Resultado bruto estimado: R$ ${(totalReceivable - totalPayable).toFixed(2)}
+- Total a receber (FAT): R$ ${totalReceivable.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Total a pagar (PAG): R$ ${totalPayable.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Resultado bruto estimado: R$ ${(totalReceivable - totalPayable).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 - Documentos financeiros gerados: ${data.financialDocs.length}
 
 **Aprovacoes pendentes**: ${data.pendingApprovals}

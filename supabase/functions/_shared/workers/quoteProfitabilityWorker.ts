@@ -280,7 +280,7 @@ function buildPrompt(
 **Cliente**: ${quote.client_name}
 **Rota**: ${quote.origin} -> ${quote.destination}
 **Distancia**: ${kmDistance || 'N/A'} km
-**Valor total (Previsto)**: R$ ${quoteValue.toFixed(2)}
+**Valor total (Previsto)**: R$ ${quoteValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 **Valor por km (Previsto)**: R$ ${valorPorKm}
 
 **Breakdown de Rentabilidade (Previsto)**:
@@ -305,15 +305,15 @@ function buildPrompt(
 
   if (realProfitability) {
     prompt += `\n\n--- Ordem de Servico Finalizada (Dados Reais) ---`;
-    prompt += `\n**Custo Carreteiro (Real)**: R$ ${realProfitability.custo_carreteiro_real.toFixed(2)}`;
+    prompt += `\n**Custo Carreteiro (Real)**: R$ ${realProfitability.custo_carreteiro_real.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (realProfitability.pedagio_real != null || realProfitability.descarga_real != null) {
       prompt += `\n**Custos adicionais (previsto vs real)**:`;
       if (realProfitability.pedagio_real != null)
-        prompt += `\n- Pedagogio real: R$ ${realProfitability.pedagio_real.toFixed(2)}`;
+        prompt += `\n- Pedagogio real: R$ ${realProfitability.pedagio_real.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       if (realProfitability.descarga_real != null)
-        prompt += `\n- Descarga real: R$ ${realProfitability.descarga_real.toFixed(2)}`;
+        prompt += `\n- Descarga real: R$ ${realProfitability.descarga_real.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
-    prompt += `\n**Resultado Liquido (Real)**: R$ ${realProfitability.resultado_liquido_real.toFixed(2)}`;
+    prompt += `\n**Resultado Liquido (Real)**: R$ ${realProfitability.resultado_liquido_real.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     prompt += `\n**Margem % Real**: ${realProfitability.margem_percent_real.toFixed(1)}%`;
     prompt += `\n**Status Conciliacao**: ${realProfitability.is_reconciled ? 'CONCILIADO (custo final confirmado por comprovante)' : 'PENDENTE (custo negociado, sem comprovante)'}`;
 

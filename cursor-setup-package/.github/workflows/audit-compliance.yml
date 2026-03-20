@@ -1,0 +1,109 @@
+name: Audit Compliance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'supabase/functions/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'supabase/functions/**'
+
+  # Permite rodar manualmente na aba Actions
+  workflow_dispatch:
+
+  # Roda toda segunda-feira às 9h (auditoria periódica semanal)
+  schedule:
+    - cron: '0 12 * * 1'  # 12:00 UTC = 09:00 BRT
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Auditoria rápida (Camada 1 — a cada commit) ───
+  audit-quick:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run compliance audit
+        run: npx tsx scripts/audit-compliance.ts --ci --report
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report-quick
+          path: audit-report.json
+          retention-days: 30
+
+      - name: Comment PR with audit results
+        if: github.event_name == 'pull_request' && failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report = {};
+            try {
+              report = JSON.parse(fs.readFileSync('audit-report.json', 'utf-8'));
+            } catch { return; }
+
+            const errors = report.summary?.errors || 0;
+            const warnings = report.summary?.warnings || 0;
+
+            const body = `## 🔍 Auditoria de Compliance
+
+            | Métrica | Resultado |
+            |---|---|
+            | Erros | ❌ ${errors} |
+            | Warnings | ⚠️ ${warnings} |
+            | Arquivos | ${report.summary?.files_analyzed || 0} |
+
+            **Corrigir os ${errors} erros antes de merge.**
+
+            Rodar localmente: \`npx tsx scripts/audit-compliance.ts\``;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+  # ─── Auditoria periódica completa (Camada 2 — semanal) ───
+  audit-periodic:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run full periodic audit
+        run: npx tsx scripts/audit-periodic.ts
+
+      - name: Upload periodic report
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report-periodic-${{ github.run_number }}
+          path: audit-periodic-report.md
+          retention-days: 90

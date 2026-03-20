@@ -762,15 +762,30 @@ export function QuoteDetailModal({
                               Spread (Venda — Custo)
                             </p>
                             <p className="text-lg font-bold text-primary tabular-nums">
-                              R$ {spread.toFixed(2)}/km
+                              R${' '}
+                              {spread.toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                              /km
                             </p>
                           </div>
                           <div className="text-right space-y-0.5">
                             <p className="text-xs text-destructive tabular-nums font-medium">
-                              Custo: R$ {(custo / km).toFixed(2)}/km
+                              Custo: R${' '}
+                              {(custo / km).toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                              /km
                             </p>
                             <p className="text-xs text-success tabular-nums font-medium">
-                              Venda: R$ {(totalClienteView / km).toFixed(2)}/km
+                              Venda: R${' '}
+                              {(totalClienteView / km).toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                              /km
                             </p>
                           </div>
                         </div>
@@ -921,12 +936,22 @@ export function QuoteDetailModal({
                             <TableCell className="text-right">
                               {tollPlazas
                                 .reduce((sum, p) => sum + p.valor, 0)
-                                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                .toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {tollPlazas
                                 .reduce((sum, p) => sum + p.valorTag, 0)
-                                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                .toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
                             </TableCell>
                           </TableRow>
                         </TableFooter>

@@ -230,9 +230,9 @@ export function CashFlowReport() {
   const settleMutation = useSettleInstallments();
   const deleteMutation = useDeleteInstallments();
 
-  const pendingRows = pendingInstallments ?? [];
-  const settledRows = settledInstallments ?? [];
-  const items = rows ?? [];
+  const pendingRows = useMemo(() => pendingInstallments ?? [], [pendingInstallments]);
+  const settledRows = useMemo(() => settledInstallments ?? [], [settledInstallments]);
+  const items = useMemo(() => rows ?? [], [rows]);
 
   // Chart data in chronological order (reversed from display)
   const chartData = useMemo(() => [...items].reverse(), [items]);

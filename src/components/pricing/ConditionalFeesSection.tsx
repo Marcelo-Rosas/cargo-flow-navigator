@@ -105,8 +105,9 @@ export function ConditionalFeesSection() {
 
   const formatFeeValue = (fee: ConditionalFee) => {
     if (fee.fee_type === 'percentage') return `${fee.fee_value}%`;
-    if (fee.fee_type === 'fixed') return `R$ ${fee.fee_value.toFixed(2)}`;
-    return `R$ ${fee.fee_value.toFixed(2)}/kg`;
+    if (fee.fee_type === 'fixed')
+      return `R$ ${fee.fee_value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `R$ ${fee.fee_value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/kg`;
   };
 
   if (isLoading) {

@@ -98,10 +98,25 @@ export function useLoadCompositionController({
     return suggestions.filter((s) => s.status === filterStatus);
   }, [suggestions, filterStatus]);
 
-  const totalSavingsCents = filteredSuggestions.reduce(
-    (sum, s) => sum + s.estimated_savings_brl,
-    0
-  );
+  // Economia máxima realizável: greedy pick de sugestões não-sobrepostas (por score desc)
+  const { maxRealizableSavingsCents, realizableCount } = useMemo(() => {
+    const sorted = [...filteredSuggestions].sort(
+      (a, b) => b.consolidation_score - a.consolidation_score
+    );
+    const usedQuoteIds = new Set<string>();
+    let savings = 0;
+    let count = 0;
+    for (const s of sorted) {
+      const overlaps = s.quote_ids.some((qid) => usedQuoteIds.has(qid));
+      if (!overlaps) {
+        savings += s.estimated_savings_brl;
+        count++;
+        for (const qid of s.quote_ids) usedQuoteIds.add(qid);
+      }
+    }
+    return { maxRealizableSavingsCents: savings, realizableCount: count };
+  }, [filteredSuggestions]);
+
   const totalSuggestions = filteredSuggestions.length;
   const feasibleCount = filteredSuggestions.filter((s) => s.is_feasible).length;
 
@@ -165,7 +180,8 @@ export function useLoadCompositionController({
     error,
 
     // Summary
-    totalSavingsCents,
+    totalSavingsCents: maxRealizableSavingsCents,
+    realizableCount,
     totalSuggestions,
     feasibleCount,
 

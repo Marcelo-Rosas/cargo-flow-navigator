@@ -12,7 +12,7 @@ const isDev = process.env.NODE_ENV === 'development';
 export default defineConfig({
   server: {
     host: '::',
-    port: 8080,
+    port: Number(process.env.PORT) || 8080,
   },
   plugins: [react(), ...(isDev ? [componentTagger()] : []), cloudflare()],
   resolve: {

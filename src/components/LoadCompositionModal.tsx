@@ -69,7 +69,15 @@ export function LoadCompositionModal({
   } = useLoadCompositionSuggestion(compositionId);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [routeData, setRouteData] = useState<{
-    legs?: unknown[];
+    legs?: {
+      from_label: string;
+      to_label: string;
+      distance_km: number;
+      duration_min: number;
+      quote_id: string | null;
+      sequence_number: number;
+      toll_centavos: number;
+    }[];
     polyline_coords?: [number, number][];
     total_distance_km?: number;
     total_duration_min?: number;

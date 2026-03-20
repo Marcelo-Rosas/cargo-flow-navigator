@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 import { ShipperForm } from '@/components/forms/ShipperForm';
-import { formatCpfDisplay } from '@/components/ui/masked-input';
+import { formatCpfDisplay } from '@/lib/formatters';
 import { Database } from '@/integrations/supabase/types';
 import { useDebounce } from '@/hooks/useDebounce';
 import {

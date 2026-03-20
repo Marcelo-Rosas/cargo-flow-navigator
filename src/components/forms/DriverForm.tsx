@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -64,7 +64,10 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
 
   // Busca veículo(s) vinculado ao motorista (apenas em modo edição)
   const { data: allVehicles } = useVehicles(driver?.id ?? null);
-  const linkedVehicles = allVehicles?.filter((v) => v.driver_id === driver?.id) ?? [];
+  const linkedVehicles = useMemo(
+    () => allVehicles?.filter((v) => v.driver_id === driver?.id) ?? [],
+    [allVehicles, driver?.id]
+  );
 
   // Verifica se o motorista já é proprietário de algum veículo vinculado
   const [initialIsOwner, setInitialIsOwner] = useState(false);

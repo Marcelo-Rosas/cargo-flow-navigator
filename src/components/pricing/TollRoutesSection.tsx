@@ -203,7 +203,13 @@ export function TollRoutesSection() {
                   <span className="text-muted-foreground">Todos</span>
                 )}
               </TableCell>
-              <TableCell className="font-medium">R$ {route.toll_value.toFixed(2)}</TableCell>
+              <TableCell className="font-medium">
+                R${' '}
+                {route.toll_value.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </TableCell>
               <TableCell>{route.distance_km ? `${route.distance_km} km` : '-'}</TableCell>
               <TableCell className="text-muted-foreground text-sm">
                 {route.via_description || '-'}

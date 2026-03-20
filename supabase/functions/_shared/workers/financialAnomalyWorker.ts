@@ -74,7 +74,7 @@ function buildPrompt(
 
 **Documento**: ${doc.code || doc.id}
 **Tipo**: ${doc.type} (${doc.type === 'FAT' ? 'A Receber' : 'A Pagar'})
-**Valor do Documento**: R$ ${docAmount.toFixed(2)}
+**Valor do Documento**: R$ ${docAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 **Status**: ${doc.status}`;
 
   if (source.clientName) prompt += `\n**Cliente**: ${source.clientName}`;
@@ -90,7 +90,8 @@ function buildPrompt(
     if (source.freightType) prompt += `\n- Tipo frete: ${source.freightType}`;
     if (source.freightModality) prompt += `\n- Modalidade: ${source.freightModality}`;
     if (source.vehicleTypeName) prompt += `\n- Veiculo: ${source.vehicleTypeName}`;
-    if (source.tollValue) prompt += `\n- Pedagio da rota: R$ ${source.tollValue.toFixed(2)}`;
+    if (source.tollValue)
+      prompt += `\n- Pedagio da rota: R$ ${source.tollValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   if (source.paymentTermName) {
@@ -106,12 +107,13 @@ function buildPrompt(
   if (source.breakdownTotalCliente || source.breakdownMargemPercent != null) {
     prompt += `\n\n**Breakdown de Precificacao (calculado na cotacao)**:`;
     if (source.breakdownReceitaBruta)
-      prompt += `\n- Receita Bruta: R$ ${source.breakdownReceitaBruta.toFixed(2)}`;
-    if (source.breakdownDas) prompt += `\n- DAS: R$ ${source.breakdownDas.toFixed(2)}`;
+      prompt += `\n- Receita Bruta: R$ ${source.breakdownReceitaBruta.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (source.breakdownDas)
+      prompt += `\n- DAS: R$ ${source.breakdownDas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (source.breakdownTotalCliente)
-      prompt += `\n- Total Cliente (calculado): R$ ${source.breakdownTotalCliente.toFixed(2)}`;
+      prompt += `\n- Total Cliente (calculado): R$ ${source.breakdownTotalCliente.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (source.breakdownToll)
-      prompt += `\n- Pedagio (no breakdown): R$ ${source.breakdownToll.toFixed(2)}`;
+      prompt += `\n- Pedagio (no breakdown): R$ ${source.breakdownToll.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (source.breakdownMargemPercent != null)
       prompt += `\n- Margem calculada: ${source.breakdownMargemPercent.toFixed(1)}% (meta: >=15%)`;
   }
@@ -119,12 +121,12 @@ function buildPrompt(
   if (source.carreteiroAntt != null || source.carreteiroReal != null) {
     prompt += `\n\n**Carreteiro (PAG)**:`;
     if (source.carreteiroAntt != null)
-      prompt += `\n- Piso ANTT: R$ ${source.carreteiroAntt.toFixed(2)}`;
+      prompt += `\n- Piso ANTT: R$ ${source.carreteiroAntt.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (source.carreteiroReal != null)
-      prompt += `\n- Real (fechado): R$ ${source.carreteiroReal.toFixed(2)}`;
+      prompt += `\n- Real (fechado): R$ ${source.carreteiroReal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (source.carreteiroAntt != null && source.carreteiroReal != null) {
       const diff = source.carreteiroReal - source.carreteiroAntt;
-      prompt += `\n- Diferenca: R$ ${diff.toFixed(2)} (${diff > 0 ? 'ACIMA do piso' : 'dentro do piso'})`;
+      prompt += `\n- Diferenca: R$ ${diff.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${diff > 0 ? 'ACIMA do piso' : 'dentro do piso'})`;
     }
   }
 
@@ -133,21 +135,21 @@ function buildPrompt(
     if (source.breakdownToll != null || source.pedagioReal != null) {
       const prev = source.breakdownToll ?? 0;
       const real = source.pedagioReal ?? 0;
-      prompt += `\n- Pedagogio: Previsto R$ ${prev.toFixed(2)} / Real R$ ${real.toFixed(2)}`;
+      prompt += `\n- Pedagogio: Previsto R$ ${prev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / Real R$ ${real.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
     if (source.descargaReal != null || source.breakdownCustosDescarga != null) {
       const prev = source.breakdownCustosDescarga ?? 0;
       const real = source.descargaReal ?? 0;
-      prompt += `\n- Descarga: Previsto R$ ${prev.toFixed(2)} / Real R$ ${real.toFixed(2)}`;
+      prompt += `\n- Descarga: Previsto R$ ${prev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / Real R$ ${real.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
   }
 
   prompt += `\n\n**Estatisticas historicas (${doc.type}, ${historicalCount} documentos)**:
-- Valor medio: R$ ${stats.avg.toFixed(2)}
-- Desvio padrao: R$ ${stats.stdDev.toFixed(2)}
-- Valor minimo: R$ ${stats.min.toFixed(2)}
-- Valor maximo: R$ ${stats.max.toFixed(2)}
-- Z-score do valor atual: ${zScore !== null ? zScore.toFixed(2) : 'N/A'}
+- Valor medio: R$ ${stats.avg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Desvio padrao: R$ ${stats.stdDev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Valor minimo: R$ ${stats.min.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Valor maximo: R$ ${stats.max.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Z-score do valor atual: ${zScore !== null ? zScore.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A'}
 - Desvio da media: ${deviationPct}%
 
 **Interpretacao estatistica**:

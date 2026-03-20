@@ -14,6 +14,14 @@ export interface AdditionalFeesSelection {
   waitingTimeCost: number;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
+export const defaultAdditionalFeesSelection: AdditionalFeesSelection = {
+  conditionalFees: [],
+  waitingTimeEnabled: false,
+  waitingTimeHours: 0,
+  waitingTimeCost: 0,
+};
+
 interface AdditionalFeesSectionProps {
   selection: AdditionalFeesSelection;
   onChange: (selection: AdditionalFeesSelection) => void;
@@ -105,6 +113,8 @@ export function AdditionalFeesSection({
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -251,11 +261,3 @@ export function AdditionalFeesSection({
     </div>
   );
 }
-
-// Default selection
-export const defaultAdditionalFeesSelection: AdditionalFeesSelection = {
-  conditionalFees: [],
-  waitingTimeEnabled: false,
-  waitingTimeHours: 0,
-  waitingTimeCost: 0,
-};

@@ -332,7 +332,7 @@ Deno.serve(async (req) => {
     };
 
     console.log(
-      `[webrouter] CEPs: ${originCep} → ${destinationCep}, origem: ${originAddrFinal?.cidade || '—'}/${originAddrFinal?.uf || '—'}, destino: ${destinationAddrFinal?.cidade || '—'}/${destinationAddrFinal?.uf || '—'}, categoria: ${categoria}${categoriaVeiculo ? ' (AILOG)' : ` (axes: ${axesCount ?? 'default'})`}`
+      `[webrouter] Route calculation: ${originCep} → ${destinationCep}, categoria: ${categoria}`
     );
 
     const res = await fetch(WEBROUTER_URL, {
@@ -381,7 +381,6 @@ Deno.serve(async (req) => {
     // Logs detalhados da resposta WebRouter (estrutura para depuração)
     if (rota && typeof rota === 'object') {
       const rotaKeys = Object.keys(rota as Record<string, unknown>);
-      console.log(`[webrouter] rota keys: ${rotaKeys.join(', ')}`);
       const ordemRoteiro = (rota as Record<string, unknown>).ordemRoteiro;
       if (Array.isArray(ordemRoteiro)) {
         console.log(
@@ -395,7 +394,6 @@ Deno.serve(async (req) => {
       const path = (rota as Record<string, unknown>).path;
       if (path && typeof path === 'object') {
         const pathKeys = Object.keys(path as Record<string, unknown>);
-        console.log(`[webrouter] path keys: ${pathKeys.join(', ')}`);
       }
       const resumoEstados = (rota as Record<string, unknown>).resumoEstados;
       if (resumoEstados != null) {

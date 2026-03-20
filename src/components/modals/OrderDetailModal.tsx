@@ -111,7 +111,12 @@ function OrderReconciliationSummary({ orderId }: { orderId: string }) {
   const { data: r } = useOrderReconciliation(orderId);
   if (!r || Number(r.expected_amount) <= 0) return null;
   const fmt = (v: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(v);
   const isPendingConfirmation =
     r.proofs_count > 0 && r.paid_amount === 0 && Number(r.expected_amount) > 0;
   return (
@@ -407,7 +412,9 @@ export function OrderDetailModal({
           pricing_breakdown: updated as unknown as typeof order.pricing_breakdown,
         },
       });
-      toast.success(`Pedágio recalculado: R$ ${toll.toFixed(2)} (${plazas.length} praças)`);
+      toast.success(
+        `Pedágio recalculado: R$ ${toll.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${plazas.length} praças)`
+      );
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     } catch (e) {
       toast.error((e as Error)?.message || 'Erro ao recalcular pedágio');
@@ -545,6 +552,8 @@ export function OrderDetailModal({
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -1157,7 +1166,7 @@ export function OrderDetailModal({
                               <p className="text-xs text-muted-foreground">ANTT R$/km</p>
                               <p className="font-semibold text-foreground">
                                 {order.carreteiro_antt != null
-                                  ? `R$ ${(Number(order.carreteiro_antt) / Number(kmDistance)).toFixed(2)}/km`
+                                  ? `R$ ${(Number(order.carreteiro_antt) / Number(kmDistance)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/km`
                                   : '—'}
                               </p>
                             </div>
@@ -1344,12 +1353,22 @@ export function OrderDetailModal({
                             <TableCell className="text-right">
                               {tollPlazas
                                 .reduce((sum, p) => sum + p.valor, 0)
-                                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                .toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {tollPlazas
                                 .reduce((sum, p) => sum + p.valorTag, 0)
-                                .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                .toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
                             </TableCell>
                           </TableRow>
                         </TableFooter>

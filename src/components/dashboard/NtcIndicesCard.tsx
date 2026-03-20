@@ -5,6 +5,7 @@
 import { useNtcIndices } from '@/hooks/useNtcIndices';
 import { useLatestMarketIndex } from '@/hooks/useMarketIndices';
 import { AlertTriangle, Info, Loader2 } from 'lucide-react';
+import { formatNumber } from '@/lib/formatters';
 import {
   LineChart,
   Line,
@@ -17,7 +18,7 @@ import {
 
 function fmtPct(v: number | null | undefined): string {
   if (v == null) return '—';
-  return `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
+  return `${v > 0 ? '+' : ''}${formatNumber(v)}%`;
 }
 
 const CustomTooltip = ({
@@ -37,7 +38,7 @@ const CustomTooltip = ({
         <p key={p.dataKey} style={{ color: p.color }}>
           {p.dataKey === 'inctl'
             ? `INCTL: ${fmtPct(p.value)}`
-            : `Diesel: R$ ${p.value.toFixed(2)}/L`}
+            : `Diesel: R$ ${p.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/L`}
         </p>
       ))}
     </div>
@@ -74,7 +75,7 @@ export function NtcIndicesCard() {
   const cards = [
     {
       label: 'INCTF 12M',
-      mainValue: `+${data.inctf_pct.toFixed(2).replace('.', ',')}%`,
+      mainValue: `+${data.inctf_pct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
       trendPct: null as string | null,
       sub: 'Carga Fracionada',
       trendColor: data.inctf_pct > 5 ? 'text-[#dc2626]' : 'text-[#16a34a]',
@@ -83,7 +84,7 @@ export function NtcIndicesCard() {
     },
     {
       label: 'INCTL 12M',
-      mainValue: `+${data.inctl_pct.toFixed(2).replace('.', ',')}%`,
+      mainValue: `+${data.inctl_pct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
       trendPct: null as string | null,
       sub: 'Carga Lotação',
       trendColor: data.inctl_pct > 5 ? 'text-[#dc2626]' : 'text-[#16a34a]',
@@ -92,7 +93,7 @@ export function NtcIndicesCard() {
     },
     {
       label: 'Diesel S-10',
-      mainValue: `R$ ${data.diesel_price.toFixed(2).replace('.', ',')}/L`,
+      mainValue: `R$ ${data.diesel_price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/L`,
       trendPct: null as string | null,
       sub: 'Preço médio nacional',
       trendColor: '',
@@ -101,7 +102,7 @@ export function NtcIndicesCard() {
     },
     {
       label: 'Reajuste sugerido',
-      mainValue: `${data.reajuste_sugerido.toFixed(2).replace('.', ',')}%`,
+      mainValue: `${formatNumber(data.reajuste_sugerido)}%`,
       trendPct: null as string | null,
       sub: 'Acumulado 12 meses',
       trendColor: data.reajuste_sugerido > 5 ? 'text-[#dc2626]' : 'text-[#16a34a]',
@@ -220,7 +221,9 @@ export function NtcIndicesCard() {
                 tick={{ fontSize: 11, fill: '#d97706' }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v) => `R$${v.toFixed(0)}`}
+                tickFormatter={(v) =>
+                  `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                }
               />
               <Tooltip content={<CustomTooltip />} />
               <Line

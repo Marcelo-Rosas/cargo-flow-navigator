@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
       options: {
-        emailRedirectTo: `${SITE_ORIGIN}/auth`,
+        emailRedirectTo: `${PROD_ORIGIN}/auth`,
         data: { full_name: fullName },
       },
     });
@@ -85,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

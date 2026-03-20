@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { BrandLogo } from '@/components/BrandLogo';
-import { useLayout } from '@/components/layout/LayoutContext';
+import { useLayout } from '@/components/layout/useLayout';
 import { useUserRole, type UserProfile } from '@/hooks/useUserRole';
 
 const navItems = [

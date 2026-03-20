@@ -9,13 +9,8 @@ interface LayoutContextValue {
   sidebarWidth: number;
 }
 
-const LayoutContext = createContext<LayoutContextValue | null>(null);
-
-export function useLayout() {
-  const ctx = useContext(LayoutContext);
-  if (!ctx) throw new Error('useLayout must be used within LayoutProvider');
-  return ctx;
-}
+// eslint-disable-next-line react-refresh/only-export-components
+export const LayoutContext = createContext<LayoutContextValue | null>(null);
 
 interface LayoutProviderProps {
   children: ReactNode;
@@ -32,5 +27,3 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     </LayoutContext.Provider>
   );
 }
-
-export { SIDEBAR_COLLAPSED, SIDEBAR_EXPANDED };

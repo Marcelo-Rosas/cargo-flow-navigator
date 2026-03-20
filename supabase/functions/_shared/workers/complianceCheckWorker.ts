@@ -113,8 +113,8 @@ function evaluatePreColeta(order: any, quote: any): RuleEvaluation[] {
       rule: 'Carreteiro >= Piso ANTT',
       passed: passesFloor,
       detail: passesFloor
-        ? `Carreteiro R$ ${carreteiro.toFixed(2)} atende piso ANTT R$ ${anttFloor.toFixed(2)}`
-        : `Carreteiro R$ ${carreteiro.toFixed(2)} ABAIXO do piso ANTT R$ ${anttFloor.toFixed(2)}`,
+        ? `Carreteiro R$ ${carreteiro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} atende piso ANTT R$ ${anttFloor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : `Carreteiro R$ ${carreteiro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ABAIXO do piso ANTT R$ ${anttFloor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     });
   }
 
@@ -172,12 +172,12 @@ function classifyPaymentReconciliation(
     if (hasProofWithUnreconciled) {
       return {
         classification: 'DIVERGENTE',
-        detail: `Divergência: R$ ${paidAmount.toFixed(2)} pago vs R$ ${expectedAmount.toFixed(2)} esperado; algum comprovante com valor incorreto`,
+        detail: `Divergência: R$ ${paidAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pago vs R$ ${expectedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} esperado; algum comprovante com valor incorreto`,
       };
     }
     return {
       classification: 'PENDENTE',
-      detail: `Saldo pendente: R$ ${paidAmount.toFixed(2)} pago vs R$ ${expectedAmount.toFixed(2)} esperado`,
+      detail: `Saldo pendente: R$ ${paidAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pago vs R$ ${expectedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} esperado`,
     };
   }
 
@@ -185,7 +185,7 @@ function classifyPaymentReconciliation(
   if (deltaAmount > RECONCILIATION_TOLERANCE) {
     return {
       classification: 'DIVERGENTE',
-      detail: `Possível duplicidade/erro: overpayment de R$ ${deltaAmount.toFixed(2)}`,
+      detail: `Possível duplicidade/erro: overpayment de R$ ${deltaAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     };
   }
   if (hasProofWithUnreconciled) {
@@ -196,7 +196,7 @@ function classifyPaymentReconciliation(
   }
   return {
     classification: 'RECONCILIADO',
-    detail: `Conciliado: R$ ${paidAmount.toFixed(2)} pago vs R$ ${expectedAmount.toFixed(2)} esperado`,
+    detail: `Conciliado: R$ ${paidAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pago vs R$ ${expectedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} esperado`,
   };
 }
 
@@ -294,7 +294,7 @@ function buildPrompt(
 **Estágio atual**: ${order.stage}
 **Tipo de verificação**: ${checkType}
 **Motorista**: ${order.driver_name || 'Não atribuído'}
-**Carreteiro real**: R$ ${Number(order.carreteiro_real || 0).toFixed(2)}
+**Carreteiro real**: R$ ${Number(order.carreteiro_real || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 
 **Resultado da avaliação programática** (${passed} OK, ${failed} falhas):
 ${rules.map((r) => `- [${r.passed ? 'OK' : 'FALHA'}] ${r.rule}: ${r.detail}`).join('\n')}`;
@@ -304,8 +304,8 @@ ${rules.map((r) => `- [${r.passed ? 'OK' : 'FALHA'}] ${r.rule}: ${r.detail}`).jo
     const breakdownProfitability = quote.pricing_breakdown?.profitability;
     const anttFloor = breakdownMeta?.antt?.total ?? breakdownMeta?.antt_piso_carreteiro;
     prompt += `\n\n**Dados da cotação vinculada** (${quote.quote_code || quote.id}):
-- Valor total: R$ ${Number(quote.value || 0).toFixed(2)}
-- Piso ANTT carreteiro: R$ ${anttFloor ? Number(anttFloor).toFixed(2) : 'N/A'}
+- Valor total: R$ ${Number(quote.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Piso ANTT carreteiro: R$ ${anttFloor ? Number(anttFloor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A'}
 - Margem: ${breakdownProfitability?.margemPercent ?? breakdownProfitability?.margem_percent ?? 'N/A'}%`;
   }
 

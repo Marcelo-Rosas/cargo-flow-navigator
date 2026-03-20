@@ -112,8 +112,20 @@ export function TacRatesSection() {
                   {index === 0 && <Badge variant="default">Vigente</Badge>}
                 </div>
               </TableCell>
-              <TableCell>R$ {rate.diesel_price_base.toFixed(3)}</TableCell>
-              <TableCell>R$ {rate.diesel_price_current.toFixed(3)}</TableCell>
+              <TableCell>
+                R${' '}
+                {rate.diesel_price_base.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 3,
+                  maximumFractionDigits: 3,
+                })}
+              </TableCell>
+              <TableCell>
+                R${' '}
+                {rate.diesel_price_current.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 3,
+                  maximumFractionDigits: 3,
+                })}
+              </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
                   {getVariationIcon(rate.variation_percent)}

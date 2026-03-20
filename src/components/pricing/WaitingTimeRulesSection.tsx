@@ -136,12 +136,20 @@ export function WaitingTimeRulesSection() {
               <TableCell>{CONTEXT_LABELS[rule.context] || rule.context}</TableCell>
               <TableCell>{rule.free_hours}h</TableCell>
               <TableCell>
-                {rule.rate_per_hour ? `R$ ${rule.rate_per_hour.toFixed(2)}` : '-'}
+                {rule.rate_per_hour
+                  ? `R$ ${rule.rate_per_hour.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : '-'}
               </TableCell>
               <TableCell>
-                {rule.rate_per_day ? `R$ ${rule.rate_per_day.toFixed(2)}` : '-'}
+                {rule.rate_per_day
+                  ? `R$ ${rule.rate_per_day.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : '-'}
               </TableCell>
-              <TableCell>{rule.min_charge ? `R$ ${rule.min_charge.toFixed(2)}` : '-'}</TableCell>
+              <TableCell>
+                {rule.min_charge
+                  ? `R$ ${rule.min_charge.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : '-'}
+              </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
                   <Button variant="ghost" size="icon" onClick={() => setEditingRule(rule)}>

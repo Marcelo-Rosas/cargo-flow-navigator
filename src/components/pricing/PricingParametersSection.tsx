@@ -53,7 +53,8 @@ export function PricingParametersSection({
 
   const formatValue = (param: PricingParameter) => {
     if (param.unit === 'kg/m3') return `${param.value} kg/m³`;
-    if (param.unit === 'BRL') return `R$ ${param.value.toFixed(2)}`;
+    if (param.unit === 'BRL')
+      return `R$ ${param.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (param.unit === '%') return `${param.value}%`;
     return param.value.toString();
   };

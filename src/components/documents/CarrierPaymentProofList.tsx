@@ -25,7 +25,12 @@ export function CarrierPaymentProofList({ orderId }: CarrierPaymentProofListProp
   const [editValue, setEditValue] = useState('');
 
   const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
 
   const formatDate = (date: string) =>
     new Intl.DateTimeFormat('pt-BR', {
