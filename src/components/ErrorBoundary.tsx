@@ -1,11 +1,13 @@
 import { ErrorBoundary as ReactErrorBoundary } from 'react-error-boundary';
+import { useLocation } from 'react-router-dom';
 import { ErrorFallback } from '@/components/ui/ErrorFallback';
-import { Sentry } from '@/lib/sentry';
+import { logger } from '@/lib/logger';
 
 interface SectionErrorBoundaryProps {
   children: React.ReactNode;
   title?: string;
   description?: string;
+  resetKeys?: unknown[];
 }
 
 /** Error boundary global — envolve toda a aplicação */
@@ -24,8 +26,7 @@ export function GlobalErrorBoundary({ children }: { children: React.ReactNode })
         </div>
       )}
       onError={(error, info) => {
-        console.error('[GlobalErrorBoundary]', error, info.componentStack);
-        Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
+        logger.captureException(error, { componentStack: info.componentStack ?? '' });
       }}
     >
       {children}
@@ -34,18 +35,37 @@ export function GlobalErrorBoundary({ children }: { children: React.ReactNode })
 }
 
 /** Error boundary de seção — isola módulos individuais */
-export function SectionErrorBoundary({ children, title, description }: SectionErrorBoundaryProps) {
+export function SectionErrorBoundary({
+  children,
+  title,
+  description,
+  resetKeys,
+}: SectionErrorBoundaryProps) {
   return (
     <ReactErrorBoundary
       FallbackComponent={(props) => (
         <ErrorFallback {...props} title={title} description={description} />
       )}
       onError={(error, info) => {
-        console.error('[SectionErrorBoundary]', error, info.componentStack);
-        Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
+        logger.captureException(error, { componentStack: info.componentStack ?? '' });
       }}
+      resetKeys={resetKeys}
     >
       {children}
     </ReactErrorBoundary>
+  );
+}
+
+/** Route-aware error boundary — auto-resets when the URL changes */
+export function RouteErrorBoundary({
+  children,
+  title,
+  description,
+}: Omit<SectionErrorBoundaryProps, 'resetKeys'>) {
+  const location = useLocation();
+  return (
+    <SectionErrorBoundary title={title} description={description} resetKeys={[location.pathname]}>
+      {children}
+    </SectionErrorBoundary>
   );
 }
