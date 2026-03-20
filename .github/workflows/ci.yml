@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: CI
 
 on:
@@ -31,8 +32,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-    # Só roda se o secret estiver configurado
-    if: ${{ secrets.SUPABASE_DB_URL != '' }}
+    # Só corre se SUPABASE_DB_URL estiver definido no repositório.
+    # Usar secrets.* no if é o padrão GitHub; NÃO uses env.SUPABASE_DB_URL no if do job — costuma falhar.
+    # PRs de forks: secret não existe → job skipped (esperado).
+    if: secrets.SUPABASE_DB_URL != ''
     steps:
       - uses: actions/checkout@v4
 

@@ -48,8 +48,41 @@ jobs:
         id: list-fns
         if: steps.filter.outputs.edge_function == 'true'
         run: |
-          FUNCTIONS=$(git diff --name-only HEAD~1 HEAD -- 'supabase/functions/' | cut -d'/' -f3 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "functions=$FUNCTIONS" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          # supabase/functions/_shared/... yields segment "_shared" — not a deployable function name (must start with a letter).
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- 'supabase/functions/' || true)
+          VALID_NAMES=""
+          while IFS= read -r name; do
+            [[ -z "$name" ]] && continue
+            if [[ "$name" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]] && [[ -f "supabase/functions/$name/index.ts" ]]; then
+              VALID_NAMES="${VALID_NAMES}${name}"$'\n'
+            fi
+          done < <(echo "$CHANGED" | cut -d'/' -f3 | sort -u)
+          # _shared affects many functions: always redeploy all deployable folders (union with diff hits).
+          if echo "$CHANGED" | grep -q '^supabase/functions/_shared/'; then
+            for d in supabase/functions/*/; do
+              [[ -d "$d" ]] || continue
+              base=$(basename "$d")
+              [[ "$base" == _shared ]] && continue
+              [[ -f "${d}index.ts" ]] && VALID_NAMES="${VALID_NAMES}${base}"$'\n'
+            done
+          fi
+          # Shared-only changes (no direct function folder in diff): redeploy every function with index.ts.
+          if [[ -z "$(echo "$VALID_NAMES" | tr -d '[:space:]')" ]] && [[ -n "$(echo "$CHANGED" | tr -d '[:space:]')" ]]; then
+            for d in supabase/functions/*/; do
+              [[ -d "$d" ]] || continue
+              base=$(basename "$d")
+              [[ "$base" == _shared ]] && continue
+              [[ -f "${d}index.ts" ]] && VALID_NAMES="${VALID_NAMES}${base}"$'\n'
+            done
+          fi
+          FUNCS_LINES=$(echo "$VALID_NAMES" | sort -u | grep -v '^$' || true)
+          if [[ -z "$FUNCS_LINES" ]]; then
+            FUNCTIONS='[]'
+          else
+            FUNCTIONS=$(echo "$FUNCS_LINES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          fi
+          echo "functions=$FUNCTIONS" >> "$GITHUB_OUTPUT"
 
   # ─── Supabase Migrations ───
   deploy-migrations:
@@ -76,7 +109,11 @@ jobs:
   # ─── Supabase Edge Functions ───
   deploy-edge-functions:
     needs: detect-changes
-    if: needs.detect-changes.outputs.edge_function == 'true' && github.event_name == 'push'
+    if: |
+      needs.detect-changes.outputs.edge_function == 'true' &&
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.edge_functions_list != '[]' &&
+      needs.detect-changes.outputs.edge_functions_list != ''
     runs-on: ubuntu-latest
     strategy:
       matrix:
