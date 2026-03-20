@@ -1,0 +1,138 @@
+name: Lighthouse Audit via DevTools MCP
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'vite.config.ts'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'vite.config.ts'
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install DevTools MCP
+        run: npm install --save-dev chrome-devtools-mcp
+
+      - name: Start local server
+        run: |
+          npx serve -s dist -l 3000 &
+          sleep 3
+        shell: bash
+
+      - name: Run Lighthouse Audit via MCP
+        env:
+          LIGHTHOUSE_URL: "http://localhost:3000"
+        run: |
+          cat > run-lighthouse.js << 'EOF'
+          const { execSync } = require('child_process');
+
+          const config = {
+            url: process.env.LIGHTHOUSE_URL || 'http://localhost:3000',
+            thresholds: {
+              performance: 75,
+              accessibility: 90,
+              'best-practices': 85,
+              seo: 90
+            }
+          };
+
+          console.log('🚀 Starting Lighthouse audit via DevTools MCP...');
+          console.log(`📍 Target URL: ${config.url}`);
+
+          try {
+            // Run Lighthouse audit
+            const result = execSync(`npx lighthouse ${config.url} --output=json --output-path=./lighthouse-report.json`, {
+              encoding: 'utf-8',
+              stdio: 'inherit'
+            });
+
+            console.log('✅ Lighthouse audit completed');
+
+            // Parse results
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('./lighthouse-report.json', 'utf-8'));
+            const scores = report.categories;
+
+            // Check thresholds
+            let allPass = true;
+            Object.entries(config.thresholds).forEach(([category, threshold]) => {
+              const score = Math.round(scores[category].score * 100);
+              const status = score >= threshold ? '✅' : '❌';
+              console.log(`${status} ${category}: ${score}/${threshold}`);
+              if (score < threshold) allPass = false;
+            });
+
+            if (!allPass) {
+              console.error('\n❌ Some audits failed the threshold');
+              process.exit(1);
+            }
+
+            console.log('\n✅ All audits passed!');
+          } catch (error) {
+            console.error('❌ Audit failed:', error.message);
+            process.exit(1);
+          }
+          EOF
+
+          node run-lighthouse.js
+
+      - name: Upload Lighthouse Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: lighthouse-report.json
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('./lighthouse-report.json', 'utf-8'));
+            const scores = report.categories;
+
+            const comment = `
+            ## 📊 Lighthouse Audit Results
+
+            | Category | Score |
+            |----------|-------|
+            | Performance | ${Math.round(scores.performance.score * 100)} |
+            | Accessibility | ${Math.round(scores.accessibility.score * 100)} |
+            | Best Practices | ${Math.round(scores['best-practices'].score * 100)} |
+            | SEO | ${Math.round(scores.seo.score * 100)} |
+
+            [📈 Full Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
