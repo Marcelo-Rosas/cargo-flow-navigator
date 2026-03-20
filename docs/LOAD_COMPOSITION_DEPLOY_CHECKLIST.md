@@ -29,7 +29,8 @@ After deploy, test each flow:
 1. Open commercial Kanban
 2. Click "Ver oportunidades" for a shipper with 2+ quotes in stages `precificacao`/`enviado`/`negociacao`
 3. Click "Gerar sugestões"
-4. Verify suggestions appear with `trigger_source: batch`
+4. Verify suggestions appear in the list; each card shows a **Batch** badge (source: `trigger_source: batch` persisted on `load_composition_suggestions`)
+5. Optional: in Supabase Table Editor or SQL, `select trigger_source from load_composition_suggestions where shipper_id = '…' order by created_at desc limit 5` — expect `batch` for rows created via this button
 
 ### On-save
 1. Create/edit a quote for a shipper that already has other eligible quotes

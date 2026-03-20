@@ -38,6 +38,9 @@ playwright-report/
 # Audit output
 audit-report.json
 
+# Claude local settings
+.claude/settings.local.json
+
 # Sensitive / local-only
 APIs/
 *.env

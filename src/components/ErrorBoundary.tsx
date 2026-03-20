@@ -1,5 +1,6 @@
 import { ErrorBoundary as ReactErrorBoundary } from 'react-error-boundary';
 import { ErrorFallback } from '@/components/ui/ErrorFallback';
+import { Sentry } from '@/lib/sentry';
 
 interface SectionErrorBoundaryProps {
   children: React.ReactNode;
@@ -24,6 +25,7 @@ export function GlobalErrorBoundary({ children }: { children: React.ReactNode })
       )}
       onError={(error, info) => {
         console.error('[GlobalErrorBoundary]', error, info.componentStack);
+        Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
       }}
     >
       {children}
@@ -40,6 +42,7 @@ export function SectionErrorBoundary({ children, title, description }: SectionEr
       )}
       onError={(error, info) => {
         console.error('[SectionErrorBoundary]', error, info.componentStack);
+        Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
       }}
     >
       {children}

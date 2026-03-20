@@ -827,9 +827,21 @@ Deno.serve(async (req: Request) => {
 
       if (insertError) {
         console.error('[analyze] Insert error:', insertError);
-        // If dedup index conflict, it's expected — some concurrent request beat us
+        // Dedup index conflict — concurrent request may have inserted first
         if (insertError.code === '23505') {
           console.log('[analyze] Duplicate key conflict (expected with concurrent requests)');
+        } else {
+          return jsonResponse(
+            {
+              error: 'Falha ao persistir sugestões no banco de dados',
+              details: insertError.message,
+              code: insertError.code,
+              hint: insertError.hint ?? undefined,
+              persist_failed: true,
+              computed_suggestion_count: newSuggestions.length,
+            },
+            500
+          );
         }
       }
     }
