@@ -62,3 +62,6 @@ CON
 !.env.example
 
 dist/wrangler.json
+
+# Bun (projeto usa npm; lockfile faz ferramentas como update-browserslist-db chamarem `bun` sem ele instalado)
+bun.lockb

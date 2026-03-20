@@ -15,8 +15,11 @@ function MainLayoutInner({ children }: MainLayoutProps) {
     <div className="min-h-screen bg-background">
       <Sidebar />
       <div
-        className="transition-[padding] duration-200 ease-[cubic-bezier(0.22,0.9,0.32,1)]"
-        style={{ paddingLeft: sidebarWidth }}
+        className="transition-[padding] duration-200"
+        style={{
+          paddingLeft: sidebarWidth,
+          transitionTimingFunction: 'cubic-bezier(0.22, 0.9, 0.32, 1)',
+        }}
         data-testid="main-content"
       >
         <Topbar />
