@@ -2301,6 +2301,62 @@ export type Database = {
           },
         ];
       };
+      quote_route_stops: {
+        Row: {
+          id: string;
+          quote_id: string;
+          sequence: number;
+          stop_type: Database['public']['Enums']['route_stop_type'];
+          cnpj: string | null;
+          name: string | null;
+          cep: string | null;
+          city_uf: string | null;
+          label: string | null;
+          planned_km_from_prev: number | null;
+          metadata: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          quote_id: string;
+          sequence?: number;
+          stop_type?: Database['public']['Enums']['route_stop_type'];
+          cnpj?: string | null;
+          name?: string | null;
+          cep?: string | null;
+          city_uf?: string | null;
+          label?: string | null;
+          planned_km_from_prev?: number | null;
+          metadata?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          quote_id?: string;
+          sequence?: number;
+          stop_type?: Database['public']['Enums']['route_stop_type'];
+          cnpj?: string | null;
+          name?: string | null;
+          cep?: string | null;
+          city_uf?: string | null;
+          label?: string | null;
+          planned_km_from_prev?: number | null;
+          metadata?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'quote_route_stops_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       quotes: {
         Row: {
           advance_due_date: string | null;
@@ -4005,6 +4061,7 @@ export type Database = {
         | 'negociacao'
         | 'ganho'
         | 'perdido';
+      route_stop_type: 'origin' | 'stop' | 'destination';
       user_profile: 'admin' | 'operacional' | 'financeiro' | 'comercial';
     };
     CompositeTypes: {

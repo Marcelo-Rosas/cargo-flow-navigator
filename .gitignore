@@ -16,6 +16,9 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
+.cursor/
+.cursorrules
+.cursorignore
 .DS_Store
 *.suo
 *.ntvs*
@@ -28,8 +31,12 @@ dist-ssr
 supabase/.temp/
 supabase/functions/**/deno.lock
 
-# Playwright auth state
+# Playwright auth state & reports
 .auth/
+playwright-report/
+
+# Audit output
+audit-report.json
 
 # Sensitive / local-only
 APIs/

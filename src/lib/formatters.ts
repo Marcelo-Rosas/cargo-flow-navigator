@@ -13,6 +13,23 @@ export function formatCurrency(value: number | null | undefined): string {
 }
 
 /**
+ * Formata um valor em centavos para a moeda Real (BRL).
+ * Exemplo: 150050 → "R$ 1.500,50"
+ */
+export function formatCurrencyFromCents(centavos: number | null | undefined): string {
+  if (centavos == null) return '—';
+  return formatCurrency(centavos / 100);
+}
+
+/**
+ * Formata um valor BRL de quote (decimal, não centavos).
+ * Exemplo: 1500.50 → "R$ 1.500,50"
+ */
+export function formatQuoteValue(value: number | null | undefined): string {
+  return formatCurrency(value);
+}
+
+/**
  * Formata uma string de data para o padrão brasileiro.
  * O padrão é dd/mmm/aaaa (ex: 01 de mar de 2026), mas pode ser sobrescrito.
  */

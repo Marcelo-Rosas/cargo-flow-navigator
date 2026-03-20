@@ -1,18 +1,16 @@
 /**
- * LoadCompositionOverlay
- *
- * Floating overlay (Dialog on desktop, Drawer on mobile) for load composition opportunities.
- * Triggered by button — no sidebar. Modern operational modal UX.
+ * LoadCompositionOverlay (v3)
+ * Thin wrapper: uses shared controller + shared components.
+ * Floating overlay (Dialog on desktop, Drawer on mobile).
  */
 
 import React, { useState } from 'react';
-import { useLoadCompositionSuggestions } from '@/hooks/useLoadCompositionSuggestions';
-import { useApproveComposition } from '@/hooks/useApproveComposition';
-import { useAnalyzeLoadComposition } from '@/hooks/useAnalyzeLoadComposition';
-import { useCalculateDiscounts } from '@/hooks/useCalculateDiscounts';
-import { useIsDesktop } from '@/hooks/useIsDesktop';
-import { LoadCompositionCard } from './LoadCompositionCard';
+import { useLoadCompositionController } from '@/hooks/useLoadCompositionController';
+import { LoadCompositionSummary } from './load-composition/LoadCompositionSummary';
+import { LoadCompositionSuggestionList } from './load-composition/LoadCompositionSuggestionList';
+import { LoadCompositionFooter } from './load-composition/LoadCompositionFooter';
 import { LoadCompositionModal } from './LoadCompositionModal';
+import { useIsDesktop } from '@/hooks/useIsDesktop';
 import {
   Dialog,
   DialogContent,
@@ -30,15 +28,14 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { AlertCircle, RefreshCw, Sparkles, Loader2 } from 'lucide-react';
+import { RefreshCw, Sparkles, Loader2 } from 'lucide-react';
+import type { CompositionFilterStatus } from '@/hooks/useLoadCompositionController';
 
 export interface LoadCompositionOverlayProps {
   shipperId: string;
   dateRange?: { from: Date; to: Date };
-  /** Custom trigger. Default: outline button "Ver oportunidades" */
   trigger?: React.ReactNode;
 }
 
@@ -49,56 +46,7 @@ export function LoadCompositionOverlay({
 }: LoadCompositionOverlayProps) {
   const isDesktop = useIsDesktop();
   const [open, setOpen] = useState(false);
-  const [selectedCompositionId, setSelectedCompositionId] = useState<string | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'executed'>(
-    'pending'
-  );
-
-  const {
-    data: suggestions,
-    isLoading,
-    error,
-    refetch,
-  } = useLoadCompositionSuggestions({
-    shipper_id: shipperId,
-    status: filterStatus === 'all' ? undefined : filterStatus,
-    date_from: dateRange?.from,
-    date_to: dateRange?.to,
-    include_details: true,
-  });
-
-  const { mutate: approve, isPending: isApproving } = useApproveComposition();
-  const { mutate: analyzeComposition, isPending: isAnalyzing } = useAnalyzeLoadComposition();
-  const { mutate: calculateDiscounts, isPending: isCalculatingDiscounts } = useCalculateDiscounts();
-
-  const handleApprove = (compositionId: string) => {
-    approve({ composition_id: compositionId });
-  };
-
-  const handleCalculateDiscounts = (compositionId: string) => {
-    calculateDiscounts({
-      composition_id: compositionId,
-      discount_strategy: 'proportional_to_original',
-      minimum_margin_percent: 30,
-      simulate_only: false,
-    });
-  };
-
-  const handleViewDetails = (compositionId: string) => {
-    setSelectedCompositionId(compositionId);
-    setShowDetailModal(true);
-  };
-
-  const filteredSuggestions =
-    suggestions?.filter((s) => (filterStatus === 'all' ? true : s.status === filterStatus)) || [];
-
-  const totalSavings = filteredSuggestions.reduce(
-    (sum, s) => sum + s.estimated_savings_brl / 100,
-    0
-  );
-  const totalSuggestions = filteredSuggestions.length;
-  const feasibleCount = filteredSuggestions.filter((s) => s.is_feasible).length;
+  const ctrl = useLoadCompositionController({ shipperId, dateRange });
 
   const content = (
     <>
@@ -108,18 +56,18 @@ export function LoadCompositionOverlay({
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Oportunidades de Consolidação</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Análise automática de cargas para otimização de rotas
+              Análise por embarcador — janela operacional e aderência ao trajeto
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="default"
               size="sm"
-              onClick={() => analyzeComposition({ shipper_id: shipperId })}
-              disabled={isAnalyzing}
+              onClick={ctrl.handleAnalyze}
+              disabled={ctrl.isAnalyzing}
               className="gap-2"
             >
-              {isAnalyzing ? (
+              {ctrl.isAnalyzing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Gerando...
@@ -134,8 +82,8 @@ export function LoadCompositionOverlay({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => refetch()}
-              disabled={isLoading}
+              onClick={() => ctrl.refetch()}
+              disabled={ctrl.isLoading}
               className="gap-2"
             >
               <RefreshCw className="w-4 h-4" />
@@ -144,31 +92,17 @@ export function LoadCompositionOverlay({
           </div>
         </div>
 
-        {/* Mini stats */}
-        <div className="flex gap-4 text-sm">
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">Sugestões:</span>
-            <span className="font-semibold">{totalSuggestions}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">Economia:</span>
-            <span className="font-semibold text-green-600">
-              R$ {totalSavings.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">Viáveis:</span>
-            <span className="font-semibold text-purple-600">
-              {feasibleCount}/{totalSuggestions}
-            </span>
-          </div>
-        </div>
+        <LoadCompositionSummary
+          totalSuggestions={ctrl.totalSuggestions}
+          totalSavingsCents={ctrl.totalSavingsCents}
+          feasibleCount={ctrl.feasibleCount}
+          layout="inline"
+        />
 
-        {/* Filter */}
         <ToggleGroup
           type="single"
-          value={filterStatus}
-          onValueChange={(v) => v && setFilterStatus(v as typeof filterStatus)}
+          value={ctrl.filterStatus}
+          onValueChange={(v) => v && ctrl.setFilterStatus(v as CompositionFilterStatus)}
           variant="outline"
           size="sm"
           className="justify-start"
@@ -182,72 +116,29 @@ export function LoadCompositionOverlay({
 
       {/* Body */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        {isLoading && (
-          <div className="space-y-3 py-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-24 w-full" />
-              </div>
-            ))}
+        <ScrollArea className="h-full pr-3">
+          <div className="pb-4">
+            <LoadCompositionSuggestionList
+              suggestions={ctrl.suggestions}
+              quoteInfoMap={ctrl.quoteInfoMap}
+              isLoading={ctrl.isLoading}
+              error={ctrl.error}
+              filterStatus={ctrl.filterStatus}
+              expandedIds={ctrl.expandedIds}
+              onToggleExpand={ctrl.toggleExpand}
+              onApprove={ctrl.handleApprove}
+              onView={ctrl.handleViewDetails}
+              onCalculateDiscounts={ctrl.handleCalculateDiscounts}
+              isApproving={ctrl.isApproving}
+              isCalculatingDiscounts={ctrl.isCalculatingDiscounts}
+              onRetry={() => ctrl.refetch()}
+              layout="compact"
+            />
           </div>
-        )}
-
-        {error && (
-          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium">Erro ao carregar sugestões</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {error instanceof Error ? error.message : 'Tente novamente'}
-              </p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>
-                Tentar novamente
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {!isLoading && !error && filteredSuggestions.length === 0 && (
-          <div className="py-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              {filterStatus === 'all'
-                ? 'Nenhuma sugestão encontrada'
-                : `Nenhuma sugestão ${filterStatus === 'pending' ? 'pendente' : filterStatus}`}
-            </p>
-            {filterStatus === 'pending' && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Use &quot;Gerar sugestões&quot; para analisar cargas pendentes
-              </p>
-            )}
-          </div>
-        )}
-
-        {!isLoading && !error && filteredSuggestions.length > 0 && (
-          <ScrollArea className="h-full pr-3">
-            <div className="space-y-3 pb-4">
-              {filteredSuggestions.map((suggestion) => (
-                <LoadCompositionCard
-                  key={suggestion.id}
-                  suggestion={suggestion}
-                  onApprove={handleApprove}
-                  onView={handleViewDetails}
-                  onCalculateDiscounts={handleCalculateDiscounts}
-                  isApproving={isApproving}
-                  isCalculatingDiscounts={isCalculatingDiscounts}
-                  compact
-                />
-              ))}
-            </div>
-          </ScrollArea>
-        )}
+        </ScrollArea>
       </div>
 
-      {/* Footer hint */}
-      <p className="text-xs text-muted-foreground pt-3 border-t">
-        💡 Sugestões analisam cargas dos últimos 14 dias. Viabilidade considera peso, datas e desvio
-        de rota.
-      </p>
+      <LoadCompositionFooter layout="overlay" />
     </>
   );
 
@@ -265,39 +156,24 @@ export function LoadCompositionOverlay({
           open={open}
           onOpenChange={(o) => {
             setOpen(o);
-            if (!o) setShowDetailModal(false);
+            if (!o) ctrl.handleCloseModal();
           }}
         >
-          <DialogTrigger asChild>
-            {trigger ?? (
-              <Button variant="outline" size="sm" className="gap-2">
-                <Sparkles className="w-4 h-4" />
-                Ver oportunidades
-              </Button>
-            )}
-          </DialogTrigger>
+          <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col gap-4 sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle className="sr-only">Oportunidades de Consolidação</DialogTitle>
-              <DialogDescription className="sr-only">
-                Análise automática de cargas para otimização
-              </DialogDescription>
+              <DialogDescription className="sr-only">Análise por embarcador</DialogDescription>
             </DialogHeader>
             {content}
           </DialogContent>
         </Dialog>
 
-        {showDetailModal && selectedCompositionId && (
+        {ctrl.showModal && ctrl.selectedCompositionId && (
           <LoadCompositionModal
-            compositionId={selectedCompositionId}
-            onClose={() => {
-              setShowDetailModal(false);
-              setSelectedCompositionId(null);
-            }}
-            onApprove={() => {
-              handleApprove(selectedCompositionId);
-              setShowDetailModal(false);
-            }}
+            compositionId={ctrl.selectedCompositionId}
+            onClose={ctrl.handleCloseModal}
+            onApprove={ctrl.handleApproveFromModal}
           />
         )}
       </>
@@ -311,23 +187,17 @@ export function LoadCompositionOverlay({
         <DrawerContent className="max-h-[90vh] flex flex-col">
           <DrawerHeader className="sr-only">
             <DrawerTitle>Oportunidades de Consolidação</DrawerTitle>
-            <DrawerDescription>Análise automática de cargas</DrawerDescription>
+            <DrawerDescription>Análise por embarcador</DrawerDescription>
           </DrawerHeader>
           <div className="flex flex-col flex-1 min-h-0 px-4 pb-6 overflow-hidden">{content}</div>
         </DrawerContent>
       </Drawer>
 
-      {showDetailModal && selectedCompositionId && (
+      {ctrl.showModal && ctrl.selectedCompositionId && (
         <LoadCompositionModal
-          compositionId={selectedCompositionId}
-          onClose={() => {
-            setShowDetailModal(false);
-            setSelectedCompositionId(null);
-          }}
-          onApprove={() => {
-            handleApprove(selectedCompositionId);
-            setShowDetailModal(false);
-          }}
+          compositionId={ctrl.selectedCompositionId}
+          onClose={ctrl.handleCloseModal}
+          onApprove={ctrl.handleApproveFromModal}
         />
       )}
     </>
