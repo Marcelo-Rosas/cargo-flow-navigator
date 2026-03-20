@@ -1,11 +1,9 @@
 /**
- * Shared ANTT utilities for Edge Functions.
+ * ANTT utilities for analyze-load-composition (colocated so deploy bundles always resolve this module).
  *
  * - Infer vehicle axes from consolidated weight via `vehicle_types` table
  * - Fetch CCD/CC floor rates from `antt_floor_rates` table
  * - Calculate ANTT minimum floor: km × CCD + CC
- *
- * Used by analyze-load-composition for real-cost savings estimation.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
