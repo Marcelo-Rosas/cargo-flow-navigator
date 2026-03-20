@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 
+import { SectionErrorBoundary } from '@/components/ErrorBoundary';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { Toaster } from '@/components/ui/toaster';
@@ -57,7 +58,12 @@ const App = () => (
                 path="/comercial"
                 element={
                   <ProtectedRoute requiredRoles={['admin', 'financeiro', 'operacional']}>
-                    <Commercial />
+                    <SectionErrorBoundary
+                      title="Erro no módulo Comercial"
+                      description="Ocorreu um erro no Kanban de cotações. Tente novamente."
+                    >
+                      <Commercial />
+                    </SectionErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -65,7 +71,12 @@ const App = () => (
                 path="/operacional"
                 element={
                   <ProtectedRoute requiredRoles={['admin', 'financeiro', 'operacional']}>
-                    <Operations />
+                    <SectionErrorBoundary
+                      title="Erro no módulo Operacional"
+                      description="Ocorreu um erro no Kanban de ordens de serviço. Tente novamente."
+                    >
+                      <Operations />
+                    </SectionErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -129,7 +140,12 @@ const App = () => (
                 path="/financeiro"
                 element={
                   <ProtectedRoute requiredRoles={['admin', 'financeiro', 'operacional']}>
-                    <Financial />
+                    <SectionErrorBoundary
+                      title="Erro no módulo Financeiro"
+                      description="Ocorreu um erro no painel financeiro. Tente novamente."
+                    >
+                      <Financial />
+                    </SectionErrorBoundary>
                   </ProtectedRoute>
                 }
               />

@@ -13,6 +13,8 @@ import React from 'react';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+export type TriggerSource = 'batch' | 'on_save' | 'manual';
+
 export interface LoadCompositionSuggestion {
   id: string;
   shipper_id: string;
@@ -29,6 +31,15 @@ export interface LoadCompositionSuggestion {
   approved_at?: string;
   created_at: string;
   updated_at: string;
+  // v2 columns
+  trigger_source: TriggerSource;
+  anchor_quote_id?: string;
+  technical_explanation?: string;
+  delta_km_abs?: number;
+  delta_km_percent?: number;
+  base_km_total?: number;
+  composed_km_total?: number;
+  route_evaluation_model?: string;
 }
 
 export interface RoutingLeg {

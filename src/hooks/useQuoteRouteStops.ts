@@ -4,20 +4,11 @@
  */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 
-export interface QuoteRouteStopRow {
-  id: string;
-  quote_id: string;
-  sequence: number;
-  stop_type: 'origin' | 'stop' | 'destination';
-  cnpj: string | null;
-  name: string | null;
-  cep: string | null;
-  city_uf: string | null;
-  label: string | null;
-  planned_km_from_prev: number | null;
-  metadata: Record<string, unknown> | null;
-}
+export type QuoteRouteStopRow = Database['public']['Tables']['quote_route_stops']['Row'];
+
+type QuoteRouteStopInsert = Database['public']['Tables']['quote_route_stops']['Insert'];
 
 /** Formato do form (route_stops no QuoteFormData) + dados do destinatário */
 export interface RouteStopFormItem {
@@ -34,7 +25,7 @@ export interface RouteStopFormItem {
 export function useQuoteRouteStops(quoteId: string | null) {
   return useQuery({
     queryKey: ['quote-route-stops', quoteId],
-    queryFn: async () => {
+    queryFn: async (): Promise<QuoteRouteStopRow[]> => {
       if (!quoteId) return [];
       const { data, error } = await supabase
         .from('quote_route_stops')
@@ -43,7 +34,7 @@ export function useQuoteRouteStops(quoteId: string | null) {
         .order('sequence', { ascending: true });
 
       if (error) throw error;
-      return (data ?? []) as QuoteRouteStopRow[];
+      return data ?? [];
     },
     enabled: !!quoteId,
   });
@@ -61,12 +52,14 @@ export async function syncQuoteRouteStops(
     const cep = (s.cep ?? '').replace(/\D/g, '');
     return cep.length === 8;
   });
+
   if (validStops.length === 0) {
-    await supabase.from('quote_route_stops').delete().eq('quote_id', quoteId);
+    const { error } = await supabase.from('quote_route_stops').delete().eq('quote_id', quoteId);
+    if (error) throw error;
     return;
   }
 
-  const rows = validStops.map((s, i) => ({
+  const rows: QuoteRouteStopInsert[] = validStops.map((s, i) => ({
     quote_id: quoteId,
     sequence: i,
     stop_type: 'stop' as const,
@@ -82,10 +75,8 @@ export async function syncQuoteRouteStops(
     .eq('quote_id', quoteId);
   if (delErr) throw delErr;
 
-  if (rows.length > 0) {
-    const { error: insertErr } = await supabase.from('quote_route_stops').insert(rows);
-    if (insertErr) throw insertErr;
-  }
+  const { error: insertErr } = await supabase.from('quote_route_stops').insert(rows);
+  if (insertErr) throw insertErr;
 }
 
 export function useInvalidateQuoteRouteStops() {

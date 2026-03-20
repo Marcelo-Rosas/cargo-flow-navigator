@@ -2,5 +2,8 @@ name = "cargo-flow-navigator"
 compatibility_date = "2025-01-01"
 pages_build_output_dir = "dist"
 
+# Variáveis de ambiente para Cloudflare Pages
+# NUNCA coloque valores reais aqui — use "wrangler secret put VITE_CFN_API_KEY"
+# ou configure no dashboard: Cloudflare Pages → Settings → Environment Variables
 [vars]
-VITE_CFN_API_KEY = "cfw_epg_2026_9h5c1d4e3f6a8b2c"
+# VITE_CFN_API_KEY deve ser configurado como secret no dashboard da Cloudflare
