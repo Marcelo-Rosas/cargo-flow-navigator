@@ -23,6 +23,8 @@ import {
   Zap,
   Clock,
   Hand,
+  Globe,
+  Calculator,
 } from 'lucide-react';
 
 export interface LoadCompositionCardProps {
@@ -47,6 +49,32 @@ const triggerConfig: Record<TriggerSource, { label: string; icon: typeof Zap }> 
   on_save: { label: 'Auto', icon: Zap },
   manual: { label: 'Manual', icon: Hand },
 };
+
+const routeModelConfig: Record<string, { label: string; icon: typeof Globe; className: string }> = {
+  webrouter_v1: {
+    label: 'Rota real',
+    icon: Globe,
+    className: 'bg-green-100 text-green-800 border-green-200',
+  },
+  stored_km_v1: {
+    label: 'Estimativa',
+    icon: Calculator,
+    className: 'bg-amber-100 text-amber-800 border-amber-200',
+  },
+};
+
+function RouteModelBadge({ model }: { model: string | null | undefined }) {
+  if (!model || model === 'mock_v1' || model === 'insufficient_data') return null;
+  const config = routeModelConfig[model];
+  if (!config) return null;
+  const Icon = config.icon;
+  return (
+    <Badge variant="outline" className={`text-[10px] gap-0.5 ${config.className}`}>
+      <Icon className="w-3 h-3" />
+      {config.label}
+    </Badge>
+  );
+}
 
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('pt-BR', {
@@ -172,18 +200,9 @@ export function LoadCompositionCard({
                 {trigger.label}
               </Badge>
             </div>
-            <div className="text-xs text-muted-foreground">
-              Criado {formatDate(suggestion.created_at)}
-              {suggestion.route_evaluation_model &&
-                suggestion.route_evaluation_model !== 'mock_v1' && (
-                  <>
-                    {' '}
-                    • Rota via{' '}
-                    {suggestion.route_evaluation_model === 'webrouter_v1'
-                      ? 'WebRouter'
-                      : 'estimativa'}
-                  </>
-                )}
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+              <span>Criado {formatDate(suggestion.created_at)}</span>
+              <RouteModelBadge model={suggestion.route_evaluation_model} />
             </div>
           </div>
           <div className="text-right shrink-0">
