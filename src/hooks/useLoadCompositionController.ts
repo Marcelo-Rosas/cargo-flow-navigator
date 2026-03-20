@@ -106,8 +106,9 @@ export function useLoadCompositionController({
   const feasibleCount = filteredSuggestions.filter((s) => s.is_feasible).length;
 
   // --- Handlers ---
+  /** Kanban "Gerar sugestões" — explicit batch mode (distinct from on_save / manual). */
   const handleAnalyze = () => {
-    analyzeComposition({ shipper_id: shipperId });
+    analyzeComposition({ shipper_id: shipperId, trigger_source: 'batch' });
   };
 
   const handleApprove = (compositionId: string) => {
