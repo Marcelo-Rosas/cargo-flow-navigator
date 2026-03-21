@@ -70,7 +70,7 @@ export function useCalculateDiscounts() {
       // Toast feedback
       const totalDiscount = (response.summary.total_discount_offered / 100).toLocaleString(
         'pt-BR',
-        { style: 'currency', currency: 'BRL' }
+        { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 }
       );
       const avgMargin = response.summary.avg_final_margin_percent.toFixed(1);
 

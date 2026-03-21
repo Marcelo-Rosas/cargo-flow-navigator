@@ -32,10 +32,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-    # Só corre se SUPABASE_DB_URL estiver definido no repositório.
-    # Usar secrets.* no if é o padrão GitHub; NÃO uses env.SUPABASE_DB_URL no if do job — costuma falhar.
-    # PRs de forks: secret não existe → job skipped (esperado).
-    if: secrets.SUPABASE_DB_URL != ''
+    # Valida migrations se SUPABASE_DB_URL estiver definido.
+    # Se o secret não existir, este job roda mas a etapa de validação falhará gracefully.
+    # PRs de forks: secret vazio → validação skipped.
     steps:
       - uses: actions/checkout@v4
 
@@ -44,5 +43,6 @@ jobs:
           node-version: "22"
 
       - name: Validate Supabase migrations
+        if: env.SUPABASE_DB_URL != ''
         run: |
           npx supabase db push --db-url "$SUPABASE_DB_URL" --dry-run

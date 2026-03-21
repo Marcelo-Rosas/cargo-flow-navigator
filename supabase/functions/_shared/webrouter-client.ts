@@ -289,17 +289,24 @@ export async function calculateRouteDistanceFull(
         ? Math.round(tollTagFromPlazas * 100)
         : Math.round((Number(custos?.pedagioTag) || 0) * 100);
 
+    const fmtBRL = (v: number) =>
+      new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(v);
     console.log(`[webrouter-full] 📊 TOLL CALCULATION:`);
     console.log(`  ├─ informacaoPedagios.result.pedagios count: ${tollPlazas.length}`);
     console.log(
-      `  ├─ sum from plazas: R$${tollFromPlazas.toFixed(2)} (${Math.round(tollFromPlazas * 100)}¢)`
+      `  ├─ sum from plazas: ${fmtBRL(tollFromPlazas)} (${Math.round(tollFromPlazas * 100)}¢)`
     );
     console.log(
       `  ├─ custos.pedagio (fallback): ${custos?.pedagio} → ${Math.round((Number(custos?.pedagio) || 0) * 100)}¢`
     );
     console.log(`  ├─ tollFromPlazas > 0? ${tollFromPlazas > 0}`);
     console.log(
-      `  └─ FINAL: tollTotal=${tollTotal}¢ (R$${(tollTotal / 100).toFixed(2)}), tollTag=${tollTag}¢`
+      `  └─ FINAL: tollTotal=${tollTotal}¢ (${fmtBRL(tollTotal / 100)}), tollTag=${tollTag}¢`
     );
 
     // Extract coordinates from ordemRoteiro (waypoints with lat/lng)

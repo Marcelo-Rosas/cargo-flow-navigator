@@ -54,7 +54,12 @@ const App = () => (
                 path="/"
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <RouteErrorBoundary
+                      title="Erro no Dashboard"
+                      description="Ocorreu um erro ao carregar o dashboard. Tente novamente."
+                    >
+                      <Dashboard />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -88,7 +93,12 @@ const App = () => (
                 path="/documentos"
                 element={
                   <ProtectedRoute>
-                    <Documents />
+                    <RouteErrorBoundary
+                      title="Erro no módulo Documentos"
+                      description="Ocorreu um erro ao carregar documentos. Tente novamente."
+                    >
+                      <Documents />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -96,7 +106,12 @@ const App = () => (
                 path="/clientes"
                 element={
                   <ProtectedRoute>
-                    <Clients />
+                    <RouteErrorBoundary
+                      title="Erro no módulo Clientes"
+                      description="Ocorreu um erro ao carregar clientes. Tente novamente."
+                    >
+                      <Clients />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -104,7 +119,12 @@ const App = () => (
                 path="/embarcadores"
                 element={
                   <ProtectedRoute>
-                    <Shippers />
+                    <RouteErrorBoundary
+                      title="Erro no módulo Embarcadores"
+                      description="Ocorreu um erro ao carregar embarcadores. Tente novamente."
+                    >
+                      <Shippers />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -128,7 +148,12 @@ const App = () => (
                 path="/veiculos"
                 element={
                   <ProtectedRoute>
-                    <Vehicles />
+                    <RouteErrorBoundary
+                      title="Erro no módulo Veículos"
+                      description="Ocorreu um erro ao carregar veículos. Tente novamente."
+                    >
+                      <Vehicles />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -136,7 +161,12 @@ const App = () => (
                 path="/tabelas-preco"
                 element={
                   <ProtectedRoute requiredRoles={['admin', 'operacional', 'financeiro']}>
-                    <PriceTables />
+                    <RouteErrorBoundary
+                      title="Erro no módulo Tabelas de Preço"
+                      description="Ocorreu um erro ao carregar tabelas de preço. Tente novamente."
+                    >
+                      <PriceTables />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -158,7 +188,12 @@ const App = () => (
                 path="/relatorios"
                 element={
                   <ProtectedRoute>
-                    <Reports />
+                    <RouteErrorBoundary
+                      title="Erro no módulo Relatórios"
+                      description="Ocorreu um erro ao carregar relatórios. Tente novamente."
+                    >
+                      <Reports />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -166,7 +201,12 @@ const App = () => (
                 path="/aprovacoes"
                 element={
                   <ProtectedRoute requiredRoles={['admin', 'financeiro']}>
-                    <Approvals />
+                    <RouteErrorBoundary
+                      title="Erro no módulo Aprovações"
+                      description="Ocorreu um erro ao carregar aprovações. Tente novamente."
+                    >
+                      <Approvals />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -174,7 +214,12 @@ const App = () => (
                 path="/usuarios"
                 element={
                   <ProtectedRoute requiredRoles={['admin']}>
-                    <UserManagement />
+                    <RouteErrorBoundary
+                      title="Erro no módulo Usuários"
+                      description="Ocorreu um erro ao carregar usuários. Tente novamente."
+                    >
+                      <UserManagement />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
               />
@@ -183,7 +228,12 @@ const App = () => (
                 path="/monitoramento-seguros"
                 element={
                   <ProtectedRoute requiredRoles={['admin', 'financeiro', 'operacional']}>
-                    <InsuranceMonitoringDashboard />
+                    <RouteErrorBoundary
+                      title="Erro no módulo Monitoramento de Seguros"
+                      description="Ocorreu um erro ao carregar o monitoramento de seguros. Tente novamente."
+                    >
+                      <InsuranceMonitoringDashboard />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
               />
