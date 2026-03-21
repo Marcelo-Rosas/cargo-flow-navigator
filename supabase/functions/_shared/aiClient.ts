@@ -262,68 +262,8 @@ async function callGeminiLLM(params: CallLLMParams): Promise<CallLLMResult> {
   };
 }
 
-function resolveProvider(hint: LLMProvider | undefined): LLMProvider {
-  const hasGeminiKey = !!getEnv('GEMINI_API_KEY');
-  const hasAnthropicKey = !!getEnv('ANTHROPIC_API_KEY');
-  const hasOpenAIKey = !!getEnv('OPENAI_API_KEY');
-
-  // Honour explicit hint if the key is available
-  if (hint === 'gemini' && hasGeminiKey) return 'gemini';
-  if (hint === 'anthropic' && hasAnthropicKey) return 'anthropic';
-  if (hint === 'openai' && hasOpenAIKey) return 'openai';
-
-  // Default priority: gemini > anthropic > openai
-  if (hasGeminiKey) return 'gemini';
-  if (hasAnthropicKey) return 'anthropic';
-  if (hasOpenAIKey) return 'openai';
-
-  return 'gemini'; // will fail with "not configured" but gives clear error
-}
-
-const providerFns: Record<LLMProvider, (p: CallLLMParams) => Promise<CallLLMResult>> = {
-  gemini: callGeminiLLM,
-  anthropic: callAnthropic,
-  openai: callOpenAI,
-};
-
-const RECOVERABLE_RE =
-  /not configured|credit balance is too low|insufficient credit|insufficient_quota|rate_limit|exceeded your current quota|ECONNRESET|ENOTFOUND|ETIMEDOUT|Failed to fetch| 5\d{2}\b| 429\b/i;
-
 export async function callLLM(params: CallLLMParams): Promise<CallLLMResult> {
-  const preferred = resolveProvider(params.modelHint);
-
-  // Build fallback chain: preferred first, then others in priority order
-  const allProviders: LLMProvider[] = ['gemini', 'anthropic', 'openai'];
-  const chain = [preferred, ...allProviders.filter((p) => p !== preferred)];
-
-  let lastError: Error | null = null;
-
-  for (let i = 0; i < chain.length; i++) {
-    const provider = chain[i];
-    try {
-      return await providerFns[provider](params);
-    } catch (e) {
-      const err = e as Error;
-      const message = err?.message || String(err);
-      lastError = err;
-
-      if (i < chain.length - 1 && RECOVERABLE_RE.test(message)) {
-        const next = chain[i + 1];
-        console.warn(`${provider} failed, falling back to ${next}:`, message);
-        await logProviderFallback({
-          from: provider,
-          to: next,
-          reason: message.substring(0, 200),
-          analysisType: params.analysisType,
-          entityType: params.entityType ?? null,
-          entityId: params.entityId ?? null,
-        });
-        continue;
-      }
-
-      throw err;
-    }
-  }
-
-  throw lastError ?? new Error('All LLM providers failed');
+  // Gemini only — same LLM used by Navi.
+  // OpenAI/Anthropic kept as dead code for future reactivation if needed.
+  return callGeminiLLM(params);
 }
