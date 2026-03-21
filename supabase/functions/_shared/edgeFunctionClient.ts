@@ -1,6 +1,14 @@
-// supabase/functions/ai-orchestrator-agent/index.ts
+// Shared helper for edge-function-to-edge-function calls (server-side).
 
 const Deno = (globalThis as any).Deno;
+
+/** Clean env var value (strip surrounding quotes/newlines). */
+function cleanEnv(value: string): string {
+  return value
+    .trim()
+    .replace(/^['"]+/, '')
+    .replace(/['"]+$/, '');
+}
 
 export async function callEdgeFunction(
   functionName: string,
@@ -8,24 +16,23 @@ export async function callEdgeFunction(
 ): Promise<any> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  // Env vars sometimes come with surrounding quotes/newlines; normalize.
-  const serviceRoleKeyClean = serviceRoleKey
-    .trim()
-    .replace(/^['"]+/, '')
-    .replace(/['"]+$/, '');
+  const serviceRoleKeyClean = cleanEnv(serviceRoleKey);
+
+  // The Supabase gateway requires the `apikey` header to identify the project.
+  // Without it, the gateway ignores Authorization and returns "Missing authorization header".
+  const apikey = anonKey ? cleanEnv(anonKey) : serviceRoleKeyClean;
 
   const res = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
     method: 'POST',
     headers: {
-      // For internal function-to-function calls, authenticate with `apikey`.
-      // Avoid sending `Authorization: Bearer <service_role>` because in some gateway
-      // configs it may be validated as a user JWT and rejected.
-      apikey: serviceRoleKeyClean,
+      Authorization: `Bearer ${serviceRoleKeyClean}`,
+      apikey: apikey,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),

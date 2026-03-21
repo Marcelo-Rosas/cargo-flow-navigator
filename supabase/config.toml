@@ -59,6 +59,36 @@ verify_jwt = false  # Orquestrador operacional; evita 401 de gateway em chamadas
 [functions.ai-approval-summary-worker]
 verify_jwt = false  # Chamado pelo front (Aprovações); gateway 401 Invalid JWT com Bearer do cliente
 
+[functions.ai-dashboard-insights-worker]
+verify_jwt = false  # Chamado pelo ai-orchestrator-agent com service role
+
+[functions.ai-quote-profitability-worker]
+verify_jwt = false  # Chamado pelo ai-orchestrator-agent com service role
+
+[functions.ai-financial-anomaly-worker]
+verify_jwt = false  # Chamado pelo ai-orchestrator-agent com service role
+
+[functions.ai-compliance-check-worker]
+verify_jwt = false  # Chamado pelo ai-operational-orchestrator com service role
+
+[functions.ai-driver-qualification-worker]
+verify_jwt = false  # Chamado pelo ai-operational-orchestrator com service role
+
+[functions.ai-operational-insights-worker]
+verify_jwt = false  # Chamado pelo ai-operational-orchestrator com service role
+
+[functions.ai-operational-report-worker]
+verify_jwt = false  # Chamado pelo ai-operational-orchestrator com service role
+
+[functions.ai-regulatory-update-worker]
+verify_jwt = false  # Chamado pelo ai-operational-orchestrator com service role
+
+[functions.ai-stage-gate-worker]
+verify_jwt = false  # Chamado pelo ai-orchestrator-agent com service role
+
+[functions.ai-manager]
+verify_jwt = false  # Router de AI; valida auth internamente
+
 [functions.invite-user]
 verify_jwt = false  # Função valida admin via is_admin() RPC
 
@@ -100,3 +130,55 @@ verify_jwt = false  # Gateway 401 Invalid JWT; chamado pelo front com Bearer de 
 
 [functions.ntc-ingest]
 verify_jwt = false  # Chamado por cron/pg_cron com service role
+
+# ── Funções locais sem entrada anterior ──────────────────────────
+
+[functions.download-document]
+verify_jwt = false  # Gateway 401; função valida Authorization manualmente
+
+[functions.process-quote-payment-proof]
+verify_jwt = false  # Chamado pelo front (useQuotePaymentProofs); valida Authorization manualmente
+
+[functions.followup-dispatcher]
+verify_jwt = false  # Chamado por cron/pg_cron com service role
+
+[functions.buonny-check-worker]
+verify_jwt = false  # Chamado pelo evaluate-risk com service role
+
+[functions.auto-approval-worker]
+verify_jwt = false  # Chamado por workflow com service role
+
+[functions.market-insights]
+verify_jwt = false  # Chamado por cron/pg_cron com service role
+
+[functions.petrobras-diesel]
+verify_jwt = false  # Chamado por cron/pg_cron com service role
+
+# ── Funções remote-only (deployadas, sem código local) ───────────
+
+[functions.ntc-monitor]
+verify_jwt = false  # Cron: monitora índices NTC
+
+[functions.partner-auth]
+verify_jwt = false  # Autenticação de parceiros via API key própria
+
+[functions.partner-quote]
+verify_jwt = false  # API pública de cotação para parceiros
+
+[functions.navi-calculate-freight]
+verify_jwt = false  # Chamado pelo Navi com service role do CFN
+
+[functions.navi-create-quote]
+verify_jwt = false  # Chamado pelo Navi com service role do CFN
+
+[functions.avaliar-entrega]
+verify_jwt = false  # Chamado pelo Navi com service role do CFN
+
+[functions.cowork-pdf-extractor]
+verify_jwt = false  # Chamado pelo Navi com service role do CFN
+
+[functions.cowork-empilhadeira]
+verify_jwt = false  # Chamado pelo Navi com service role do CFN
+
+[functions.navi-router]
+verify_jwt = false  # Roteador multi-agente; chamado pelos webhooks do Navi
