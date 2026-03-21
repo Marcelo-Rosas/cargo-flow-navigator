@@ -27,7 +27,7 @@ function isUuid(v: string) {
 }
 
 function formatBRL(value: number): string {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 }).format(value);
 }
 
 const LOGO_URL = 'https://app.vectracargo.com.br/brand/logo_vectra.jpg';

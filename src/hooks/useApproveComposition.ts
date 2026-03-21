@@ -89,6 +89,7 @@ export function useApproveComposition() {
       const savings = (response.summary.estimated_savings_brl / 100).toLocaleString('pt-BR', {
         style: 'currency',
         currency: 'BRL',
+        minimumFractionDigits: 2,
       });
 
       toast.success(

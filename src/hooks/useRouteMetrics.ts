@@ -1,6 +1,7 @@
 import {
   useMutation,
   useQuery,
+  useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
@@ -101,6 +102,7 @@ export function useUpsertRouteMetricsConfig(): UseMutationResult<
   Error,
   UpsertRouteMetricsConfigInput
 > {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input) => {
       const { id, ...payload } = input;
@@ -128,10 +130,14 @@ export function useUpsertRouteMetricsConfig(): UseMutationResult<
       if (error) throw error;
       return data as RouteMetricsConfigRow;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['route-metrics-config'] });
+    },
   });
 }
 
 export function useDeleteRouteMetricsConfig(): UseMutationResult<void, Error, { id: string }> {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id }) => {
       const { error } = await supabase
@@ -139,6 +145,9 @@ export function useDeleteRouteMetricsConfig(): UseMutationResult<void, Error, { 
         .delete()
         .eq('id', id);
       if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['route-metrics-config'] });
     },
   });
 }

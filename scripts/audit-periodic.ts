@@ -47,6 +47,15 @@ function runCmd(cmd: string): string {
   }
 }
 
+function countLines(filePath: string): number {
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    return content.split('\n').length;
+  } catch {
+    return 0;
+  }
+}
+
 const report: string[] = [];
 function h1(text: string) {
   report.push(`\n# ${text}\n`);
@@ -146,41 +155,83 @@ if (brlIssues.length > 0) {
 h2('3. Error Boundaries');
 
 let hasErrorBoundaryLib = false;
-let errorBoundaryUsages = 0;
+let errorBoundaryUsagesInPages = 0;
+let errorBoundaryUsagesInAppTsx = 0;
 
+// Check individual page files for ErrorBoundary usage
 for (const file of tsxFiles) {
   const content = readFileSync(file, 'utf-8');
   if (content.includes('react-error-boundary')) hasErrorBoundaryLib = true;
-  if (content.includes('ErrorBoundary') || content.includes('errorBoundary')) errorBoundaryUsages++;
+  if (file.includes('/pages/')) {
+    if (content.includes('ErrorBoundary') || content.includes('errorBoundary')) {
+      errorBoundaryUsagesInPages++;
+    }
+  }
 }
 
+// Check App.tsx for RouteErrorBoundary wrapping page components
+const appTsxPath = join(SRC, 'App.tsx');
+if (existsSync(appTsxPath)) {
+  const appContent = readFileSync(appTsxPath, 'utf-8');
+  if (appContent.includes('ErrorBoundary')) hasErrorBoundaryLib = true;
+
+  // Count <RouteErrorBoundary ...> wrapping page components
+  const routeErrorBoundaryMatches = appContent.match(/<RouteErrorBoundary[\s\S]*?<\/RouteErrorBoundary>/g);
+  if (routeErrorBoundaryMatches) {
+    errorBoundaryUsagesInAppTsx = routeErrorBoundaryMatches.length;
+  }
+}
+
+const totalErrorBoundaryUsages = errorBoundaryUsagesInPages + errorBoundaryUsagesInAppTsx;
+
 line(`**Library instalada:** ${hasErrorBoundaryLib ? '✅ sim' : '❌ não'}`);
-line(`**Componentes com error boundary:** ${errorBoundaryUsages}`);
+line(`**Páginas com error boundary (no próprio arquivo):** ${errorBoundaryUsagesInPages}`);
+line(`**Páginas com RouteErrorBoundary (em App.tsx):** ${errorBoundaryUsagesInAppTsx}`);
+line(`**Total de páginas protegidas:** ${totalErrorBoundaryUsages}`);
 line(
-  `**Páginas sem error boundary:** ${pageFiles.length - errorBoundaryUsages} de ${pageFiles.length}`
+  `**Páginas sem error boundary:** ${Math.max(0, pageFiles.length - totalErrorBoundaryUsages)} de ${pageFiles.length}`
 );
 if (!hasErrorBoundaryLib) {
   line('\n⚠️ **Recomendação:** `npm install react-error-boundary`');
 }
 
-// ─── 4. Code Splitting ──────────────────────────────────────
+// ─── 4. Code Splitting / Lazy Loading ───────────────────────
 
 h2('4. Code Splitting / Lazy Loading');
 
-let lazyImports = 0;
+let lazyImportsInPages = 0;
+let lazyImportsInAppTsx = 0;
 let suspenseUsages = 0;
 
+// Check individual page files for lazy usage
 for (const file of tsxFiles) {
   const content = readFileSync(file, 'utf-8');
-  if (content.includes('React.lazy') || content.includes('lazy(() =>')) lazyImports++;
+  if (file.includes('/pages/')) {
+    if (content.includes('React.lazy') || content.includes('lazy(() =>')) {
+      lazyImportsInPages++;
+    }
+  }
   if (content.includes('<Suspense')) suspenseUsages++;
 }
 
-line(`**React.lazy imports:** ${lazyImports}`);
+// Check App.tsx for lazy(() => import('./pages/...')) patterns
+if (existsSync(appTsxPath)) {
+  const appContent = readFileSync(appTsxPath, 'utf-8');
+  const lazyPageMatches = appContent.match(/lazy\(\s*\(\)\s*=>\s*import\(\s*['"]\.\/pages\//g);
+  if (lazyPageMatches) {
+    lazyImportsInAppTsx = lazyPageMatches.length;
+  }
+}
+
+const totalLazyImports = lazyImportsInPages + lazyImportsInAppTsx;
+
+line(`**React.lazy imports (em arquivos de página):** ${lazyImportsInPages}`);
+line(`**React.lazy imports (em App.tsx para páginas):** ${lazyImportsInAppTsx}`);
+line(`**Total lazy imports:** ${totalLazyImports}`);
 line(`**Suspense wrappers:** ${suspenseUsages}`);
 line(`**Páginas total:** ${pageFiles.length}`);
-if (lazyImports < pageFiles.length) {
-  line(`\n⚠️ **Recomendação:** ${pageFiles.length - lazyImports} páginas sem lazy loading`);
+if (totalLazyImports < pageFiles.length) {
+  line(`\n⚠️ **Recomendação:** ${pageFiles.length - totalLazyImports} páginas sem lazy loading`);
 }
 
 // ─── 5. Segurança ───────────────────────────────────────────
@@ -223,29 +274,58 @@ h2('6. Padrões de Arquitetura');
 let mutationsWithoutInvalidate = 0;
 let useEffectFetches = 0;
 let externalStateLibs = 0;
+const useEffectFetchFiles: string[] = [];
 
 for (const file of [...tsxFiles, ...tsFiles]) {
   const content = readFileSync(file, 'utf-8');
   const rel = relative(ROOT, file);
 
-  // Mutations sem invalidate
+  // Mutations sem invalidate — skip import lines
   const mutationMatches = content.match(/useMutation/g);
   if (mutationMatches) {
     const blocks = content.split('useMutation');
     blocks.slice(1).forEach((block) => {
-      const chunk = block.substring(0, 500);
-      if (!chunk.includes('invalidateQueries') && !chunk.includes('invalidate')) {
-        mutationsWithoutInvalidate++;
+      // Skip blocks that start with import patterns (e.g. ", " or "} from")
+      const trimmed = block.trimStart();
+      if (trimmed.startsWith(', ') || trimmed.startsWith('} from') || trimmed.startsWith("} from")) {
+        return; // This is an import line, not an actual mutation call
+      }
+      // Only count blocks that start with actual mutation calls
+      if (trimmed.startsWith('({') || trimmed.startsWith('(\n') || trimmed.startsWith('({\n')) {
+        const chunk = block.substring(0, 500);
+        if (!chunk.includes('invalidateQueries') && !chunk.includes('invalidate')) {
+          mutationsWithoutInvalidate++;
+        }
       }
     });
   }
 
-  // useEffect com fetch
-  if (
-    content.includes('useEffect') &&
-    (content.includes('fetch(') || content.includes('supabase.from('))
-  ) {
-    useEffectFetches++;
+  // useEffect com fetch — only flag when fetch/supabase.from is INSIDE useEffect callback
+  // Skip hook files that use useQuery (they legitimately use supabase.from in useQuery, not useEffect)
+  if (content.includes('useEffect')) {
+    const isHookWithQuery = file.includes('/hooks/') && content.includes('useQuery');
+    if (!isHookWithQuery) {
+      // Find useEffect blocks and check if fetch/supabase.from appears within ~15 lines
+      const lines = content.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('useEffect')) {
+          // Look at next 15 lines for fetch or supabase.from
+          const windowEnd = Math.min(i + 15, lines.length);
+          let foundFetchInEffect = false;
+          for (let j = i + 1; j < windowEnd; j++) {
+            if (lines[j].includes('fetch(') || lines[j].includes('supabase.from(')) {
+              foundFetchInEffect = true;
+              break;
+            }
+          }
+          if (foundFetchInEffect) {
+            useEffectFetches++;
+            useEffectFetchFiles.push(rel);
+            break; // Count each file only once
+          }
+        }
+      }
+    }
   }
 
   // State libs proibidas
@@ -278,6 +358,11 @@ table(
     ],
   ]
 );
+
+if (useEffectFetchFiles.length > 0) {
+  line('\n**Arquivos com useEffect + fetch/supabase:**');
+  useEffectFetchFiles.forEach((f) => line(`- \`${f}\``));
+}
 
 // ─── 7. Bundle & Dependencies ───────────────────────────────
 
@@ -339,24 +424,117 @@ table(
   ]
 );
 
+// ─── 9. Código & Higiene ────────────────────────────────────
+
+h2('9. Código & Higiene');
+
+let todoCount = 0;
+let fixmeCount = 0;
+let hackCount = 0;
+let consoleLogCount = 0;
+let largeComponents = 0;
+const fileSizes: { rel: string; lines: number }[] = [];
+
+const allSrcFiles = collectFiles(SRC, ['.ts', '.tsx']);
+
+for (const file of allSrcFiles) {
+  const content = readFileSync(file, 'utf-8');
+  const rel = relative(ROOT, file);
+  const lineCount = content.split('\n').length;
+  const isTestFile = file.includes('.test.') || file.includes('.spec.');
+
+  // Count TODO/FIXME/HACK
+  const todoMatches = content.match(/\/\/\s*TODO/gi);
+  if (todoMatches) todoCount += todoMatches.length;
+  const fixmeMatches = content.match(/\/\/\s*FIXME/gi);
+  if (fixmeMatches) fixmeCount += fixmeMatches.length;
+  const hackMatches = content.match(/\/\/\s*HACK/gi);
+  if (hackMatches) hackCount += hackMatches.length;
+
+  // Count console.log (not in test files)
+  if (!isTestFile) {
+    const consoleMatches = content.match(/console\.log\(/g);
+    if (consoleMatches) consoleLogCount += consoleMatches.length;
+  }
+
+  // Components >400 lines (only .tsx, not tests)
+  if (file.endsWith('.tsx') && !isTestFile && lineCount > 400) {
+    largeComponents++;
+  }
+
+  // Track file sizes for top 5
+  fileSizes.push({ rel, lines: lineCount });
+}
+
+// Sort by line count descending and take top 5
+fileSizes.sort((a, b) => b.lines - a.lines);
+const top5 = fileSizes.slice(0, 5);
+
+table(
+  ['Métrica', 'Quantidade'],
+  [
+    ['TODO comments', String(todoCount)],
+    ['FIXME comments', String(fixmeCount)],
+    ['HACK comments', String(hackCount)],
+    ['console.log em src/ (excl. testes)', String(consoleLogCount)],
+    ['Componentes >400 linhas', String(largeComponents)],
+  ]
+);
+
+line('\n**Top 5 maiores arquivos:**');
+top5.forEach((f, i) => {
+  line(`${i + 1}. \`${f.rel}\` — ${f.lines} linhas`);
+});
+
+// ─── 10. Tendências ─────────────────────────────────────────
+
+h2('10. Tendências');
+
+const reportPath = join(ROOT, 'audit-periodic-report.md');
+let previousScore: number | null = null;
+
+if (existsSync(reportPath)) {
+  try {
+    const previousReport = readFileSync(reportPath, 'utf-8');
+    const scoreMatch = previousReport.match(/\*\*Score:\s*(\d+)%/);
+    if (scoreMatch) {
+      previousScore = parseInt(scoreMatch[1], 10);
+    }
+  } catch {
+    /* */
+  }
+}
+
 // ─── Score Final ────────────────────────────────────────────
 
 h2('Score de Compliance');
 
-const totalChecks = 8;
+const totalChecks = 9;
 let passed = 0;
 if (brlIncorrect === 0) passed++;
-if (hasErrorBoundaryLib && errorBoundaryUsages >= pageFiles.length * 0.5) passed++;
-if (lazyImports >= pageFiles.length * 0.5) passed++;
+if (hasErrorBoundaryLib && totalErrorBoundaryUsages >= pageFiles.length * 0.5) passed++;
+if (totalLazyImports >= pageFiles.length * 0.5) passed++;
 if (securityIssues.length === 0) passed++;
 if (mutationsWithoutInvalidate === 0) passed++;
 if (useEffectFetches === 0) passed++;
 if (externalStateLibs === 0) passed++;
 if (testFiles.length > 0) passed++;
+if (consoleLogCount < 10) passed++;
 
 const score = Math.round((passed / totalChecks) * 100);
 
 line(`\n**Score: ${score}% (${passed}/${totalChecks} checks passando)**\n`);
+
+// Show trend
+if (previousScore !== null) {
+  const delta = score - previousScore;
+  const deltaStr = delta >= 0 ? `+${delta}` : String(delta);
+  line(`**Score anterior:** ${previousScore}% → **Score atual:** ${score}% (${deltaStr})`);
+} else {
+  line('**Primeiro relatório — sem histórico**');
+}
+
+line('');
 line(
   score >= 80
     ? '✅ Projeto em boa forma para MVP'
