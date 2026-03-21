@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeDreRealFromPresumido } from '../dre.calculations';
 
-// Testar helpers internos indiretamente via a função exportada
-// round2 e num são usados internamente em dre.calculations.ts linhas 4-17
-
 describe('computeDreRealFromPresumido', () => {
   const baseParams = {
     receitaBrutaPresumida: 10000,

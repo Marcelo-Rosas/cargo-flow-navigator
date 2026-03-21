@@ -5,17 +5,6 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Extrai valor numérico seguro de objeto aninhado */
-function num(obj: unknown, ...keys: string[]): number {
-  let cur: unknown = obj;
-  for (const k of keys) {
-    if (cur == null || typeof cur !== 'object') return 0;
-    cur = (cur as Record<string, unknown>)[k];
-  }
-  const v = typeof cur === 'number' ? cur : Number(cur);
-  return Number.isFinite(v) ? v : 0;
-}
-
 /** Calcula DRE Real a partir dos valores presumidos, alterando APENAS custos operacionais.
  * Regra: receita, tributos e overhead permanecem fixos. */
 export function computeDreRealFromPresumido(params: {
