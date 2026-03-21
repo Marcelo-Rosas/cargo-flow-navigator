@@ -53,7 +53,7 @@ export async function monitorEdgeFunctions(input: {
     // Simulated metrics based on function name
     let baseLatency = 150;
     let errorRate = 0.02;
-    let successCount = 500;
+    const successCount = 500;
 
     if (functionName === 'calculate-freight') {
       baseLatency = 200; // heavier function

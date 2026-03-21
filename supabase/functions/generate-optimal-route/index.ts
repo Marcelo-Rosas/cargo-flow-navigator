@@ -116,23 +116,64 @@ Deno.serve(async (req: Request) => {
     const destCep = (mainQuote.destination_cep ?? '').replace(/\D/g, '');
 
     if (originCep.length !== 8 || destCep.length !== 8) {
+      console.warn(
+        `[generate-optimal-route] Main quote CEPs invalid (origin=${originCep.length}digits, dest=${destCep.length}digits) — using fallback`
+      );
+      const fallback = buildFallbackRoute(typedQuotes);
+
+      // FIX: Persist fallback route to DB so reopening the composition still shows data.
+      // Without this, approve-composition sums an empty routings set to 0 km / 0 duration.
+      if (composition_id && save_to_db) {
+        await saveRoutingsToDB(supabase, composition_id, fallback.legs);
+      }
+
       return jsonResponse(
         {
-          error: 'Cotação principal sem CEPs válidos de origem/destino',
-          route: buildFallbackRoute(typedQuotes),
+          success: true,
+          route: {
+            ...fallback,
+            toll_plazas: [],
+            polyline_coords: [],
+            composition_id: composition_id || null,
+            route_source: 'fallback_km',
+          },
+          timestamp: new Date().toISOString(),
         },
         200
       );
     }
 
-    // 3. Build waypoints from secondary quote destinations
+    // 3. Build waypoints: secondary origins (if different from main) + secondary destinations
+    // FIX: For mixed-origin compositions, we must include pickup points for secondary quotes.
+    // Without this, only the main quote's origin is sent to WebRouter, understating km/tolls.
     const waypointCeps: string[] = [];
+    const seenCeps = new Set<string>([originCep, destCep]); // avoid duplicating origin/dest
+
     for (const q of secondaryQuotes) {
-      const cep = (q.destination_cep ?? '').replace(/\D/g, '');
-      if (cep.length === 8) waypointCeps.push(cep);
+      // Add secondary origin if it differs from main origin (mixed-origin composition)
+      const secOriginCep = (q.origin_cep ?? '').replace(/\D/g, '');
+      if (secOriginCep.length === 8 && !seenCeps.has(secOriginCep)) {
+        waypointCeps.push(secOriginCep);
+        seenCeps.add(secOriginCep);
+      }
+
+      // Add secondary destination
+      const secDestCep = (q.destination_cep ?? '').replace(/\D/g, '');
+      if (secDestCep.length === 8 && !seenCeps.has(secDestCep)) {
+        waypointCeps.push(secDestCep);
+        seenCeps.add(secDestCep);
+      }
     }
 
+    console.log(
+      `[generate-optimal-route] Waypoints: ${waypointCeps.length} (origins+destinations from ${secondaryQuotes.length} secondary quotes)`
+    );
+
     // 4. Call WebRouter Full
+    console.log(
+      `[generate-optimal-route] Calling WebRouter with: origin=${originCep}, dest=${destCep}, waypoints=${waypointCeps.length}`
+    );
+
     const routeResult = await calculateRouteDistanceFull(originCep, destCep, waypointCeps);
 
     let legs: RouteLeg[];
@@ -153,13 +194,28 @@ Deno.serve(async (req: Request) => {
       // Build legs: origin → each waypoint → destination
       legs = buildLegsFromRoute(mainQuote, secondaryQuotes, totalDistanceKm, totalTollCentavos);
 
+      const fmtBRL = (c: number) =>
+        new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(c / 100);
       console.log(
-        `[generate-optimal-route] WebRouter OK: ${totalDistanceKm}km, toll: ${totalTollCentavos}, coords: ${polylineCoords.length}`
+        `[generate-optimal-route] WebRouter SUCCESS ✓ | distance=${totalDistanceKm}km | toll=${totalTollCentavos}¢ (${fmtBRL(totalTollCentavos)}) | plazas=${tollPlazas.length} | coords=${polylineCoords.length}`
       );
+
+      // Diagnostic: warn if toll is zero despite successful call
+      if (totalTollCentavos === 0) {
+        console.warn(
+          `[generate-optimal-route] ⚠️ WebRouter returned ZERO TOLL despite success. Possible causes: 1) Route has no toll plazas, 2) custos.pedagio = 0, 3) informacaoPedagios empty`
+        );
+      }
     } else {
       // Fallback: use stored km_distance
+      const errorMsg = 'error' in routeResult ? routeResult.error : 'unknown error';
       console.warn(
-        `[generate-optimal-route] WebRouter failed: ${'error' in routeResult ? routeResult.error : 'unknown'}, using fallback`
+        `[generate-optimal-route] WebRouter FAILED ✗ | error="${errorMsg}" | using fallback with zero toll`
       );
       const fallback = buildFallbackRoute(typedQuotes);
       legs = fallback.legs;
@@ -211,19 +267,43 @@ function buildLegsFromRoute(
   totalTollCentavos: number
 ): RouteLeg[] {
   const legs: RouteLeg[] = [];
-  const allStops = [
-    { label: mainQuote.origin.split(',')[0], quoteId: null as string | null, km: 0 },
-    ...secondaryQuotes.map((q) => ({
+
+  // Build stops list: main origin → [secondary pickups & deliveries] → main destination
+  // For mixed-origin compositions, secondary origins are added as intermediate pickup stops.
+  const mainOriginCep = (mainQuote.origin_cep ?? '').replace(/\D/g, '');
+  const seenLabels = new Set<string>();
+
+  const allStops: { label: string; quoteId: string | null; km: number }[] = [
+    { label: mainQuote.origin.split(',')[0], quoteId: null, km: 0 },
+  ];
+  seenLabels.add(mainQuote.origin.split(',')[0]);
+
+  for (const q of secondaryQuotes) {
+    // Add pickup stop if origin differs from main origin
+    const secOriginCep = (q.origin_cep ?? '').replace(/\D/g, '');
+    const pickupLabel = q.origin.split(',')[0];
+    if (
+      secOriginCep.length === 8 &&
+      secOriginCep !== mainOriginCep &&
+      !seenLabels.has(pickupLabel)
+    ) {
+      allStops.push({ label: `${pickupLabel} (coleta)`, quoteId: null, km: 0 });
+      seenLabels.add(pickupLabel);
+    }
+
+    // Add delivery stop
+    allStops.push({
       label: q.destination.split(',')[0],
       quoteId: q.id,
       km: Number(q.km_distance) || 0,
-    })),
-    {
-      label: mainQuote.destination.split(',')[0],
-      quoteId: mainQuote.id,
-      km: Number(mainQuote.km_distance) || 0,
-    },
-  ];
+    });
+  }
+
+  allStops.push({
+    label: mainQuote.destination.split(',')[0],
+    quoteId: mainQuote.id,
+    km: Number(mainQuote.km_distance) || 0,
+  });
 
   // Distribute km proportionally
   const totalStoredKm = allStops.reduce((s, st) => s + st.km, 0) || totalKm;
@@ -257,12 +337,31 @@ function buildFallbackRoute(quotes: QuoteRow[]) {
   const mainQuote = sorted[0];
   const secondaryQuotes = sorted.slice(1);
 
-  const totalKm = sorted.reduce((s, q) => s + (Number(q.km_distance) || 0), 0);
+  // FIX: Estimate consolidated distance instead of raw sum.
+  // Raw sum overstates the route (e.g., NGS→SP 600km + NGS→CWB 200km = 800km,
+  // but consolidated NGS→CWB→SP ≈ 600km). Use the same heuristic as analyze-load-composition.
+  const mainKm = Number(mainQuote.km_distance) || 0;
+  const secondaryKmSum = secondaryQuotes.reduce((s, q) => s + (Number(q.km_distance) || 0), 0);
+
+  // Check if origins match
+  const mainOriginCep = (mainQuote.origin_cep ?? '').replace(/\D/g, '');
+  const originsMatch = secondaryQuotes.every((q) => {
+    const cep = (q.origin_cep ?? '').replace(/\D/g, '');
+    return cep === mainOriginCep;
+  });
+
+  // Shared origin: 30% extra from secondaries (70% is shared corridor)
+  // Different origins: 40% extra (less corridor overlap)
+  const overlapFactor = originsMatch ? 0.3 : 0.4;
+  const estimatedConsolidatedKm = mainKm + secondaryKmSum * overlapFactor;
+
+  // Use the larger of: estimated consolidated, or main route alone (never shrink below main)
+  const totalKm = Math.max(mainKm, estimatedConsolidatedKm);
   const legs = buildLegsFromRoute(mainQuote, secondaryQuotes, totalKm, 0);
 
   return {
     legs,
-    total_distance_km: totalKm,
+    total_distance_km: Math.round(totalKm * 10) / 10,
     total_duration_min: Math.round((totalKm / 60) * 60),
     total_toll_centavos: 0,
   };

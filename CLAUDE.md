@@ -6,6 +6,7 @@ Sistema web para gestão de cotações de frete, ordens de serviço, precificaç
 
 ## Stack
 Vite + React 18 + TypeScript + Tailwind 3.4 + shadcn/ui + Supabase + React Router 6 + TanStack Query 5
+- Dependências e scripts: **npm** + `package-lock.json` — **não usar Bun** (evita `bun.lockb` e quebra de ferramentas que detectam Bun sem ele instalado, ex.: `update-browserslist-db`)
 
 ## Comandos
 ```bash
@@ -15,6 +16,7 @@ npm run lint         # ESLint
 npx tsc --noEmit     # Type check
 npx tsx scripts/audit-compliance.ts        # Auditoria rápida
 npx tsx scripts/audit-periodic.ts          # Auditoria completa
+npm run docs:claude                        # Regenera CLAUDE.md UTF-8 (repo principal)
 ```
 
 ## Arquitetura
@@ -31,7 +33,7 @@ npx tsx scripts/audit-periodic.ts          # Auditoria completa
 - Auth: usar `useAuth` hook — nunca reimplementar
 - WhatsApp: sempre via Edge Function `notification-hub` → OpenClaw — nunca Evolution API direto
 - Cálculo de frete: existe em dois lugares (local + Edge Function) — duplicidade intencional
-- Edge Functions: chamar via `supabaseInvoke` helper em `src/lib/`
+- Edge Functions: chamar via `invokeEdgeFunction` em `src/lib/edgeFunctions.ts`
 
 ## Supabase
 - Project ref: epgedaiukjippepujuzc
@@ -45,16 +47,26 @@ npx tsx scripts/audit-periodic.ts          # Auditoria completa
 | calculate-freight | Cálculo de frete server-side |
 | notification-hub | Envio email + WhatsApp via OpenClaw |
 | workflow-orchestrator | Eventos de workflow/aprovações |
-| calculate-distance-webrouter | Roteirização |
+| generate-optimal-route | Rota otimizada para composição (WebRouter + pedágio) |
+| calculate-distance-webrouter | Roteirização simples |
 
 ## Módulos principais
 - **Comercial**: cotações (draft→pending→approved→rejected→converted), Kanban, wizard 4 passos
 - **Operacional**: ordens de serviço, trips, tracking, despacho
 - **Financeiro**: faturamento (FAT), pagamento (PAG), parcelas
 - **Precificação**: tabelas de preço, cálculo de frete, ANTT, ICMS, peso cubado
+- **Composição de carga**: rota no mapa, métricas agregadas (distância, duração, pedágio, paradas)
 - **Frota**: motoristas, veículos, proprietários, qualificação
 - **Documentos**: CT-e, POD, upload
 - **Aprovações**: approval_requests + approval_rules
+
+## Hooks de métricas de rota (não confundir)
+| Hook | Arquivo | Propósito | Usado por |
+|---|---|---|---|
+| `useCompositionRouteMetrics` | `src/hooks/useCompositionRouteMetrics.ts` | Métricas de composição: legs, mapa, pedágio centavos | `RouteMapVisualization`, `RouteStats` |
+| `useRouteMetrics` | `src/hooks/useRouteMetrics.ts` | Relatórios: RPC `get_route_metrics`, config UF/OS | `Reports.tsx`, `RouteMetricsCards` |
+
+**Regra**: nunca substituir um pelo outro — são domínios diferentes (composição vs relatórios).
 
 ## Deploy (CI/CD)
 - `.github/workflows/deploy-cloudflare.yml` — detecção inteligente de mudanças
@@ -64,7 +76,13 @@ npx tsx scripts/audit-periodic.ts          # Auditoria completa
 - Alterou `supabase/functions/` → supabase functions deploy (por função)
 - Ordem: Migration → Tipos → Build → Deploy
 
+## Debug de pedágio (WebRouter)
+- Documentação: `docs/TOLL_DEBUG_CHECKLIST.md` — referências expandidas (composição vs relatórios): `docs/TOLL_DEBUG_CHECKLIST_REFERENCIAS.md` (mesclar no checklist principal quando o arquivo não estiver bloqueado no editor)
+- Logs: Supabase → Edge Functions → `generate-optimal-route` e `webrouter-client`
+- Strings de busca nos logs: `[generate-optimal-route] WebRouter SUCCESS`, `WebRouter FAILED`, `[webrouter-full] TOLL CALCULATION`
+
 ## Não fazer
+- Não usar Bun como runtime ou gerenciador de pacotes (`bun install`, commitar `bun.lockb`) — stack é **npm**; ver também `bun.lockb` no `.gitignore`
 - Não usar Zustand, Redux, MobX
 - Não usar Next.js patterns
 - Não hardcodar alíquotas de ICMS
@@ -72,3 +90,4 @@ npx tsx scripts/audit-periodic.ts          # Auditoria completa
 - Não chamar Evolution API diretamente
 - Não reimplementar auth
 - Não exibir valores sem R$ e 2 casas decimais
+- Não sobrescrever `useRouteMetrics` para métricas de composição — usar `useCompositionRouteMetrics`

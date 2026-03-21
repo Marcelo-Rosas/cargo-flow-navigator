@@ -33,7 +33,7 @@ export async function validateIntlFormat(input: {
 
   try {
     const fullPath = resolve(filePath);
-    let code = readFileSync(fullPath, 'utf-8');
+    const code = readFileSync(fullPath, 'utf-8');
     const lines = code.split('\n');
     const issues: IntlIssue[] = [];
 

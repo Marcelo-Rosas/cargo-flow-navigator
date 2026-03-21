@@ -1,0 +1,2 @@
+# Normalize line endings for docs (avoids CRLF/LF noise on Windows)
+*.md text eol=lf

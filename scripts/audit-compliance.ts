@@ -34,7 +34,14 @@ const CATEGORY = CATEGORY_FLAG ? CATEGORY_FLAG.split('=')[1] : 'all';
 
 // ─── Tipos ──────────────────────────────────────────────────
 type Severity = 'error' | 'warning' | 'info';
-type Category = 'brl' | 'imports' | 'security' | 'a11y' | 'performance' | 'architecture' | 'hygiene';
+type Category =
+  | 'brl'
+  | 'imports'
+  | 'security'
+  | 'a11y'
+  | 'performance'
+  | 'architecture'
+  | 'hygiene';
 
 interface Finding {
   file: string;
@@ -408,7 +415,10 @@ function auditPerformance(file: string, lines: string[]) {
           return;
         }
         // Skip if the file already imports useQuery (likely proper pattern coexisting)
-        if (fullContent.includes("useQuery") && (fullContent.includes("from '@tanstack") || fullContent.includes("from 'react-query"))) {
+        if (
+          fullContent.includes('useQuery') &&
+          (fullContent.includes("from '@tanstack") || fullContent.includes("from 'react-query"))
+        ) {
           return;
         }
 
@@ -497,8 +507,15 @@ function auditHygiene(file: string, lines: string[]) {
 
   // hygiene/duplicate-type-definition: type/interface matching Supabase table names
   const supabaseTableNames = [
-    'quotes', 'orders', 'clients', 'shippers', 'vehicles',
-    'drivers', 'owners', 'documents', 'price_tables',
+    'quotes',
+    'orders',
+    'clients',
+    'shippers',
+    'vehicles',
+    'drivers',
+    'owners',
+    'documents',
+    'price_tables',
   ];
 
   lines.forEach((line, i) => {
@@ -605,9 +622,7 @@ function auditA11y(file: string, lines: string[]) {
   let mlMatch: RegExpExecArray | null;
   while ((mlMatch = multilineButtonRegex.exec(fullContent)) !== null) {
     const tagContent = mlMatch[0];
-    if (
-      tagContent.includes('size="icon"') || tagContent.includes("size='icon'")
-    ) {
+    if (tagContent.includes('size="icon"') || tagContent.includes("size='icon'")) {
       if (!tagContent.includes('aria-label')) {
         const upToMatch = fullContent.substring(0, mlMatch.index);
         const lineNum = upToMatch.split('\n').length;
@@ -624,7 +639,8 @@ function auditA11y(file: string, lines: string[]) {
             category: 'a11y',
             severity: 'warning',
             rule: 'a11y/button-no-label',
-            message: '<Button size="icon"> sem aria-label — adicionar aria-label para acessibilidade',
+            message:
+              '<Button size="icon"> sem aria-label — adicionar aria-label para acessibilidade',
             code: matchLine.trim(),
           });
         }

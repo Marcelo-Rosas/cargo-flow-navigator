@@ -176,7 +176,9 @@ if (existsSync(appTsxPath)) {
   if (appContent.includes('ErrorBoundary')) hasErrorBoundaryLib = true;
 
   // Count <RouteErrorBoundary ...> wrapping page components
-  const routeErrorBoundaryMatches = appContent.match(/<RouteErrorBoundary[\s\S]*?<\/RouteErrorBoundary>/g);
+  const routeErrorBoundaryMatches = appContent.match(
+    /<RouteErrorBoundary[\s\S]*?<\/RouteErrorBoundary>/g
+  );
   if (routeErrorBoundaryMatches) {
     errorBoundaryUsagesInAppTsx = routeErrorBoundaryMatches.length;
   }
@@ -287,7 +289,11 @@ for (const file of [...tsxFiles, ...tsFiles]) {
     blocks.slice(1).forEach((block) => {
       // Skip blocks that start with import patterns (e.g. ", " or "} from")
       const trimmed = block.trimStart();
-      if (trimmed.startsWith(', ') || trimmed.startsWith('} from') || trimmed.startsWith("} from")) {
+      if (
+        trimmed.startsWith(', ') ||
+        trimmed.startsWith('} from') ||
+        trimmed.startsWith('} from')
+      ) {
         return; // This is an import line, not an actual mutation call
       }
       // Only count blocks that start with actual mutation calls

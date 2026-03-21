@@ -253,11 +253,13 @@ export async function calculateRouteDistanceFull(
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
+      console.error(`[webrouter-full] HTTP ERROR ${res.status}:`, data?.mensagem);
       return { success: false, error: data?.mensagem || `WebRouter HTTP ${res.status}` };
     }
 
     const status = data?.status ?? '';
     if (status !== 'SUCESSO' && status !== '') {
+      console.error(`[webrouter-full] API ERROR status="${status}":`, data?.mensagem);
       return { success: false, error: data?.mensagem || `WebRouter status: ${status}` };
     }
 
@@ -265,8 +267,11 @@ export async function calculateRouteDistanceFull(
     const km = rota?.path?.distanciaKM;
 
     if (typeof km !== 'number' || !Number.isFinite(km) || km < 0) {
+      console.error(`[webrouter-full] Invalid distance km:`, km);
       return { success: false, error: 'WebRouter did not return valid distance' };
     }
+
+    console.log(`[webrouter-full] ✓ API call successful | status="${status}" | km=${km}`);
 
     // Extract tolls from individual plazas (more reliable than custos.pedagio)
     const tollPlazas = extractTollPlazas(rota);
@@ -284,8 +289,24 @@ export async function calculateRouteDistanceFull(
         ? Math.round(tollTagFromPlazas * 100)
         : Math.round((Number(custos?.pedagioTag) || 0) * 100);
 
+    const fmtBRL = (v: number) =>
+      new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(v);
+    console.log(`[webrouter-full] 📊 TOLL CALCULATION:`);
+    console.log(`  ├─ informacaoPedagios.result.pedagios count: ${tollPlazas.length}`);
     console.log(
-      `[webrouter-full] toll: plazas=${tollPlazas.length}, fromPlazas=${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 }).format(tollFromPlazas)}, custos.pedagio=${custos?.pedagio}`
+      `  ├─ sum from plazas: ${fmtBRL(tollFromPlazas)} (${Math.round(tollFromPlazas * 100)}¢)`
+    );
+    console.log(
+      `  ├─ custos.pedagio (fallback): ${custos?.pedagio} → ${Math.round((Number(custos?.pedagio) || 0) * 100)}¢`
+    );
+    console.log(`  ├─ tollFromPlazas > 0? ${tollFromPlazas > 0}`);
+    console.log(
+      `  └─ FINAL: tollTotal=${tollTotal}¢ (${fmtBRL(tollTotal / 100)}), tollTag=${tollTag}¢`
     );
 
     // Extract coordinates from ordemRoteiro (waypoints with lat/lng)
