@@ -63,9 +63,12 @@ export function getAlertStyles(nivel: string) {
   }
 }
 
+// queryKey inclui data do dia — React Query nunca serve cache de ontem
+const todayKey = () => new Date().toISOString().slice(0, 10); // "2026-03-21"
+
 export function useMarketInsights() {
   return useQuery<MarketInsights>({
-    queryKey: ['market-insights', 'latest'],
+    queryKey: ['market-insights', todayKey()], // cache expira automaticamente a cada dia
     queryFn: async () => {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
@@ -81,15 +84,13 @@ export function useMarketInsights() {
         },
       });
 
-      if (!response.ok) {
-        throw new Error('Falha ao buscar dados de inteligência de mercado');
-      }
-
+      if (!response.ok) throw new Error('Falha ao buscar dados de inteligência de mercado');
       return response.json();
     },
-    staleTime: 1000 * 60 * 60, // 1 hour
-    gcTime: 1000 * 60 * 60 * 24, // 24 hours (was cacheTime)
+    staleTime: 1000 * 60 * 60, // 1h fresco dentro do dia
+    gcTime: 1000 * 60 * 60 * 2, // 2h em memória (era 24h — causa do banner persistir entre sessões)
     retry: 2,
-    refetchInterval: 1000 * 60 * 60, // Refetch every hour
+    refetchOnWindowFocus: false,
+    refetchInterval: 1000 * 60 * 60,
   });
 }
