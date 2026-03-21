@@ -194,8 +194,15 @@ Deno.serve(async (req: Request) => {
       // Build legs: origin → each waypoint → destination
       legs = buildLegsFromRoute(mainQuote, secondaryQuotes, totalDistanceKm, totalTollCentavos);
 
+      const fmtBRL = (c: number) =>
+        new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(c / 100);
       console.log(
-        `[generate-optimal-route] WebRouter SUCCESS ✓ | distance=${totalDistanceKm}km | toll=${totalTollCentavos}¢ (R$${(totalTollCentavos / 100).toFixed(2)}) | plazas=${tollPlazas.length} | coords=${polylineCoords.length}`
+        `[generate-optimal-route] WebRouter SUCCESS ✓ | distance=${totalDistanceKm}km | toll=${totalTollCentavos}¢ (${fmtBRL(totalTollCentavos)}) | plazas=${tollPlazas.length} | coords=${polylineCoords.length}`
       );
 
       // Diagnostic: warn if toll is zero despite successful call
