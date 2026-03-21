@@ -19,6 +19,9 @@
     "prepare": "husky",
     "lint:types": "tsc --noEmit",
     "lint:eslint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
@@ -123,6 +126,7 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^4.2.3",
+    "@vitest/coverage-v8": "^4.1.0",
     "autoprefixer": "^10.4.21",
     "cross-env": "^10.1.0",
     "dotenv": "^17.3.1",
@@ -140,6 +144,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.36.0",
     "vite": "^7.3.1",
+    "vitest": "^4.1.0",
     "wrangler": "^4.71.0"
   }
 }
