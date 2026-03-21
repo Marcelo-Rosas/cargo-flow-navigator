@@ -1,6 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-type LLMProvider = 'anthropic' | 'openai';
+type LLMProvider = 'anthropic' | 'openai' | 'gemini';
 
 const getEnv = (key: string): string | undefined => {
   try {
@@ -215,61 +215,115 @@ async function callOpenAI(params: CallLLMParams): Promise<CallLLMResult> {
   };
 }
 
-export async function callLLM(params: CallLLMParams): Promise<CallLLMResult> {
+async function callGeminiLLM(params: CallLLMParams): Promise<CallLLMResult> {
+  const apiKey = getEnv('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+
+  const model = getEnv('GEMINI_MODEL') || 'gemini-2.0-flash';
+  const maxTokens = params.maxTokens ?? 1024;
+  const temperature = params.temperature ?? 0.2;
+
+  const fullPrompt = params.system ? `${params.system}\n\n${params.prompt}` : params.prompt;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: fullPrompt }] }],
+        generationConfig: {
+          temperature,
+          maxOutputTokens: maxTokens,
+        },
+      }),
+    }
+  );
+
+  const textBody = await res.text();
+
+  if (!res.ok) {
+    throw new Error(`Gemini API error (${res.status}): ${textBody}`);
+  }
+
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(textBody);
+  } catch {
+    parsed = textBody;
+  }
+
+  const contentText = parsed?.candidates?.[0]?.content?.parts?.[0]?.text ?? String(textBody);
+
+  return {
+    provider: 'gemini',
+    text: contentText,
+    raw: parsed,
+  };
+}
+
+function resolveProvider(hint: LLMProvider | undefined): LLMProvider {
+  const hasGeminiKey = !!getEnv('GEMINI_API_KEY');
   const hasAnthropicKey = !!getEnv('ANTHROPIC_API_KEY');
   const hasOpenAIKey = !!getEnv('OPENAI_API_KEY');
 
-  // Resolve preferred provider: honour modelHint first, then fall back to
-  // whichever key is actually available so we never fail with "not configured"
-  // when the other provider is ready to go.
-  let preferred: LLMProvider;
-  if (params.modelHint) {
-    preferred = params.modelHint;
-  } else if (hasAnthropicKey && !hasOpenAIKey) {
-    preferred = 'anthropic';
-  } else if (hasOpenAIKey && !hasAnthropicKey) {
-    preferred = 'openai';
-  } else {
-    // Both keys present (or neither) – default to openai for backwards compat
-    preferred = 'openai';
-  }
+  // Honour explicit hint if the key is available
+  if (hint === 'gemini' && hasGeminiKey) return 'gemini';
+  if (hint === 'anthropic' && hasAnthropicKey) return 'anthropic';
+  if (hint === 'openai' && hasOpenAIKey) return 'openai';
 
-  const tryOpenAIFirst = preferred === 'openai';
+  // Default priority: gemini > anthropic > openai
+  if (hasGeminiKey) return 'gemini';
+  if (hasAnthropicKey) return 'anthropic';
+  if (hasOpenAIKey) return 'openai';
 
-  const primary = tryOpenAIFirst ? callOpenAI : callAnthropic;
-  const secondary = tryOpenAIFirst ? callAnthropic : callOpenAI;
+  return 'gemini'; // will fail with "not configured" but gives clear error
+}
 
-  try {
-    return await primary(params);
-  } catch (e) {
-    const err = e as any;
-    const message: string = err?.message || String(err);
+const providerFns: Record<LLMProvider, (p: CallLLMParams) => Promise<CallLLMResult>> = {
+  gemini: callGeminiLLM,
+  anthropic: callAnthropic,
+  openai: callOpenAI,
+};
 
-    const isRecoverable =
-      /not configured/i.test(message) ||
-      /credit balance is too low/i.test(message) ||
-      /insufficient credit/i.test(message) ||
-      /insufficient_quota/i.test(message) ||
-      /rate_limit/i.test(message) ||
-      /ECONNRESET|ENOTFOUND|ETIMEDOUT|Failed to fetch/i.test(message) ||
-      / 5\d{2}\b/.test(message) ||
-      / 429\b/.test(message);
+const RECOVERABLE_RE =
+  /not configured|credit balance is too low|insufficient credit|insufficient_quota|rate_limit|exceeded your current quota|ECONNRESET|ENOTFOUND|ETIMEDOUT|Failed to fetch| 5\d{2}\b| 429\b/i;
 
-    if (isRecoverable) {
-      const fromProvider: LLMProvider = tryOpenAIFirst ? 'openai' : 'anthropic';
-      const toProvider: LLMProvider = tryOpenAIFirst ? 'anthropic' : 'openai';
-      console.warn(`${fromProvider} failed, falling back to ${toProvider}:`, message);
-      await logProviderFallback({
-        from: fromProvider,
-        to: toProvider,
-        reason: message.substring(0, 200),
-        analysisType: params.analysisType,
-        entityType: params.entityType ?? null,
-        entityId: params.entityId ?? null,
-      });
-      return await secondary(params);
+export async function callLLM(params: CallLLMParams): Promise<CallLLMResult> {
+  const preferred = resolveProvider(params.modelHint);
+
+  // Build fallback chain: preferred first, then others in priority order
+  const allProviders: LLMProvider[] = ['gemini', 'anthropic', 'openai'];
+  const chain = [preferred, ...allProviders.filter((p) => p !== preferred)];
+
+  let lastError: Error | null = null;
+
+  for (let i = 0; i < chain.length; i++) {
+    const provider = chain[i];
+    try {
+      return await providerFns[provider](params);
+    } catch (e) {
+      const err = e as Error;
+      const message = err?.message || String(err);
+      lastError = err;
+
+      if (i < chain.length - 1 && RECOVERABLE_RE.test(message)) {
+        const next = chain[i + 1];
+        console.warn(`${provider} failed, falling back to ${next}:`, message);
+        await logProviderFallback({
+          from: provider,
+          to: next,
+          reason: message.substring(0, 200),
+          analysisType: params.analysisType,
+          entityType: params.entityType ?? null,
+          entityId: params.entityId ?? null,
+        });
+        continue;
+      }
+
+      throw err;
     }
-
-    throw err;
   }
+
+  throw lastError ?? new Error('All LLM providers failed');
 }

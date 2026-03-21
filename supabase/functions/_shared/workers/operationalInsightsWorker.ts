@@ -156,7 +156,7 @@ export async function executeOperationalInsightsWorker(
     prompt,
     system: SYSTEM_PROMPT_OPERATIONAL_INSIGHTS,
     maxTokens: MAX_TOKENS_OPERATIONAL_INSIGHTS,
-    modelHint: 'openai',
+    modelHint: 'gemini',
     analysisType: 'operational_insights',
     entityType: null,
     entityId: null,

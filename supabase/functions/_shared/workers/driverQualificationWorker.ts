@@ -85,7 +85,7 @@ export async function executeDriverQualificationWorker(
     prompt,
     system: SYSTEM_PROMPT_DRIVER_QUALIFICATION,
     maxTokens: MAX_TOKENS_DRIVER_QUALIFICATION,
-    modelHint: 'openai',
+    modelHint: 'gemini',
     analysisType: 'driver_qualification',
     entityType: 'order',
     entityId: orderData.id,

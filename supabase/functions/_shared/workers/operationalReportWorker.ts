@@ -99,7 +99,7 @@ export async function executeOperationalReportWorker(
     prompt,
     system: SYSTEM_PROMPT_OPERATIONAL_REPORT,
     maxTokens: MAX_TOKENS_OPERATIONAL_REPORT,
-    modelHint: 'openai',
+    modelHint: 'gemini',
     analysisType: 'operational_report',
     entityType: null,
     entityId: null,

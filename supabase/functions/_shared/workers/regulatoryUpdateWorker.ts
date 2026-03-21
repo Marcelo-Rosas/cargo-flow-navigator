@@ -88,7 +88,7 @@ Classifique a relevância de 0 a 10 e indique se requer ação imediata da trans
         prompt,
         system: SYSTEM_PROMPT_REGULATORY,
         maxTokens: MAX_TOKENS_REGULATORY,
-        modelHint: 'openai',
+        modelHint: 'gemini',
         analysisType: 'regulatory_update',
         entityType: null,
         entityId: null,

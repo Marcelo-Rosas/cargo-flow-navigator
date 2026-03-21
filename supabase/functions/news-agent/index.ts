@@ -126,7 +126,7 @@ Classifique a relevância de 0 a 10 para impacto na precificação e resuma em 2
     prompt,
     system: SYSTEM_PROMPT_NEWS_SUMMARY,
     maxTokens: MAX_TOKENS_NEWS_SUMMARY,
-    modelHint: 'openai',
+    modelHint: 'gemini',
     analysisType: 'regulatory_update',
   });
 
