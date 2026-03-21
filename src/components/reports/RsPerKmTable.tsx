@@ -63,12 +63,14 @@ export function RsPerKmTable({ rows, isLoading }: RsPerKmTableProps) {
                 {row.carreteiro_real.toLocaleString('pt-BR', {
                   style: 'currency',
                   currency: 'BRL',
+                  minimumFractionDigits: 2,
                 })}
               </TableCell>
               <TableCell className="text-right">
                 {row.rs_per_km.toLocaleString('pt-BR', {
                   style: 'currency',
                   currency: 'BRL',
+                  minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </TableCell>

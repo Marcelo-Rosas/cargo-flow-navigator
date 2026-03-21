@@ -1334,12 +1334,14 @@ export function OrderDetailModal({
                                 {plaza.valor.toLocaleString('pt-BR', {
                                   style: 'currency',
                                   currency: 'BRL',
+                                  minimumFractionDigits: 2,
                                 })}
                               </TableCell>
                               <TableCell className="text-right text-sm text-muted-foreground">
                                 {plaza.valorTag.toLocaleString('pt-BR', {
                                   style: 'currency',
                                   currency: 'BRL',
+                                  minimumFractionDigits: 2,
                                 })}
                               </TableCell>
                             </TableRow>

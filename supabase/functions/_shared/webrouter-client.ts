@@ -285,7 +285,7 @@ export async function calculateRouteDistanceFull(
         : Math.round((Number(custos?.pedagioTag) || 0) * 100);
 
     console.log(
-      `[webrouter-full] toll: plazas=${tollPlazas.length}, fromPlazas=R$${tollFromPlazas.toFixed(2)}, custos.pedagio=${custos?.pedagio}`
+      `[webrouter-full] toll: plazas=${tollPlazas.length}, fromPlazas=${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 }).format(tollFromPlazas)}, custos.pedagio=${custos?.pedagio}`
     );
 
     // Extract coordinates from ordemRoteiro (waypoints with lat/lng)

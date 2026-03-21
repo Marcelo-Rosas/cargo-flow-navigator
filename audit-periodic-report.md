@@ -3,7 +3,7 @@
 
 **Data:** 2026-03-21
 **Branch:** claude/run-dbexpert-audit-mwSLr
-**Último commit:** f92bab6 fix(ci): move secrets condition from job-level to step-level
+**Último commit:** 8128c8e chore: add periodic audit report
 
 ## 1. Estrutura do Projeto
 
@@ -36,14 +36,13 @@
 
 ## 5. Segurança
 
-❌ 1 problemas encontrados:
-- `.env.example` — contém referência a SERVICE_ROLE
+✅ Nenhum problema de segurança encontrado
 
 ## 6. Padrões de Arquitetura
 
 | Padrão | Status | Ocorrências |
 | --- | --- | --- |
-| useMutation sem invalidateQueries | ⚠️ | 78 |
+| useMutation sem invalidateQueries | ⚠️ | 77 |
 | useEffect com fetch/supabase | ⚠️ | 8 |
 | State libs proibidas (Zustand/Redux) | ✅ | 0 |
 
@@ -62,6 +61,6 @@
 ## Score de Compliance
 
 
-**Score: 38% (3/8 checks passando)**
+**Score: 50% (4/8 checks passando)**
 
-❌ Compliance crítico — priorizar correções
+⚠️ Melhorias necessárias antes de release
