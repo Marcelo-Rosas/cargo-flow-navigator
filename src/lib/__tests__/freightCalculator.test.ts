@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateFreight,
+  buildStoredBreakdown,
   round2,
   normalizeIcmsRate,
   ufFromCep,
@@ -395,5 +396,137 @@ describe('calculateFreight — ICMS proporcional por UF', () => {
     // Weighted: (200/600)*12 + (400/600)*18 = 4 + 12 = 16
     expect(result.totals.icms).toBeGreaterThan(0);
     expect(result.profitability.regimeFiscal).toBe('excesso_sublimite');
+  });
+});
+
+// ─── calculateFreight: LTL GRIS min / BELOW_TARGET ─────────────────────────
+
+describe('calculateFreight — LTL GRIS minimum', () => {
+  it('applies grisMin when cargo below grisMinCargoLimit', () => {
+    const result = calculateFreight(
+      makeFtlInput({
+        modality: 'fracionado',
+        weightKg: 2000,
+        cargoValue: 500, // low cargo → gris calc will be tiny
+        ltlParams: {
+          minWeightKg: 1000,
+          grisPercent: 0.3,
+          grisMin: 50, // minimum gris
+          grisMinCargoLimit: 10000, // cargo 500 < 10000 → applies grisMin
+          minTso: 20,
+        },
+        priceTableRow: {
+          ...makeFtlInput().priceTableRow!,
+          weight_rate_20: 5,
+          weight_rate_30: 4.5,
+        },
+      })
+    );
+    expect(result.components.gris).toBeGreaterThanOrEqual(50);
+  });
+
+  it('applies minTso when tso is below minimum', () => {
+    const result = calculateFreight(
+      makeFtlInput({
+        modality: 'fracionado',
+        weightKg: 2000,
+        cargoValue: 100, // very low cargo → tso tiny
+        ltlParams: {
+          minWeightKg: 1000,
+          grisPercent: 0.3,
+          grisMin: 0,
+          grisMinCargoLimit: 0,
+          minTso: 30,
+        },
+        priceTableRow: {
+          ...makeFtlInput().priceTableRow!,
+          weight_rate_20: 5,
+          weight_rate_30: 4.5,
+        },
+      })
+    );
+    expect(result.components.tso).toBeGreaterThanOrEqual(30);
+  });
+});
+
+describe('calculateFreight — margin status', () => {
+  it('reports BELOW_TARGET when margin is low', () => {
+    const result = calculateFreight(
+      makeFtlInput({
+        weightKg: 10000,
+        cargoValue: 1000000,
+        pricingParams: {
+          targetMarginPercent: 99, // impossibly high target
+        },
+      })
+    );
+    expect(result.meta.marginStatus).toBe('BELOW_TARGET');
+  });
+});
+
+// ─── buildStoredBreakdown ───────────────────────────────────────────────────
+
+describe('buildStoredBreakdown', () => {
+  it('builds breakdown from calculateFreight output', () => {
+    const input = makeFtlInput();
+    const output = calculateFreight(input);
+    const breakdown = buildStoredBreakdown(output, input);
+
+    expect(breakdown.version).toBe('5.0-risk-aware');
+    expect(breakdown.status).toBe('OK');
+    expect(breakdown.calculatedAt).toBeTruthy();
+    expect(breakdown.meta.routeUfLabel).toBeTruthy();
+    expect(breakdown.meta.kmBandLabel).toBeTruthy();
+    expect(breakdown.weights.billableWeight).toBeGreaterThan(0);
+    expect(breakdown.components.baseCost).toBeGreaterThan(0);
+    expect(breakdown.totals.totalCliente).toBeGreaterThan(0);
+    expect(breakdown.rates.dasPercent).toBeDefined();
+    expect(breakdown.rates.icmsPercent).toBeDefined();
+    expect(breakdown.riskPassThrough).toBeDefined();
+    expect(breakdown.riskPassThrough!.total).toBeGreaterThanOrEqual(0);
+  });
+
+  it('includes extras metadata when provided', () => {
+    const input = makeFtlInput({
+      extras: {
+        conditionalFees: { ids: ['fee-1'], total: 100 },
+        waitingTimeEnabled: true,
+        waitingTimeHours: 2,
+        unloadingCostItems: [{ description: 'Descarga', amount: 200 }] as any,
+        equipmentRentalItems: [{ description: 'Guindaste', amount: 500 }] as any,
+      },
+    });
+    const output = calculateFreight(input);
+    const breakdown = buildStoredBreakdown(output, input);
+
+    expect(breakdown.meta.selectedConditionalFeeIds).toEqual(['fee-1']);
+    expect(breakdown.meta.waitingTimeEnabled).toBe(true);
+    expect(breakdown.meta.waitingTimeHours).toBe(2);
+    expect(breakdown.meta.unloadingCost).toBeDefined();
+    expect(breakdown.meta.equipmentRental).toBeDefined();
+  });
+
+  it('sets icmsMode based on kmByUf', () => {
+    // Mode A: no kmByUf
+    const inputA = makeFtlInput();
+    const outputA = calculateFreight(inputA);
+    const breakdownA = buildStoredBreakdown(outputA, inputA);
+    expect(breakdownA.meta.icmsMode).toBe('A');
+
+    // Mode B: with kmByUf
+    const inputB = makeFtlInput({ kmByUf: { SC: 200, SP: 400 }, icmsByUf: { SC: 12, SP: 18 } });
+    const outputB = calculateFreight(inputB);
+    const breakdownB = buildStoredBreakdown(outputB, inputB);
+    expect(breakdownB.meta.icmsMode).toBe('B');
+  });
+
+  it('includes profitability data', () => {
+    const input = makeFtlInput();
+    const output = calculateFreight(input);
+    const breakdown = buildStoredBreakdown(output, input);
+
+    expect(breakdown.profitability).toBeDefined();
+    expect(breakdown.profitability.resultadoLiquido).toBeDefined();
+    expect(breakdown.profitability.receitaLiquida).toBeDefined();
   });
 });

@@ -4,6 +4,7 @@ import {
   formatCurrencyFromCents,
   formatQuoteValue,
   formatNumber,
+  formatDate,
   formatCpfDisplay,
 } from '../formatters';
 
@@ -81,6 +82,27 @@ describe('formatNumber', () => {
 
   it('always shows 2 decimal places', () => {
     expect(formatNumber(100)).toBe('100,00');
+  });
+});
+
+describe('formatDate', () => {
+  it('formats ISO date to pt-BR', () => {
+    const result = formatDate('2026-01-15');
+    expect(result).toContain('15');
+    expect(result).toContain('2026');
+  });
+
+  it('returns em dash for null/undefined/empty', () => {
+    expect(formatDate(null)).toBe('—');
+    expect(formatDate(undefined)).toBe('—');
+    expect(formatDate('')).toBe('—');
+  });
+
+  it('accepts custom options', () => {
+    const result = formatDate('2026-03-21', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    expect(result).toContain('21');
+    expect(result).toContain('03');
+    expect(result).toContain('2026');
   });
 });
 

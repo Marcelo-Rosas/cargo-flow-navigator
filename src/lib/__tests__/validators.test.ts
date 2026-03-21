@@ -6,6 +6,12 @@ import {
   validatePhone,
   validateCep,
   validatePlate,
+  zodCpf,
+  zodCnpj,
+  zodCpfOrCnpj,
+  zodPhone,
+  zodCep,
+  zodPlate,
 } from '../validators';
 
 describe('validateCpf', () => {
@@ -122,5 +128,107 @@ describe('validatePlate', () => {
     expect(validatePlate('1234567')).toBe(false);
     expect(validatePlate('AB12345')).toBe(false);
     expect(validatePlate('A')).toBe(false);
+  });
+});
+
+// ─── Zod Schemas ────────────────────────────────────────────────────────────
+
+describe('zodCpf', () => {
+  it('accepts valid CPF', () => {
+    expect(zodCpf.safeParse('52998224725').success).toBe(true);
+  });
+
+  it('accepts undefined (optional)', () => {
+    expect(zodCpf.safeParse(undefined).success).toBe(true);
+  });
+
+  it('accepts empty string', () => {
+    expect(zodCpf.safeParse('').success).toBe(true);
+  });
+
+  it('rejects invalid CPF', () => {
+    expect(zodCpf.safeParse('12345678901').success).toBe(false);
+  });
+});
+
+describe('zodCnpj', () => {
+  it('accepts valid CNPJ', () => {
+    expect(zodCnpj.safeParse('11222333000181').success).toBe(true);
+  });
+
+  it('accepts undefined', () => {
+    expect(zodCnpj.safeParse(undefined).success).toBe(true);
+  });
+
+  it('accepts empty string', () => {
+    expect(zodCnpj.safeParse('').success).toBe(true);
+  });
+
+  it('rejects invalid CNPJ', () => {
+    expect(zodCnpj.safeParse('11222333000182').success).toBe(false);
+  });
+});
+
+describe('zodCpfOrCnpj', () => {
+  it('accepts valid CPF', () => {
+    expect(zodCpfOrCnpj.safeParse('52998224725').success).toBe(true);
+  });
+
+  it('accepts valid CNPJ', () => {
+    expect(zodCpfOrCnpj.safeParse('11222333000181').success).toBe(true);
+  });
+
+  it('accepts undefined', () => {
+    expect(zodCpfOrCnpj.safeParse(undefined).success).toBe(true);
+  });
+
+  it('rejects invalid', () => {
+    expect(zodCpfOrCnpj.safeParse('12345').success).toBe(false);
+  });
+});
+
+describe('zodPhone', () => {
+  it('accepts valid phone', () => {
+    expect(zodPhone.safeParse('11999999999').success).toBe(true);
+  });
+
+  it('accepts undefined', () => {
+    expect(zodPhone.safeParse(undefined).success).toBe(true);
+  });
+
+  it('accepts empty string', () => {
+    expect(zodPhone.safeParse('').success).toBe(true);
+  });
+
+  it('rejects invalid phone', () => {
+    expect(zodPhone.safeParse('123').success).toBe(false);
+  });
+});
+
+describe('zodCep', () => {
+  it('accepts valid CEP', () => {
+    expect(zodCep.safeParse('88370000').success).toBe(true);
+  });
+
+  it('accepts undefined', () => {
+    expect(zodCep.safeParse(undefined).success).toBe(true);
+  });
+
+  it('rejects invalid CEP', () => {
+    expect(zodCep.safeParse('1234567').success).toBe(false);
+  });
+});
+
+describe('zodPlate', () => {
+  it('accepts valid plate', () => {
+    expect(zodPlate.safeParse('ABC1234').success).toBe(true);
+  });
+
+  it('rejects empty string', () => {
+    expect(zodPlate.safeParse('').success).toBe(false);
+  });
+
+  it('rejects invalid plate', () => {
+    expect(zodPlate.safeParse('INVALID').success).toBe(false);
   });
 });
