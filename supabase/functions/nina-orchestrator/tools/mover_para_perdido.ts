@@ -1,5 +1,5 @@
 // supabase/functions/nina-orchestrator/tools/mover_para_perdido.ts
-// Tool: mover_para_perdido — move cotações confirmadas para status "perdido"
+// Tool: mover_para_perdido — move cotações confirmadas para stage "perdido"
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -24,15 +24,15 @@ export async function executeMoverParaPerdido(
 
   for (const quoteId of input.quote_ids) {
     try {
-      // UPDATE quote status
+      // UPDATE quote stage
       const { error: updateError } = await sb
         .from('quotes')
         .update({
-          status: 'perdido',
+          stage: 'perdido',
           updated_at: new Date().toISOString(),
         })
         .eq('id', quoteId)
-        .eq('status', 'negociacao'); // Safety: only move if still in negociacao
+        .eq('stage', 'negociacao'); // Safety: only move if still in negociacao
 
       if (updateError) {
         console.error(`[mover_para_perdido] Update error for ${quoteId}:`, updateError);
@@ -40,19 +40,40 @@ export async function executeMoverParaPerdido(
         continue;
       }
 
-      // INSERT audit event in quote_events
-      const { error: eventError } = await sb.from('quote_events').insert({
-        quote_id: quoteId,
-        event_type: 'status_change',
-        from_status: 'negociacao',
-        to_status: 'perdido',
-        notes: 'Movido via Navi — sugestão automática +10d',
+      // INSERT workflow_event for audit trail
+      const { error: eventError } = await sb.from('workflow_events').insert({
+        event_type: 'stage_change',
+        entity_type: 'quote',
+        entity_id: quoteId,
+        payload: {
+          from_stage: 'negociacao',
+          to_stage: 'perdido',
+          notes: 'Movido via Navi — sugestão automática +10d',
+        },
+        status: 'processed',
         created_at: new Date().toISOString(),
       });
 
       if (eventError) {
         console.error(`[mover_para_perdido] Event insert error for ${quoteId}:`, eventError);
         // Quote was updated but event failed — log but count as moved
+      }
+
+      // INSERT workflow_event_log for detailed audit
+      const { error: logError } = await sb.from('workflow_event_logs').insert({
+        action: 'move_to_perdido',
+        agent: 'navi',
+        details: {
+          quote_id: quoteId,
+          from_stage: 'negociacao',
+          to_stage: 'perdido',
+          trigger: 'sugestao_automatica_10d',
+        },
+        created_at: new Date().toISOString(),
+      });
+
+      if (logError) {
+        console.error(`[mover_para_perdido] Log insert error for ${quoteId}:`, logError);
       }
 
       movidas.push(quoteId);

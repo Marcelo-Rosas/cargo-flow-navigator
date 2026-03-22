@@ -69,8 +69,8 @@ async function callGeminiWithTools(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: messages,
-        tools: [{ functionDeclarations: toolDeclarations }],
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        tools: [{ function_declarations: toolDeclarations }],
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
         generationConfig: {
           temperature: 0.3,
           maxOutputTokens: 2048,
@@ -134,7 +134,10 @@ async function processWithToolLoop(
           {
             functionResponse: {
               name,
-              response: { result },
+              response: {
+                name,
+                content: result,
+              },
             },
           },
         ],

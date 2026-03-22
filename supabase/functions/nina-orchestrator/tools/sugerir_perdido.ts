@@ -29,12 +29,12 @@ export async function executeSugerirPerdido(): Promise<SugerirPerdidoResult> {
     .from('quotes')
     .select(`
       id,
-      quote_number,
+      quote_code,
       client_name,
       shipper_name,
       updated_at
     `)
-    .eq('status', 'negociacao')
+    .eq('stage', 'negociacao')
     .lt('updated_at', tenDaysAgo.toISOString())
     .order('updated_at', { ascending: true });
 
@@ -55,7 +55,7 @@ export async function executeSugerirPerdido(): Promise<SugerirPerdidoResult> {
 
     return {
       id: q.id,
-      codigo: q.quote_number || q.id.slice(0, 8),
+      codigo: q.quote_code || q.id.slice(0, 8),
       cliente: q.client_name || 'Cliente não informado',
       embarcador: q.shipper_name || 'Embarcador não informado',
       dias_parado: dias,
