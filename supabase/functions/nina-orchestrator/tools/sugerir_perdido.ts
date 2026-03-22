@@ -1,5 +1,5 @@
 // supabase/functions/nina-orchestrator/tools/sugerir_perdido.ts
-// Tool: sugerir_perdido — busca cotações paradas há +10 dias via followup_campaigns
+// Tool: sugerir_perdido — busca cotações em negociação paradas há +10 dias
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -21,36 +21,46 @@ export async function executeSugerirPerdido(): Promise<SugerirPerdidoResult> {
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const sb = createClient(supabaseUrl, supabaseKey);
 
+  // Cotações em negociação com updated_at há mais de 10 dias
+  const tenDaysAgo = new Date();
+  tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
   const { data, error } = await sb
-    .from('followup_campaigns')
+    .from('quotes')
     .select(`
       id,
-      quote_id,
       quote_code,
       client_name,
       shipper_name,
-      days_stalled
+      updated_at
     `)
-    .eq('status', 'pending')
-    .gte('days_stalled', 10)
-    .order('days_stalled', { ascending: false });
+    .eq('stage', 'negociacao')
+    .lt('updated_at', tenDaysAgo.toISOString())
+    .order('updated_at', { ascending: true });
 
   if (error) {
     console.error('[sugerir_perdido] Query error:', error);
-    throw new Error(`Erro ao buscar cotações paradas: ${error.message}`);
+    throw new Error(`Erro ao buscar cotações: ${error.message}`);
   }
 
   if (!data || data.length === 0) {
     return { sugestoes: [], total: 0 };
   }
 
-  const sugestoes: SugestaoItem[] = data.map((c) => ({
-    id: c.id,
-    codigo: c.quote_code || c.id.slice(0, 8),
-    cliente: c.client_name || 'Cliente não informado',
-    embarcador: c.shipper_name || 'Embarcador não informado',
-    dias_parado: c.days_stalled,
-  }));
+  const now = new Date();
+  const sugestoes: SugestaoItem[] = data.map((q) => {
+    const updatedAt = new Date(q.updated_at);
+    const diffMs = now.getTime() - updatedAt.getTime();
+    const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    return {
+      id: q.id,
+      codigo: q.quote_code || q.id.slice(0, 8),
+      cliente: q.client_name || 'Cliente não informado',
+      embarcador: q.shipper_name || 'Embarcador não informado',
+      dias_parado: dias,
+    };
+  });
 
   console.log(`[sugerir_perdido] ${sugestoes.length} cotações elegíveis encontradas`);
 
