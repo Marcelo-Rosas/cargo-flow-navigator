@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { validateJWT, AuthError, authErrorResponse } from '../_shared/auth.ts';
 
 interface InviteBody {
   email: string;
@@ -42,22 +43,8 @@ deno.serve(async (req: Request) => {
         }
       );
     }
-    // Validate auth header
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({
-          error: 'Missing Authorization header',
-        }),
-        {
-          status: 401,
-          headers: {
-            ...corsHeaders,
-            'content-type': 'application/json',
-          },
-        }
-      );
-    }
+    // Validate JWT + admin role via shared middleware
+    await validateJWT(req, ['admin']);
     // Parse body
     let body: InviteBody;
     try {
@@ -96,41 +83,9 @@ deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, 'content-type': 'application/json' },
       });
     }
-    // Check caller is admin using their JWT
-    const supabaseUrl = deno.env.get('SUPABASE_URL');
-    const supabaseAnonKey = deno.env.get('SUPABASE_ANON_KEY');
-    const supabaseServiceRoleKey = deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-      return new Response(
-        JSON.stringify({
-          error: 'Variáveis de ambiente do Supabase não configuradas',
-        }),
-        {
-          status: 500,
-          headers: {
-            ...corsHeaders,
-            'content-type': 'application/json',
-          },
-        }
-      );
-    }
-
-    const callerClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          authorization: authHeader,
-        },
-      },
-    });
-    const { data: isAdmin, error: adminCheckError } = await callerClient.rpc('is_admin');
-    if (adminCheckError || !isAdmin) {
-      return new Response(
-        JSON.stringify({ error: 'Somente administradores podem convidar usuários' }),
-        { status: 403, headers: { ...corsHeaders, 'content-type': 'application/json' } }
-      );
-    }
-    // Use service role to invite user
+    // Use service role to invite user (admin check already done by validateJWT above)
+    const supabaseUrl = deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceRoleKey = deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -204,6 +159,9 @@ deno.serve(async (req: Request) => {
       }
     );
   } catch (e) {
+    if (e instanceof AuthError) {
+      return authErrorResponse(e, corsHeaders);
+    }
     return new Response(
       JSON.stringify({
         error: String(e),

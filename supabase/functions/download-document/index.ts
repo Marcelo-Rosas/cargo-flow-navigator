@@ -19,6 +19,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { validateJWT, AuthError, authErrorResponse } from '../_shared/auth.ts';
 
 const BUCKET = 'documents';
 
@@ -63,34 +64,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // --- Authentication ---
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'content-type': 'application/json' },
-      });
-    }
-
-    // Create user-scoped client to verify the token
-    const userClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { authorization: authHeader } } }
-    );
-
-    const {
-      data: { user },
-      error: authError,
-    } = await userClient.auth.getUser();
-
-    if (authError || !user) {
-      console.warn('[download-document] Auth failed:', authError?.message);
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'content-type': 'application/json' },
-      });
-    }
+    // --- Authentication via shared middleware ---
+    const { user } = await validateJWT(req);
 
     // --- Body validation ---
     let body: { path?: string };
@@ -181,6 +156,9 @@ Deno.serve(async (req) => {
       },
     });
   } catch (e) {
+    if (e instanceof AuthError) {
+      return authErrorResponse(e, corsHeaders);
+    }
     console.error('[download-document] Unexpected error:', String(e));
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
