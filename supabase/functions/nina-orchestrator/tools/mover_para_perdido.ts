@@ -1,10 +1,10 @@
 // supabase/functions/nina-orchestrator/tools/mover_para_perdido.ts
-// Tool: mover_para_perdido — move cotações confirmadas para stage "perdido"
+// Tool: mover_para_perdido — move campanhas confirmadas para status "lost" via followup_campaigns
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 export interface MoverParaPerdidoInput {
-  quote_ids: string[];
+  campaign_ids: string[];
 }
 
 export interface MoverParaPerdidoResult {
@@ -22,64 +22,82 @@ export async function executeMoverParaPerdido(
   const movidas: string[] = [];
   const erros: string[] = [];
 
-  for (const quoteId of input.quote_ids) {
+  for (const campaignId of input.campaign_ids) {
     try {
-      // UPDATE quote stage
+      // Fetch campaign to get quote_id for audit trail
+      const { data: campaign, error: fetchError } = await sb
+        .from('followup_campaigns')
+        .select('id, quote_id, quote_code')
+        .eq('id', campaignId)
+        .eq('status', 'pending')
+        .single();
+
+      if (fetchError || !campaign) {
+        console.error(`[mover_para_perdido] Fetch error for ${campaignId}:`, fetchError);
+        erros.push(campaignId);
+        continue;
+      }
+
+      // UPDATE campaign status to lost
       const { error: updateError } = await sb
-        .from('quotes')
-        .update({
-          stage: 'perdido',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', quoteId)
-        .eq('stage', 'negociacao'); // Safety: only move if still in negociacao
+        .from('followup_campaigns')
+        .update({ status: 'lost' })
+        .eq('id', campaignId)
+        .eq('status', 'pending'); // Safety: only move if still pending
 
       if (updateError) {
-        console.error(`[mover_para_perdido] Update error for ${quoteId}:`, updateError);
-        erros.push(quoteId);
+        console.error(`[mover_para_perdido] Update error for ${campaignId}:`, updateError);
+        erros.push(campaignId);
         continue;
       }
 
       // INSERT workflow_event for audit trail
-      const { error: eventError } = await sb.from('workflow_events').insert({
-        event_type: 'stage_change',
-        entity_type: 'quote',
-        entity_id: quoteId,
-        payload: {
-          from_stage: 'negociacao',
-          to_stage: 'perdido',
-          notes: 'Movido via Navi — sugestão automática +10d',
-        },
-        status: 'processed',
-        created_at: new Date().toISOString(),
-      });
+      const entityId = campaign.quote_id ?? campaignId;
+      const { data: event, error: eventError } = await sb
+        .from('workflow_events')
+        .insert({
+          event_type: 'quote.marked_lost',
+          entity_type: 'followup_campaign',
+          entity_id: entityId,
+          payload: {
+            campaign_id: campaignId,
+            quote_code: campaign.quote_code,
+            from_status: 'pending',
+            to_status: 'lost',
+            notes: 'Movido via Navi — sugestão automática +10d parado',
+          },
+          status: 'processed',
+        })
+        .select('id')
+        .single();
 
       if (eventError) {
-        console.error(`[mover_para_perdido] Event insert error for ${quoteId}:`, eventError);
-        // Quote was updated but event failed — log but count as moved
+        console.error(`[mover_para_perdido] Event insert error for ${campaignId}:`, eventError);
       }
 
       // INSERT workflow_event_log for detailed audit
       const { error: logError } = await sb.from('workflow_event_logs').insert({
+        event_id: event?.id ?? null,
         action: 'move_to_perdido',
         agent: 'navi',
         details: {
-          quote_id: quoteId,
-          from_stage: 'negociacao',
-          to_stage: 'perdido',
+          campaign_id: campaignId,
+          quote_id: campaign.quote_id,
+          quote_code: campaign.quote_code,
+          from_status: 'pending',
+          to_status: 'lost',
           trigger: 'sugestao_automatica_10d',
         },
-        created_at: new Date().toISOString(),
       });
 
       if (logError) {
-        console.error(`[mover_para_perdido] Log insert error for ${quoteId}:`, logError);
+        console.error(`[mover_para_perdido] Log insert error for ${campaignId}:`, logError);
       }
 
-      movidas.push(quoteId);
+      movidas.push(campaignId);
     } catch (err) {
-      console.error(`[mover_para_perdido] Unexpected error for ${quoteId}:`, err);
-      erros.push(quoteId);
+      console.error(`[mover_para_perdido] Unexpected error for ${campaignId}:`, err);
+      erros.push(campaignId);
     }
   }
 

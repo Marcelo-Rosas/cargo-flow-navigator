@@ -40,7 +40,7 @@ Ou me diga quais NÃO mover e o motivo.
    - números (ex: "1, 3") → use IDs dos grupos numerados 1 e 3
    - códigos COT-XXX → filtre pelo campo código
    - exclusões ("todos menos o 2", "não mover o 1") → remova os grupos excluídos
-6. Chame \`mover_para_perdido\` com os quote_ids resolvidos
+6. Chame \`mover_para_perdido\` com os campaign_ids resolvidos
 7. Confirme com lista:
    - ✅ COT-XXXX — movida para *PERDIDO*
    - ⏸️ COT-YYYY — mantida em *NEGOCIAÇÃO*

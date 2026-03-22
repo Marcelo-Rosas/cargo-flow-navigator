@@ -9,7 +9,7 @@ export const toolDeclarations = [
   {
     name: 'sugerir_perdido',
     description:
-      'Busca cotações no estágio "negociação" paradas há mais de 10 dias e retorna uma lista agrupada por embarcador com sugestão de mover para perdido. Não requer parâmetros.',
+      'Busca campanhas de follow-up pendentes paradas há mais de 10 dias (followup_campaigns) e retorna lista agrupada por embarcador com sugestão de mover para perdido. Não requer parâmetros.',
     parameters: {
       type: 'object',
       properties: {},
@@ -19,17 +19,17 @@ export const toolDeclarations = [
   {
     name: 'mover_para_perdido',
     description:
-      'Move cotações confirmadas pelo usuário do estágio "negociação" para "perdido". Registra evento de auditoria em quote_events.',
+      'Move campanhas de follow-up confirmadas pelo usuário de "pending" para "lost". Registra evento de auditoria em workflow_events e workflow_event_logs.',
     parameters: {
       type: 'object',
       properties: {
-        quote_ids: {
+        campaign_ids: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array de UUIDs das cotações a serem movidas para perdido',
+          description: 'Array de UUIDs das campanhas (followup_campaigns) a serem movidas para lost',
         },
       },
-      required: ['quote_ids'],
+      required: ['campaign_ids'],
     },
   },
 ];
@@ -45,7 +45,7 @@ export async function executeTool(
 
     case 'mover_para_perdido':
       return await executeMoverParaPerdido({
-        quote_ids: args.quote_ids as string[],
+        campaign_ids: args.campaign_ids as string[],
       });
 
     default:
