@@ -1,23 +1,25 @@
 /**
  * Supabase Storage utilities for private bucket access.
  *
- * APPROACH: Signed URLs (default)
- * - All document access uses signed URLs generated client-side via Supabase SDK.
- * - The user must be authenticated (RLS policies on storage.objects require it).
- * - URLs expire after `expiresInSeconds` (default 60s).
+ * APPROACH: Server-side Signed URLs
+ * - All document access uses signed URLs generated server-side via the
+ *   `generate-signed-url` Edge Function (service role key).
+ * - The user must be authenticated (JWT validated by the Edge Function).
+ * - URLs expire after `expiresInSeconds` (default 3600s = 1 hour).
  * - For proxy download without exposing a signed URL, use the Edge Function
  *   `download-document` (POST /functions/v1/download-document).
  *
  * SECURITY:
  * - Never use getPublicUrl() for the private 'documents' bucket.
  * - Never expose SUPABASE_SERVICE_ROLE_KEY on the client.
+ * - Signed URLs are generated server-side via Edge Function, not client-side.
  * - The bucket remains private; RLS policies are unchanged.
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 const BUCKET = 'documents';
-const DEFAULT_EXPIRES_SECONDS = 300; // 5 min
+const DEFAULT_EXPIRES_SECONDS = 3600; // 1 hour
 
 /**
  * Extracts the storage path from a file_url stored in the documents table.
@@ -78,16 +80,15 @@ export async function getDocumentSignedUrl(
 ): Promise<string> {
   const storagePath = extractStoragePath(path);
 
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(storagePath, expiresInSeconds);
+  const result = await invokeEdgeFunction<{ signedUrl: string }>('generate-signed-url', {
+    body: { path: storagePath, expiresIn: expiresInSeconds },
+  });
 
-  if (error || !data?.signedUrl) {
-    console.error('[storage] Failed to create signed URL:', error?.message);
-    throw new Error(error?.message || 'Não foi possível gerar URL de acesso ao documento.');
+  if (!result?.signedUrl) {
+    throw new Error('Não foi possível gerar URL de acesso ao documento.');
   }
 
-  return data.signedUrl;
+  return result.signedUrl;
 }
 
 /**
