@@ -29,6 +29,7 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
   const [cc, setCc] = useState('');
   const [bcc, setBcc] = useState('');
   const [showCcBcc, setShowCcBcc] = useState(false);
+  const [emailMode, setEmailMode] = useState<'simplified' | 'detailed'>('simplified');
   const sendMutation = useSendQuoteEmail();
   const { data: paymentTerms } = usePaymentTerms(true);
 
@@ -38,6 +39,7 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
       setCc('');
       setBcc('');
       setShowCcBcc(false);
+      setEmailMode('simplified');
     }
   }, [quote, open]);
 
@@ -50,6 +52,7 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
         recipientEmail,
         cc: cc.trim() || undefined,
         bcc: bcc.trim() || undefined,
+        emailMode,
       },
       { onSuccess: () => onClose() }
     );
@@ -184,6 +187,40 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
             </div>
           </div>
         )}
+
+        {/* Email Mode */}
+        <div className="space-y-2">
+          <Label>Modelo do E-mail</Label>
+          <div className="flex gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="emailMode"
+                value="simplified"
+                checked={emailMode === 'simplified'}
+                onChange={() => setEmailMode('simplified')}
+                className="accent-primary"
+              />
+              <span className="text-sm">Simplificado (Cliente)</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="emailMode"
+                value="detailed"
+                checked={emailMode === 'detailed'}
+                onChange={() => setEmailMode('detailed')}
+                className="accent-primary"
+              />
+              <span className="text-sm">Detalhado (Interno)</span>
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {emailMode === 'simplified'
+              ? 'Mostra apenas pedágio, aluguel e carga/descarga.'
+              : 'Mostra composição completa do frete.'}
+          </p>
+        </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-2">

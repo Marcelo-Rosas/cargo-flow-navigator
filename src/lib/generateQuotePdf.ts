@@ -5,12 +5,16 @@ import type { StoredPricingBreakdown, TollPlaza } from '@/lib/freightCalculator'
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 
+export type QuotePdfMode = 'detailed' | 'simplified';
+
 interface QuotePdfInput {
   quote: Quote;
   breakdown: StoredPricingBreakdown | null;
   vehicleName?: string | null;
   paymentTermLabel?: string | null;
   routeStops?: { city_uf: string; cep?: string | null; name?: string | null }[];
+  /** 'detailed' = todos os itens (interno); 'simplified' = só custos adicionais (cliente). Default: 'detailed' */
+  mode?: QuotePdfMode;
 }
 
 const fmt = (v: number) =>
@@ -51,6 +55,7 @@ export async function generateQuotePdf({
   vehicleName,
   paymentTermLabel,
   routeStops,
+  mode = 'detailed',
 }: QuotePdfInput): Promise<void> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -225,31 +230,44 @@ export async function generateQuotePdf({
 
   if (breakdown?.components) {
     const c = breakdown.components;
-    if ((c.baseFreight ?? 0) > 0) priceRows.push(['Frete Base', fmt(c.baseFreight)]);
+    const isDetailed = mode === 'detailed';
+
+    // Itens internos — só no modo detalhado
+    if (isDetailed) {
+      if ((c.baseFreight ?? 0) > 0) priceRows.push(['Frete Base', fmt(c.baseFreight)]);
+    }
+
+    // Pedágio — sempre visível
     if ((c.toll ?? 0) > 0) priceRows.push(['Pedágio', fmt(c.toll)]);
-    if ((c.gris ?? 0) > 0)
-      priceRows.push([`GRIS (${breakdown.rates?.grisPercent?.toFixed(2) ?? 0}%)`, fmt(c.gris)]);
-    if ((c.tso ?? 0) > 0)
-      priceRows.push([`TSO (${breakdown.rates?.tsoPercent?.toFixed(2) ?? 0}%)`, fmt(c.tso)]);
-    if ((c.rctrc ?? 0) > 0)
-      priceRows.push([
-        `RCTR-C (${breakdown.rates?.costValuePercent?.toFixed(2) ?? 0}%)`,
-        fmt(c.rctrc),
-      ]);
-    if ((c.adValorem ?? 0) > 0)
-      priceRows.push([
-        `Ad Valorem (${breakdown.rates?.adValoremPercent?.toFixed(3) ?? 0}%)`,
-        fmt(c.adValorem),
-      ]);
-    if ((c.tde ?? 0) > 0) priceRows.push(['TDE', fmt(c.tde)]);
-    if ((c.tear ?? 0) > 0) priceRows.push(['TEAR', fmt(c.tear)]);
-    if ((c.dispatchFee ?? 0) > 0) priceRows.push(['Taxa de Despacho', fmt(c.dispatchFee)]);
+
+    // Taxas/seguros — só no modo detalhado
+    if (isDetailed) {
+      if ((c.gris ?? 0) > 0)
+        priceRows.push([`GRIS (${breakdown.rates?.grisPercent?.toFixed(2) ?? 0}%)`, fmt(c.gris)]);
+      if ((c.tso ?? 0) > 0)
+        priceRows.push([`TSO (${breakdown.rates?.tsoPercent?.toFixed(2) ?? 0}%)`, fmt(c.tso)]);
+      if ((c.rctrc ?? 0) > 0)
+        priceRows.push([
+          `RCTR-C (${breakdown.rates?.costValuePercent?.toFixed(2) ?? 0}%)`,
+          fmt(c.rctrc),
+        ]);
+      if ((c.adValorem ?? 0) > 0)
+        priceRows.push([
+          `Ad Valorem (${breakdown.rates?.adValoremPercent?.toFixed(3) ?? 0}%)`,
+          fmt(c.adValorem),
+        ]);
+      if ((c.tde ?? 0) > 0) priceRows.push(['TDE', fmt(c.tde)]);
+      if ((c.tear ?? 0) > 0) priceRows.push(['TEAR', fmt(c.tear)]);
+      if ((c.dispatchFee ?? 0) > 0) priceRows.push(['Taxa de Despacho', fmt(c.dispatchFee)]);
+      if ((c.conditionalFeesTotal ?? 0) > 0)
+        priceRows.push(['Taxas Condicionais', fmt(c.conditionalFeesTotal)]);
+    }
+
+    // Custos adicionais — sempre visíveis
     if ((c.aluguelMaquinas ?? 0) > 0)
       priceRows.push(['Aluguel de Máquinas', fmt(c.aluguelMaquinas)]);
     if ((c.waitingTimeCost ?? 0) > 0)
       priceRows.push(['Estadia / Hora Parada', fmt(c.waitingTimeCost)]);
-    if ((c.conditionalFeesTotal ?? 0) > 0)
-      priceRows.push(['Taxas Condicionais', fmt(c.conditionalFeesTotal)]);
   }
 
   if (breakdown?.profitability?.custosDescarga && breakdown.profitability.custosDescarga > 0) {

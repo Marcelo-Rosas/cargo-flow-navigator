@@ -34,7 +34,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { supabase } from '@/integrations/supabase/client';
 import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
-import { formatRouteUf, StoredPricingBreakdown, TollPlaza } from '@/lib/freightCalculator';
+import {
+  formatRouteUf,
+  StoredPricingBreakdown,
+  TollPlaza,
+  FREIGHT_CONSTANTS,
+} from '@/lib/freightCalculator';
 import {
   Table,
   TableBody,
@@ -86,7 +91,7 @@ const STAGE_LABELS: Record<QuoteStage, { label: string; color: string }> = {
   perdido: { label: 'Perdido', color: 'bg-destructive/10 text-destructive' },
 };
 
-const TARGET_MARGIN_PERCENT = 15;
+const TARGET_MARGIN_PERCENT = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
 
 export function QuoteDetailModal({
   open,
@@ -601,7 +606,9 @@ export function QuoteDetailModal({
   const vehicleName = (vehicleType as { name?: string } | null)?.name ?? null;
   const vehicleCode = (vehicleType as { code?: string } | null)?.code ?? null;
 
-  const handleDownloadPdf = async () => {
+  const handleDownloadPdf = async (
+    mode: import('@/lib/generateQuotePdf').QuotePdfMode = 'detailed'
+  ) => {
     if (!quote) return;
     const ptLabel =
       paymentTerm &&
@@ -622,6 +629,7 @@ export function QuoteDetailModal({
         .filter((s) => s.stop_type === 'stop')
         .sort((a, b) => a.sequence - b.sequence)
         .map((s) => ({ city_uf: s.city_uf, cep: s.cep, name: s.name })),
+      mode,
     });
   };
   const hasOperacao =

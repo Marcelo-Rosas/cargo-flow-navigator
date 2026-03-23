@@ -6,6 +6,7 @@ interface RequestBody {
   recipientEmail: string;
   cc?: string;
   bcc?: string;
+  emailMode?: 'simplified' | 'detailed';
 }
 
 interface PaymentTerm {
@@ -46,7 +47,8 @@ interface RouteStop {
 function buildEmailHtml(
   quote: Record<string, unknown>,
   paymentTerm: PaymentTerm | null,
-  routeStops: RouteStop[] = []
+  routeStops: RouteStop[] = [],
+  emailMode: 'simplified' | 'detailed' = 'simplified'
 ): string {
   const breakdown = quote.pricing_breakdown as Record<string, unknown> | null;
   const meta = breakdown?.meta as Record<string, unknown> | null;
@@ -74,10 +76,25 @@ function buildEmailHtml(
   const profitability = breakdown?.profitability as Record<string, unknown> | null;
   const rates = breakdown?.rates as Record<string, unknown> | null;
 
+  const baseFreight = components?.baseFreight as number | null;
   const toll = components?.toll as number | null;
+  const gris = components?.gris as number | null;
+  const tso = components?.tso as number | null;
+  const rctrc = components?.rctrc as number | null;
+  const adValorem = components?.adValorem as number | null;
+  const tde = components?.tde as number | null;
+  const tear = components?.tear as number | null;
+  const dispatchFee = components?.dispatchFee as number | null;
+  const conditionalFeesTotal = components?.conditionalFeesTotal as number | null;
   const insurance = components?.insurance as number | null;
   const aluguelMaquinas = components?.aluguelMaquinas as number | null;
+  const waitingTimeCost = components?.waitingTimeCost as number | null;
   const custosDescarga = profitability?.custosDescarga as number | null;
+
+  const grisPercent = rates?.grisPercent as number | null;
+  const tsoPercent = rates?.tsoPercent as number | null;
+  const costValuePercent = rates?.costValuePercent as number | null;
+  const adValoremPercent = rates?.adValoremPercent as number | null;
 
   // Taxes
   const das = totals?.das as number | null;
@@ -121,12 +138,45 @@ function buildEmailHtml(
     </tr>`;
 
   // Build pricing rows
+  const isDetailed = emailMode === 'detailed';
   const pricingRows: string[] = [];
+
+  // Itens internos — só no modo detalhado
+  if (isDetailed && baseFreight != null && baseFreight > 0)
+    pricingRows.push(pricingRow('Frete Base', formatBRL(baseFreight)));
+
+  // Pedágio — sempre visível
   if (toll != null && toll > 0) pricingRows.push(pricingRow('Pedágio', formatBRL(toll)));
+
+  // Taxas/seguros — só no modo detalhado
+  if (isDetailed) {
+    if (gris != null && gris > 0)
+      pricingRows.push(pricingRow(`GRIS (${(grisPercent ?? 0).toFixed(2)}%)`, formatBRL(gris)));
+    if (tso != null && tso > 0)
+      pricingRows.push(pricingRow(`TSO (${(tsoPercent ?? 0).toFixed(2)}%)`, formatBRL(tso)));
+    if (rctrc != null && rctrc > 0)
+      pricingRows.push(
+        pricingRow(`RCTR-C (${(costValuePercent ?? 0).toFixed(2)}%)`, formatBRL(rctrc))
+      );
+    if (adValorem != null && adValorem > 0)
+      pricingRows.push(
+        pricingRow(`Ad Valorem (${(adValoremPercent ?? 0).toFixed(3)}%)`, formatBRL(adValorem))
+      );
+    if (tde != null && tde > 0) pricingRows.push(pricingRow('TDE', formatBRL(tde)));
+    if (tear != null && tear > 0) pricingRows.push(pricingRow('TEAR', formatBRL(tear)));
+    if (dispatchFee != null && dispatchFee > 0)
+      pricingRows.push(pricingRow('Taxa de Despacho', formatBRL(dispatchFee)));
+    if (conditionalFeesTotal != null && conditionalFeesTotal > 0)
+      pricingRows.push(pricingRow('Taxas Condicionais', formatBRL(conditionalFeesTotal)));
+  }
+
+  // Custos adicionais — sempre visíveis
   if (insurance != null && insurance > 0)
     pricingRows.push(pricingRow('Seguro', formatBRL(insurance)));
   if (aluguelMaquinas != null && aluguelMaquinas > 0)
     pricingRows.push(pricingRow('Aluguel de Máquinas', formatBRL(aluguelMaquinas)));
+  if (waitingTimeCost != null && waitingTimeCost > 0)
+    pricingRows.push(pricingRow('Estadia / Hora Parada', formatBRL(waitingTimeCost)));
   if (custosDescarga != null && custosDescarga > 0)
     pricingRows.push(pricingRow('Descarga', formatBRL(custosDescarga)));
   // Mark last row
@@ -436,7 +486,12 @@ Deno.serve(async (req) => {
     }
 
     const quoteCode = quote.quote_code || quote.id.slice(0, 8);
-    const html = buildEmailHtml(quote, paymentTerm, routeStops ?? []);
+    const html = buildEmailHtml(
+      quote,
+      paymentTerm,
+      routeStops ?? [],
+      body.emailMode ?? 'simplified'
+    );
 
     // Send email via Resend
     const resendRes = await fetch('https://api.resend.com/emails', {

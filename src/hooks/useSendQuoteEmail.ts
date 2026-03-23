@@ -9,17 +9,18 @@ interface SendQuoteEmailParams {
   recipientEmail: string;
   cc?: string;
   bcc?: string;
+  emailMode?: 'simplified' | 'detailed';
 }
 
 export function useSendQuoteEmail() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ quoteId, recipientEmail, cc, bcc }: SendQuoteEmailParams) => {
+    mutationFn: async ({ quoteId, recipientEmail, cc, bcc, emailMode }: SendQuoteEmailParams) => {
       // 1. Send the email via Edge Function.
       // Auth headers are handled centrally by invokeEdgeFunction (token refresh + retry).
       const data = await invokeEdgeFunction<{ error?: string }>('send-quote-email', {
-        body: { quoteId, recipientEmail, cc, bcc },
+        body: { quoteId, recipientEmail, cc, bcc, emailMode: emailMode ?? 'simplified' },
       });
 
       if (data?.error) throw new Error(data.error);

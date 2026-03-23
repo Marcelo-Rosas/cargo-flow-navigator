@@ -49,6 +49,9 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   if (inAllowlist) {
     headers['Access-Control-Allow-Origin'] = requestOrigin!;
     headers['Vary'] = 'Origin';
+  } else {
+    // Fallback: allow all origins to prevent empty responses on CORS mismatch
+    headers['Access-Control-Allow-Origin'] = '*';
   }
 
   return headers;

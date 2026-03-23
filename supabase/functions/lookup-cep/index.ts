@@ -1,4 +1,4 @@
-import { getCorsHeaders } from '../_shared/cors.ts';
+import { corsHeaders } from '../_shared/cors.ts';
 
 interface CepData {
   cep: string;
@@ -93,7 +93,7 @@ function formatAddress(data: CepData): string {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
+  // lookup-cep é público (sem auth) — CORS wildcard é seguro aqui
   const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
 
   if (req.method === 'OPTIONS') {

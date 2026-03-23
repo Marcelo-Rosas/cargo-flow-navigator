@@ -1048,7 +1048,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         success: boolean;
         data?: { formatted: string };
         error?: string;
-      }>('lookup-cep', { cep });
+      }>('lookup-cep', { body: { cep }, requireAuth: false });
 
       if (!data?.success) {
         toast.error('CEP de origem não encontrado');
@@ -1076,7 +1076,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         success: boolean;
         data?: { formatted: string };
         error?: string;
-      }>('lookup-cep', { cep });
+      }>('lookup-cep', { body: { cep }, requireAuth: false });
 
       if (!data?.success) {
         toast.error('CEP de destino não encontrado');
@@ -1596,8 +1596,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                   <Alert className="bg-warning/10 border-warning">
                     <AlertTriangle className="h-4 w-4 text-warning-foreground" />
                     <AlertDescription className="text-warning-foreground">
-                      Margem de {calculationResult.profitability.margemPercent.toFixed(1)}% abaixo
-                      da meta de 15%
+                      Margem operacional de{' '}
+                      {calculationResult.profitability.margemPercent.toFixed(1)}% abaixo da meta de{' '}
+                      {resolvedPricingParams.profitMarginPercent}%
                     </AlertDescription>
                   </Alert>
                 )}
@@ -2600,7 +2601,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                               )}
                             >
                               <div className="flex justify-between">
-                                <span className="text-muted-foreground">Margem Bruta</span>
+                                <span className="text-muted-foreground">Margem Bruta (R$)</span>
                                 <span className="text-foreground">
                                   {formatCurrency(calculationResult.profitability.margemBruta)}
                                 </span>
@@ -2629,7 +2630,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                                 </Badge>
                               </div>
                               <div className="flex justify-between font-semibold items-center gap-2">
-                                <span className="text-foreground">Margem %</span>
+                                <span className="text-foreground">Margem Operacional</span>
                                 <Badge
                                   variant={
                                     calculationResult.meta.marginStatus === 'BELOW_TARGET'
