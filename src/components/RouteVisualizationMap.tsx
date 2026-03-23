@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Loader } from 'lucide-react';
 import { loadGoogleMapsScript } from '@/lib/google-maps';
-import type { LoadCompositionSuggestionWithDetails } from '@/hooks/useLoadCompositionSuggestions';
+import type { LoadCompositionSuggestionWithDetails } from '@/types/load-composition';
 
 export interface RouteVisualizationMapProps {
   suggestion: LoadCompositionSuggestionWithDetails;
@@ -34,8 +34,8 @@ export function RouteVisualizationMap({
   height = '400px',
 }: RouteVisualizationMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const mapRef = useRef<unknown>(null);
+  const markersRef = useRef<Array<{ setMap: (map: unknown) => void }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,9 +46,13 @@ export function RouteVisualizationMap({
       try {
         // Load Google Maps script
         await loadGoogleMapsScript();
+        const googleMaps = (window as Window & { google?: typeof google }).google;
+        if (!googleMaps?.maps) {
+          throw new Error('Google Maps indisponivel');
+        }
 
         // Create map centered on Brazil
-        const map = new window.google.maps.Map(mapContainer.current, {
+        const map = new googleMaps.maps.Map(mapContainer.current, {
           zoom: 10,
           center: { lat: -23.5505, lng: -46.6333 }, // São Paulo region
           mapTypeId: 'roadmap',
@@ -61,7 +65,10 @@ export function RouteVisualizationMap({
         markersRef.current = [];
 
         // Add markers for each quote
-        const infoWindows: google.maps.InfoWindow[] = [];
+        const infoWindows: Array<{
+          close: () => void;
+          open: (map: unknown, anchor: unknown) => void;
+        }> = [];
 
         // Default coordinates (São Paulo region as fallback)
         const defaultCoords: Record<string, { lat: number; lng: number }> = {
@@ -89,7 +96,7 @@ export function RouteVisualizationMap({
 
           // Origin marker (blue, only for first quote)
           if (index === 0) {
-            const originMarker = new window.google.maps.Marker({
+            const originMarker = new googleMaps.maps.Marker({
               position: originCoords,
               map,
               title: quote.origin,
@@ -100,7 +107,7 @@ export function RouteVisualizationMap({
                 fontWeight: 'bold',
               },
               icon: {
-                path: window.google.maps.SymbolPath.CIRCLE,
+                path: googleMaps.maps.SymbolPath.CIRCLE,
                 scale: 10,
                 fillColor: '#3b82f6',
                 fillOpacity: 1,
@@ -109,7 +116,7 @@ export function RouteVisualizationMap({
               },
             });
 
-            const originInfoWindow = new window.google.maps.InfoWindow({
+            const originInfoWindow = new googleMaps.maps.InfoWindow({
               content: `<div class="font-semibold text-sm">${quote.origin}</div><div class="text-xs text-gray-600">📍 Origem</div>`,
             });
 
@@ -128,7 +135,7 @@ export function RouteVisualizationMap({
               ? '#ef4444' // Main destination
               : '#f97316'; // Secondary destinations
 
-          const destMarker = new window.google.maps.Marker({
+          const destMarker = new googleMaps.maps.Marker({
             position: destCoords,
             map,
             title: quote.destination,
@@ -139,7 +146,7 @@ export function RouteVisualizationMap({
               fontWeight: 'bold',
             },
             icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
+              path: googleMaps.maps.SymbolPath.CIRCLE,
               scale: 10,
               fillColor: markerIcon,
               fillOpacity: 1,
@@ -149,7 +156,7 @@ export function RouteVisualizationMap({
           });
 
           const clientName = quote.client_name || 'Cliente';
-          const destInfoWindow = new window.google.maps.InfoWindow({
+          const destInfoWindow = new googleMaps.maps.InfoWindow({
             content: `<div class="font-semibold text-sm">${quote.destination}</div><div class="text-xs text-gray-600">📦 ${clientName}</div><div class="text-xs text-gray-500">Parada ${index === 0 ? 'Principal' : index}</div>`,
           });
 
@@ -166,7 +173,7 @@ export function RouteVisualizationMap({
         if (quotes.length > 1) {
           const polylinePath = quotes.map((quote) => getCoordinates(quote.destination || ''));
 
-          const polyline = new window.google.maps.Polyline({
+          const polyline = new googleMaps.maps.Polyline({
             path: polylinePath,
             geodesic: true,
             strokeColor: '#4f46e5',
@@ -176,7 +183,7 @@ export function RouteVisualizationMap({
           });
 
           // Fit bounds to show all markers
-          const bounds = new window.google.maps.LatLngBounds();
+          const bounds = new googleMaps.maps.LatLngBounds();
           polylinePath.forEach((point) => {
             bounds.extend(point);
           });
@@ -268,7 +275,7 @@ export function RouteVisualizationMap({
               <div>
                 <div className="text-gray-600">Distância Total</div>
                 <div className="font-semibold text-green-700">
-                  {suggestion.composed_km_total
+                  {suggestion.composed_km_total != null
                     ? `${suggestion.composed_km_total.toFixed(0)}km`
                     : '—'}
                 </div>
@@ -276,13 +283,13 @@ export function RouteVisualizationMap({
               <div>
                 <div className="text-gray-600">Delta</div>
                 <div className="font-semibold text-green-700">
-                  {suggestion.delta_km_percent !== null
+                  {suggestion.delta_km_percent != null
                     ? `+${suggestion.delta_km_percent.toFixed(1)}%`
                     : '—'}
                 </div>
               </div>
             </div>
-            {suggestion.delta_km_abs !== null && (
+            {suggestion.delta_km_abs != null && (
               <div className="text-xs text-gray-600">
                 Economia: <strong>+{suggestion.delta_km_abs.toFixed(0)}km</strong> versus rotas
                 separadas

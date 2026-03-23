@@ -6,11 +6,13 @@ on:
     paths:
       - 'src/**'
       - 'supabase/functions/**'
+      - 'supabase/migrations/**'
   pull_request:
     branches: [main]
     paths:
       - 'src/**'
       - 'supabase/functions/**'
+      - 'supabase/migrations/**'
 
   # Permite rodar manualmente na aba Actions
   workflow_dispatch:

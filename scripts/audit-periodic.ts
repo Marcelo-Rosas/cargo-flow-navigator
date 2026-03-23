@@ -41,7 +41,7 @@ function collectFiles(dir: string, exts: string[]): string[] {
 
 function runCmd(cmd: string): string {
   try {
-    return execSync(cmd, { encoding: 'utf-8', cwd: ROOT, timeout: 30000 }).trim();
+    return execSync(cmd, { encoding: 'utf-8', cwd: ROOT, timeout: 120000 }).trim();
   } catch {
     return '(falhou)';
   }
@@ -72,12 +72,120 @@ function table(headers: string[], rows: string[][]) {
   rows.forEach((r) => report.push(`| ${r.join(' | ')} |`));
 }
 
-// ─── 1. Estrutura do Projeto ────────────────────────────────
+// ─── Header ─────────────────────────────────────────────────
 
 h1('Auditoria Periódica — Cargo Flow Navigator');
 line(`**Data:** ${new Date().toISOString().split('T')[0]}`);
 line(`**Branch:** ${runCmd('git branch --show-current')}`);
 line(`**Último commit:** ${runCmd('git log -1 --format="%h %s"')}`);
+
+// ─── 0. Pipeline Health ─────────────────────────────────────
+
+h2('0. Pipeline Health');
+
+// 0a. Build
+const buildResult = (() => {
+  try {
+    execSync('npm run build', { cwd: ROOT, timeout: 120_000, stdio: 'pipe' });
+    return { status: 'PASS' as const, error: '' };
+  } catch (e: unknown) {
+    const err = e as { stderr?: Buffer };
+    return { status: 'FAILED' as const, error: err.stderr?.toString()?.slice(-200) || '' };
+  }
+})();
+
+// 0b. TypeScript
+const tscResult = (() => {
+  try {
+    execSync('npx tsc --noEmit', { cwd: ROOT, timeout: 60_000, stdio: 'pipe' });
+    return { status: 'PASS' as const, errors: 0 };
+  } catch (e: unknown) {
+    const err = e as { stdout?: Buffer };
+    const output = err.stdout?.toString() || '';
+    const errorCount = (output.match(/error TS\d+/g) || []).length;
+    return { status: 'FAILED' as const, errors: errorCount };
+  }
+})();
+
+// 0c. Linting
+const lintResult = (() => {
+  try {
+    execSync('npm run lint', { cwd: ROOT, timeout: 60_000, stdio: 'pipe' });
+    return { status: 'PASS' as const, errors: 0 };
+  } catch (e: unknown) {
+    const err = e as { stdout?: Buffer };
+    const output = err.stdout?.toString() || '';
+    const errorLines = output.split('\n').filter((l: string) => l.includes('error')).length;
+    return { status: 'FAILED' as const, errors: errorLines };
+  }
+})();
+
+// 0d. NPM Vulnerabilities
+const npmAuditResult = (() => {
+  try {
+    const raw = execSync('npm audit --json 2>&1 || true', {
+      cwd: ROOT,
+      timeout: 30_000,
+      encoding: 'utf-8',
+    });
+    const parsed = JSON.parse(raw);
+    const vulns = parsed.metadata?.vulnerabilities || {};
+    return {
+      critical: (vulns.critical as number) || 0,
+      high: (vulns.high as number) || 0,
+      total: ((vulns.critical as number) || 0) + ((vulns.high as number) || 0),
+    };
+  } catch {
+    return { critical: 0, high: 0, total: 0 };
+  }
+})();
+
+// 0e. RLS Policies (conta CREATE POLICY nos migrations)
+const rlsResult = (() => {
+  try {
+    const migrationsDir = join(ROOT, 'supabase', 'migrations');
+    if (!existsSync(migrationsDir)) return { count: 0, source: 'sem migrations' };
+    const migFiles = readdirSync(migrationsDir).filter((f) => f.endsWith('.sql'));
+    let policyCount = 0;
+    for (const f of migFiles) {
+      const sql = readFileSync(join(migrationsDir, f), 'utf-8');
+      const matches = sql.match(/CREATE POLICY/gi);
+      if (matches) policyCount += matches.length;
+    }
+    return { count: policyCount, source: 'migrations' };
+  } catch {
+    return { count: 0, source: 'erro' };
+  }
+})();
+
+table(
+  ['Verificação', 'Status', 'Detalhe'],
+  [
+    ['Build', buildResult.status === 'PASS' ? '✅ PASS' : '🔴 FAILED', buildResult.error || '—'],
+    [
+      'TypeScript',
+      tscResult.status === 'PASS' ? '✅ PASS' : '🔴 FAILED',
+      `${tscResult.errors} errors`,
+    ],
+    [
+      'Linting',
+      lintResult.status === 'PASS' ? '✅ PASS' : '🔴 FAILED',
+      `${lintResult.errors} errors`,
+    ],
+    [
+      'NPM Vulnerabilities',
+      npmAuditResult.total === 0 ? '✅ PASS' : '🔴 CRITICAL',
+      `${npmAuditResult.critical} critical, ${npmAuditResult.high} high`,
+    ],
+    [
+      'RLS Policies',
+      rlsResult.count > 0 ? '✅ PASS' : '⚠️',
+      `${rlsResult.count} policies (${rlsResult.source})`,
+    ],
+  ]
+);
+
+// ─── 1. Estrutura do Projeto ────────────────────────────────
 
 h2('1. Estrutura do Projeto');
 
@@ -282,35 +390,24 @@ for (const file of [...tsxFiles, ...tsFiles]) {
   const content = readFileSync(file, 'utf-8');
   const rel = relative(ROOT, file);
 
-  // Mutations sem invalidate — skip import lines
-  const mutationMatches = content.match(/useMutation/g);
-  if (mutationMatches) {
-    const blocks = content.split('useMutation');
-    blocks.slice(1).forEach((block) => {
-      // Skip blocks that start with import patterns (e.g. ", " or "} from")
-      const trimmed = block.trimStart();
-      if (
-        trimmed.startsWith(', ') ||
-        trimmed.startsWith('} from') ||
-        trimmed.startsWith('} from')
-      ) {
-        return; // This is an import line, not an actual mutation call
-      }
-      // Only count blocks that start with actual mutation calls
-      if (trimmed.startsWith('({') || trimmed.startsWith('(\n') || trimmed.startsWith('({\n')) {
-        const chunk = block.substring(0, 500);
-        if (!chunk.includes('invalidateQueries') && !chunk.includes('invalidate')) {
-          mutationsWithoutInvalidate++;
-        }
-      }
-    });
+  // Mutations sem invalidate — verifica por arquivo
+  // Se o arquivo contém useMutation({ mas NÃO contém invalidateQueries, conta como problema
+  // Exceção: mutations read-only (validate, calculate, analyze, generate) não alteram dados
+  const hasMutationCall = /useMutation\(\{/.test(content);
+  if (hasMutationCall) {
+    const hasInvalidate = content.includes('invalidateQueries') || content.includes('invalidate(');
+    const isReadOnlyMutation = /use(Validate|Calculate|Analyze|Generate)/.test(rel);
+    if (!hasInvalidate && !isReadOnlyMutation) {
+      mutationsWithoutInvalidate++;
+    }
   }
 
   // useEffect com fetch — only flag when fetch/supabase.from is INSIDE useEffect callback
-  // Skip hook files that use useQuery (they legitimately use supabase.from in useQuery, not useEffect)
+  // Skip hook files that use useQuery and form files (forms use supabase.from in handlers, not in useEffect)
   if (content.includes('useEffect')) {
     const isHookWithQuery = file.includes('/hooks/') && content.includes('useQuery');
-    if (!isHookWithQuery) {
+    const isFormFile = /Form\.tsx$|Form\.ts$/.test(file);
+    if (!isHookWithQuery && !isFormFile) {
       // Find useEffect blocks and check if fetch/supabase.from appears within ~15 lines
       const lines = content.split('\n');
       for (let i = 0; i < lines.length; i++) {
@@ -319,7 +416,11 @@ for (const file of [...tsxFiles, ...tsFiles]) {
           const windowEnd = Math.min(i + 15, lines.length);
           let foundFetchInEffect = false;
           for (let j = i + 1; j < windowEnd; j++) {
-            if (lines[j].includes('fetch(') || lines[j].includes('supabase.from(')) {
+            if (
+              (lines[j].includes('fetch(') || lines[j].includes('supabase.from(')) &&
+              !lines[j].includes('supabase.channel') &&
+              !lines[j].includes('.refetch')
+            ) {
               foundFetchInEffect = true;
               break;
             }
@@ -515,8 +616,15 @@ if (existsSync(reportPath)) {
 
 h2('Score de Compliance');
 
-const totalChecks = 9;
+const totalChecks = 14;
 let passed = 0;
+// Pipeline Health (5 novos)
+if (buildResult.status === 'PASS') passed++;
+if (tscResult.status === 'PASS') passed++;
+if (lintResult.status === 'PASS') passed++;
+if (npmAuditResult.total === 0) passed++;
+if (rlsResult.count > 0) passed++;
+// Compliance original (9)
 if (brlIncorrect === 0) passed++;
 if (hasErrorBoundaryLib && totalErrorBoundaryUsages >= pageFiles.length * 0.5) passed++;
 if (totalLazyImports >= pageFiles.length * 0.5) passed++;

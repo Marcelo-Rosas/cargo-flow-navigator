@@ -14,35 +14,32 @@ export interface PetrobrasDieselData {
   parcela_distribuicao: number | null;
 }
 
-interface DieselRow {
-  uf: string;
-  preco_medio: number;
-  periodo_coleta: string | null;
-  fetched_at: string;
-  parcela_petrobras: number | null;
-  parcela_impostos_federais: number | null;
-  parcela_icms: number | null;
-  parcela_biodiesel: number | null;
-  parcela_distribuicao: number | null;
-}
-
 async function fetchFromTable(uf: string): Promise<PetrobrasDieselData | null> {
+  // Busca os 2 períodos de coleta mais recentes (distinct por periodo_coleta)
   const { data, error } = await supabase
     .from('petrobras_diesel_prices' as 'documents')
-    .select('*')
+    .select(
+      'uf, preco_medio, periodo_coleta, fetched_at, parcela_petrobras, parcela_impostos_federais, parcela_icms, parcela_biodiesel, parcela_distribuicao'
+    )
     .eq('uf', uf.toUpperCase())
     .order('fetched_at', { ascending: false })
-    .limit(2);
+    .limit(10); // pega mais registros para garantir 2 períodos distintos
 
   if (error) throw error;
-  const rows = (data ?? []) as unknown as DieselRow[];
+  const rows = (data ?? []) as Record<string, unknown>[];
   if (rows.length === 0) return null;
 
   const latest = rows[0];
-  const prev = rows.length > 1 ? rows[1] : null;
+
+  // Buscar registro de período ANTERIOR (período diferente do mais recente)
+  const prev = rows.find((r) => r.periodo_coleta !== latest.periodo_coleta) ?? null;
+
   const variacao_pct =
-    prev && prev.preco_medio > 0
-      ? Math.round(((latest.preco_medio - prev.preco_medio) / prev.preco_medio) * 10000) / 100
+    prev && Number(prev.preco_medio) > 0
+      ? Math.round(
+          ((Number(latest.preco_medio) - Number(prev.preco_medio)) / Number(prev.preco_medio)) *
+            10000
+        ) / 100
       : null;
 
   return {
@@ -68,7 +65,7 @@ async function callEdgeFunction(uf: string): Promise<PetrobrasDieselData> {
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
 
   const response = await fetch(
-    `${supabaseUrl}/functions/v1/petrobras-diesel?uf=${uf.toLowerCase()}`,
+    `${supabaseUrl}/functions/v1/petrobras-diesel?uf=${uf.toUpperCase()}`,
     {
       headers: {
         Authorization: `Bearer ${token ?? anonKey}`,
@@ -77,10 +74,7 @@ async function callEdgeFunction(uf: string): Promise<PetrobrasDieselData> {
     }
   );
 
-  if (!response.ok) {
-    throw new Error(`petrobras-diesel returned ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`petrobras-diesel returned ${response.status}`);
   return response.json();
 }
 
@@ -88,23 +82,22 @@ export function usePetrobrasDiesel(uf = 'BR') {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['petrobras-diesel', uf],
+    queryKey: ['petrobras-diesel', uf.toUpperCase()], // normaliza para evitar cache duplicado
     queryFn: async () => {
-      // Try cached data from table first
       const cached = await fetchFromTable(uf);
       if (cached) return cached;
-      // Fallback: trigger scrape on-demand
+      // Banco vazio para esta UF — chama Edge Function para popular
       return callEdgeFunction(uf);
     },
-    staleTime: 1000 * 60 * 30,
+    staleTime: 0, // FIX: sempre considera dado stale ao mudar UF
     gcTime: 1000 * 60 * 120,
     retry: 2,
   });
 
-  /** Manual refresh — calls Edge Function to re-scrape and invalidates cache */
+  /** Manual refresh — força nova coleta via Edge Function */
   const refresh = async () => {
     await callEdgeFunction(uf);
-    queryClient.invalidateQueries({ queryKey: ['petrobras-diesel', uf] });
+    queryClient.invalidateQueries({ queryKey: ['petrobras-diesel', uf.toUpperCase()] });
   };
 
   return { ...query, refresh };
