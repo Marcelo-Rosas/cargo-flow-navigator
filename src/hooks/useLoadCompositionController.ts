@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useLoadCompositionSuggestions } from '@/hooks/useLoadCompositionSuggestions';
 import type { LoadCompositionSuggestionWithDetails } from '@/types/load-composition';
@@ -38,6 +38,8 @@ export function useLoadCompositionController({
   shipperId,
   dateRange,
 }: UseLoadCompositionControllerParams) {
+  const queryClient = useQueryClient();
+
   // --- UI state ---
   const [filterStatus, setFilterStatus] = useState<CompositionFilterStatus>('pending');
   const [selectedCompositionId, setSelectedCompositionId] = useState<string | null>(null);
@@ -99,7 +101,11 @@ export function useLoadCompositionController({
 
   // --- Mutations ---
   const { mutate: approve, isPending: isApproving } = useApproveComposition();
-  const { mutate: analyzeComposition, isPending: isAnalyzing } = useAnalyzeLoadComposition();
+  const {
+    mutateAsync: analyzeCompositionAsync,
+    mutate: analyzeComposition,
+    isPending: isAnalyzing,
+  } = useAnalyzeLoadComposition();
   const { mutate: calculateDiscounts, isPending: isCalculatingDiscounts } = useCalculateDiscounts();
 
   // --- Derived ---
@@ -137,16 +143,27 @@ export function useLoadCompositionController({
     analyzeComposition({ shipper_id: shipperId, trigger_source: 'batch' });
   };
 
-  /** "Atualizar" — deleta sugestões pendentes e re-analisa do zero */
+  /** "Atualizar" — deleta sugestões pendentes e re-analisa do zero.
+   *  Comando independente: delete sequencial → analyze, sem depender do botão "Gerar". */
   const handleRefresh = async () => {
-    // Deletar sugestões pendentes do embarcador para forçar nova geração (sem dedup)
-    await supabase
+    // 1. Deletar sugestões pendentes do embarcador para forçar nova geração (sem dedup)
+    const { error: delError, count } = await supabase
       .from('load_composition_suggestions' as never)
-      .delete()
+      .delete({ count: 'exact' })
       .eq('shipper_id', shipperId)
       .eq('status', 'pending');
-    // Re-analisar
-    analyzeComposition({ shipper_id: shipperId, trigger_source: 'batch' });
+
+    if (delError) {
+      console.error('[handleRefresh] Delete failed:', delError.message);
+    } else {
+      console.log(`[handleRefresh] Deleted ${count} pending suggestions`);
+    }
+
+    // 2. Invalidar cache para que a lista reflita a deleção
+    await queryClient.invalidateQueries({ queryKey: ['load-composition-suggestions'] });
+
+    // 3. Re-analisar sequencialmente (await garante que só processa após delete)
+    await analyzeCompositionAsync({ shipper_id: shipperId, trigger_source: 'batch' });
   };
 
   const handleApprove = (compositionId: string) => {
