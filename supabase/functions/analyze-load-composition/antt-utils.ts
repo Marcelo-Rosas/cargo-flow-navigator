@@ -13,8 +13,10 @@ import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 // ---------------------------------------------------------------------------
 
 export interface VehicleInference {
+  id?: string;
   axes_count: number;
   vehicle_code: string;
+  vehicle_name?: string;
   capacity_kg: number;
 }
 
@@ -65,7 +67,7 @@ export async function inferAxesFromWeight(
 ): Promise<VehicleInference> {
   const { data, error } = await supabase
     .from('vehicle_types')
-    .select('code, axes_count, capacity_kg')
+    .select('id, code, name, axes_count, capacity_kg')
     .eq('active', true)
     .gte('capacity_kg', weightKg)
     .order('capacity_kg', { ascending: true })
@@ -74,8 +76,10 @@ export async function inferAxesFromWeight(
 
   if (!error && data && data.axes_count && data.capacity_kg) {
     return {
+      id: String(data.id),
       axes_count: Number(data.axes_count),
       vehicle_code: String(data.code),
+      vehicle_name: String(data.name),
       capacity_kg: Number(data.capacity_kg),
     };
   }

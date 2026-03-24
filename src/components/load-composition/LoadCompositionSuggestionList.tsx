@@ -4,11 +4,11 @@
  */
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, Truck } from 'lucide-react';
 import { LoadCompositionCard } from '@/components/LoadCompositionCard';
-import type { LoadCompositionSuggestionWithDetails } from '@/hooks/useLoadCompositionSuggestions';
 import type { QuoteInfo, CompositionFilterStatus } from '@/hooks/useLoadCompositionController';
 import { formatCurrencyFromCents, formatQuoteValue, formatDate } from '@/lib/formatters';
+import type { LoadCompositionSuggestionWithDetails } from '@/types/load-composition';
 
 export interface LoadCompositionSuggestionListProps {
   suggestions: LoadCompositionSuggestionWithDetails[];
@@ -222,6 +222,52 @@ function ExpandableSuggestionRow({
               );
             })}
           </div>
+
+          {/* Veículo sugerido */}
+          {suggestion.suggested_vehicle_type_name && (
+            <div className="mx-4 my-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Truck className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-800">
+                  Veículo Sugerido: {suggestion.suggested_vehicle_type_name}
+                  {suggestion.suggested_axes_count
+                    ? ` (${suggestion.suggested_axes_count} eixos)`
+                    : ''}
+                </span>
+              </div>
+              <div className="text-xs text-blue-700 mb-2">
+                Peso total: {(suggestion.total_combined_weight_kg ?? 0).toLocaleString('pt-BR')} kg
+                {suggestion.total_combined_volume_m3
+                  ? ` • Volume total: ${suggestion.total_combined_volume_m3.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} m³`
+                  : ''}
+              </div>
+              <div className="space-y-1">
+                {suggestion.quote_ids.map((qid) => {
+                  const q = quoteInfoMap[qid];
+                  if (!q) return null;
+                  const isCompatible = q.vehicle_type_id === suggestion.suggested_vehicle_type_id;
+                  return (
+                    <div key={qid} className="flex items-center gap-2 text-xs">
+                      <span className="font-medium">{q.quote_code || qid.slice(0, 8)}</span>
+                      <span className="text-muted-foreground">
+                        {q.vehicle_type_name || 'Sem veículo'}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {q.weight ? `${q.weight.toLocaleString('pt-BR')} kg` : ''}
+                      </span>
+                      <span className="ml-auto">
+                        {isCompatible ? (
+                          <span className="text-green-700 font-medium">Compatível</span>
+                        ) : (
+                          <span className="text-amber-700 font-medium">Troca necessária</span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Full card */}
           <div className="p-3 bg-muted/30">

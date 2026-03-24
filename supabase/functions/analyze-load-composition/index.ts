@@ -61,6 +61,7 @@ interface QuoteRow {
   destination_cep: string | null;
   km_distance: number | null;
   weight: number | null;
+  volume: number | null;
   value: number;
   estimated_loading_date: string | null;
   stage: string;
@@ -91,6 +92,11 @@ interface SuggestionRow {
   base_km_total: number | null;
   composed_km_total: number | null;
   route_evaluation_model: string;
+  suggested_vehicle_type_id: string | null;
+  suggested_vehicle_type_name: string | null;
+  suggested_axes_count: number | null;
+  total_combined_weight_kg: number | null;
+  total_combined_volume_m3: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +127,7 @@ function shouldSkipResult(routeModel: string): boolean {
 }
 
 const QUOTE_SELECT =
-  'id, shipper_id, origin, destination, origin_cep, destination_cep, km_distance, weight, value, estimated_loading_date, stage, quote_code, client_name, route_stops:quote_route_stops(cep, city_uf, sequence)';
+  'id, shipper_id, origin, destination, origin_cep, destination_cep, km_distance, weight, volume, value, estimated_loading_date, stage, quote_code, client_name, route_stops:quote_route_stops(cep, city_uf, sequence)';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -460,10 +466,12 @@ async function analyzeCombo(
   const warnings: string[] = [];
 
   let totalWeight = 0;
+  let totalVolume = 0;
   let totalValueCentavos = 0;
 
   for (const q of quotes) {
     totalWeight += Number(q.weight) || 0;
+    totalVolume += Number(q.volume) || 0;
     // value is stored as BRL decimal (e.g. 1500.50), convert to centavos
     totalValueCentavos += Math.round((Number(q.value) || 0) * 100);
   }
@@ -611,6 +619,12 @@ async function analyzeCombo(
     base_km_total: routeEval.base_km_total,
     composed_km_total: routeEval.composed_km_total,
     route_evaluation_model: routeEval.model,
+    // Veículo sugerido (peso real, sem peso cubado — lotação)
+    suggested_vehicle_type_id: vehicle.id ?? null,
+    suggested_vehicle_type_name: vehicle.vehicle_name ?? vehicle.vehicle_code,
+    suggested_axes_count: vehicle.axes_count,
+    total_combined_weight_kg: totalWeight,
+    total_combined_volume_m3: totalVolume,
     _preScore: score, // internal: used for sorting before WebRouter pass
   };
 }
@@ -1029,6 +1043,11 @@ Deno.serve(async (req: Request) => {
         base_km_total: s.base_km_total,
         composed_km_total: s.composed_km_total,
         route_evaluation_model: s.route_evaluation_model,
+        suggested_vehicle_type_id: s.suggested_vehicle_type_id,
+        suggested_vehicle_type_name: s.suggested_vehicle_type_name,
+        suggested_axes_count: s.suggested_axes_count,
+        total_combined_weight_kg: s.total_combined_weight_kg,
+        total_combined_volume_m3: s.total_combined_volume_m3,
         created_by: userId,
         status: 'pending',
       }));

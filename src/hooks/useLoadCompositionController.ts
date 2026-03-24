@@ -25,6 +25,8 @@ export interface QuoteInfo {
   value: number;
   estimated_loading_date: string | null;
   weight: number | null;
+  vehicle_type_id: string | null;
+  vehicle_type_name: string | null;
 }
 
 export interface UseLoadCompositionControllerParams {
@@ -72,11 +74,22 @@ export function useLoadCompositionController({
       if (allQuoteIds.length === 0) return {};
       const { data } = (await supabase
         .from('quotes' as never)
-        .select('id, quote_code, client_name, destination, value, estimated_loading_date, weight')
-        .in('id', allQuoteIds)) as unknown as { data: QuoteInfo[] | null };
+        .select(
+          'id, quote_code, client_name, destination, value, estimated_loading_date, weight, vehicle_type_id, vehicle_types(name)'
+        )
+        .in('id', allQuoteIds)) as unknown as {
+        data:
+          | (Omit<QuoteInfo, 'vehicle_type_name'> & {
+              vehicle_types: { name: string } | null;
+            })[]
+          | null;
+      };
       const map: Record<string, QuoteInfo> = {};
       for (const q of data ?? []) {
-        map[q.id] = q;
+        map[q.id] = {
+          ...q,
+          vehicle_type_name: q.vehicle_types?.name ?? null,
+        };
       }
       return map;
     },

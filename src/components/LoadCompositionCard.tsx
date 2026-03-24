@@ -4,10 +4,7 @@
  * Shows consolidation opportunity with route-fit evaluation, score, savings, and action buttons
  */
 
-import {
-  LoadCompositionSuggestionWithDetails,
-  type TriggerSource,
-} from '@/hooks/useLoadCompositionSuggestions';
+import type { TriggerSource, LoadCompositionSuggestionWithDetails } from '@/types/load-composition';
 import { formatCurrencyFromCents } from '@/lib/formatters';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +22,7 @@ import {
   Hand,
   Globe,
   Calculator,
+  Truck,
 } from 'lucide-react';
 
 export interface LoadCompositionCardProps {
@@ -140,6 +138,31 @@ export function LoadCompositionCard({
             <p className="text-[11px] text-muted-foreground leading-tight line-clamp-2">
               {suggestion.technical_explanation}
             </p>
+          )}
+
+          {/* Veículo sugerido */}
+          {suggestion.suggested_vehicle_type_name && (
+            <div className="flex items-center gap-1.5 text-[11px] text-blue-700 bg-blue-50 rounded px-2 py-1">
+              <Truck className="w-3 h-3 shrink-0" />
+              <span className="font-medium">
+                {suggestion.suggested_vehicle_type_name}
+                {suggestion.suggested_axes_count
+                  ? ` (${suggestion.suggested_axes_count} eixos)`
+                  : ''}
+              </span>
+              <span className="text-blue-600">
+                • {(suggestion.total_combined_weight_kg ?? 0).toLocaleString('pt-BR')} kg
+              </span>
+              {suggestion.total_combined_volume_m3 ? (
+                <span className="text-blue-600">
+                  •{' '}
+                  {suggestion.total_combined_volume_m3.toLocaleString('pt-BR', {
+                    maximumFractionDigits: 1,
+                  })}{' '}
+                  m³
+                </span>
+              ) : null}
+            </div>
           )}
 
           <div className="flex flex-wrap gap-2">
