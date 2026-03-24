@@ -77,8 +77,8 @@ async function fetchCityUf(cep: string): Promise<{ cidade: string; uf: string } 
 
 function buildAddress(cep: string, ordemPassagem: number, opts?: { cidade?: string; uf?: string }) {
   return {
-    ordemPassagem,
-    codigo: '',
+    ordemPassagem, // 1-based (caller must pass i+1)
+    codigo: String(ordemPassagem).padStart(2, '0'),
     logradouro: '',
     numero: '',
     cep,
@@ -86,9 +86,17 @@ function buildAddress(cep: string, ordemPassagem: number, opts?: { cidade?: stri
       pais: 'Brasil',
       uf: (opts?.uf || '').trim().toUpperCase().slice(0, 2),
       cidade: (opts?.cidade || '').trim().slice(0, 100),
-      codigoIbge: 0,
+      codigoIbge: '',
     },
     latLng: { latitude: 0, longitude: 0 },
+    informacaoParada: {
+      peso: 0,
+      volume: 0,
+      descricao: '',
+      dias: 0,
+      horas: 0,
+      minutos: 0,
+    },
   };
 }
 
@@ -135,7 +143,7 @@ export async function calculateRouteDistance(
 
   const enderecos = allCeps.map((cep, i) => {
     const addr = addrs[i];
-    return buildAddress(cep, i, addr ?? undefined);
+    return buildAddress(cep, i + 1, addr ?? undefined);
   });
 
   const body = {
@@ -248,7 +256,7 @@ export async function calculateRouteDistanceFull(
 
   const enderecos = allCeps.map((cep, i) => {
     const addr = addrs[i];
-    return buildAddress(cep, i, addr ?? undefined);
+    return buildAddress(cep, i + 1, addr ?? undefined);
   });
 
   const categoriaVeiculo = axesToCategoriaVeiculo(axesCount);
