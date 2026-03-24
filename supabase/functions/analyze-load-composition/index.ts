@@ -99,7 +99,7 @@ interface SuggestionRow {
 
 const MIN_VIABLE_SCORE = 60;
 const MIN_SAVINGS_CENTAVOS = 0; // Mostrar todas sugestões viáveis (removido mínimo R$500)
-const DEFAULT_DATE_WINDOW_DAYS = 14;
+const DEFAULT_DATE_WINDOW_DAYS = 45;
 const MAX_TRUCK_CAPACITY_KG = 30000;
 /** Hard rule: max days between loading dates for feasibility */
 const MAX_DATE_SPREAD_DAYS = 3;

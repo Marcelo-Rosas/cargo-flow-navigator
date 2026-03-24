@@ -51,7 +51,7 @@ export function useAnalyzeLoadComposition() {
             trigger_source: params.trigger_source ?? 'batch',
             anchor_quote_id: params.anchor_quote_id,
             quote_ids: params.quote_ids,
-            date_window_days: params.date_window_days ?? 14,
+            date_window_days: params.date_window_days ?? 45,
             min_viable_score: params.min_viable_score ?? 60,
           },
           requireAuth: true,
