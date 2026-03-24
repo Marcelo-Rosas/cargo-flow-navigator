@@ -380,15 +380,26 @@ export function QuoteDetailModal({
     try {
       const response = await calculateFreightMutation.mutateAsync(payload);
       const newBreakdown = buildStoredBreakdownFromEdgeResponse(response, bd);
+      // Apenas atualiza pricing_breakdown (memória de cálculo / ANTT / margem).
+      // NÃO sobrescreve value — o preço negociado com o cliente é preservado.
+      // Para alterar o value, o comercial deve passar pelo Wizard.
       await updateQuoteMutation.mutateAsync({
         id: quote.id,
         updates: {
           pricing_breakdown: newBreakdown as unknown as Json,
-          value: response.totals.total_cliente,
         },
       });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      toast.success('Memória de cálculo recalculada com sucesso');
+      const currentValue = Number(quote.value) || 0;
+      const newCalcValue = response.totals.total_cliente;
+      if (newCalcValue > currentValue && currentValue > 0) {
+        toast.warning(
+          `Memória recalculada. Valor sugerido (R$ ${newCalcValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) é maior que o valor atual. Avalie reajuste.`,
+          { duration: 8000 }
+        );
+      } else {
+        toast.success('Memória de cálculo recalculada com sucesso');
+      }
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : 'Erro ao recalcular. Verifique os dados da cotação.'
