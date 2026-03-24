@@ -12,7 +12,7 @@
  * - Warnings if any
  */
 
-import { AlertCircle, Route, Clock, DollarSign, MapPin } from 'lucide-react';
+import { AlertCircle, Route, Clock, Banknote, MapPin } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrencyFromCents } from '@/lib/formatters';
 import type { CompositionRouteMetrics } from '@/hooks/useCompositionRouteMetrics';
@@ -64,7 +64,7 @@ export function RouteStats({ metrics, className = '' }: RouteStatsProps) {
         {/* Toll */}
         <div className="rounded-lg border p-4">
           <div className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-green-500" />
+            <Banknote className="h-5 w-5 text-green-500" />
             <span className="text-sm font-medium text-muted-foreground">Pedágio</span>
           </div>
           <div className="mt-2 text-lg font-semibold">

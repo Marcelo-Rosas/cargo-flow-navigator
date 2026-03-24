@@ -74,7 +74,7 @@ export function useCompositionRouteMetrics({
         toll = legs.reduce((sum, leg) => sum + leg.toll_centavos, 0);
       }
 
-      stops = Math.max(0, legs.length - 1);
+      stops = legs.length; // cada leg termina em uma parada (entrega)
 
       const legsWithoutToll = legs.filter((leg) => leg.toll_centavos === 0).length;
       if (legsWithoutToll > 0) {
