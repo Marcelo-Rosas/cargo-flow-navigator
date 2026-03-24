@@ -39,6 +39,7 @@ import {
   Calendar,
   Ruler,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { RouteMapVisualization, type RouteMapVisualizationProps } from './RouteMapVisualization';
 import { DiscountProposalBreakdown } from './DiscountProposalBreakdown';
 import { generateLoadCompositionProposalPdf } from '@/lib/generateLoadCompositionProposalPdf';
@@ -214,14 +215,43 @@ export function LoadCompositionModal({
     };
   }, [composition]);
 
+  const quoteCodeById = useMemo<Record<string, string | null>>(() => {
+    const entries =
+      quotesDetail?.map((quote) => [quote.id, quote.quote_code] as const).filter(([id]) => !!id) ??
+      [];
+    return Object.fromEntries(entries);
+  }, [quotesDetail]);
+
+  const resolveSuggestionSequence = async (createdAt: string): Promise<number | undefined> => {
+    const createdDate = new Date(createdAt);
+    const monthStart = new Date(createdDate.getFullYear(), createdDate.getMonth(), 1);
+
+    const { count, error } = (await supabase
+      .from('load_composition_suggestions' as never)
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', monthStart.toISOString())
+      .lte('created_at', createdDate.toISOString())) as {
+      count: number | null;
+      error: { message: string } | null;
+    };
+
+    if (error || !count) {
+      return undefined;
+    }
+
+    return count;
+  };
+
   if (isLoading) {
     return (
       <Dialog open={true} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <Skeleton className="h-6 w-1/3" />
+            <DialogTitle className="sr-only">Carregando detalhes da composição</DialogTitle>
+            <DialogDescription className="sr-only">Aguarde</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <Skeleton className="h-6 w-1/3" />
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-64 w-full" />
           </div>
@@ -236,6 +266,7 @@ export function LoadCompositionModal({
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Erro ao carregar detalhes</DialogTitle>
+            <DialogDescription>Não foi possível carregar os dados da composição.</DialogDescription>
           </DialogHeader>
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
@@ -562,10 +593,13 @@ export function LoadCompositionModal({
               ) : routeData || (composition.routings && composition.routings.length > 0) ? (
                 <RouteMapVisualization
                   polylineCoords={routeData?.polyline_coords}
+                  encodedPolyline={routeData?.encoded_polyline ?? composition.encoded_polyline}
                   legs={routeData?.legs as RouteMapVisualizationProps['legs']}
                   totalDistanceKm={routeData?.total_distance_km}
                   totalDurationMin={routeData?.total_duration_min}
-                  totalTollCentavos={routeData?.total_toll_centavos}
+                  totalTollCentavos={
+                    routeData?.total_toll_centavos ?? composition.total_toll_centavos
+                  }
                   routeSource={routeData?.route_source}
                   routings={composition.routings}
                 />
@@ -692,7 +726,19 @@ export function LoadCompositionModal({
                     if (!composition.discounts || composition.discounts.length === 0) return;
                     try {
                       setIsExportingPdf(true);
-                      await generateLoadCompositionProposalPdf({ suggestion: composition });
+                      const suggestionSequence = await resolveSuggestionSequence(
+                        composition.created_at
+                      );
+                      await generateLoadCompositionProposalPdf({
+                        suggestion: composition,
+                        quoteCodeById,
+                        suggestionSequence,
+                      });
+                      toast.success('PDF gerado com sucesso');
+                    } catch (error) {
+                      const description =
+                        error instanceof Error ? error.message : 'Tente novamente em instantes.';
+                      toast.error('Falha ao gerar PDF da proposta', { description });
                     } finally {
                       setIsExportingPdf(false);
                     }
