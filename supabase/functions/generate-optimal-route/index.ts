@@ -32,6 +32,8 @@ interface GenerateRouteRequest {
   quote_ids: string[];
   composition_id?: string;
   save_to_db?: boolean;
+  /** Number of axes for toll calculation (maps to WebRouter categoriaVeiculo) */
+  axes_count?: number;
 }
 
 interface QuoteRow {
@@ -72,7 +74,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = (await req.json()) as GenerateRouteRequest;
-    const { quote_ids, composition_id, save_to_db = true } = body;
+    const { quote_ids, composition_id, save_to_db = true, axes_count } = body;
 
     if (!quote_ids || quote_ids.length < 2) {
       return jsonResponse({ error: 'At least 2 quote_ids required' }, 400);
@@ -174,7 +176,12 @@ Deno.serve(async (req: Request) => {
       `[generate-optimal-route] Calling WebRouter with: origin=${originCep}, dest=${destCep}, waypoints=${waypointCeps.length}`
     );
 
-    const routeResult = await calculateRouteDistanceFull(originCep, destCep, waypointCeps);
+    const routeResult = await calculateRouteDistanceFull(
+      originCep,
+      destCep,
+      waypointCeps,
+      axes_count
+    );
 
     let legs: RouteLeg[];
     let totalDistanceKm: number;
@@ -182,6 +189,9 @@ Deno.serve(async (req: Request) => {
     let totalTollCentavos: number;
     let tollPlazas: TollPlaza[] = [];
     let polylineCoords: [number, number][] = [];
+    let encodedPolyline = '';
+    let urlMapaView = '';
+    let webrouterIdRota: number | null = null;
 
     if (routeResult.success) {
       const fullResult = routeResult as RouteDistanceFullResult;
@@ -190,6 +200,9 @@ Deno.serve(async (req: Request) => {
       totalTollCentavos = fullResult.toll_total_centavos;
       tollPlazas = fullResult.toll_plazas;
       polylineCoords = fullResult.polyline_coords;
+      encodedPolyline = fullResult.encoded_polyline ?? '';
+      urlMapaView = fullResult.url_mapa_view ?? '';
+      webrouterIdRota = fullResult.id_rota ?? null;
 
       // Build legs: origin → each waypoint → destination
       legs = buildLegsFromRoute(mainQuote, secondaryQuotes, totalDistanceKm, totalTollCentavos);
@@ -227,6 +240,26 @@ Deno.serve(async (req: Request) => {
     // 5. Save to DB if composition_id provided
     if (composition_id && save_to_db) {
       await saveRoutingsToDB(supabase, composition_id, legs);
+
+      // Persist toll + polyline + map URL on the suggestion row
+      const { error: updateErr } = await supabase
+        .from('load_composition_suggestions')
+        .update({
+          total_toll_centavos: totalTollCentavos,
+          total_toll_tag_centavos: routeResult.success
+            ? (routeResult as RouteDistanceFullResult).toll_tag_centavos
+            : 0,
+          encoded_polyline: encodedPolyline || null,
+          url_mapa_view: urlMapaView || null,
+          webrouter_id_rota: webrouterIdRota,
+        })
+        .eq('id', composition_id);
+      if (updateErr) {
+        console.error(
+          '[generate-optimal-route] Failed to update suggestion with toll/polyline:',
+          updateErr.message
+        );
+      }
     }
 
     return jsonResponse({
@@ -238,6 +271,8 @@ Deno.serve(async (req: Request) => {
         total_toll_centavos: totalTollCentavos,
         toll_plazas: tollPlazas,
         polyline_coords: polylineCoords,
+        encoded_polyline: encodedPolyline,
+        url_mapa_view: urlMapaView,
         composition_id: composition_id || null,
         route_source: routeResult.success ? 'webrouter' : 'fallback_km',
       },
@@ -384,8 +419,9 @@ async function saveRoutingsToDB(
     quote_id: leg.quote_id!,
     leg_distance_km: leg.distance_km,
     leg_duration_min: leg.duration_min,
-    leg_polyline: '', // polyline stored at route level, not per leg
+    leg_polyline: '',
     is_feasible: true,
+    toll_centavos: leg.toll_centavos,
   }));
 
   const { error } = await supabase.from('load_composition_routings').insert(rows);

@@ -12,6 +12,7 @@ interface GenerateOptimalRouteParams {
   composition_id?: string;
   use_google_maps?: boolean;
   save_to_db?: boolean;
+  axes_count?: number;
 }
 
 interface RouteLeg {
@@ -19,7 +20,7 @@ interface RouteLeg {
   to_label: string;
   distance_km: number;
   duration_min: number;
-  quote_id?: string | null;
+  quote_id: string | null;
   sequence_number: number;
   toll_centavos: number;
 }
@@ -42,6 +43,8 @@ interface GenerateOptimalRouteResponse {
     total_toll_centavos: number;
     toll_plazas?: TollPlaza[];
     polyline_coords?: [number, number][];
+    encoded_polyline?: string;
+    url_mapa_view?: string;
     composition_id: string | null;
     route_source?: 'webrouter' | 'fallback_km';
     waypoints?: unknown[];

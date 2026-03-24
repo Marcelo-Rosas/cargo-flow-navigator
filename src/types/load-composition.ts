@@ -29,6 +29,11 @@ export interface LoadCompositionSuggestion {
   suggested_axes_count?: number | null;
   total_combined_weight_kg?: number | null;
   total_combined_volume_m3?: number | null;
+  total_toll_centavos?: number | null;
+  total_toll_tag_centavos?: number | null;
+  encoded_polyline?: string | null;
+  url_mapa_view?: string | null;
+  webrouter_id_rota?: number | null;
 }
 
 export interface RoutingLeg {

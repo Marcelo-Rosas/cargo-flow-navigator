@@ -1,11 +1,26 @@
 /**
  * Shared WebRouter client — callable from any Edge Function.
- * Calculates route distance (km) for origin → waypoints → destination
- * using the WebRouter API (same provider as calculate-distance-webrouter).
+ * Calculates route distance (km), tolls, and polyline for origin → waypoints → destination
+ * using the WebRouter API (AILOG Roteirizador REST v2.0).
  *
- * Returns only km_distance (no tolls/km_by_uf) to keep it lightweight
- * for composition analysis where we just need delta-km comparison.
+ * categoriaVeiculo mapping (commercial, rod. dupla):
+ *   axes 2→'2', 3→'4', 4→'6', 5→'7', 6→'8', 7→'10', 8→'11', 9→'12'
  */
+
+/** Map axes_count → WebRouter categoriaVeiculo (commercial, rod. dupla) */
+function axesToCategoriaVeiculo(axesCount?: number): string {
+  const map: Record<number, string> = {
+    2: '2',
+    3: '4',
+    4: '6',
+    5: '7',
+    6: '8',
+    7: '10',
+    8: '11',
+    9: '12',
+  };
+  return map[axesCount ?? 4] ?? '6'; // default: 4 eixos comercial
+}
 
 const WEBROUTER_URL = 'https://way.webrouter.com.br/RouterService/router/api/calcular';
 const UA = 'vectra-cargo-flow/1.0 (webrouter; contact: support@vectracargo.com.br)';
@@ -98,7 +113,8 @@ export interface RouteDistanceError {
 export async function calculateRouteDistance(
   originCep: string,
   destinationCep: string,
-  waypointCeps: string[] = []
+  waypointCeps: string[] = [],
+  axesCount?: number
 ): Promise<RouteDistanceResult | RouteDistanceError> {
   const apiKey = getEnv('WEBROUTER_API_KEY');
   if (!apiKey) {
@@ -127,15 +143,16 @@ export async function calculateRouteDistance(
     rota: {
       enderecos,
       params: {
-        categoriaVeiculo: '6', // trucado 4 eixos (default)
+        categoriaVeiculo: axesToCategoriaVeiculo(axesCount),
         perfilVeiculo: 'CAMINHAO',
         tipoCombustivel: 'DIESEL',
         tipoVeiculo: 'CAMINHAO',
-        tipoRota: 'RAPIDA',
+        tipoCaminho: 'RAPIDA',
         priorizarRodovias: true,
+        retornaURLmapa: true,
       },
     },
-    salvarRota: false,
+    salvarRota: true,
   };
 
   try {
@@ -190,6 +207,12 @@ export interface RouteDistanceFullResult {
   toll_plazas: TollPlaza[];
   /** Ordered [lat, lng] pairs from WebRouter path for Leaflet rendering */
   polyline_coords: [number, number][];
+  /** Encoded polyline string from WebRouter (path.polyline) for storage/decoding */
+  encoded_polyline: string;
+  /** WebRouter map visualization URL (requires salvarRota: true + retornaURLmapa: true) */
+  url_mapa_view: string;
+  /** WebRouter route ID for future queries (requires salvarRota: true) */
+  id_rota: number | null;
 }
 
 export interface RouteDistanceFullError {
@@ -204,7 +227,8 @@ export interface RouteDistanceFullError {
 export async function calculateRouteDistanceFull(
   originCep: string,
   destinationCep: string,
-  waypointCeps: string[] = []
+  waypointCeps: string[] = [],
+  axesCount?: number
 ): Promise<RouteDistanceFullResult | RouteDistanceFullError> {
   const apiKey = getEnv('WEBROUTER_API_KEY');
   if (!apiKey) {
@@ -227,20 +251,26 @@ export async function calculateRouteDistanceFull(
     return buildAddress(cep, i, addr ?? undefined);
   });
 
+  const categoriaVeiculo = axesToCategoriaVeiculo(axesCount);
+  console.log(
+    `[webrouter-full] categoriaVeiculo=${categoriaVeiculo} (axes=${axesCount ?? 'default'})`
+  );
+
   const body = {
     autenticacao: { chaveAcesso: apiKey },
     rota: {
       enderecos,
       params: {
-        categoriaVeiculo: '6',
+        categoriaVeiculo,
         perfilVeiculo: 'CAMINHAO',
         tipoCombustivel: 'DIESEL',
         tipoVeiculo: 'CAMINHAO',
-        tipoRota: 'RAPIDA',
+        tipoCaminho: 'RAPIDA',
         priorizarRodovias: true,
+        retornaURLmapa: true,
       },
     },
-    salvarRota: false,
+    salvarRota: true,
   };
 
   try {
@@ -309,10 +339,16 @@ export async function calculateRouteDistanceFull(
       `  └─ FINAL: tollTotal=${tollTotal}¢ (${fmtBRL(tollTotal / 100)}), tollTag=${tollTag}¢`
     );
 
+    // Extract encoded polyline (complete route path from manual: path.polyline)
+    const pathObj = rota?.path as Record<string, unknown> | undefined;
+    const encodedPolyline = String(pathObj?.polyline ?? '');
+    const urlMapaView = String(pathObj?.urlMapaView ?? '');
+    const idRota = typeof rota?.idRota === 'number' ? rota.idRota : null;
+
     // Extract coordinates from ordemRoteiro (waypoints with lat/lng)
     const polylineCoords = extractPolylineCoords(rota);
     console.log(
-      `[webrouter-full] polyline coords: ${polylineCoords.length}, ordemRoteiro exists: ${!!rota?.ordemRoteiro}, path keys: ${rota?.path ? Object.keys(rota.path as object).join(',') : 'none'}`
+      `[webrouter-full] polyline: ${encodedPolyline.length} chars, coords: ${polylineCoords.length}, urlMapa: ${urlMapaView ? 'yes' : 'no'}, idRota: ${idRota}`
     );
 
     return {
@@ -322,6 +358,9 @@ export async function calculateRouteDistanceFull(
       toll_tag_centavos: tollTag,
       toll_plazas: tollPlazas,
       polyline_coords: polylineCoords,
+      encoded_polyline: encodedPolyline,
+      url_mapa_view: urlMapaView,
+      id_rota: idRota,
     };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'WebRouter fetch failed' };
