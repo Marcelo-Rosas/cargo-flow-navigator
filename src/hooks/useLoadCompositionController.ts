@@ -9,10 +9,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  useLoadCompositionSuggestions,
-  type LoadCompositionSuggestionWithDetails,
-} from '@/hooks/useLoadCompositionSuggestions';
+import { useLoadCompositionSuggestions } from '@/hooks/useLoadCompositionSuggestions';
+import type { LoadCompositionSuggestionWithDetails } from '@/types/load-composition';
 import { useApproveComposition } from '@/hooks/useApproveComposition';
 import { useAnalyzeLoadComposition } from '@/hooks/useAnalyzeLoadComposition';
 import { useCalculateDiscounts } from '@/hooks/useCalculateDiscounts';
@@ -72,12 +70,12 @@ export function useLoadCompositionController({
     queryKey: ['composition-quote-info', allQuoteIds],
     queryFn: async () => {
       if (allQuoteIds.length === 0) return {};
-      const { data } = await supabase
-        .from('quotes')
+      const { data } = (await supabase
+        .from('quotes' as never)
         .select('id, quote_code, client_name, destination, value, estimated_loading_date, weight')
-        .in('id', allQuoteIds);
+        .in('id', allQuoteIds)) as unknown as { data: QuoteInfo[] | null };
       const map: Record<string, QuoteInfo> = {};
-      for (const q of (data ?? []) as QuoteInfo[]) {
+      for (const q of data ?? []) {
         map[q.id] = q;
       }
       return map;
@@ -123,6 +121,18 @@ export function useLoadCompositionController({
   // --- Handlers ---
   /** Kanban "Gerar sugestões" — explicit batch mode (distinct from on_save / manual). */
   const handleAnalyze = () => {
+    analyzeComposition({ shipper_id: shipperId, trigger_source: 'batch' });
+  };
+
+  /** "Atualizar" — deleta sugestões pendentes e re-analisa do zero */
+  const handleRefresh = async () => {
+    // Deletar sugestões pendentes do embarcador para forçar nova geração (sem dedup)
+    await supabase
+      .from('load_composition_suggestions' as never)
+      .delete()
+      .eq('shipper_id', shipperId)
+      .eq('status', 'pending');
+    // Re-analisar
     analyzeComposition({ shipper_id: shipperId, trigger_source: 'batch' });
   };
 
@@ -193,6 +203,7 @@ export function useLoadCompositionController({
     // Actions
     refetch,
     handleAnalyze,
+    handleRefresh,
     handleApprove,
     handleCalculateDiscounts,
     handleViewDetails,
