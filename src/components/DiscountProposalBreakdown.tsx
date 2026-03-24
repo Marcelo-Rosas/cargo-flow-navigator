@@ -17,6 +17,8 @@ export interface DiscountProposalBreakdownProps {
   tollEconomyCentavos?: number;
   /** Economia ANTT (centavos) — delta CCD/CC individual vs consolidado */
   anttEconomyCentavos?: number;
+  /** Mapa quote_id → quote_code para exibir código legível */
+  quoteCodeById?: Record<string, string | null | undefined>;
 }
 
 export function DiscountProposalBreakdown({
@@ -24,6 +26,7 @@ export function DiscountProposalBreakdown({
   minimumMarginPercent,
   tollEconomyCentavos,
   anttEconomyCentavos,
+  quoteCodeById,
 }: DiscountProposalBreakdownProps) {
   const summary = useMemo(() => {
     const totalOriginal = discounts.reduce((sum, d) => sum + d.original_quote_price_brl, 0);
@@ -272,7 +275,8 @@ export function DiscountProposalBreakdown({
               <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <p className="text-xs font-medium text-yellow-800">
-                  Quote {discounts[idx].quote_id.slice(0, 8)}...
+                  {quoteCodeById?.[discounts[idx].quote_id] ||
+                    `Cotação ${discounts[idx].quote_id.slice(0, 8)}...`}
                 </p>
                 <p className="text-xs text-yellow-700 mt-1">{warning}</p>
               </div>

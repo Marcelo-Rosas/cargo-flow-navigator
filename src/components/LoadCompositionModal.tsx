@@ -789,6 +789,7 @@ export function LoadCompositionModal({
                   }
                   tollEconomyCentavos={tollEconomy.toll}
                   anttEconomyCentavos={tollEconomy.antt}
+                  quoteCodeById={quoteCodeById}
                 />
               ) : (
                 <div className="bg-gray-50 p-8 rounded-lg text-center text-sm text-gray-600">
