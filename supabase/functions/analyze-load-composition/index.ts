@@ -98,7 +98,7 @@ interface SuggestionRow {
 // ---------------------------------------------------------------------------
 
 const MIN_VIABLE_SCORE = 60;
-const MIN_SAVINGS_CENTAVOS = 50000; // R$ 500,00
+const MIN_SAVINGS_CENTAVOS = 0; // Mostrar todas sugestões viáveis (removido mínimo R$500)
 const DEFAULT_DATE_WINDOW_DAYS = 14;
 const MAX_TRUCK_CAPACITY_KG = 30000;
 /** Hard rule: max days between loading dates for feasibility */
@@ -114,9 +114,10 @@ const KM_DATA_THRESHOLD = 0.7;
 /** Eligible stages for composition analysis */
 const ELIGIBLE_STAGES = ['precificacao', 'enviado', 'negociacao'];
 
-/** Check if a route evaluation model should be rejected from results */
+/** Check if a route evaluation model should be rejected from results.
+ *  insufficient_data agora é mantido como feasible=false (não descartado). */
 function shouldSkipResult(routeModel: string): boolean {
-  return routeModel === INSUFFICIENT_DATA_MODEL || routeModel === 'mock_v1';
+  return routeModel === 'mock_v1'; // Apenas mock_v1 é descartado; insufficient_data mantido
 }
 
 const QUOTE_SELECT =

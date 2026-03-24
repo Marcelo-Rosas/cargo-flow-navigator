@@ -94,7 +94,7 @@ export function checkDataQuality(quotes: QuoteRow[]): DataQualityCheck {
   return {
     hasKmData: withKm >= Math.ceil(totalQuotes * 0.7), // 70% minimum
     hasCepData: withCep >= Math.floor(totalQuotes * 0.5), // 50% ideal
-    hasLoadingDates: withDate === totalQuotes, // 100% required
+    hasLoadingDates: withDate >= Math.ceil(totalQuotes * 0.7), // 70% minimum (cotações sem data filtradas na descoberta)
     totalScore: Math.round(totalScore),
     details: { withKm, totalQuotes, withCep, withDate },
   };
