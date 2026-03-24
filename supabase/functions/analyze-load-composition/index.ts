@@ -774,11 +774,46 @@ Deno.serve(async (req: Request) => {
       ]);
       // Build combos: anchor paired with each candidate (and triples)
       allQuotes = [anchor, ...candidates];
+    } else if (!shipperId) {
+      // Batch ALL shippers: discover all eligible shippers and run for each
+      console.log('[batch-all] No shipper_id — discovering all eligible shippers');
+      const { data: shipperRows, error: shipperErr } = await supabase
+        .from('quotes')
+        .select('shipper_id')
+        .in('stage', ELIGIBLE_STAGES)
+        .not('estimated_loading_date', 'is', null)
+        .not('shipper_id', 'is', null);
+
+      if (shipperErr || !shipperRows) {
+        return jsonResponse({ error: 'Failed to discover shippers' }, 500);
+      }
+
+      // Count per shipper, keep those with >= 2
+      const shipperCounts = new Map<string, number>();
+      for (const row of shipperRows) {
+        const sid = (row as { shipper_id: string }).shipper_id;
+        shipperCounts.set(sid, (shipperCounts.get(sid) ?? 0) + 1);
+      }
+      const eligibleShippers = [...shipperCounts.entries()]
+        .filter(([, count]) => count >= 2)
+        .map(([sid]) => sid);
+
+      console.log(`[batch-all] ${eligibleShippers.length} shippers with >= 2 eligible quotes`);
+
+      if (eligibleShippers.length === 0) {
+        return jsonResponse({
+          suggestions: [],
+          total_found: 0,
+          message: 'Nenhum embarcador com 2+ cotações elegíveis para consolidação',
+        });
+      }
+
+      // Run analysis for FIRST eligible shipper (simplest fix; iterate later if needed)
+      shipperId = eligibleShippers[0];
+      allQuotes = await discoverCandidates(supabase, shipperId, dateWindowDays);
+      console.log(`[batch-all] Using shipper ${shipperId} with ${allQuotes.length} quotes`);
     } else {
       // Batch: discover all candidates for the shipper
-      if (!shipperId) {
-        return jsonResponse({ error: 'Missing shipper_id' }, 400);
-      }
       allQuotes = await discoverCandidates(supabase, shipperId, dateWindowDays);
     }
 

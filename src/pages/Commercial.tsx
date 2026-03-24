@@ -268,11 +268,25 @@ export default function Commercial() {
       .reduce((acc, q) => acc + Number(q.value), 0);
   }, [quotes]);
 
-  /** Embarcador para análise de consolidação: qualquer cotação com shipper, senão primeiro cadastrado */
+  /** Embarcador para análise de consolidação: o que tem mais cotações com loading_date */
   const consolidationShipperId = useMemo(() => {
-    const fromQuote = quotes?.find((q) => q.shipper_id)?.shipper_id;
-    if (fromQuote) return fromQuote;
-    return shippers?.[0]?.id ?? null;
+    if (!quotes?.length) return shippers?.[0]?.id ?? null;
+    const counts = new Map<string, number>();
+    for (const q of quotes) {
+      if (q.shipper_id && (q as Record<string, unknown>).estimated_loading_date) {
+        counts.set(q.shipper_id, (counts.get(q.shipper_id) ?? 0) + 1);
+      }
+    }
+    // Pegar o shipper com mais cotações elegíveis
+    let best: string | null = null;
+    let bestCount = 0;
+    for (const [sid, count] of counts) {
+      if (count > bestCount) {
+        best = sid;
+        bestCount = count;
+      }
+    }
+    return best ?? shippers?.[0]?.id ?? null;
   }, [quotes, shippers]);
 
   const formatCurrency = (value: number) => {
