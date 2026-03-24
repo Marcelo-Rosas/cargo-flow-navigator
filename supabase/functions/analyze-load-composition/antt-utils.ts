@@ -6,7 +6,7 @@
  * - Calculate ANTT minimum floor: km × CCD + CC
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 
 // ---------------------------------------------------------------------------
 // Types
