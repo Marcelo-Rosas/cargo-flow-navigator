@@ -57,8 +57,8 @@ export function LoadCompositionPanel({ shipperId, dateRange }: LoadCompositionPa
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => ctrl.refetch()}
-                disabled={ctrl.isLoading}
+                onClick={() => ctrl.handleRefresh()}
+                disabled={ctrl.isLoading || ctrl.isAnalyzing}
                 className="gap-2"
               >
                 <RefreshCw className="w-4 h-4" />
