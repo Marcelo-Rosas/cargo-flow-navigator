@@ -5,19 +5,25 @@
  */
 
 import React, { useMemo } from 'react';
-import { DiscountProposal } from '@/hooks/useLoadCompositionSuggestions';
+import type { DiscountProposal } from '@/types/load-composition';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle, TrendingDown, DollarSign } from 'lucide-react';
+import { AlertCircle, CheckCircle, TrendingDown, DollarSign, Waypoints } from 'lucide-react';
 
 export interface DiscountProposalBreakdownProps {
   discounts: DiscountProposal[];
   minimumMarginPercent: number;
+  /** Economia de pedágio (centavos) — delta entre tolls individuais e toll consolidado */
+  tollEconomyCentavos?: number;
+  /** Economia ANTT (centavos) — delta CCD/CC individual vs consolidado */
+  anttEconomyCentavos?: number;
 }
 
 export function DiscountProposalBreakdown({
   discounts,
   minimumMarginPercent,
+  tollEconomyCentavos,
+  anttEconomyCentavos,
 }: DiscountProposalBreakdownProps) {
   const summary = useMemo(() => {
     const totalOriginal = discounts.reduce((sum, d) => sum + d.original_quote_price_brl, 0);
@@ -63,6 +69,42 @@ export function DiscountProposalBreakdown({
           </div>
         </div>
       </div>
+
+      {/* Economy Breakdown (ANTT + Toll) */}
+      {tollEconomyCentavos != null && tollEconomyCentavos > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-2">
+          <div className="flex items-start gap-2">
+            <Waypoints className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 text-sm">
+              <p className="font-medium text-emerald-900">Composição da Economia</p>
+              <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                {anttEconomyCentavos != null && anttEconomyCentavos > 0 && (
+                  <div>
+                    <span className="text-emerald-700">Economia ANTT (CCD/CC):</span>
+                    <p className="font-semibold text-emerald-900">
+                      R${' '}
+                      {(anttEconomyCentavos / 100).toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <span className="text-emerald-700">Economia de Pedágio:</span>
+                  <p className="font-semibold text-emerald-900">
+                    R${' '}
+                    {(tollEconomyCentavos / 100).toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Margin Analysis */}
       <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 space-y-2">

@@ -101,6 +101,7 @@ export function LoadCompositionModal({
     weight: number | null;
     estimated_loading_date: string | null;
     km_distance: number | null;
+    toll_value: number | null;
   }
 
   const { data: quotesDetail } = useQuery({
@@ -110,7 +111,7 @@ export function LoadCompositionModal({
       const { data } = await supabase
         .from('quotes')
         .select(
-          'id, quote_code, client_name, origin, destination, value, weight, estimated_loading_date, km_distance'
+          'id, quote_code, client_name, origin, destination, value, weight, estimated_loading_date, km_distance, toll_value'
         )
         .in('id', quoteIds);
       return (data ?? []) as unknown as QuoteDetail[];
@@ -133,6 +134,25 @@ export function LoadCompositionModal({
     enabled: !!shipperId,
     staleTime: 10 * 60 * 1000,
   });
+
+  // Toll economy: individual toll sum vs consolidated toll
+  const tollEconomy = useMemo(() => {
+    if (!quotesDetail || !composition) return { toll: 0, antt: 0 };
+    const individualTollSumCentavos = quotesDetail.reduce(
+      (sum, q) => sum + Math.round((Number(q.toll_value) || 0) * 100),
+      0
+    );
+    const composedTollCentavos = Number(composition.total_toll_centavos) || 0;
+    const tollDelta = Math.max(0, individualTollSumCentavos - composedTollCentavos);
+
+    // ANTT economy from metrics
+    const metrics = composition.metrics;
+    const anttDelta = metrics
+      ? Math.max(0, (metrics.original_total_cost || 0) - (metrics.composed_total_cost || 0))
+      : 0;
+
+    return { toll: tollDelta, antt: anttDelta };
+  }, [quotesDetail, composition]);
 
   // When details open and there are no routings, trigger route generation (once per composition)
   const hasTriggeredRef = React.useRef<string | null>(null);
@@ -733,6 +753,8 @@ export function LoadCompositionModal({
                         suggestion: composition,
                         quoteCodeById,
                         suggestionSequence,
+                        tollEconomyCentavos: tollEconomy.toll,
+                        anttEconomyCentavos: tollEconomy.antt,
                       });
                       toast.success('PDF gerado com sucesso');
                     } catch (error) {
@@ -765,6 +787,8 @@ export function LoadCompositionModal({
                   minimumMarginPercent={
                     composition.discounts[0]?.minimum_margin_percent_applied || 30
                   }
+                  tollEconomyCentavos={tollEconomy.toll}
+                  anttEconomyCentavos={tollEconomy.antt}
                 />
               ) : (
                 <div className="bg-gray-50 p-8 rounded-lg text-center text-sm text-gray-600">

@@ -24,17 +24,25 @@ export interface CalculateDiscountsRequest {
   simulate_only?: boolean; // if true, don't save to DB
 }
 
+export interface DiscountSummary {
+  total_original_price: number;
+  total_discount_offered: number;
+  total_final_price: number;
+  avg_final_margin_percent: number;
+  min_final_margin_percent: number;
+  // Toll economy breakdown (centavos)
+  antt_economy_centavos?: number;
+  toll_economy_centavos?: number;
+  total_economy_centavos?: number;
+  individual_toll_sum_centavos?: number;
+  composed_toll_centavos?: number;
+}
+
 export interface CalculateDiscountsResponse {
   success: boolean;
   composition_id: string;
   discount_breakdown: DiscountProposal[];
-  summary: {
-    total_original_price: number;
-    total_discount_offered: number;
-    total_final_price: number;
-    avg_final_margin_percent: number;
-    min_final_margin_percent: number;
-  };
+  summary: DiscountSummary;
 }
 
 /**

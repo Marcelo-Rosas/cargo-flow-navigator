@@ -57,6 +57,7 @@ interface QuoteWithCost {
   price_brl: number; // centavos
   weight_kg: number;
   freight_cost_brl: number; // calculated cost
+  toll_centavos: number; // individual quote toll (centavos)
 }
 
 interface DiscountProposal {
@@ -104,20 +105,26 @@ Deno.serve(async (req) => {
       throw new Error('Composition has no associated quotes');
     }
 
-    // 2. Fetch quote details with costs (use real column names)
+    // 2. Fetch quote details with costs + toll (use real column names)
     const { data: quotes, error: quotesError } = await supabase
       .from('quotes')
-      .select('id, shipper_id, value, weight')
+      .select('id, shipper_id, value, weight, toll_value')
       .in('id', composition.quote_ids);
 
     if (quotesError) {
       throw new Error(`Failed to fetch quotes: ${quotesError.message}`);
     }
 
-    // 3. Map real column names (value/weight) to internal names (price_brl/weight_kg)
+    // 3. Map real column names (value/weight/toll_value) to internal names
     // value is in BRL decimal (e.g. 16523.29), convert to centavos
     const quotesWithCost: QuoteWithCost[] = (
-      quotes as { id: string; shipper_id: string; value: number; weight: number }[]
+      quotes as {
+        id: string;
+        shipper_id: string;
+        value: number;
+        weight: number;
+        toll_value: number | null;
+      }[]
     ).map((q) => {
       const priceCentavos = Math.round((Number(q.value) || 0) * 100);
       return {
@@ -126,6 +133,7 @@ Deno.serve(async (req) => {
         price_brl: priceCentavos,
         weight_kg: Number(q.weight) || 0,
         freight_cost_brl: Math.round(priceCentavos * 0.6), // 60% cost assumption
+        toll_centavos: Math.round((Number(q.toll_value) || 0) * 100), // R$ → centavos
       };
     });
 
@@ -140,6 +148,11 @@ Deno.serve(async (req) => {
       weight_kg: q.weight_kg,
     }));
 
+    // 4b. Calculate toll delta (individual vs consolidated route)
+    const individualTollSum = quotesWithCost.reduce((sum, q) => sum + q.toll_centavos, 0);
+    const composedTollCentavos = Number(composition.total_toll_centavos) || 0;
+    const tollDeltaCentavos = Math.max(0, individualTollSum - composedTollCentavos);
+
     // 5. Calculate total economy and max discounts
     // Metrics may not exist yet (left join) — use suggestion's estimated_savings as fallback
     const metricsRow = Array.isArray(composition.load_composition_metrics)
@@ -147,11 +160,13 @@ Deno.serve(async (req) => {
       : null;
     const totalOriginalCost = metricsRow?.original_total_cost || 0;
     const composedTotalCost = metricsRow?.composed_total_cost || 0;
-    // Use metrics if available, otherwise fall back to estimated_savings from the suggestion
-    const totalEconomy =
+    // ANTT economy (CCD/CC savings from consolidation)
+    const anttEconomyCentavos =
       totalOriginalCost > 0
         ? Math.max(0, totalOriginalCost - composedTotalCost)
         : Math.max(0, composition.estimated_savings_brl || 0);
+    // Total economy = ANTT savings + toll savings
+    const totalEconomy = anttEconomyCentavos + tollDeltaCentavos;
 
     // 6. Calculate max discount per quote (respecting margin rule)
     const discountProposals: DiscountProposal[] = metricsPerQuote.map((m) => {
@@ -231,6 +246,12 @@ Deno.serve(async (req) => {
         discountProposals.reduce((sum, dp) => sum + dp.final_margin_percent, 0) /
         discountProposals.length,
       min_final_margin_percent: Math.min(...discountProposals.map((dp) => dp.final_margin_percent)),
+      // Toll economy breakdown (centavos)
+      antt_economy_centavos: anttEconomyCentavos,
+      toll_economy_centavos: tollDeltaCentavos,
+      total_economy_centavos: totalEconomy,
+      individual_toll_sum_centavos: individualTollSum,
+      composed_toll_centavos: composedTollCentavos,
     };
 
     return new Response(
