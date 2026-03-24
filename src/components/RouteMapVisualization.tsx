@@ -66,6 +66,8 @@ const destinationIcon = new L.Icon({
 export interface RouteMapVisualizationProps {
   /** Full route polyline coordinates [lat, lng][] from WebRouter */
   polylineCoords?: [number, number][];
+  /** Encoded polyline from WebRouter (decoded as fallback when polylineCoords is empty) */
+  encodedPolyline?: string | null;
   /** Route legs from generate-optimal-route (standardized with toll_centavos) */
   legs?: CompositionRouteLeg[];
   /** Total distance in km */
@@ -92,6 +94,7 @@ export interface RouteMapVisualizationProps {
 
 export function RouteMapVisualization({
   polylineCoords,
+  encodedPolyline,
   legs,
   totalDistanceKm,
   totalDurationMin,
@@ -105,16 +108,18 @@ export function RouteMapVisualization({
     totalDurationMin,
     totalTollCentavos,
     polylineCoords,
+    encodedPolyline,
     routings,
   });
 
-  const hasMap = metrics.hasValidCoordinates && polylineCoords && polylineCoords.length >= 2;
+  // Use resolved coords (from polylineCoords or decoded encodedPolyline)
+  const mapCoords = metrics.resolvedCoords;
+  const hasMap = metrics.hasValidCoordinates && mapCoords.length >= 2;
 
-  // Center map on polyline bounds (using memoized metrics to avoid recalculation)
   const bounds = useMemo(() => {
-    if (!hasMap || !polylineCoords || polylineCoords.length < 2) return undefined;
-    return L.latLngBounds(polylineCoords.map(([lat, lng]) => [lat, lng]));
-  }, [polylineCoords, hasMap]);
+    if (!hasMap || mapCoords.length < 2) return undefined;
+    return L.latLngBounds(mapCoords.map(([lat, lng]) => [lat, lng]));
+  }, [mapCoords, hasMap]);
 
   return (
     <div className="space-y-4">
@@ -132,11 +137,11 @@ export function RouteMapVisualization({
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <Polyline
-              positions={polylineCoords!}
+              positions={mapCoords}
               pathOptions={{ color: '#2563eb', weight: 4, opacity: 0.8 }}
             />
             {/* Origin marker */}
-            <Marker position={polylineCoords![0]} icon={originIcon}>
+            <Marker position={mapCoords[0]} icon={originIcon}>
               <Popup>
                 <strong>Origem</strong>
                 {legs?.[0]?.from_label && <br />}
@@ -144,7 +149,7 @@ export function RouteMapVisualization({
               </Popup>
             </Marker>
             {/* Destination marker */}
-            <Marker position={polylineCoords![polylineCoords!.length - 1]} icon={destinationIcon}>
+            <Marker position={mapCoords[mapCoords.length - 1]} icon={destinationIcon}>
               <Popup>
                 <strong>Destino</strong>
                 {legs && legs.length > 0 && <br />}
@@ -158,11 +163,11 @@ export function RouteMapVisualization({
                 // Estimate waypoint position proportionally along polyline
                 const fraction = (i + 1) / legs.length;
                 const idx = Math.min(
-                  Math.floor(fraction * (polylineCoords!.length - 1)),
-                  polylineCoords!.length - 1
+                  Math.floor(fraction * (mapCoords.length - 1)),
+                  mapCoords.length - 1
                 );
                 return (
-                  <Marker key={i} position={polylineCoords![idx]}>
+                  <Marker key={i} position={mapCoords[idx]}>
                     <Popup>
                       <strong>Parada {i + 1}</strong>
                       <br />

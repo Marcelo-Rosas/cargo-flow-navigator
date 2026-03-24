@@ -6,6 +6,7 @@
  */
 
 import { useMemo } from 'react';
+import { decodePolyline } from '@/lib/decodePolyline';
 
 export interface CompositionRouteLeg {
   from_label: string;
@@ -23,6 +24,8 @@ export interface CompositionRouteMetrics {
   totalTollCentavos: number;
   stopCount: number;
   hasValidCoordinates: boolean;
+  /** Resolved coordinates — from polylineCoords or decoded from encodedPolyline */
+  resolvedCoords: [number, number][];
   warnings: string[];
 }
 
@@ -37,6 +40,8 @@ export interface UseCompositionRouteMetricsProps {
   totalDurationMin?: number;
   totalTollCentavos?: number;
   polylineCoords?: [number, number][];
+  /** Encoded polyline string from WebRouter (fallback when polylineCoords is empty) */
+  encodedPolyline?: string | null;
   /** Quando não há `legs` (ex.: só registros em load_composition_routings) */
   routings?: CompositionRoutingRow[];
 }
@@ -47,6 +52,7 @@ export function useCompositionRouteMetrics({
   totalDurationMin,
   totalTollCentavos,
   polylineCoords,
+  encodedPolyline,
   routings,
 }: UseCompositionRouteMetricsProps): CompositionRouteMetrics {
   return useMemo(() => {
@@ -92,7 +98,17 @@ export function useCompositionRouteMetrics({
       toll = Math.round(toll);
     }
 
-    const hasValidCoordinates = !!polylineCoords && polylineCoords.length > 0;
+    // Decode encoded polyline as fallback when polylineCoords is empty
+    let resolvedCoords = polylineCoords;
+    if ((!resolvedCoords || resolvedCoords.length === 0) && encodedPolyline) {
+      try {
+        resolvedCoords = decodePolyline(encodedPolyline);
+      } catch {
+        warnings.push('Falha ao decodificar polyline');
+      }
+    }
+
+    const hasValidCoordinates = !!resolvedCoords && resolvedCoords.length > 0;
     if (!hasValidCoordinates && (distance > 0 || toll > 0)) {
       warnings.push('Coordenadas de rota não disponíveis para visualizar mapa');
     }
@@ -103,7 +119,16 @@ export function useCompositionRouteMetrics({
       totalTollCentavos: toll,
       stopCount: stops,
       hasValidCoordinates,
+      resolvedCoords: resolvedCoords ?? [],
       warnings,
     };
-  }, [legs, totalDistanceKm, totalDurationMin, totalTollCentavos, polylineCoords, routings]);
+  }, [
+    legs,
+    totalDistanceKm,
+    totalDurationMin,
+    totalTollCentavos,
+    polylineCoords,
+    encodedPolyline,
+    routings,
+  ]);
 }
