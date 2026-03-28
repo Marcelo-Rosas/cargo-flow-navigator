@@ -92,5 +92,31 @@ npm run docs:claude                        # Regenera CLAUDE.md UTF-8 (repo prin
 - Não exibir valores sem R$ e 2 casas decimais
 - Não sobrescrever `useRouteMetrics` para métricas de composição — usar `useCompositionRouteMetrics`
 
+## Memória persistente
+Ao iniciar uma sessão, leia os arquivos em `/memory/` para contexto:
+- `memory/user.md` — perfil do usuário principal (Marcelo / Vectra Cargo)
+- `memory/decisions.md` — decisões arquiteturais e de produto já tomadas
+- `memory/preferences.md` — preferências de codificação e estilo
+- `memory/people.md` — equipe e stakeholders
+
+Ao encerrar, registre em `memory/decisions.md` qualquer decisão técnica nova tomada na sessão.
+
+## NAVI (Assistente WhatsApp AI)
+- **Edge Function**: `nina-orchestrator` (Deno, Supabase Edge Functions)
+- **LLM**: Gemini 2.0 Flash (inline em nina-orchestrator) — modelo configurável
+- **Gemini compartilhado**: `_shared/gemini.ts` → `callGemini()` + `selectGeminiModel()`
+- **Tools registradas**: `sugerir_perdido`, `mover_para_perdido` (em `supabase/functions/nina-orchestrator/tools/`)
+- **System prompt**: embutido em `nina-orchestrator/index.ts`
+- **WhatsApp gateway**: OpenClaw (via `notification-hub`) — NUNCA Evolution API
+- **Sessão**: stateless por request; `session_messages` passado pelo cliente
+- **Tool loop**: máximo 5 iterações (hardcoded em `processWithToolLoop`)
+- **maxOutputTokens**: 2048 (nina-orchestrator) / 1024 (_shared/gemini.ts)
+- **Skill operacional**: `skills/navi-ops/SKILL.md`
+
+### Convenções NAVI
+- Respostas sempre em pt-BR com formatação WhatsApp (`*negrito*`, `_itálico_`), sem HTML
+- Novas tools: adicionar declaration em `tools/index.ts`, handler em arquivo próprio, case no switch de `executeTool`
+- Roteamento de modelo: Flash para queries simples/cotações, Pro para análises complexas (`selectGeminiModel`)
+
 ## Pacote cursor-setup
 **Fonte canônica (UTF-8):** este arquivo. O `CLAUDE.md` na raiz do repositório é o **mesmo conteúdo sem esta seção**, gerado por `npm run docs:claude` (`scripts/patch-claude-md.mjs` lê este arquivo e grava a raiz). Não edite só a raiz e depois rode o script antigo baseado em `origin/main` — isso reaplicava texto já corrompido.

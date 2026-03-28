@@ -1,0 +1,7 @@
+data,categoria,decisao,raciocinio,resultado_esperado,data_revisao,status
+2025-06-01,stack,npm como gerenciador de pacotes (nunca Bun),Bun causa problemas com update-browserslist-db e detecção sem instalação,Estabilidade de build e CI,2025-12-01,ACCEPTED
+2025-08-01,ai,Migrar Navi de Claude API para Gemini 2.0 Flash / 2.5 Pro,Créditos Anthropic esgotados e custo menor,Mesma qualidade com menor custo,2026-03-01,ACCEPTED
+2025-08-01,integration,WhatsApp via OpenClaw (nunca Evolution API),Centralização via notification-hub com templates Meta-approved,Auditabilidade e conformidade,2026-02-01,ACCEPTED
+2025-09-01,architecture,Sessões Navi stateless via session_messages,Simplicidade sem session store server-side,Cold starts rápidos e sem storage extra,2026-03-01,ACCEPTED
+2025-10-01,ai,Roteamento Gemini Flash (padrão) vs Pro (análises complexas),Flash ~10x mais barato — Pro só para approval_summary e dashboard_insights,Economia de 40-60% em custo de API,2026-04-01,REVIEW DUE
+2026-01-15,architecture,Tool loop limitado a 5 iterações no nina-orchestrator,Prevenir loops infinitos de function calling,Estabilidade do assistente,2026-07-15,ACCEPTED
