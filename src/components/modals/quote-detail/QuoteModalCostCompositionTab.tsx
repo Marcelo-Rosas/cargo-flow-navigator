@@ -105,6 +105,8 @@ export function QuoteModalCostCompositionTab({
   const baseFreight = breakdown.components?.baseFreight ?? 0;
   const pedagioMemoria = breakdown.components?.toll ?? 0;
   const subtotalMotorista = baseFreight + pedagioMemoria;
+  const anttFloorApplied = breakdown.meta?.anttFloorApplied === true;
+  const fretePesoOriginal = breakdown.meta?.fretePesoOriginal ?? 0;
 
   const composicaoRows: { label: string; value: number }[] = [];
   if (breakdown.components) {
@@ -182,8 +184,25 @@ export function QuoteModalCostCompositionTab({
               </TableHeader>
               <TableBody>
                 {/* Grupo: Subtotal Motorista (Base de Negociação) */}
+                {anttFloorApplied && fretePesoOriginal > 0 && (
+                  <TableRow>
+                    <TableCell className="text-muted-foreground line-through">
+                      Frete Peso (tabela)
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums text-muted-foreground line-through">
+                      {formatCurrency(fretePesoOriginal)}
+                    </TableCell>
+                  </TableRow>
+                )}
                 <TableRow>
-                  <TableCell className="text-muted-foreground">Frete Base</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    Frete Base
+                    {anttFloorApplied && (
+                      <span className="ml-1 text-xs text-amber-600 font-medium">
+                        (Piso ANTT aplicado — MP 1.343/2026)
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-medium tabular-nums">
                     {formatCurrency(baseFreight)}
                   </TableCell>

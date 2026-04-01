@@ -87,6 +87,9 @@ export interface FreightCalculationInput {
     dispatchFee: number;
   };
 
+  /** Piso ANTT carreteiro (R$). Quando fornecido, em lotação o custo motorista = MAX(frete_peso, pisoAntt). */
+  pisoAnttCarreteiro?: number;
+
   // Alíquota ICMS (já normalizada em %). Ignorada quando kmByUf + icmsByUf presentes.
   icmsRatePercent: number;
 
@@ -198,6 +201,10 @@ export interface FreightCalculationOutput {
     ltlMinWeightApplied?: boolean;
     /** Peso real informado (antes da trava 1t) */
     originalWeightKg?: number;
+    /** MP 1.343/2026: Piso ANTT foi aplicado como custo motorista (lotação) */
+    anttFloorApplied?: boolean;
+    /** Frete peso original da tabela (antes do piso ANTT) */
+    fretePesoOriginal?: number;
   };
 
   components: {
@@ -325,6 +332,11 @@ export interface StoredPricingBreakdown {
       total: number;
       description?: string;
     }>;
+    /** MP 1.343/2026: Piso ANTT foi aplicado como custo motorista (lotação) */
+    anttFloorApplied?: boolean;
+    /** Frete peso original da tabela de preços (antes do piso ANTT) */
+    fretePesoOriginal?: number;
+
     // ANTT piso mínimo (memória de cálculo) - opcional
     antt?: {
       operationTable: 'A' | 'B' | 'C' | 'D';
@@ -866,7 +878,10 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const waitingTimeCost = round2(input.extras?.waitingTimeCost ?? 0);
 
   // ---- STEP 7: CUSTOS DIRETOS (Asset-Light) ----
-  const custoMotorista = baseCost;
+  // MP 1.343/2026: em lotação, custo motorista não pode ser inferior ao Piso ANTT
+  const pisoAntt = input.pisoAnttCarreteiro ?? 0;
+  const anttFloorApplied = !isLtl && pisoAntt > 0 && pisoAntt > baseCost;
+  const custoMotorista = anttFloorApplied ? pisoAntt : baseCost;
   const aluguelMaquinas = round2(input.aluguelMaquinasValue ?? 0);
   const custoServicos = round2(
     input.tollValue +
@@ -964,10 +979,12 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       icmsBreakdownByUf,
       ltlMinWeightApplied: ltlMinWeightApplied || undefined,
       originalWeightKg,
+      anttFloorApplied: anttFloorApplied || undefined,
+      fretePesoOriginal: anttFloorApplied ? baseCost : undefined,
     },
     components: {
-      baseCost,
-      baseFreight,
+      baseCost: custoMotorista,
+      baseFreight: custoMotorista,
       toll: round2(input.tollValue),
       aluguelMaquinas,
       gris,
@@ -1052,6 +1069,8 @@ export function buildStoredBreakdown(
       equipmentRental: input.extras?.equipmentRentalItems,
       kmByUf: input.kmByUf,
       icmsMode: input.kmByUf && Object.keys(input.kmByUf).length > 0 ? 'B' : 'A',
+      anttFloorApplied: output.meta.anttFloorApplied,
+      fretePesoOriginal: output.meta.fretePesoOriginal,
     },
 
     weights: {

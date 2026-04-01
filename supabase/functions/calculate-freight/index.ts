@@ -778,7 +778,15 @@ Deno.serve(async (req) => {
     // Alinhado com freightCalculator client-side.
     // =====================================================
 
-    const custoMotorista = frete_peso; // NTC: base cost (frete peso)
+    // MP 1.343/2026: em lotação, custo motorista não pode ser inferior ao Piso ANTT
+    const anttFloorApplied =
+      modality === 'lotacao' && pisoAnttCarreteiro > 0 && pisoAnttCarreteiro > frete_peso;
+    const custoMotorista = anttFloorApplied ? pisoAnttCarreteiro : frete_peso;
+    if (anttFloorApplied) {
+      console.log(
+        `[calculate-freight] ANTT floor applied: frete_peso=${frete_peso}, pisoAntt=${pisoAnttCarreteiro}, custoMotorista=${custoMotorista}`
+      );
+    }
     const custoServicos =
       toll +
       gris +
@@ -864,13 +872,15 @@ Deno.serve(async (req) => {
       ...(priceTableRowId && { price_table_row_id: priceTableRowId }),
       ...(priceTableRowId && { ntc_base: roundCurrency(ntc_base) }),
       antt_piso_carreteiro: roundCurrency(pisoAnttCarreteiro),
+      antt_floor_applied: anttFloorApplied,
+      ...(anttFloorApplied && { frete_peso_original: roundCurrency(frete_peso) }),
       ...(ltlMinWeightApplied && { ltl_min_weight_applied: true }),
       ...(ltlMinWeightApplied && { original_weight_kg: roundCurrency(originalWeightKg) }),
     };
 
     const components: FreightComponents = {
-      base_cost: roundCurrency(frete_peso),
-      base_freight: roundCurrency(frete_peso),
+      base_cost: roundCurrency(custoMotorista),
+      base_freight: roundCurrency(custoMotorista),
       toll: roundCurrency(toll),
       gris: roundCurrency(gris),
       tso: roundCurrency(tso),

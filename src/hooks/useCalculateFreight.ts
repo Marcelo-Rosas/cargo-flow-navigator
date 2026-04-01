@@ -164,6 +164,9 @@ export function buildStoredBreakdownFromEdgeResponse(
       tollPlazas: existingBreakdown?.meta?.tollPlazas,
       unloadingCost: existingBreakdown?.meta?.unloadingCost,
       equipmentRental: existingBreakdown?.meta?.equipmentRental,
+      anttFloorApplied:
+        (response.meta as { antt_floor_applied?: boolean }).antt_floor_applied || undefined,
+      fretePesoOriginal: (response.meta as { frete_peso_original?: number }).frete_peso_original,
     },
     weights: {
       cubageWeight: cubKg,

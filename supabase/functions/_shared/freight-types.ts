@@ -89,6 +89,10 @@ export interface FreightMeta {
   ntc_base?: number;
   /** Piso ANTT carreteiro (km × CCD + CC) para custos diretos e rentabilidade */
   antt_piso_carreteiro?: number;
+  /** MP 1.343/2026: Piso ANTT foi aplicado como custo motorista (lotação) */
+  antt_floor_applied?: boolean;
+  /** Frete peso original da tabela de preços (antes do piso ANTT) */
+  frete_peso_original?: number;
   /** Trava 1t aplicada no fracionado */
   ltl_min_weight_applied?: boolean;
   /** Peso real informado (antes da trava 1t) */
