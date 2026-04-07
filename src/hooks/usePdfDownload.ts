@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
 
 export function usePdfDownload() {
-  const [isDownloading, setIsDownloading] = useState(false);
-  const download = useCallback(async (_opts: Record<string, unknown>) => {
-    setIsDownloading(false);
+  const [loading, setLoading] = useState<string | false>(false);
+  const downloadQuotePdf = useCallback(async (_quoteId: string, _mode: string) => {
+    setLoading(false);
   }, []);
-  return { download, isDownloading };
+  return { downloadQuotePdf, loading };
 }
