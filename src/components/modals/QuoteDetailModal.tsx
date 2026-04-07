@@ -903,8 +903,10 @@ export function QuoteDetailModal({
                     (quote as { balance_due_date?: string | null })?.balance_due_date ?? null
                   }
                   advancePercent={
-                    (paymentTerm as { advance_percent?: number | null } | null)?.advance_percent ??
-                    null
+                    Number(
+                      (paymentTerm as { advance_percent?: number | null } | null)
+                        ?.advance_percent ?? 0
+                    ) || 0
                   }
                   totalCliente={totalClienteView}
                 />
