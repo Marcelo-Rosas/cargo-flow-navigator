@@ -69,6 +69,9 @@ function formatValue(value: number, isPercent = false): string {
 
 /** Renderiza uma única tabela DRE (uma entidade ou período consolidado) */
 export function DreTableBlock({ table }: { table: DreTable }) {
+  const hidePresumedColumn =
+    table.status_detail === 'legacy_quote_breakdown' || table.status_detail === 'os_without_quote';
+
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="px-4 py-3 bg-muted/30 border-b">
@@ -78,6 +81,12 @@ export function DreTableBlock({ table }: { table: DreTable }) {
             : table.period_key}
           {table.status === 'sem_os_vinculada' && (
             <span className="ml-2 text-xs text-muted-foreground">(sem OS vinculada)</span>
+          )}
+          {table.status_detail === 'legacy_quote_breakdown' && (
+            <span className="ml-2 text-xs text-muted-foreground">(COT legacy: presumido indisponível)</span>
+          )}
+          {table.status_detail === 'os_without_quote' && (
+            <span className="ml-2 text-xs text-muted-foreground">(OS sem quote vinculada)</span>
           )}
         </p>
       </div>
@@ -135,18 +144,20 @@ export function DreTableBlock({ table }: { table: DreTable }) {
                   )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums py-2">
-                  {formatValue(row.presumed_value, isPercent)}
+                  {hidePresumedColumn ? '—' : formatValue(row.presumed_value, isPercent)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums py-2">
                   {formatValue(row.real_value, isPercent)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums py-2">
-                  {!isPercent
-                    ? formatCurrency(row.variance_value)
-                    : `${row.variance_value >= 0 ? '+' : ''}${row.variance_value.toFixed(1)} pp`}
+                  {hidePresumedColumn
+                    ? '—'
+                    : !isPercent
+                      ? formatCurrency(row.variance_value)
+                      : `${row.variance_value >= 0 ? '+' : ''}${row.variance_value.toFixed(1)} pp`}
                 </TableCell>
                 <TableCell className="text-right py-2">
-                  {!isPercent ? formatPercent(row.variance_percent) : '—'}
+                  {hidePresumedColumn ? '—' : !isPercent ? formatPercent(row.variance_percent) : '—'}
                 </TableCell>
                 <TableCell className="py-2">
                   <LineBadge row={row} />
@@ -188,7 +199,7 @@ export function DreOperacionalTable({
   return (
     <div className="space-y-6">
       {tables.map((table, i) => (
-        <DreTableBlock key={`${table.periodKey}-${i}`} table={table} />
+        <DreTableBlock key={`${table.period_key}-${i}`} table={table} />
       ))}
     </div>
   );

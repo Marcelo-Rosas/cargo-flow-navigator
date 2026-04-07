@@ -1,6 +1,7 @@
 import { DollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/formatters';
+import { FREIGHT_CONSTANTS } from '@/lib/freightCalculator';
 
 interface FinancialValuesBlockProps {
   amount: number;
@@ -56,11 +57,11 @@ export function FinancialValuesBlock({
 
         {profitability && profitability.margemPercent != null && (
           <div className="mt-2 pt-2 border-t border-primary/10 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Margem</span>
+            <span className="text-muted-foreground">Margem Operacional</span>
             <Badge
-              variant={profitability.margemPercent < 15 ? 'destructive' : 'default'}
+              variant={profitability.margemPercent < FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT ? 'destructive' : 'default'}
               className={
-                profitability.margemPercent >= 15
+                profitability.margemPercent >= FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                   : ''
               }

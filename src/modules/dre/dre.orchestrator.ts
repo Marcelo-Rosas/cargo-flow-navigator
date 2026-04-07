@@ -17,6 +17,7 @@ export interface OrderForDre {
   id: string;
   os_number: string;
   quote_id: string | null;
+  trip_id?: string | null;
   value: number;
   created_at: string;
   pricing_breakdown: Record<string, unknown> | null;
@@ -42,6 +43,8 @@ export interface DreOrchestratorInput {
   orders: OrderForDre[];
   quotes: QuoteForDre[];
   tripCostItemsByOrderId?: Map<string, TripCostItemForDre[]>;
+  tripScopedItemsByTripId?: Map<string, TripCostItemForDre[]>;
+  apportionByOrderId?: Map<string, number>;
   grisByOrderId?: Map<string, number>;
   riskByOrderId?: Map<string, number>;
 }
@@ -54,6 +57,8 @@ export function buildDreTables(input: DreOrchestratorInput): DreTable[] {
     orders,
     quotes,
     tripCostItemsByOrderId = new Map(),
+    tripScopedItemsByTripId = new Map(),
+    apportionByOrderId = new Map(),
     grisByOrderId = new Map(),
     riskByOrderId = new Map(),
   } = input;
@@ -71,6 +76,8 @@ export function buildDreTables(input: DreOrchestratorInput): DreTable[] {
     const presumedQuoteValue = quote?.value ?? order.quote_value ?? order.value;
     const quoteCode = quote?.quote_code ?? order.quote_code ?? null;
     const referenceDate = quote?.created_at ?? order.quote_created_at ?? order.created_at;
+    const presumedSource =
+      typeof presumedBreakdown?.source === 'string' ? presumedBreakdown.source : null;
 
     const presumed = computePresumedFromBreakdown(presumedBreakdown, presumedQuoteValue);
 
@@ -88,6 +95,8 @@ export function buildDreTables(input: DreOrchestratorInput): DreTable[] {
     const real = computeRealFromOrder({
       order: orderForReal,
       tripCostItems: tripItems,
+      tripScopedItems: order.trip_id ? (tripScopedItemsByTripId.get(order.trip_id) ?? []) : [],
+      apportionFactor: apportionByOrderId.get(order.id) ?? 1,
       grisAmountReal: grisByOrderId.get(order.id) ?? 0,
       riskCostAmount: riskByOrderId.get(order.id) ?? 0,
     });
@@ -112,6 +121,12 @@ export function buildDreTables(input: DreOrchestratorInput): DreTable[] {
       os_number: order.os_number,
       reference_date: referenceDate,
       status: 'ok',
+      status_detail:
+        order.quote_id == null
+          ? 'os_without_quote'
+          : presumedSource === 'legacy'
+            ? 'legacy_quote_breakdown'
+            : 'ok',
       rows,
     });
   }
@@ -148,6 +163,7 @@ export function buildDreTables(input: DreOrchestratorInput): DreTable[] {
       os_number: null,
       reference_date: quote.created_at,
       status: 'sem_os_vinculada',
+      status_detail: 'ok',
       rows,
     });
   }

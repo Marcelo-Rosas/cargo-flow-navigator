@@ -43,7 +43,7 @@ function expect<T>(actual: T) {
   };
 }
 
-function rowByCode(rows: Array<{ line_code: string }>, code: string): (typeof rows)[number] {
+function rowByCode<T extends { line_code: string }>(rows: T[], code: string): T {
   const row = rows.find((r) => r.line_code === code);
   if (!row) throw new Error(`Missing line ${code}`);
   return row;
@@ -225,6 +225,180 @@ test('consolidado mensal preserva a mesma estrutura de linhas', () => {
   expect(monthly[0]!.rows.length).toBe(15);
   expect(monthly[0]!.rows[0]!.line_code).toBe('faturamento_bruto');
   expect(monthly[0]!.rows[14]!.line_code).toBe('margem_liquida');
+});
+
+const sharedTripTables = buildDreTables({
+  quotes: [
+    {
+      id: 'q-shared-1',
+      quote_code: 'COT-SHARED-1',
+      created_at: '2026-03-11T10:00:00.000Z',
+      value: 1000,
+      pricing_breakdown: {
+        source: 'modern',
+        totals: { totalCliente: 1000, das: 40, icms: 0 },
+        profitability: {
+          receitaLiquida: 960,
+          custoMotorista: 200,
+          custosDescarga: 20,
+          overhead: 0,
+          margemPercent: 50,
+        },
+        components: { toll: 80, gris: 0, tso: 0 },
+      } as Record<string, unknown>,
+    },
+    {
+      id: 'q-shared-2',
+      quote_code: 'COT-SHARED-2',
+      created_at: '2026-03-11T10:00:00.000Z',
+      value: 500,
+      pricing_breakdown: {
+        source: 'modern',
+        totals: { totalCliente: 500, das: 20, icms: 0 },
+        profitability: { receitaLiquida: 480, custoMotorista: 80, custosDescarga: 10, overhead: 0 },
+        components: { toll: 30, gris: 0, tso: 0 },
+      } as Record<string, unknown>,
+    },
+    {
+      id: 'q-legacy',
+      quote_code: 'COT-LEGACY',
+      created_at: '2026-03-11T10:00:00.000Z',
+      value: 700,
+      pricing_breakdown: {
+        source: 'legacy',
+        totals: { totalCliente: 700, das: 0, icms: 0 },
+      } as Record<string, unknown>,
+    },
+  ],
+  orders: [
+    {
+      id: 'o-shared-1',
+      os_number: 'OS-SHARED-1',
+      quote_id: 'q-shared-1',
+      trip_id: 'trip-1',
+      value: 1000,
+      created_at: '2026-03-12T10:00:00.000Z',
+      pricing_breakdown: null,
+      carreteiro_real: null,
+      pedagio_real: null,
+      descarga_real: null,
+      waiting_time_cost: null,
+    },
+    {
+      id: 'o-shared-2',
+      os_number: 'OS-SHARED-2',
+      quote_id: 'q-shared-2',
+      trip_id: 'trip-1',
+      value: 500,
+      created_at: '2026-03-12T10:00:00.000Z',
+      pricing_breakdown: null,
+      carreteiro_real: null,
+      pedagio_real: null,
+      descarga_real: null,
+      waiting_time_cost: null,
+    },
+    {
+      id: 'o-legacy',
+      os_number: 'OS-LEGACY-1',
+      quote_id: 'q-legacy',
+      trip_id: null,
+      value: 700,
+      created_at: '2026-03-12T10:00:00.000Z',
+      pricing_breakdown: null,
+      carreteiro_real: 100,
+      pedagio_real: 20,
+      descarga_real: 10,
+      waiting_time_cost: null,
+    },
+    {
+      id: 'o-no-quote',
+      os_number: 'OS-NO-QUOTE-1',
+      quote_id: null,
+      trip_id: 'trip-2',
+      value: 400,
+      created_at: '2026-03-12T10:00:00.000Z',
+      pricing_breakdown: null,
+      carreteiro_real: null,
+      pedagio_real: null,
+      descarga_real: null,
+      waiting_time_cost: null,
+    },
+  ],
+  tripCostItemsByOrderId: new Map([
+    [
+      'o-shared-1',
+      [
+        { order_id: 'o-shared-1', scope: 'OS', category: 'das', amount: 50 },
+        { order_id: 'o-shared-1', scope: 'OS', category: 'descarga', amount: 70 },
+        { order_id: 'o-shared-1', scope: 'OS', category: 'gris', amount: 20 },
+        { order_id: 'o-shared-1', scope: 'OS', category: 'tso', amount: 10 },
+      ],
+    ],
+    [
+      'o-shared-2',
+      [{ order_id: 'o-shared-2', scope: 'OS', category: 'das', amount: 30 }],
+    ],
+    [
+      'o-no-quote',
+      [{ order_id: 'o-no-quote', scope: 'OS', category: 'das', amount: 10 }],
+    ],
+  ]),
+  tripScopedItemsByTripId: new Map([
+    [
+      'trip-1',
+      [
+        { order_id: null, scope: 'TRIP', category: 'carreteiro', amount: 500 },
+        { order_id: null, scope: 'TRIP', category: 'pedagio', amount: 200 },
+      ],
+    ],
+    [
+      'trip-2',
+      [{ order_id: null, scope: 'TRIP', category: 'carreteiro', amount: 250 }],
+    ],
+  ]),
+  apportionByOrderId: new Map([
+    ['o-shared-1', 0.4],
+    ['o-shared-2', 0.6],
+    ['o-no-quote', 1],
+  ]),
+});
+
+test('aplica rateio TRIP por apportion_factor no fallback de carreteiro/pedágio', () => {
+  const table = sharedTripTables.find((t) => t.os_number === 'OS-SHARED-1')!;
+  const carreteiro = rowByCode(table.rows, 'custo_motorista');
+  const pedagio = rowByCode(table.rows, 'pedagio');
+  expect(carreteiro.real_value).toBeCloseTo(200);
+  expect(pedagio.real_value).toBeCloseTo(80);
+});
+
+test('usa fallback OS para descarga/GRIS/TSO e recalcula margens pelo real', () => {
+  const table = sharedTripTables.find((t) => t.os_number === 'OS-SHARED-1')!;
+  const receitaLiquida = rowByCode(table.rows, 'receita_liquida');
+  const custosDiretos = rowByCode(table.rows, 'custos_diretos');
+  const resultado = rowByCode(table.rows, 'resultado_liquido');
+  const margem = rowByCode(table.rows, 'margem_liquida');
+  const descarga = rowByCode(table.rows, 'carga_descarga');
+  const outros = rowByCode(table.rows, 'outros_custos');
+
+  expect(receitaLiquida.real_value).toBeCloseTo(950);
+  expect(descarga.real_value).toBeCloseTo(70);
+  expect(outros.real_value).toBeCloseTo(30);
+  expect(custosDiretos.real_value).toBeCloseTo(380);
+  expect(resultado.real_value).toBeCloseTo(570);
+  expect(margem.real_value).toBeCloseTo(60);
+});
+
+test('quando *_real e fallback estão ausentes, aplica zero após fallback', () => {
+  const table = sharedTripTables.find((t) => t.os_number === 'OS-SHARED-2')!;
+  const descarga = rowByCode(table.rows, 'carga_descarga');
+  expect(descarga.real_value).toBe(0);
+});
+
+test('marca flags de edge case para COT legacy e OS sem quote', () => {
+  const legacy = sharedTripTables.find((t) => t.os_number === 'OS-LEGACY-1');
+  const noQuote = sharedTripTables.find((t) => t.os_number === 'OS-NO-QUOTE-1');
+  expect(legacy?.status_detail).toBe('legacy_quote_breakdown');
+  expect(noQuote?.status_detail).toBe('os_without_quote');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

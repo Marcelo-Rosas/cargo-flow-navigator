@@ -81,6 +81,7 @@ export function useRealtimeSubscription(tables: TableName[]) {
           if (tables.includes('financial_documents')) {
             queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
             queryClient.invalidateQueries({ queryKey: ['card'] });
+            queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
           }
         }
       )
@@ -95,6 +96,7 @@ export function useRealtimeSubscription(tables: TableName[]) {
           if (tables.includes('financial_installments')) {
             queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
             queryClient.invalidateQueries({ queryKey: ['card'] });
+            queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
           }
         }
       )
@@ -110,6 +112,7 @@ export function useRealtimeSubscription(tables: TableName[]) {
             queryClient.invalidateQueries({ queryKey: ['quote_payment_proofs'] });
             queryClient.invalidateQueries({ queryKey: ['quote_reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+            queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
           }
         }
       )

@@ -97,6 +97,7 @@ export type Database = {
           city: string | null;
           cnpj: string | null;
           cnpj_mask: string | null;
+          contact_name: string | null;
           cpf: number | null;
           created_at: string;
           created_by: string | null;
@@ -116,6 +117,7 @@ export type Database = {
           city?: string | null;
           cnpj?: string | null;
           cnpj_mask?: string | null;
+          contact_name?: string | null;
           cpf?: number | null;
           created_at?: string;
           created_by?: string | null;
@@ -135,6 +137,7 @@ export type Database = {
           city?: string | null;
           cnpj?: string | null;
           cnpj_mask?: string | null;
+          contact_name?: string | null;
           cpf?: number | null;
           created_at?: string;
           created_by?: string | null;

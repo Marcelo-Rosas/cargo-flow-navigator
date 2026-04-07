@@ -16,7 +16,8 @@ function get(rows: DreCanonicalRow[], code: DreCanonicalRow['line_code']): DreCa
  * Valida fórmulas contábeis obrigatórias da DRE e propaga warning técnico.
  * - custos_diretos = soma das sublinhas
  * - resultado_liquido = receita_liquida - overhead - custos_diretos
- * - margem_liquida = resultado_liquido / faturamento_bruto
+ * - margem_liquida (presumido) = resultado_liquido / faturamento_bruto
+ * - margem_liquida (real) = resultado_liquido / receita_liquida_real
  */
 export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
   const custoMotorista = get(rows, 'custo_motorista');
@@ -59,8 +60,8 @@ export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
   const expectedMargem = faturamento.presumed_value
     ? round2((resultadoLiquido.presumed_value / faturamento.presumed_value) * 100)
     : 0;
-  const expectedMargemReal = faturamento.real_value
-    ? round2((resultadoLiquido.real_value / faturamento.real_value) * 100)
+  const expectedMargemReal = receitaLiquida.real_value
+    ? round2((resultadoLiquido.real_value / receitaLiquida.real_value) * 100)
     : 0;
 
   const hasMismatch =

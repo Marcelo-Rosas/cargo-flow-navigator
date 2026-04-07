@@ -9,6 +9,9 @@ import {
   BarChart3,
   FileSpreadsheet,
   AlertCircle,
+  Droplets,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   BarChart,
@@ -50,6 +53,12 @@ import type {
 import { formatCurrency } from '@/lib/formatters';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 import { toast } from 'sonner';
+import { useLiquidityIndicators } from '@/hooks/useLiquidityIndicators';
+import {
+  getLiquidityStatusLabel,
+  getLiquidityStatusBadgeVariant,
+  getLiquidityStatusColor,
+} from '@/lib/financialLiquidity';
 
 // ─────────────────────────────────────────────────────
 // Helpers
@@ -209,6 +218,67 @@ function KpiCard({
   );
 }
 
+// ── Liquidez Summary (colapsável) ────────────────────
+
+function LiquiditySummaryBlock() {
+  const [expanded, setExpanded] = useState(false);
+  const { result, isLoading } = useLiquidityIndicators();
+
+  if (isLoading) return null;
+
+  const indicators = [
+    { label: 'Corrente', value: result.liquidezCorrente, status: result.statusCorrente },
+    { label: 'Seca', value: result.liquidezSeca, status: result.statusSeca },
+    { label: 'Imediata', value: result.liquidezImediata, status: result.statusImediata },
+  ] as const;
+
+  return (
+    <div className="rounded-lg border bg-card">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded((p) => !p)}
+      >
+        <span className="flex items-center gap-2">
+          <Droplets className="h-4 w-4 text-blue-500" />
+          Indicadores de Liquidez
+        </span>
+        {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4 pt-1">
+          <div className="grid grid-cols-3 gap-3">
+            {indicators.map((ind) => (
+              <div
+                key={ind.label}
+                className="rounded-lg border p-3 text-center space-y-1"
+              >
+                <p className="text-[10px] font-medium text-muted-foreground uppercase">
+                  {ind.label}
+                </p>
+                <p
+                  className={`text-xl font-bold tabular-nums ${getLiquidityStatusColor(ind.status)}`}
+                >
+                  {ind.value !== null ? ind.value.toFixed(2) : '—'}
+                </p>
+                <Badge
+                  variant={getLiquidityStatusBadgeVariant(ind.status)}
+                  className="text-[9px]"
+                >
+                  {getLiquidityStatusLabel(ind.status)}
+                </Badge>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-2 text-center">
+            Acesse a aba <strong>Liquidez</strong> para detalhes, metas e capacidade de retirada.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────
@@ -327,6 +397,9 @@ export function CashFlowReport() {
 
       {/* ── KPI Cards ── */}
       <KpiCards items={items} />
+
+      {/* ── Liquidez (resumo colapsável) ── */}
+      <LiquiditySummaryBlock />
 
       {/* ── Gráfico ── */}
       {chartData.length > 0 && (

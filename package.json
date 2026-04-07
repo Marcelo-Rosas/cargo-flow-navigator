@@ -31,7 +31,9 @@
     "test:e2e:codegen": "playwright codegen https://app.vectracargo.com.br",
     "test:e2e:auth": "npx playwright test --project=chromium-auth",
     "test:e2e:mocks": "npx playwright test tests/e2e/quote-*.spec.ts --project=chromium-mocks",
-    "test:e2e:seeded": "npx playwright test tests/e2e/flows/*.seeded.spec.ts --project=chromium-auth"
+    "test:e2e:seeded": "npx playwright test tests/e2e/flows/*.seeded.spec.ts --project=chromium-auth",
+    "audit:trips": "npx tsx scripts/audit-trips.ts",
+    "audit:trips:json": "npx tsx scripts/audit-trips.ts --json"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -94,8 +96,6 @@
     "exceljs": "^4.1.1",
     "framer-motion": "^12.25.0",
     "input-otp": "^1.4.2",
-    "jspdf": "^4.2.1",
-    "jspdf-autotable": "^5.0.7",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.462.0",
     "motion": "^12.38.0",

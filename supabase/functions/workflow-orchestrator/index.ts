@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { callEdgeFunction } from '../_shared/edgeFunctionClient.ts';
 

@@ -194,6 +194,7 @@ export function useUpdateOrder() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
       queryClient.invalidateQueries({ queryKey: cardQueryKey(null, id) });
     },
   });
@@ -302,6 +303,7 @@ export function useConvertQuoteToOrder() {
             payment_term_id: quote.payment_term_id,
             km_distance: quote.km_distance,
             toll_value: quote.toll_value,
+            cargo_value: quote.cargo_value ?? null,
             pricing_breakdown: quote.pricing_breakdown,
             freight_type: quote.freight_type,
             freight_modality: quote.freight_modality,

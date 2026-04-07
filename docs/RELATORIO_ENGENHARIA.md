@@ -362,6 +362,24 @@ Rotas de página com **lazy loading** (`React.lazy` em `App.tsx`); **Sentry** in
 - **profitability:** `custosCarreteiro`, `resultadoLiquido`, `margemPercent`
 - **components:** `baseCost`, `toll`, `gris`, `tso`, `rctrc`, `adValorem`, taxas condicionais, etc.
 
+### 7.1 Mapeamento DRE Contábil ↔ Motor CFN
+
+| DRE Clássica | Equivalente CFN | Campo | Fórmula |
+|---|---|---|---|
+| Receita Bruta | Total Cliente | `totals.totalCliente` | gross-up de custosDiretos |
+| (-) Impostos | DAS + ICMS | `totals.das` + `totals.icms` | % sobre totalCliente |
+| Receita Líquida | receitaLiquida | `profitability.receitaLiquida` | totalCliente - DAS - ICMS |
+| (-) CSP | custosDiretos | `profitability.custosDiretos` | motorista + serviços + descarga |
+| (-) Overhead | overhead | `profitability.overhead` | receitaLiquida × overhead% |
+| **Lucro Operacional** | resultadoLiquido | `profitability.resultadoLiquido` | receitaLiquida - overhead - custosDiretos |
+| **Margem Operacional** | margemPercent | `profitability.margemPercent` | (resultadoLiquido / totalCliente) × 100 |
+
+> **Nota**: `margemPercent` é margem operacional (após impostos + overhead), não margem bruta. O campo `margemBruta` é valor absoluto em R$. `profit_margin_percent` é a margem alvo (input do gross-up), não a margem real.
+
+> **Divergência adapter**: `buildStoredBreakdownFromEdgeResponse` não copia `receita_liquida` nem `custo_motorista` da Edge. A UI deriva `receitaLiquida` quando ausente (`totalCliente - das - icms`).
+
+Documentação completa: [Plan 02 v0.2.3](plans/plan-02-metodologia-precificacao-lotacao-vs-fracionado/v0.2.3/methodology.md)
+
 ---
 
 ## 8. Convenções Técnicas
@@ -396,6 +414,25 @@ Feature para rotas com múltiplos pontos. MVP: 1 FAT + 1 PAG por viagem; embarca
 
 ---
 
+## 9.1 Indicadores de Liquidez
+
+Módulo de análise de liquidez no board Financeiro (aba **Liquidez** + resumo colapsável no **Fluxo de Caixa**).
+
+**Indicadores:**
+- Liquidez Corrente = ativoCirculante / passivoCirculante (meta: 1.5–2.0)
+- Liquidez Seca = Corrente (estoque = 0 para transportadora)
+- Liquidez Imediata = (caixa + aplicações) / passivoCirculante (meta: ≥ 1.0)
+
+**Fonte de dados híbrida:**
+- AUTO: FAT/PAG pendentes e settled de `financial_installments`
+- MANUAL: saldo bancário inicial, aplicações financeiras, empréstimos CP (localStorage `cfn:liquidity:inputs`)
+
+**Retirada de caixa:** conservador (LC ≥ 1.5) e otimista (LC ≥ 1.0).
+
+**Entrypoints:** `src/lib/financialLiquidity.ts`, `src/hooks/useLiquidityIndicators.ts`, `src/components/financial/LiquidityPanel.tsx`, `src/components/financial/CashFlowReport.tsx` (resumo), `src/pages/Financial.tsx` (tab)
+
+---
+
 ## 10. Hooks Principais por Módulo
 
 
@@ -403,7 +440,7 @@ Feature para rotas com múltiplos pontos. MVP: 1 FAT + 1 PAG por viagem; embarca
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cotação             | `useQuotes`, `useCreateLegacyQuote`, `useCalculateFreight`, `useSendQuoteEmail`, `useQuoteRouteStops` (paradas: persistência em `quote_route_stops`, waypoints na Edge Function) |
 | Ordem/Operacional   | `useOrders`, `useTrips`                                                                                                                                                          |
-| Financeiro          | `useEnsureFinancialDocument`, `useFinancialDocumentsKanban`, `useQuotePaymentProofs`, `useComplianceChecks`                                                                      |
+| Financeiro          | `useEnsureFinancialDocument`, `useFinancialDocumentsKanban`, `useQuotePaymentProofs`, `useComplianceChecks`, `useLiquidityIndicators`                                            |
 | Precificação        | `usePriceTables`, `usePriceTableRows`, `usePricingRules`, `useVehicleTypes`, `useAnttFloorRate`, `useUnloadingCostRates`                                                         |
 | Frota               | `useClients`, `useShippers`, `useDrivers`, `useVehicles`, `useOwners`, `useDriverQualification`                                                                                  |
 | Documentos          | `useDocuments`, `useCepLookup`                                                                                                                                                   |

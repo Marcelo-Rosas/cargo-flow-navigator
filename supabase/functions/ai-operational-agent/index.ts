@@ -7,6 +7,8 @@
  */
 import { getCorsHeaders } from '../_shared/cors.ts';
 
+const Deno = (globalThis as any).Deno;
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
@@ -15,12 +17,16 @@ Deno.serve(async (req) => {
 
   try {
     const bodyText = await req.text();
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const apikey = anonKey || serviceRoleKey;
 
     const res = await fetch(orchestratorUrl, {
       method: req.method,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey,
       },
       body: bodyText || undefined,
     });

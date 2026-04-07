@@ -1,5 +1,29 @@
 # Changelog — Plan 02 Metodologia de Precificação (Lotação vs Fracionado)
 
+## v0.2.3 (2026-03-21)
+
+**change_type**: minor
+
+### O que mudou
+
+- **Nova seção**: Mapeamento DRE Contábil ↔ Motor CFN — tabela que relaciona a cascata DRE clássica (Receita Bruta → Líquida → Lucro Operacional) aos campos reais do motor de precificação.
+- **Glossário de desambiguação**: esclarece `margemBruta` (valor absoluto R$), `margemPercent` (margem operacional %), `profit_margin_percent` (margem alvo input).
+- **Classificação de margem**: `margemPercent` = margem operacional (após impostos + overhead), não margem bruta — formalizado com justificativa contábil.
+- **Terminologia**: CSP (Custo do Serviço Prestado) em vez de CMV — Vectra Cargo é transportadora.
+- **Vetores de impacto na margem**: documentação do binômio preço (gross-up) + custo direto (operacional).
+- **Evidence index**: comandos `rg` e `Select-String` para verificação dos claims.
+
+### O que foi mantido sem alteração
+
+- Contract/Shape (seção 2), Contrato de precedência (seção 3), Metodologia Lotação e Fracionado (seções 4–5), Search log (seção 6), Glossário oficial (seção 7 — complementado), Provas negativas (seção 8), Matriz TS vs Edge (seção 9), Dicionário de configuração (seção 10), MRE (seção 11), Mapa de código (seção 12), Gaps (seção 13), Checklist (seção 14).
+
+### Justificativa do bump (minor)
+
+- Nova seção substancial (Mapeamento DRE ↔ CFN) com impacto na compreensão do motor.
+- Glossário de desambiguação resolve confusão recorrente entre termos contábeis e de código.
+
+---
+
 ## v0.2.1 (2026-03-06)
 
 **change_type**: patch

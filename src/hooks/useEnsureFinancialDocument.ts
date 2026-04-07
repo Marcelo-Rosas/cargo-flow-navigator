@@ -29,6 +29,7 @@ export function useEnsureFinancialDocument() {
         qc.invalidateQueries({ queryKey: ['quotes'] }),
         qc.invalidateQueries({ queryKey: ['orders'] }),
         qc.invalidateQueries({ queryKey: ['card'] }),
+        qc.invalidateQueries({ queryKey: ['cash-flow-summary'] }),
       ]);
     },
   });

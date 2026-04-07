@@ -28,6 +28,7 @@ const digits = (v: string) => v.replace(/\D/g, '');
 
 const clientSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(200, 'Nome muito longo'),
+  contact_name: z.string().max(200, 'Nome muito longo').optional(),
   cpf: z
     .string()
     .optional()
@@ -65,6 +66,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
     resolver: zodResolver(clientSchema),
     defaultValues: {
       name: '',
+      contact_name: '',
       cpf: '',
       cnpj: '',
       email: '',
@@ -81,6 +83,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
     if (client) {
       form.reset({
         name: client.name,
+        contact_name: client.contact_name || '',
         cpf: client.cpf ? String(client.cpf) : '',
         cnpj: client.cnpj || '',
         email: client.email || '',
@@ -94,6 +97,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
     } else {
       form.reset({
         name: '',
+        contact_name: '',
         cpf: '',
         cnpj: '',
         email: '',
@@ -177,6 +181,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
           id: client.id,
           updates: {
             name: data.name,
+            contact_name: data.contact_name || null,
             cpf: cpfNum,
             cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
             email: data.email || null,
@@ -193,6 +198,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
         const cpfNum = data.cpf ? Number(digits(data.cpf)) : null;
         await createClientMutation.mutateAsync({
           name: data.name,
+          contact_name: data.contact_name || null,
           cpf: cpfNum,
           cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
           email: data.email || null,
@@ -231,6 +237,20 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                   <FormLabel>Nome / Razão Social *</FormLabel>
                   <FormControl>
                     <Input placeholder="Empresa LTDA" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="contact_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Responsável</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Nome do responsável" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

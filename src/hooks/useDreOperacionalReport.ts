@@ -88,7 +88,7 @@ export function useDreOperacionalReport({
         .from('orders')
         .select(
           `id, os_number, quote_id, value, created_at, pricing_breakdown,
-           carreteiro_real, pedagio_real, descarga_real, waiting_time_cost,
+           carreteiro_real, pedagio_real, descarga_real, waiting_time_cost, trip_id,
            quote:quotes(id, quote_code, created_at, value, pricing_breakdown)`
         )
         .not('value', 'is', null)
@@ -127,6 +127,7 @@ export function useDreOperacionalReport({
         pedagio_real: number | null;
         descarga_real: number | null;
         waiting_time_cost: number | null;
+        trip_id: string | null;
         quote?: {
           id?: string;
           quote_code?: string | null;
@@ -138,14 +139,15 @@ export function useDreOperacionalReport({
 
       const orders = (ordersData ?? []) as OrderRow[];
       const orderIds = orders.map((o) => o.id);
+      const tripIds = Array.from(new Set(orders.map((o) => o.trip_id).filter(Boolean))) as string[];
       const tripCostItemsByOrderId = new Map<
         string,
-        Array<{ order_id: string | null; scope: string; category: string; amount: number }>
+        Array<{ order_id: string | null; trip_id: string | null; scope: string; category: string; amount: number }>
       >();
       if (orderIds.length > 0) {
         const { data: tripCostItemsData } = await supabase
           .from('trip_cost_items')
-          .select('order_id, scope, category, amount')
+          .select('order_id, trip_id, scope, category, amount')
           .in('order_id', orderIds);
         for (const item of tripCostItemsData ?? []) {
           const orderId = item.order_id ?? '';
@@ -153,11 +155,49 @@ export function useDreOperacionalReport({
           const arr = tripCostItemsByOrderId.get(orderId) ?? [];
           arr.push({
             order_id: item.order_id,
+            trip_id: item.trip_id,
             scope: item.scope,
             category: item.category,
             amount: item.amount,
           });
           tripCostItemsByOrderId.set(orderId, arr);
+        }
+      }
+
+      const tripScopedItemsByTripId = new Map<
+        string,
+        Array<{ order_id: string | null; trip_id: string | null; scope: string; category: string; amount: number }>
+      >();
+      if (tripIds.length > 0) {
+        const { data: tripScopeItemsData } = await supabase
+          .from('trip_cost_items')
+          .select('order_id, trip_id, scope, category, amount')
+          .eq('scope', 'TRIP')
+          .in('trip_id', tripIds);
+        for (const item of tripScopeItemsData ?? []) {
+          const tripId = item.trip_id ?? '';
+          if (!tripId) continue;
+          const arr = tripScopedItemsByTripId.get(tripId) ?? [];
+          arr.push({
+            order_id: item.order_id,
+            trip_id: item.trip_id,
+            scope: item.scope,
+            category: item.category,
+            amount: item.amount,
+          });
+          tripScopedItemsByTripId.set(tripId, arr);
+        }
+      }
+
+      const apportionByOrderId = new Map<string, number>();
+      if (orderIds.length > 0) {
+        const { data: tripOrdersRows } = await supabase
+          .from('trip_orders')
+          .select('order_id, apportion_factor')
+          .in('order_id', orderIds);
+        for (const row of tripOrdersRows ?? []) {
+          if (!row.order_id) continue;
+          apportionByOrderId.set(row.order_id, row.apportion_factor ?? 1);
         }
       }
 
@@ -184,6 +224,7 @@ export function useDreOperacionalReport({
           id: o.id,
           os_number: o.os_number,
           quote_id: o.quote_id,
+          trip_id: o.trip_id,
           value: o.value,
           created_at: o.created_at,
           pricing_breakdown: o.pricing_breakdown as Record<string, unknown> | null,
@@ -201,6 +242,8 @@ export function useDreOperacionalReport({
         })),
         quotes,
         tripCostItemsByOrderId,
+        tripScopedItemsByTripId,
+        apportionByOrderId,
         grisByOrderId,
       });
 

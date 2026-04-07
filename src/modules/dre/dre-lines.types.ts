@@ -70,5 +70,6 @@ export interface DreTable {
   /** Base temporal única para filtros e agrupamentos (quote.created_at | fallback order.created_at). */
   reference_date: string;
   status?: 'ok' | 'sem_os_vinculada';
+  status_detail?: 'ok' | 'legacy_quote_breakdown' | 'os_without_quote';
   rows: DreCanonicalRow[];
 }

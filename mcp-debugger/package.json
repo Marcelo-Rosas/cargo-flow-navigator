@@ -8,6 +8,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
+    "debug:component": "npm run build && node scripts/run-debug-component.mjs",
     "test": "vitest",
     "lint": "eslint src --ext .ts",
     "type-check": "tsc --noEmit"

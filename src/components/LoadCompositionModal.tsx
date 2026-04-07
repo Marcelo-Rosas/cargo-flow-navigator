@@ -42,7 +42,7 @@ import {
 import { toast } from 'sonner';
 import { RouteMapVisualization, type RouteMapVisualizationProps } from './RouteMapVisualization';
 import { DiscountProposalBreakdown } from './DiscountProposalBreakdown';
-import { generateLoadCompositionProposalPdf } from '@/lib/generateLoadCompositionProposalPdf';
+import { usePdfDownload } from '@/hooks/usePdfDownload';
 
 export interface LoadCompositionModalProps {
   compositionId: string;
@@ -69,6 +69,7 @@ export function LoadCompositionModal({
     refetch: refetchComposition,
   } = useLoadCompositionSuggestion(compositionId);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const { downloadLoadCompositionPdf } = usePdfDownload();
   const [routeData, setRouteData] = useState<{
     legs?: {
       from_label: string;
@@ -80,9 +81,10 @@ export function LoadCompositionModal({
       toll_centavos: number;
     }[];
     polyline_coords?: [number, number][];
+    encoded_polyline?: string;
     total_distance_km?: number;
     total_duration_min?: number;
-    total_toll_centavos?: number;
+    total_toll_centavos?: number | null;
     route_source?: string;
   } | null>(null);
   const generateRoute = useGenerateOptimalRoute();
@@ -242,25 +244,7 @@ export function LoadCompositionModal({
     return Object.fromEntries(entries);
   }, [quotesDetail]);
 
-  const resolveSuggestionSequence = async (createdAt: string): Promise<number | undefined> => {
-    const createdDate = new Date(createdAt);
-    const monthStart = new Date(createdDate.getFullYear(), createdDate.getMonth(), 1);
-
-    const { count, error } = (await supabase
-      .from('load_composition_suggestions' as never)
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', monthStart.toISOString())
-      .lte('created_at', createdDate.toISOString())) as {
-      count: number | null;
-      error: { message: string } | null;
-    };
-
-    if (error || !count) {
-      return undefined;
-    }
-
-    return count;
-  };
+  // resolveSuggestionSequence era usado apenas no gerador client-side de PDF (jsPDF).
 
   if (isLoading) {
     return (
@@ -618,7 +602,7 @@ export function LoadCompositionModal({
                   totalDistanceKm={routeData?.total_distance_km}
                   totalDurationMin={routeData?.total_duration_min}
                   totalTollCentavos={
-                    routeData?.total_toll_centavos ?? composition.total_toll_centavos
+                    (routeData?.total_toll_centavos ?? composition.total_toll_centavos) ?? undefined
                   }
                   routeSource={routeData?.route_source}
                   routings={composition.routings}
@@ -746,16 +730,7 @@ export function LoadCompositionModal({
                     if (!composition.discounts || composition.discounts.length === 0) return;
                     try {
                       setIsExportingPdf(true);
-                      const suggestionSequence = await resolveSuggestionSequence(
-                        composition.created_at
-                      );
-                      await generateLoadCompositionProposalPdf({
-                        suggestion: composition,
-                        quoteCodeById,
-                        suggestionSequence,
-                        tollEconomyCentavos: tollEconomy.toll,
-                        anttEconomyCentavos: tollEconomy.antt,
-                      });
+                      await downloadLoadCompositionPdf(composition.id);
                       toast.success('PDF gerado com sucesso');
                     } catch (error) {
                       const description =

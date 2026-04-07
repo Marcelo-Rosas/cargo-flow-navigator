@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { SectionBlock } from '@/components/ui/section-block';
 import type { FinancialKanbanRow } from '@/types/financial';
+import { FREIGHT_CONSTANTS } from '@/lib/freightCalculator';
 import { FinancialAiAnalysis } from '@/components/financial/FinancialAiAnalysis';
 import { FinancialCargoDetails } from '@/components/financial/modal-sections/FinancialCargoDetails';
 import { FinancialCostBreakdown } from '@/components/financial/modal-sections/FinancialCostBreakdown';
@@ -157,14 +158,14 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
                 )}
                 {margemPercent != null && (
                   <Badge
-                    variant={margemPercent < 15 ? 'destructive' : 'default'}
+                    variant={margemPercent < FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT ? 'destructive' : 'default'}
                     className={
-                      margemPercent >= 15
+                      margemPercent >= FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT
                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                         : ''
                     }
                   >
-                    Margem {margemPercent.toFixed(1)}%
+                    Margem Op. {margemPercent.toFixed(1)}%
                   </Badge>
                 )}
               </div>

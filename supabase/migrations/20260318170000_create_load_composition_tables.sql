@@ -185,3 +185,24 @@ GRANT SELECT ON load_composition_summary TO authenticated;
 GRANT SELECT ON load_composition_suggestions TO authenticated;
 GRANT SELECT ON load_composition_routings TO authenticated;
 GRANT SELECT ON load_composition_metrics TO authenticated;
+
+
+DO $$
+BEGIN
+  IF to_regclass('public.load_composition_discount_breakdown') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_constraint
+      WHERE conname = 'load_composition_discount_breakdown_composition_id_fkey'
+        AND conrelid = 'public.load_composition_discount_breakdown'::regclass
+    ) THEN
+      ALTER TABLE public.load_composition_discount_breakdown
+      ADD CONSTRAINT load_composition_discount_breakdown_composition_id_fkey
+      FOREIGN KEY (composition_id)
+      REFERENCES public.load_composition_suggestions(id)
+      ON DELETE CASCADE;
+    END IF;
+  END IF;
+END
+$$;
+

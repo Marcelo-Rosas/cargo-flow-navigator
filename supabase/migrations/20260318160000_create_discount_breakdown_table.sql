@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS load_composition_discount_breakdown (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  composition_id UUID NOT NULL REFERENCES load_composition_suggestions(id) ON DELETE CASCADE,
+  composition_id UUID NOT NULL,
 
   -- Quote & Shipper
   quote_id UUID NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
@@ -100,3 +100,24 @@ COMMENT ON COLUMN load_composition_discount_breakdown.discount_strategy IS
    - equal_share: divide economy equally
    - proportional_to_original: higher original price = higher discount
    - weighted_by_weight: higher weight = higher discount';
+
+DO $$
+BEGIN
+  IF to_regclass('public.load_composition_suggestions') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_constraint
+      WHERE conname = 'load_composition_discount_breakdown_composition_id_fkey'
+        AND conrelid = 'public.load_composition_discount_breakdown'::regclass
+    ) THEN
+      ALTER TABLE public.load_composition_discount_breakdown
+      ADD CONSTRAINT load_composition_discount_breakdown_composition_id_fkey
+      FOREIGN KEY (composition_id)
+      REFERENCES public.load_composition_suggestions(id)
+      ON DELETE CASCADE;
+    END IF;
+  END IF;
+END
+$$;
+
+

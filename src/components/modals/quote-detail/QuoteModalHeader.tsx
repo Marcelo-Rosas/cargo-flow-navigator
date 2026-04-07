@@ -1,25 +1,7 @@
-import { useState } from 'react';
-import {
-  Route,
-  Pencil,
-  ArrowRightLeft,
-  Receipt,
-  Loader2,
-  RefreshCw,
-  Download,
-  FileText,
-  ChevronDown,
-} from 'lucide-react';
+import { Route, Pencil, ArrowRightLeft, Receipt, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import type { QuotePdfMode } from '@/lib/generateQuotePdf';
 
 interface QuoteModalHeaderProps {
   quoteCode: string;
@@ -36,7 +18,6 @@ interface QuoteModalHeaderProps {
   onConvertToFAT: () => void;
   onRecalcular: () => void;
   onEdit: () => void;
-  onDownloadPdf?: (mode: QuotePdfMode) => Promise<void>;
   showRecalcular: boolean;
 }
 
@@ -55,21 +36,8 @@ export function QuoteModalHeader({
   onConvertToFAT,
   onRecalcular,
   onEdit,
-  onDownloadPdf,
   showRecalcular,
 }: QuoteModalHeaderProps) {
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-
-  const handleDownloadPdf = async (mode: QuotePdfMode) => {
-    if (!onDownloadPdf) return;
-    setIsGeneratingPdf(true);
-    try {
-      await onDownloadPdf(mode);
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  };
-
   return (
     <>
       <div className="flex items-start justify-between gap-4">
@@ -95,36 +63,6 @@ export function QuoteModalHeader({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {onDownloadPdf && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 gap-1 px-2"
-                  disabled={isGeneratingPdf}
-                  title="Baixar PDF da cotação"
-                >
-                  {isGeneratingPdf ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4" />
-                  )}
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleDownloadPdf('simplified')}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  PDF Simplificado (Cliente)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDownloadPdf('detailed')}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  PDF Detalhado (Interno)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
           {canManage && showRecalcular && (
             <Button
               variant="ghost"

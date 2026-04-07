@@ -21,12 +21,22 @@ export default defineConfig({
     },
   },
   build: {
+    chunkSizeWarningLimit: 1000, // kB — default é 500
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          supabase: ['@supabase/supabase-js'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react-dom')) return 'vendor-react';
+            if (id.includes('react-router')) return 'vendor-react';
+            if (id.includes('@supabase')) return 'vendor-supabase';
+            if (id.includes('@radix-ui')) return 'vendor-ui';
+            if (id.includes('leaflet')) return 'vendor-map';
+            if (id.includes('@dnd-kit')) return 'vendor-dnd';
+            if (id.includes('@tanstack')) return 'vendor-query';
+            if (id.includes('framer-motion')) return 'vendor-motion';
+            if (id.includes('date-fns')) return 'vendor-date';
+            if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
+          }
         },
       },
     },

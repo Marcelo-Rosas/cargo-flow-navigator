@@ -14,10 +14,13 @@
 -- - AdditionalFeesSection.tsx: UI for selecting conditional fees
 -- =====================================================
 
-INSERT INTO public.pricing_parameters (key, value, description)
+INSERT INTO public.pricing_parameters (key, value, unit, description)
 VALUES (
   'FORBID_CONDITIONAL_FEES',
-  'false',
-  'Quando true, o motor Edge ignora input.conditional_fees. Taxas gerenciadas localmente via Taxas Adicionais (pricing_rules).'
+  0,
+  'boolean_0_1',
+  'Quando true (=1), o motor Edge ignora input.conditional_fees. Quando false (=0), comportamento legado.'
 )
 ON CONFLICT (key) DO NOTHING;
+
+

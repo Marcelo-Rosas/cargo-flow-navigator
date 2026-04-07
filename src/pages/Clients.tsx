@@ -10,6 +10,7 @@ import {
   Phone,
   Mail,
   MapPin,
+  User,
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -206,9 +207,10 @@ export default function Clients() {
                         </div>
                         <div>
                           <p className="font-medium text-foreground">{client.name}</p>
-                          {client.notes && (
-                            <p className="text-sm text-muted-foreground truncate max-w-[200px]">
-                              {client.notes}
+                          {client.contact_name && (
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {client.contact_name}
                             </p>
                           )}
                         </div>

@@ -34,7 +34,8 @@ CREATE INDEX IF NOT EXISTS idx_lcs_anchor_quote
   WHERE anchor_quote_id IS NOT NULL;
 
 -- 4. Update the summary view to include new columns
-CREATE OR REPLACE VIEW load_composition_summary AS
+DROP VIEW IF EXISTS load_composition_summary;
+CREATE VIEW load_composition_summary AS
 SELECT
   s.id,
   s.shipper_id,
@@ -56,3 +57,5 @@ FROM load_composition_suggestions s
 ORDER BY s.created_at DESC;
 
 GRANT SELECT ON load_composition_summary TO authenticated;
+
+

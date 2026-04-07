@@ -62,8 +62,8 @@ export async function debugComponent(input: {
           const contextEnd = Math.min(code.length, match.index + 500);
           const context = code.substring(contextStart, contextEnd);
 
-          // Check if useEffect has dependency array
-          if (!context.includes('[]') && !context.includes('[') + '(' + ']') {
+          // Check if useEffect has dependency array (heuristic on local snippet)
+          if (!context.includes('[]')) {
             const cleanContext = context.replace(/\s+/g, ' ');
             if (!cleanContext.match(/useEffect\s*\(\s*[^)]+\s*,\s*\[\s*[^\]]*\s*\]/)) {
               issues.push({

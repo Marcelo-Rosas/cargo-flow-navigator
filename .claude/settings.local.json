@@ -21,7 +21,9 @@
       "Bash(npx tsc:*)",
       "mcp__Claude_Preview__preview_start",
       "Bash(command -v npm)",
-      "Bash(node -e \"const {execSync} = require\\(''child_process''\\); console.log\\(execSync\\(''where npm''\\).toString\\(\\).trim\\(\\)\\)\")"
+      "Bash(node -e \"const {execSync} = require\\(''child_process''\\); console.log\\(execSync\\(''where npm''\\).toString\\(\\).trim\\(\\)\\)\")",
+      "Read(//c/Users/marce/navi/**)",
+      "Read(//c/Users/marce/**)"
     ]
   },
   "hooks": {

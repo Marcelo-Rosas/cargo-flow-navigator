@@ -83,6 +83,7 @@ export function useUpdateQuote() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
       queryClient.invalidateQueries({ queryKey: cardQueryKey(id, null) });
     },
   });
