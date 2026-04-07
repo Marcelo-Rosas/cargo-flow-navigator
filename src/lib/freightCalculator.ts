@@ -119,6 +119,12 @@ export interface FreightCalculationInput {
     regimeSimplesNacional?: boolean;
     /** Excesso de Sublimite (ICMS separado). Default false. */
     excessoSublimite?: boolean;
+    /** Regime Lucro Presumido (PIS/COFINS/IRPJ/CSLL individuais). Default false. */
+    regimeLucroPresumido?: boolean;
+    pisPercent?: number;
+    cofinsPercent?: number;
+    irpjEffectivePercent?: number;
+    csllEffectivePercent?: number;
     markupScope?: MarkupScope;
     tdePercent?: number;
     tearPercent?: number;
@@ -227,6 +233,10 @@ export interface FreightCalculationOutput {
   rates: {
     dasPercent: number;
     icmsPercent: number;
+    pisPercent: number;
+    cofinsPercent: number;
+    irpjPercent: number;
+    csllPercent: number;
     grisPercent: number;
     tsoPercent: number;
     costValuePercent: number;
@@ -242,6 +252,10 @@ export interface FreightCalculationOutput {
     receitaBruta: number;
     das: number;
     icms: number;
+    pis: number;
+    cofins: number;
+    irpj: number;
+    csll: number;
     totalImpostos: number;
     totalCliente: number;
   };
@@ -258,7 +272,7 @@ export interface FreightCalculationOutput {
     resultadoLiquido: number;
     margemPercent: number;
     profitMarginTarget: number;
-    regimeFiscal: 'simples_nacional' | 'excesso_sublimite' | 'normal';
+    regimeFiscal: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
   };
 
   conditionalFeesBreakdown: Record<string, number>;
@@ -308,6 +322,7 @@ export interface StoredPricingBreakdown {
     originalWeightKg?: number;
     regimeSimplesNacional?: boolean;
     excessoSublimite?: boolean;
+    regimeLucroPresumido?: boolean;
 
     /** Modo de cálculo ICMS: 'A' = alíquota fixa, 'B' = proporcional por UF */
     icmsMode?: 'A' | 'B';
@@ -379,6 +394,10 @@ export interface StoredPricingBreakdown {
     receitaBruta: number;
     das: number;
     icms: number;
+    pis?: number;
+    cofins?: number;
+    irpj?: number;
+    csll?: number;
     tacAdjustment?: number;
     paymentAdjustment?: number;
     totalImpostos: number;
@@ -399,12 +418,16 @@ export interface StoredPricingBreakdown {
     resultadoLiquido: number;
     margemPercent: number;
     profitMarginTarget?: number;
-    regimeFiscal?: 'simples_nacional' | 'excesso_sublimite' | 'normal';
+    regimeFiscal?: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
   };
 
   rates: {
     dasPercent: number;
     icmsPercent: number;
+    pisPercent?: number;
+    cofinsPercent?: number;
+    irpjPercent?: number;
+    csllPercent?: number;
     grisPercent: number;
     tsoPercent: number;
     costValuePercent: number;
@@ -536,6 +559,11 @@ function resolveParams(input: FreightCalculationInput) {
     profitMarginPercent: pp?.profitMarginPercent ?? FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT,
     regimeSimplesNacional: pp?.regimeSimplesNacional ?? true,
     excessoSublimite: pp?.excessoSublimite ?? false,
+    regimeLucroPresumido: pp?.regimeLucroPresumido ?? false,
+    pisPercent: pp?.pisPercent ?? 0,
+    cofinsPercent: pp?.cofinsPercent ?? 0,
+    irpjEffectivePercent: pp?.irpjEffectivePercent ?? 0,
+    csllEffectivePercent: pp?.csllEffectivePercent ?? 0,
     markupScope: pp?.markupScope ?? ('BASE_ONLY' as MarkupScope),
     tdePercent: pp?.tdePercent ?? FREIGHT_CONSTANTS.NTC_TDE_PERCENT,
     tearPercent: pp?.tearPercent ?? FREIGHT_CONSTANTS.NTC_TEAR_PERCENT,
@@ -548,12 +576,13 @@ function resolveParams(input: FreightCalculationInput) {
 }
 
 /** Regime fiscal para Gross-up */
-export type RegimeFiscal = 'simples_nacional' | 'excesso_sublimite' | 'normal';
+export type RegimeFiscal = 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
 
 /**
  * Calcula Total Cliente via Gross-up Híbrido (Asset-Light).
  * Simples: divisor = 1 - (Overhead% + DAS% + Lucro%)/100, ICMS=0.
  * Sublimite: divisor = 1 - (Overhead% + DAS% + ICMS% + Lucro%)/100.
+ * Lucro Presumido: divisor = 1 - (Overhead% + PIS% + COFINS% + IRPJ% + CSLL% + ICMS% + Lucro%)/100.
  */
 function calculateGrossUpHibrido(
   custosDiretos: number,
@@ -562,18 +591,30 @@ function calculateGrossUpHibrido(
   profitMarginPercent: number,
   icmsPercent: number,
   regimeSimples: boolean,
-  excessoSublimite: boolean
+  excessoSublimite: boolean,
+  regimeLucroPresumido = false,
+  pisPercent = 0,
+  cofinsPercent = 0,
+  irpjPercent = 0,
+  csllPercent = 0
 ): {
   totalCliente: number;
   receitaBruta: number;
   das: number;
   icms: number;
+  pis: number;
+  cofins: number;
+  irpj: number;
+  csll: number;
   regimeFiscal: RegimeFiscal;
 } {
   let regimeFiscal: RegimeFiscal;
   let icmsNoDivisor: boolean;
 
-  if (regimeSimples && !excessoSublimite) {
+  if (regimeLucroPresumido) {
+    regimeFiscal = 'lucro_presumido';
+    icmsNoDivisor = true;
+  } else if (regimeSimples && !excessoSublimite) {
     regimeFiscal = 'simples_nacional';
     icmsNoDivisor = false;
   } else if (regimeSimples && excessoSublimite) {
@@ -584,24 +625,53 @@ function calculateGrossUpHibrido(
     icmsNoDivisor = true;
   }
 
-  const taxaBruta = icmsNoDivisor
-    ? (overheadPercent + dasPercent + icmsPercent + profitMarginPercent) / 100
-    : (overheadPercent + dasPercent + profitMarginPercent) / 100;
+  let taxaBruta: number;
+  if (regimeFiscal === 'lucro_presumido') {
+    taxaBruta =
+      (overheadPercent +
+        pisPercent +
+        cofinsPercent +
+        irpjPercent +
+        csllPercent +
+        icmsPercent +
+        profitMarginPercent) /
+      100;
+  } else if (icmsNoDivisor) {
+    taxaBruta = (overheadPercent + dasPercent + icmsPercent + profitMarginPercent) / 100;
+  } else {
+    taxaBruta = (overheadPercent + dasPercent + profitMarginPercent) / 100;
+  }
 
   if (taxaBruta >= 1) {
     throw new Error(
-      `Soma de Overhead (${overheadPercent}%) + DAS (${dasPercent}%) + ` +
-        `${icmsNoDivisor ? `ICMS (${icmsPercent}%) + ` : ''}` +
-        `Lucro (${profitMarginPercent}%) não pode ser >= 100%`
+      `Soma de impostos + overhead + lucro não pode ser >= 100% (taxa bruta: ${(taxaBruta * 100).toFixed(2)}%)`
     );
   }
 
   const totalCliente = round2(custosDiretos / (1 - taxaBruta));
-  const das = round2(totalCliente * (dasPercent / 100));
-  const icms = regimeFiscal === 'simples_nacional' ? 0 : round2(totalCliente * (icmsPercent / 100));
-  const receitaBruta = round2(totalCliente - das - icms);
 
-  return { totalCliente, receitaBruta, das, icms, regimeFiscal };
+  let das: number;
+  let icms: number;
+  let pis = 0;
+  let cofins = 0;
+  let irpj = 0;
+  let csll = 0;
+
+  if (regimeFiscal === 'lucro_presumido') {
+    das = 0;
+    pis = round2(totalCliente * (pisPercent / 100));
+    cofins = round2(totalCliente * (cofinsPercent / 100));
+    irpj = round2(totalCliente * (irpjPercent / 100));
+    csll = round2(totalCliente * (csllPercent / 100));
+    icms = round2(totalCliente * (icmsPercent / 100));
+  } else {
+    das = round2(totalCliente * (dasPercent / 100));
+    icms = regimeFiscal === 'simples_nacional' ? 0 : round2(totalCliente * (icmsPercent / 100));
+  }
+
+  const receitaBruta = round2(totalCliente - das - icms - pis - cofins - irpj - csll);
+
+  return { totalCliente, receitaBruta, das, icms, pis, cofins, irpj, csll, regimeFiscal };
 }
 
 function resolveDirectCosts(input: FreightCalculationInput, receitaBruta: number) {
@@ -669,7 +739,8 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const params = resolveParams(input);
   let icmsPercent = normalizeIcmsRate(input.icmsRatePercent);
   // Simples Nacional sem excesso: ICMS na DAS (não incide separadamente)
-  if (params.regimeSimplesNacional && !params.excessoSublimite) {
+  // Lucro Presumido: ICMS incide normalmente
+  if (params.regimeSimplesNacional && !params.excessoSublimite && !params.regimeLucroPresumido) {
     icmsPercent = 0;
   }
   const kmBandUsed = Math.round(Number(input.kmDistance || 0));
@@ -711,6 +782,10 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
     rates: {
       dasPercent: params.dasPercent,
       icmsPercent,
+      pisPercent: params.pisPercent ?? 0,
+      cofinsPercent: params.cofinsPercent ?? 0,
+      irpjPercent: params.irpjEffectivePercent ?? 0,
+      csllPercent: params.csllEffectivePercent ?? 0,
       grisPercent: 0,
       tsoPercent: 0,
       costValuePercent: 0,
@@ -721,7 +796,17 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       profitMarginPercent: 0,
       adValoremPercent: 0,
     },
-    totals: { receitaBruta: 0, das: 0, icms: 0, totalImpostos: 0, totalCliente: 0 },
+    totals: {
+      receitaBruta: 0,
+      das: 0,
+      icms: 0,
+      pis: 0,
+      cofins: 0,
+      irpj: 0,
+      csll: 0,
+      totalImpostos: 0,
+      totalCliente: 0,
+    },
     profitability: {
       custoMotorista: 0,
       custosCarreteiro: 0,
@@ -920,19 +1005,26 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const profitMarginPercent = params.profitMarginPercent ?? FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
   const regimeSimples = params.regimeSimplesNacional ?? true;
   const excessoSublimite = params.excessoSublimite ?? false;
+  const regimeLucroPresumido = params.regimeLucroPresumido ?? false;
 
-  const { totalCliente, das, icms, regimeFiscal } = calculateGrossUpHibrido(
-    custosDiretos,
-    params.overheadPercent,
-    params.dasPercent,
-    profitMarginPercent,
-    icmsPercentForGrossUp,
-    regimeSimples,
-    excessoSublimite
-  );
+  const { totalCliente, das, icms, pis, cofins, irpj, csll, regimeFiscal } =
+    calculateGrossUpHibrido(
+      custosDiretos,
+      params.overheadPercent,
+      params.dasPercent,
+      profitMarginPercent,
+      icmsPercentForGrossUp,
+      regimeSimples,
+      excessoSublimite,
+      regimeLucroPresumido,
+      params.pisPercent ?? 0,
+      params.cofinsPercent ?? 0,
+      params.irpjEffectivePercent ?? 0,
+      params.csllEffectivePercent ?? 0
+    );
 
   // receitaBruta = totalCliente (gross revenue); receitaLiquida = totalCliente - impostos
-  const totalImpostos = round2(das + icms);
+  const totalImpostos = round2(das + icms + pis + cofins + irpj + csll);
   const receitaLiquida = round2(totalCliente - totalImpostos);
 
   // ICMS breakdown por UF (para exibição)
@@ -1001,6 +1093,10 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
     rates: {
       dasPercent: params.dasPercent,
       icmsPercent,
+      pisPercent: params.pisPercent ?? 0,
+      cofinsPercent: params.cofinsPercent ?? 0,
+      irpjPercent: params.irpjEffectivePercent ?? 0,
+      csllPercent: params.csllEffectivePercent ?? 0,
       grisPercent,
       tsoPercent,
       costValuePercent,
@@ -1015,6 +1111,10 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       receitaBruta: totalCliente,
       das,
       icms,
+      pis,
+      cofins,
+      irpj,
+      csll,
       totalImpostos,
       totalCliente,
     },

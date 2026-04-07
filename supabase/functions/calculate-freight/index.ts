@@ -198,13 +198,22 @@ Deno.serve(async (req) => {
       (resolveRule('regime_simples_nacional', vehicleTypeIdForRules) ?? 1) === 1;
     const excessoSublimite = (resolveRule('excesso_sublimite', vehicleTypeIdForRules) ?? 0) === 1;
 
+    const regimeLucroPresumido =
+      (resolveRule('regime_lucro_presumido', vehicleTypeIdForRules) ??
+        paramsMap.get('tax_regime_lucro_presumido') ??
+        0) === 1;
+    const pisPercent = resolveRule('pis_percent', vehicleTypeIdForRules) ?? 0;
+    const cofinsPercent = resolveRule('cofins_percent', vehicleTypeIdForRules) ?? 0;
+    const irpjEffectivePercent = resolveRule('irpj_effective_percent', vehicleTypeIdForRules) ?? 0;
+    const csllEffectivePercent = resolveRule('csll_effective_percent', vehicleTypeIdForRules) ?? 0;
+
     const carreteiroPercent = input.carreteiro_percent ?? paramsMap.get('carreteiro_percent') ?? 0;
     const descargaValue = input.descarga_value ?? 0;
     const aluguelMaquinasValue = input.aluguel_maquinas_value ?? 0;
 
     const correctionFactor = paramsMap.get('correction_factor_inctf') ?? 1.0;
 
-    const isSimples = regimeSimplesNacional && !excessoSublimite;
+    const isSimples = regimeSimplesNacional && !excessoSublimite && !regimeLucroPresumido;
 
     if (!paramsMap.has('das_percent'))
       fallbacksApplied.push(
@@ -652,10 +661,34 @@ Deno.serve(async (req) => {
 
     // =====================================================
     // GET ICMS RATE
+    // UF fiscal (sede CT-e) tem precedência sobre UF física da coleta.
+    // fiscal_origin_uf é lido da Central de Regras (metadata.uf).
     // =====================================================
 
-    const originUf = extractUf(input.origin);
+    const physicalOriginUf = extractUf(input.origin);
     const destUf = extractUf(input.destination);
+
+    // Ler UF fiscal da Central de Regras (metadata.uf do registro fiscal_origin_uf)
+    let fiscalOriginUf: string | null = null;
+    const fiscalRule = allRules.find((r) => r.key === 'fiscal_origin_uf');
+    if (fiscalRule) {
+      // A UF fica no metadata (lido separadamente pois allRules só traz key/value/vehicle_type_id)
+      const { data: fiscalRow } = await supabase
+        .from('pricing_rules_config')
+        .select('metadata')
+        .eq('key', 'fiscal_origin_uf')
+        .is('vehicle_type_id', null)
+        .maybeSingle();
+      fiscalOriginUf = ((fiscalRow?.metadata as Record<string, unknown>)?.uf as string) ?? null;
+    }
+
+    const originUf = fiscalOriginUf || physicalOriginUf;
+    if (fiscalOriginUf && physicalOriginUf && fiscalOriginUf !== physicalOriginUf) {
+      fallbacksApplied.push(
+        `icms_origin: usando UF fiscal ${fiscalOriginUf} (sede CT-e) em vez de ${physicalOriginUf} (coleta física)`
+      );
+    }
+
     let icmsPercent: number = FREIGHT_CONSTANTS.DEFAULT_ICMS_PERCENT;
 
     const resolveIcmsFromRules = (): number | undefined => {
@@ -703,7 +736,8 @@ Deno.serve(async (req) => {
     }
 
     // Simples Nacional: ICMS não incide no cálculo (linha continua visível com 0% e R$ 0,00)
-    if (isSimples) icmsPercent = 0;
+    // Lucro Presumido: ICMS incide normalmente (tabela icms_rates)
+    if (isSimples && !regimeLucroPresumido) icmsPercent = 0;
 
     // =====================================================
     // GET TAC RATE — NTC 2.6: Temporal formula
@@ -805,9 +839,12 @@ Deno.serve(async (req) => {
     const custosDescarga = descargaValue;
     const custosDiretos = custoMotorista + custoServicos + custosDescarga;
 
-    let regimeFiscal: 'simples_nacional' | 'excesso_sublimite' | 'normal';
+    let regimeFiscal: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
     let icmsNoDivisor: boolean;
-    if (regimeSimplesNacional && !excessoSublimite) {
+    if (regimeLucroPresumido) {
+      regimeFiscal = 'lucro_presumido';
+      icmsNoDivisor = true;
+    } else if (regimeSimplesNacional && !excessoSublimite) {
       regimeFiscal = 'simples_nacional';
       icmsNoDivisor = false;
     } else if (regimeSimplesNacional && excessoSublimite) {
@@ -818,31 +855,71 @@ Deno.serve(async (req) => {
       icmsNoDivisor = true;
     }
 
-    const taxaBruta = icmsNoDivisor
-      ? (overheadPercent + dasPercent + icmsPercent + profitMarginPercent) / 100
-      : (overheadPercent + dasPercent + profitMarginPercent) / 100;
+    // LP: impostos individuais no divisor (PIS+COFINS+IRPJ+CSLL+ICMS)
+    // Simples: DAS no divisor, ICMS=0
+    // Sublimite/Normal: DAS+ICMS no divisor
+    let taxaBruta: number;
+    if (regimeFiscal === 'lucro_presumido') {
+      taxaBruta =
+        (overheadPercent +
+          pisPercent +
+          cofinsPercent +
+          irpjEffectivePercent +
+          csllEffectivePercent +
+          icmsPercent +
+          profitMarginPercent) /
+        100;
+    } else if (icmsNoDivisor) {
+      taxaBruta = (overheadPercent + dasPercent + icmsPercent + profitMarginPercent) / 100;
+    } else {
+      taxaBruta = (overheadPercent + dasPercent + profitMarginPercent) / 100;
+    }
 
     let totalCliente: number;
     let das: number;
     let icms: number;
+    let pis = 0;
+    let cofins = 0;
+    let irpj = 0;
+    let csll = 0;
 
     if (taxaBruta >= 1) {
       fallbacksApplied.push(
-        `gross_up: soma Overhead+DAS+ICMS+Lucro >= 100%, usando modelo por fora`
+        `gross_up: soma impostos+overhead+lucro >= 100%, usando modelo por fora`
       );
       const receitaFinal = receitaBrutaPreTac + tacAdjustment + paymentAdjustment;
-      const dasProvisionMinValue = paramsMap.get('das_provision_min_value') ?? 0;
-      das = roundCurrency(Math.max(receitaFinal * (dasPercent / 100), dasProvisionMinValue));
-      icms = roundCurrency(receitaFinal * (icmsPercent / 100));
-      totalCliente = roundCurrency(receitaFinal + das + icms);
+      if (regimeFiscal === 'lucro_presumido') {
+        das = 0;
+        pis = roundCurrency(receitaFinal * (pisPercent / 100));
+        cofins = roundCurrency(receitaFinal * (cofinsPercent / 100));
+        irpj = roundCurrency(receitaFinal * (irpjEffectivePercent / 100));
+        csll = roundCurrency(receitaFinal * (csllEffectivePercent / 100));
+        icms = roundCurrency(receitaFinal * (icmsPercent / 100));
+      } else {
+        const dasProvisionMinValue = paramsMap.get('das_provision_min_value') ?? 0;
+        das = roundCurrency(Math.max(receitaFinal * (dasPercent / 100), dasProvisionMinValue));
+        icms = roundCurrency(receitaFinal * (icmsPercent / 100));
+      }
+      totalCliente = roundCurrency(receitaFinal + das + icms + pis + cofins + irpj + csll);
     } else {
       totalCliente = roundCurrency(custosDiretos / (1 - taxaBruta));
-      das = roundCurrency(totalCliente * (dasPercent / 100));
-      icms =
-        regimeFiscal === 'simples_nacional' ? 0 : roundCurrency(totalCliente * (icmsPercent / 100));
+      if (regimeFiscal === 'lucro_presumido') {
+        das = 0;
+        pis = roundCurrency(totalCliente * (pisPercent / 100));
+        cofins = roundCurrency(totalCliente * (cofinsPercent / 100));
+        irpj = roundCurrency(totalCliente * (irpjEffectivePercent / 100));
+        csll = roundCurrency(totalCliente * (csllEffectivePercent / 100));
+        icms = roundCurrency(totalCliente * (icmsPercent / 100));
+      } else {
+        das = roundCurrency(totalCliente * (dasPercent / 100));
+        icms =
+          regimeFiscal === 'simples_nacional'
+            ? 0
+            : roundCurrency(totalCliente * (icmsPercent / 100));
+      }
     }
 
-    const totalImpostos = das + icms;
+    const totalImpostos = das + icms + pis + cofins + irpj + csll;
     const receitaLiquida = roundCurrency(totalCliente - totalImpostos);
     const overhead = roundCurrency(receitaLiquida * (overheadPercent / 100));
     const resultadoLiquido = roundCurrency(
@@ -898,6 +975,10 @@ Deno.serve(async (req) => {
     const rates: FreightRates = {
       das_percent: dasPercent,
       icms_percent: icmsPercent,
+      pis_percent: pisPercent,
+      cofins_percent: cofinsPercent,
+      irpj_percent: irpjEffectivePercent,
+      csll_percent: csllEffectivePercent,
       gris_percent: grisPercent,
       tso_percent: tsoPercent,
       cost_value_percent: costValuePercent,
@@ -912,6 +993,10 @@ Deno.serve(async (req) => {
       receita_bruta: roundCurrency(totalCliente),
       das,
       icms: roundCurrency(icms),
+      pis: roundCurrency(pis),
+      cofins: roundCurrency(cofins),
+      irpj: roundCurrency(irpj),
+      csll: roundCurrency(csll),
       tac_adjustment: roundCurrency(tacAdjustment),
       payment_adjustment: roundCurrency(paymentAdjustment),
       total_impostos: roundCurrency(totalImpostos),

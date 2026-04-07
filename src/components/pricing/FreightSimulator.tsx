@@ -494,14 +494,41 @@ export function FreightSimulator() {
                       value={result.totals.payment_adjustment}
                     />
                   )}
-                  <BreakdownRow
-                    label={`Provisionamento DAS (${result.rates.das_percent}%)`}
-                    value={result.totals.das}
-                  />
-                  <BreakdownRow
-                    label={`ICMS (${result.rates.icms_percent}%)`}
-                    value={result.totals.icms}
-                  />
+                  {result.profitability?.regime_fiscal === 'lucro_presumido' ? (
+                    <>
+                      <BreakdownRow
+                        label={`PIS (${result.rates.pis_percent ?? 0}%)`}
+                        value={result.totals.pis ?? 0}
+                      />
+                      <BreakdownRow
+                        label={`COFINS (${result.rates.cofins_percent ?? 0}%)`}
+                        value={result.totals.cofins ?? 0}
+                      />
+                      <BreakdownRow
+                        label={`ICMS (${result.rates.icms_percent ?? 0}%)`}
+                        value={result.totals.icms ?? 0}
+                      />
+                      <BreakdownRow
+                        label={`IRPJ provisão (${result.rates.irpj_percent ?? 0}%)`}
+                        value={result.totals.irpj ?? 0}
+                      />
+                      <BreakdownRow
+                        label={`CSLL provisão (${result.rates.csll_percent ?? 0}%)`}
+                        value={result.totals.csll ?? 0}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <BreakdownRow
+                        label={`Provisionamento DAS (${result.rates.das_percent}%)`}
+                        value={result.totals.das}
+                      />
+                      <BreakdownRow
+                        label={`ICMS (${result.rates.icms_percent}%)`}
+                        value={result.totals.icms}
+                      />
+                    </>
+                  )}
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
@@ -522,7 +549,10 @@ export function FreightSimulator() {
                     value={result.profitability.custos_diretos}
                     negative
                   />
-                  <BreakdownRow label="Margem Bruta" value={result.profitability.margem_bruta} />
+                  <BreakdownRow
+                    label="Margem Bruta (R$)"
+                    value={result.profitability.margem_bruta}
+                  />
                   <BreakdownRow
                     label={`Overhead (${result.rates.overhead_percent}%)`}
                     value={result.profitability.overhead}
@@ -537,6 +567,11 @@ export function FreightSimulator() {
                     </span>
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Margem = Resultado Líquido &divide; Total Cliente. Dois vetores de impacto: (1)
+                  preço final &mdash; controlado via margem alvo no gross-up; (2) custo direto
+                  &mdash; motorista + serviços + descarga.
+                </p>
               </div>
 
               {/* Fallbacks */}

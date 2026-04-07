@@ -59,6 +59,10 @@ export interface FreightComponents {
 export interface FreightRates {
   das_percent: number;
   icms_percent: number;
+  pis_percent?: number;
+  cofins_percent?: number;
+  irpj_percent?: number;
+  csll_percent?: number;
   gris_percent: number;
   tso_percent: number;
   cost_value_percent: number;
@@ -73,6 +77,10 @@ export interface FreightTotals {
   receita_bruta: number;
   das: number;
   icms: number;
+  pis?: number;
+  cofins?: number;
+  irpj?: number;
+  csll?: number;
   tac_adjustment: number;
   payment_adjustment: number;
   total_impostos: number;
@@ -90,7 +98,7 @@ export interface FreightProfitability {
   resultado_liquido: number;
   margem_percent: number;
   profit_margin_target?: number;
-  regime_fiscal?: 'simples_nacional' | 'excesso_sublimite' | 'normal';
+  regime_fiscal?: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
 }
 
 export interface CalculateFreightResponse {

@@ -13,6 +13,7 @@ interface QuoteModalFinancialSummaryProps {
   isBelowTarget: boolean;
   targetMarginPercent: number;
   marginPercentForAlert?: number;
+  regimeFiscal?: string;
 }
 
 export function QuoteModalFinancialSummary({
@@ -24,6 +25,7 @@ export function QuoteModalFinancialSummary({
   isBelowTarget,
   targetMarginPercent,
   marginPercentForAlert,
+  regimeFiscal,
 }: QuoteModalFinancialSummaryProps) {
   return (
     <div className="space-y-3">
@@ -50,7 +52,7 @@ export function QuoteModalFinancialSummary({
                 : ''
             }
           >
-            Margem {(margemPercent || 0).toFixed(1)}%
+            Margem Op. {(margemPercent || 0).toFixed(1)}%
           </Badge>
         </div>
 
@@ -70,7 +72,11 @@ export function QuoteModalFinancialSummary({
             <div>
               <p className="text-[10px] text-primary/60 mb-0.5">Receita Líquida</p>
               <p className="text-sm font-semibold tabular-nums">{formatCurrency(receitaLiquida)}</p>
-              <p className="text-[10px] text-primary/40">Após DAS e ICMS</p>
+              <p className="text-[10px] text-primary/40">
+                {regimeFiscal === 'lucro_presumido'
+                  ? 'Após PIS, COFINS, IRPJ, CSLL e ICMS'
+                  : 'Após DAS e ICMS'}
+              </p>
             </div>
           )}
         </div>

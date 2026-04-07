@@ -305,6 +305,9 @@ const quoteSchema = z
     tear_enabled: z.boolean().optional().default(false),
     discount: z.number().min(0, 'Desconto não pode ser negativo').optional().default(0),
     notes: z.string().max(500, 'Observações muito longas').optional(),
+    delivery_days_min: z.number().min(0).optional(),
+    delivery_days_max: z.number().min(0).optional(),
+    delivery_notes: z.string().max(500).optional(),
     // Condição financeira: datas manuais (adiantamento, à vista, saldo)
     advance_due_date: z.string().optional(),
     balance_due_date: z.string().optional(),
@@ -608,18 +611,24 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
           })()
         : null;
 
-  // Get ICMS rate for origin/destination states
-  const originUf = extractUf(watchedOrigin || '');
-  const destUf = extractUf(watchedDestination || '');
-  const { data: icmsRateData } = useIcmsRateForPricing(originUf || '', destUf || '');
-  const icmsRate = icmsRateData?.rate_percent ?? 12;
-
   // Regime tributário global (1 = Simples → ICMS 0%; 0 = Normal)
   const { data: taxRegimeParam } = usePricingParameter('tax_regime_simples');
   const taxRegimeSimples = taxRegimeParam?.value != null ? Number(taxRegimeParam.value) : 1;
 
   // Regras da central (precedência: veículo > global > constante)
   const { data: pricingRules } = usePricingRulesConfig(true);
+
+  // Get ICMS rate: UF fiscal (sede CT-e) tem precedência sobre UF física da coleta
+  const physicalOriginUf = extractUf(watchedOrigin || '');
+  const destUf = extractUf(watchedDestination || '');
+  const fiscalOriginUf = useMemo(() => {
+    if (!pricingRules?.length) return null;
+    const rule = pricingRules.find((r) => r.key === 'fiscal_origin_uf');
+    return (rule?.metadata?.uf as string) ?? null;
+  }, [pricingRules]);
+  const originUf = fiscalOriginUf || physicalOriginUf;
+  const { data: icmsRateData } = useIcmsRateForPricing(originUf || '', destUf || '');
+  const icmsRate = icmsRateData?.rate_percent ?? 12;
   const icmsByUfMap = useMemo(() => {
     if (!pricingRules?.length) return undefined;
     const map: Record<string, number> = {};

@@ -31,6 +31,13 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -78,6 +85,11 @@ const PROTECTED_RULE_KEYS = new Set([
   'profit_margin_percent',
   'regime_simples_nacional',
   'excesso_sublimite',
+  'regime_lucro_presumido',
+  'pis_percent',
+  'cofins_percent',
+  'irpj_percent',
+  'csll_percent',
 ]);
 
 const DEFAULT_VALUE_TYPE = 'percentage';
@@ -193,7 +205,12 @@ export function PricingRulesManager() {
   const excessoSublimiteRule = rules?.find(
     (r) => r.key === 'excesso_sublimite' && r.vehicle_type_id == null
   );
-  const regimeSimplesNacional = Number(regimeSimplesRule?.value ?? 1) === 1;
+  const regimeLucroPresumidoRule = rules?.find(
+    (r) => r.key === 'regime_lucro_presumido' && r.vehicle_type_id == null
+  );
+  const regimeLucroPresumido = Number(regimeLucroPresumidoRule?.value ?? 0) === 1;
+  const regimeSimplesNacional =
+    !regimeLucroPresumido && Number(regimeSimplesRule?.value ?? 1) === 1;
   const excessoSublimite = Number(excessoSublimiteRule?.value ?? 0) === 1;
 
   const handleToggleRegimeSimples = async (checked: boolean) => {
@@ -219,8 +236,35 @@ export function PricingRulesManager() {
     }
   };
 
+  const handleRegimeChange = async (value: string) => {
+    try {
+      const isLP = value === 'lucro_presumido';
+      if (regimeLucroPresumidoRule) {
+        await updateMutation.mutateAsync({ id: regimeLucroPresumidoRule.id, value: isLP ? 1 : 0 });
+      }
+      if (regimeSimplesRule) {
+        await updateMutation.mutateAsync({ id: regimeSimplesRule.id, value: isLP ? 0 : 1 });
+      }
+      if (isLP && excessoSublimiteRule) {
+        await updateMutation.mutateAsync({ id: excessoSublimiteRule.id, value: 0 });
+      }
+      toast.success(isLP ? 'Lucro Presumido ativado' : 'Simples Nacional ativado');
+    } catch {
+      toast.error('Erro ao atualizar regime');
+    }
+  };
+
   const financeiroKeys = ['overhead_percent', 'das_percent', 'profit_margin_percent'] as const;
-  const financeiroRules = financeiroKeys
+  const lpKeys = [
+    'overhead_percent',
+    'pis_percent',
+    'cofins_percent',
+    'irpj_percent',
+    'csll_percent',
+    'profit_margin_percent',
+  ] as const;
+  const activeFinanceiroKeys = regimeLucroPresumido ? lpKeys : financeiroKeys;
+  const financeiroRules = activeFinanceiroKeys
     .map((key) => rules?.find((r) => r.key === key && r.vehicle_type_id == null))
     .filter((r): r is PricingRuleConfig => r != null);
 
@@ -248,17 +292,25 @@ export function PricingRulesManager() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-4">
-            <div>
-              <Label className="text-base font-semibold">Regime Simples Nacional</Label>
+            <div className="flex-1 mr-4">
+              <Label className="text-base font-semibold">Regime Tributário</Label>
               <p className="mt-1 text-sm text-muted-foreground">
-                ICMS incluído na guia DAS (não soma ao divisor Gross-up)
+                Define o regime fiscal e os tributos aplicados no Gross-up
               </p>
             </div>
-            <Switch
-              checked={regimeSimplesNacional}
-              onCheckedChange={handleToggleRegimeSimples}
+            <Select
+              value={regimeLucroPresumido ? 'lucro_presumido' : 'simples'}
+              onValueChange={handleRegimeChange}
               disabled={updateMutation.isPending}
-            />
+            >
+              <SelectTrigger className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="simples">Simples Nacional</SelectItem>
+                <SelectItem value="lucro_presumido">Lucro Presumido</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {regimeSimplesNacional && (
@@ -279,19 +331,23 @@ export function PricingRulesManager() {
 
           <Alert
             className={cn(
-              excessoSublimite
-                ? 'bg-warning/10 border-warning/20'
-                : 'bg-primary/10 border-primary/20'
+              regimeLucroPresumido
+                ? 'bg-blue-500/10 border-blue-500/20'
+                : excessoSublimite
+                  ? 'bg-warning/10 border-warning/20'
+                  : 'bg-primary/10 border-primary/20'
             )}
           >
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Regime Ativo</AlertTitle>
             <AlertDescription>
-              {excessoSublimite
-                ? 'Excesso de Sublimite: ICMS será calculado separadamente (DAS Federal + ICMS Estadual).'
-                : regimeSimplesNacional
-                  ? 'Simples Nacional: ICMS incluído na DAS (divisor Gross-up não soma ICMS).'
-                  : 'Regime Normal: ICMS calculado separadamente.'}
+              {regimeLucroPresumido
+                ? 'Lucro Presumido ativo: PIS 0,65% + COFINS 3,00% + IRPJ 1,20% + CSLL 1,08% + ICMS por UF'
+                : excessoSublimite
+                  ? 'Excesso de Sublimite: ICMS será calculado separadamente (DAS Federal + ICMS Estadual).'
+                  : regimeSimplesNacional
+                    ? 'Simples Nacional: ICMS incluído na DAS (divisor Gross-up não soma ICMS).'
+                    : 'Regime Normal: ICMS calculado separadamente.'}
             </AlertDescription>
           </Alert>
 

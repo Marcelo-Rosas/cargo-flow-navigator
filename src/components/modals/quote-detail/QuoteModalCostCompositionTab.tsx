@@ -88,9 +88,10 @@ export function QuoteModalCostCompositionTab({
     totalCliente - (breakdown.totals.das ?? 0) - (breakdown.totals.icms ?? 0);
   const regimeFiscal = (
     breakdown.profitability as {
-      regimeFiscal?: 'simples_nacional' | 'excesso_sublimite' | 'normal';
+      regimeFiscal?: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
     }
   )?.regimeFiscal;
+  const isLucroPresumido = regimeFiscal === 'lucro_presumido';
   const custoEfetivoMotorista = breakdown.components?.baseFreight ?? 0;
   const pedagio = breakdown.components?.toll ?? 0;
   const grisValue = breakdown.components?.gris ?? 0;
@@ -237,23 +238,71 @@ export function QuoteModalCostCompositionTab({
                     {formatCurrency(breakdown.totals.receitaBruta || 0)}
                   </TableCell>
                 </TableRow>
-                <TableRow>
-                  <TableCell className="text-muted-foreground">
-                    Provisionamento DAS ({breakdown.rates?.dasPercent?.toFixed(2) ?? 0}%)
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatCurrency(breakdown.totals.das || 0)}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="text-muted-foreground">
-                    ICMS (
-                    {isSimplesNacional ? '0' : (breakdown.rates?.icmsPercent?.toFixed(2) ?? 0)}%)
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatCurrency(isSimplesNacional ? 0 : breakdown.totals.icms || 0)}
-                  </TableCell>
-                </TableRow>
+                {isLucroPresumido ? (
+                  <>
+                    <TableRow>
+                      <TableCell className="text-muted-foreground">
+                        PIS ({breakdown.rates?.pisPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(breakdown.totals.pis ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-muted-foreground">
+                        COFINS ({breakdown.rates?.cofinsPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(breakdown.totals.cofins ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-muted-foreground">
+                        IRPJ provisao ({breakdown.rates?.irpjPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(breakdown.totals.irpj ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-muted-foreground">
+                        CSLL provisao ({breakdown.rates?.csllPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(breakdown.totals.csll ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-muted-foreground">
+                        ICMS ({breakdown.rates?.icmsPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(breakdown.totals.icms ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                  </>
+                ) : (
+                  <>
+                    <TableRow>
+                      <TableCell className="text-muted-foreground">
+                        Provisionamento DAS ({breakdown.rates?.dasPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(breakdown.totals.das || 0)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-muted-foreground">
+                        ICMS (
+                        {isSimplesNacional ? '0' : (breakdown.rates?.icmsPercent?.toFixed(2) ?? 0)}
+                        %)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(isSimplesNacional ? 0 : breakdown.totals.icms || 0)}
+                      </TableCell>
+                    </TableRow>
+                  </>
+                )}
                 {discountValue > 0 && (
                   <TableRow className="bg-orange-50/50 dark:bg-orange-900/10">
                     <TableCell className="text-orange-700 dark:text-orange-400">
@@ -294,6 +343,8 @@ export function QuoteModalCostCompositionTab({
                   'Simples Nacional: ICMS incluído na DAS (não soma ao divisor Gross-up).'}
                 {regimeFiscal === 'excesso_sublimite' &&
                   'Excesso de Sublimite: ICMS calculado separadamente (Cálculo por Dentro).'}
+                {regimeFiscal === 'lucro_presumido' &&
+                  'Lucro Presumido: PIS/COFINS destacados na NF. IRPJ/CSLL provisionados. ICMS por UF.'}
                 {regimeFiscal === 'normal' && 'Regime Normal: ICMS sempre separado.'}
               </AlertDescription>
             </Alert>
@@ -319,24 +370,71 @@ export function QuoteModalCostCompositionTab({
                   <TableCell className="font-semibold">(-) Impostos</TableCell>
                   <TableCell />
                 </TableRow>
-                <TableRow>
-                  <TableCell className="pl-8 text-muted-foreground">
-                    • DAS {regimeFiscal === 'excesso_sublimite' ? 'Federal ' : ''}(
-                    {breakdown.rates?.dasPercent?.toFixed(2) ?? 0}%)
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-destructive">
-                    -{formatCurrency(breakdown.totals.das ?? 0)}
-                  </TableCell>
-                </TableRow>
-                {regimeFiscal !== 'simples_nacional' && (
-                  <TableRow>
-                    <TableCell className="pl-8 text-muted-foreground">
-                      • ICMS Estadual ({breakdown.rates?.icmsPercent?.toFixed(2) ?? 0}%)
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-destructive">
-                      -{formatCurrency(breakdown.totals.icms ?? 0)}
-                    </TableCell>
-                  </TableRow>
+                {isLucroPresumido ? (
+                  <>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        • PIS ({breakdown.rates?.pisPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        -{formatCurrency(breakdown.totals.pis ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        • COFINS ({breakdown.rates?.cofinsPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        -{formatCurrency(breakdown.totals.cofins ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        • ICMS Estadual ({breakdown.rates?.icmsPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        -{formatCurrency(breakdown.totals.icms ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        • IRPJ provisao ({breakdown.rates?.irpjPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        -{formatCurrency(breakdown.totals.irpj ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        • CSLL provisao ({breakdown.rates?.csllPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        -{formatCurrency(breakdown.totals.csll ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                  </>
+                ) : (
+                  <>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        • DAS {regimeFiscal === 'excesso_sublimite' ? 'Federal ' : ''}(
+                        {breakdown.rates?.dasPercent?.toFixed(2) ?? 0}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        -{formatCurrency(breakdown.totals.das ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                    {regimeFiscal !== 'simples_nacional' && (
+                      <TableRow>
+                        <TableCell className="pl-8 text-muted-foreground">
+                          • ICMS Estadual ({breakdown.rates?.icmsPercent?.toFixed(2) ?? 0}%)
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-destructive">
+                          -{formatCurrency(breakdown.totals.icms ?? 0)}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 )}
                 <TableRow className="border-t bg-muted/30">
                   <TableCell className="font-semibold">(=) Receita Líquida</TableCell>
@@ -519,7 +617,7 @@ export function QuoteModalCostCompositionTab({
                 </TableRow>
                 <TableRow>
                   <TableCell className="font-semibold">
-                    Resultado Líquido (Mínimo Viável: {targetMarginPercent}%)
+                    Margem Operacional (Mínimo Viável: {targetMarginPercent}%)
                   </TableCell>
                   <TableCell className="text-right">
                     <Badge variant={isBelowTarget ? 'destructive' : 'default'}>
@@ -677,7 +775,7 @@ export function QuoteModalCostCompositionTab({
           </h5>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Margem Bruta</span>
+              <span className="text-muted-foreground">Margem Bruta (R$)</span>
               <span className="font-medium tabular-nums">{formatCurrency(margemBruta)}</span>
             </div>
             <div className="flex justify-between">
@@ -694,7 +792,7 @@ export function QuoteModalCostCompositionTab({
               </Badge>
             </div>
             <div className="flex justify-between items-center gap-2">
-              <span className="font-semibold">Margem %</span>
+              <span className="font-semibold">Margem Operacional</span>
               <Badge
                 variant={isBelowTarget ? 'destructive' : 'default'}
                 className={!isBelowTarget ? 'bg-success text-success-foreground' : ''}

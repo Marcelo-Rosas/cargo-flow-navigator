@@ -121,6 +121,10 @@ export interface FreightComponents {
 export interface FreightRates {
   das_percent: number;
   icms_percent: number;
+  pis_percent?: number; // LP: 0,65% cumulativo
+  cofins_percent?: number; // LP: 3,00% cumulativo
+  irpj_percent?: number; // LP: 1,20% efetiva (8% presunção × 15%)
+  csll_percent?: number; // LP: 1,08% efetiva (12% presunção × 9%)
   gris_percent: number;
   tso_percent: number;
   cost_value_percent: number; // Para RCTR-C
@@ -135,9 +139,13 @@ export interface FreightTotals {
   receita_bruta: number; // = total_cliente (gross revenue, before tax deductions)
   das: number;
   icms: number;
+  pis?: number; // LP: PIS sobre receita
+  cofins?: number; // LP: COFINS sobre receita
+  irpj?: number; // LP: IRPJ provisão
+  csll?: number; // LP: CSLL provisão
   tac_adjustment: number;
   payment_adjustment: number;
-  total_impostos: number; // das + icms
+  total_impostos: number; // das + icms + pis + cofins + irpj + csll
   total_cliente: number; // = receita_bruta (price to client)
 }
 
@@ -153,7 +161,7 @@ export interface FreightProfitability {
   resultado_liquido: number;
   margem_percent: number;
   profit_margin_target?: number;
-  regime_fiscal?: 'simples_nacional' | 'excesso_sublimite' | 'normal';
+  regime_fiscal?: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
 }
 
 export interface CalculateFreightResponse {

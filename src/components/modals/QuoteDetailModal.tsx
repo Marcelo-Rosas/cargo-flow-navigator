@@ -8,6 +8,7 @@ import {
   Scale,
   Box,
   Package,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -69,7 +70,7 @@ import {
   QuoteModalHistoryTab,
 } from '@/components/modals/quote-detail';
 import { formatCurrency } from '@/lib/formatters';
-import { generateQuotePdf } from '@/lib/generateQuotePdf';
+import { usePdfDownload } from '@/hooks/usePdfDownload';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteStage = Database['public']['Enums']['quote_stage'];
@@ -122,6 +123,7 @@ export function QuoteDetailModal({
   const { data: priceTable } = usePriceTable(quote?.price_table_id || '');
   const { data: routeStops } = useQuoteRouteStops(open && quote ? quote.id : null);
   const { data: taxRegimeParam } = usePricingParameter('tax_regime_simples');
+  const { data: taxRegimeLPParam } = usePricingParameter('tax_regime_lucro_presumido');
   const { data: conditionalFeesData } = useConditionalFees(true);
   const { data: paymentTermsList } = usePaymentTerms(true);
 
@@ -142,8 +144,11 @@ export function QuoteDetailModal({
     }
     return opts.sort((a, b) => Number(a.value) - Number(b.value));
   }, [paymentTermsList]);
+  const isLucroPresumido =
+    taxRegimeLPParam?.value != null ? Number(taxRegimeLPParam.value) === 1 : false;
   const isSimplesNacional =
-    taxRegimeParam?.value != null ? Number(taxRegimeParam.value) === 1 : true;
+    !isLucroPresumido &&
+    (taxRegimeParam?.value != null ? Number(taxRegimeParam.value) === 1 : true);
 
   const { data: vehicleType } = useQuery({
     queryKey: ['vehicle-type', quote?.vehicle_type_id],
@@ -506,7 +511,7 @@ export function QuoteDetailModal({
 
       toast.success(res?.data?.created ? 'FAT criado com sucesso' : 'FAT já existente');
       queryClient.invalidateQueries({ queryKey: ['financial-documents'] });
-      queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao converter para FAT';
       toast.error(msg);
@@ -616,33 +621,7 @@ export function QuoteDetailModal({
 
   const vehicleName = (vehicleType as { name?: string } | null)?.name ?? null;
   const vehicleCode = (vehicleType as { code?: string } | null)?.code ?? null;
-
-  const handleDownloadPdf = async (
-    mode: import('@/lib/generateQuotePdf').QuotePdfMode = 'detailed'
-  ) => {
-    if (!quote) return;
-    const ptLabel =
-      paymentTerm &&
-      (() => {
-        const adv = (paymentTerm as { advance_percent?: number | null }).advance_percent ?? 0;
-        const days = (paymentTerm as { days?: number | null }).days;
-        if (adv === 0 && days === 0) return 'À vista';
-        if (adv === 0) return `${days} dias`;
-        return `${adv}% Adiantamento / ${100 - adv}% Saldo em ${days} dias`;
-      })();
-
-    await generateQuotePdf({
-      quote,
-      breakdown,
-      vehicleName: vehicleName ? vehicleName + (vehicleCode ? ` (${vehicleCode})` : '') : null,
-      paymentTermLabel: ptLabel || null,
-      routeStops: (routeStops ?? [])
-        .filter((s) => s.stop_type === 'stop')
-        .sort((a, b) => a.sequence - b.sequence)
-        .map((s) => ({ city_uf: s.city_uf, cep: s.cep, name: s.name })),
-      mode,
-    });
-  };
+  const { downloadQuotePdf, loading: pdfLoading } = usePdfDownload();
   const hasOperacao =
     vehicleType ||
     quote.cargo_type ||
@@ -671,13 +650,43 @@ export function QuoteDetailModal({
               onConvertToFAT={handleConvertToFAT}
               onRecalcular={handleRecalcular}
               onEdit={() => setIsEditFormOpen(true)}
-              onDownloadPdf={handleDownloadPdf}
               showRecalcular={!!(breakdown && quote?.price_table_id && quote?.km_distance)}
             />
           </div>
 
           {/* ── Corpo scrollável ─────────────────────────────── */}
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2 text-sm"
+                disabled={pdfLoading === 'quote:simplified'}
+                onClick={() => downloadQuotePdf(quote.id, 'simplified')}
+              >
+                {pdfLoading === 'quote:simplified' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+                PDF Simplificado (Cliente)
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2 text-sm"
+                disabled={pdfLoading === 'quote:detailed'}
+                onClick={() => downloadQuotePdf(quote.id, 'detailed')}
+              >
+                {pdfLoading === 'quote:detailed' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+                PDF Detalhado (Interno)
+              </Button>
+            </div>
             {kmStatus === 'OUT_OF_RANGE' && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
@@ -697,6 +706,9 @@ export function QuoteDetailModal({
               isBelowTarget={isBelowTarget}
               targetMarginPercent={targetMargin}
               marginPercentForAlert={marginPercent}
+              regimeFiscal={
+                (breakdown?.profitability as { regimeFiscal?: string } | undefined)?.regimeFiscal
+              }
             />
 
             {/* ROTA */}

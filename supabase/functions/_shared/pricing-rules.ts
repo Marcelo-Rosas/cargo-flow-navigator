@@ -20,6 +20,11 @@ export interface DynamicFreightParams {
   profitMarginPercent: number;
   regimeSimplesNacional: boolean;
   excessoSublimite: boolean;
+  regimeLucroPresumido: boolean;
+  pisPercent: number;
+  cofinsPercent: number;
+  irpjEffectivePercent: number;
+  csllEffectivePercent: number;
   carreteiroPercent: number;
   descargaValue: number;
   aluguelMaquinasValue: number;
@@ -134,6 +139,19 @@ export async function buildDynamicFreightParams(
   const excessoSublimite =
     (resolvePricingRuleBackend(allRules, 'excesso_sublimite', vehicleTypeIdForRules) ?? 0) === 1;
 
+  const regimeLucroPresumido =
+    (resolvePricingRuleBackend(allRules, 'regime_lucro_presumido', vehicleTypeIdForRules) ??
+      paramsMap.get('tax_regime_lucro_presumido') ??
+      0) === 1;
+
+  const pisPercent = resolvePricingRuleBackend(allRules, 'pis_percent', vehicleTypeIdForRules) ?? 0;
+  const cofinsPercent =
+    resolvePricingRuleBackend(allRules, 'cofins_percent', vehicleTypeIdForRules) ?? 0;
+  const irpjEffectivePercent =
+    resolvePricingRuleBackend(allRules, 'irpj_effective_percent', vehicleTypeIdForRules) ?? 0;
+  const csllEffectivePercent =
+    resolvePricingRuleBackend(allRules, 'csll_effective_percent', vehicleTypeIdForRules) ?? 0;
+
   const carreteiroPercent = input.carreteiro_percent ?? paramsMap.get('carreteiro_percent') ?? 0;
 
   const descargaValue = input.descarga_value ?? 0;
@@ -141,7 +159,7 @@ export async function buildDynamicFreightParams(
 
   const correctionFactor = paramsMap.get('correction_factor_inctf') ?? 1.0;
 
-  const isSimples = regimeSimplesNacional && !excessoSublimite;
+  const isSimples = regimeSimplesNacional && !excessoSublimite && !regimeLucroPresumido;
 
   // Fallbacks auditáveis
   if (!paramsMap.has('das_percent') && !allRules.some((r) => r.key === 'das_percent')) {
@@ -169,6 +187,11 @@ export async function buildDynamicFreightParams(
       profitMarginPercent,
       regimeSimplesNacional,
       excessoSublimite,
+      regimeLucroPresumido,
+      pisPercent,
+      cofinsPercent,
+      irpjEffectivePercent,
+      csllEffectivePercent,
       carreteiroPercent,
       descargaValue,
       aluguelMaquinasValue,

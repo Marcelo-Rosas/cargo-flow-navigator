@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -13,12 +14,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Card } from '@/components/ui/card';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { DatePickerString } from '@/components/ui/date-picker';
-import { Loader2, TrendingUp, ReceiptText, MapPin } from 'lucide-react';
+import { Loader2, TrendingUp, ReceiptText, MapPin, PackageCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatters';
 import { SectionBlock } from '@/components/ui/section-block';
+import { estimateDeliveryDays } from '@/hooks/useRiskPolicies';
 
 import { UnloadingCostSection } from '@/components/quotes/UnloadingCostSection';
 import { EquipmentRentalSection } from '@/components/quotes/EquipmentRentalSection';
@@ -72,6 +75,43 @@ export function PricingStep({
   const legacyValue = Number(form.watch('value') ?? 0);
   const legacyCarreteiro = Number(form.watch('carreteiro_real') ?? 0);
   const legacyMargin = legacyValue - legacyCarreteiro;
+
+  // ALL-IN summary data
+  const watchOrigin = form.watch('origin');
+  const watchDestination = form.watch('destination');
+  const watchKmDistance = form.watch('km_distance');
+  const watchModality = form.watch('freight_modality');
+
+  const deliveryDays = useMemo(
+    () => estimateDeliveryDays(watchKmDistance || 0, watchModality || 'lotacao'),
+    [watchKmDistance, watchModality]
+  );
+
+  const showAllIn = !isLegacy && calculationResult?.status === 'OK' && (t?.totalCliente ?? 0) > 0;
+
+  // Auto-fill delivery days when ALL-IN becomes visible
+  useEffect(() => {
+    if (showAllIn) {
+      form.setValue('delivery_days_min', deliveryDays.min);
+      form.setValue('delivery_days_max', deliveryDays.max);
+    }
+  }, [showAllIn, deliveryDays.min, deliveryDays.max, form]);
+
+  const includedComponents = useMemo(() => {
+    if (!c) return [];
+    const items: string[] = [];
+    if ((c.baseFreight ?? 0) > 0) items.push('Frete Peso');
+    if ((c.toll ?? 0) > 0) items.push('Pedágio');
+    if ((c.gris ?? 0) > 0) items.push('GRIS');
+    if ((c.tso ?? 0) > 0) items.push('TSO');
+    if ((c.rctrc ?? 0) > 0) items.push('RCTR-C');
+    if ((c.aluguelMaquinas ?? 0) > 0) items.push('Aluguel de Máquinas');
+    if ((c.tde ?? 0) + (c.tear ?? 0) > 0) items.push('TDE/TEAR');
+    if ((c.dispatchFee ?? 0) > 0) items.push('Taxa de Expedição');
+    if ((c.conditionalFeesTotal ?? 0) > 0) items.push('Taxas Condicionais');
+    if ((c.waitingTimeCost ?? 0) > 0) items.push('Estadia');
+    return items;
+  }, [c]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
@@ -335,19 +375,6 @@ export function PricingStep({
                     />
                   </SectionBlock>
                 </div>
-
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs font-semibold">Notas</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} className="h-20" />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
               </>
             )}
           </div>
@@ -455,8 +482,36 @@ export function PricingStep({
 
                 <TabsContent value="rentabilidade" className="p-5 space-y-3 text-sm mt-0">
                   <ResultRow label="Receita Bruta" value={formatCurrency(t?.receitaBruta ?? 0)} />
-                  {t?.das != null && t.das > 0 && (
-                    <ResultRow label="DAS (Simples)" value={formatCurrency(t.das)} />
+                  {p?.regimeFiscal === 'lucro_presumido' ? (
+                    <>
+                      {(t?.pis ?? 0) > 0 && (
+                        <ResultRow
+                          label={`PIS (${calculationResult?.rates?.pisPercent?.toFixed(2) ?? 0}%)`}
+                          value={formatCurrency(t?.pis ?? 0)}
+                        />
+                      )}
+                      {(t?.cofins ?? 0) > 0 && (
+                        <ResultRow
+                          label={`COFINS (${calculationResult?.rates?.cofinsPercent?.toFixed(2) ?? 0}%)`}
+                          value={formatCurrency(t?.cofins ?? 0)}
+                        />
+                      )}
+                      {(t?.irpj ?? 0) > 0 && (
+                        <ResultRow
+                          label={`IRPJ provisao (${calculationResult?.rates?.irpjPercent?.toFixed(2) ?? 0}%)`}
+                          value={formatCurrency(t?.irpj ?? 0)}
+                        />
+                      )}
+                      {(t?.csll ?? 0) > 0 && (
+                        <ResultRow
+                          label={`CSLL provisao (${calculationResult?.rates?.csllPercent?.toFixed(2) ?? 0}%)`}
+                          value={formatCurrency(t?.csll ?? 0)}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    t?.das != null &&
+                    t.das > 0 && <ResultRow label="DAS (Simples)" value={formatCurrency(t.das)} />
                   )}
                   {t?.icms != null && t.icms > 0 && (
                     <ResultRow label="ICMS" value={formatCurrency(t.icms)} />
@@ -467,7 +522,10 @@ export function PricingStep({
                   )}
 
                   <Separator className="my-2" />
-                  <ResultRow label="Margem Bruta" value={formatCurrency(p?.margemBruta ?? 0)} />
+                  <ResultRow
+                    label="Margem Bruta (R$)"
+                    value={formatCurrency(p?.margemBruta ?? 0)}
+                  />
                   <ResultRow label="Overhead (Fixo)" value={formatCurrency(p?.overhead ?? 0)} />
 
                   <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-950/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900 mt-4">
@@ -476,7 +534,7 @@ export function PricingStep({
                         Resultado Líquido
                       </span>
                       <span className="text-[10px] text-emerald-600 dark:text-emerald-500 font-medium">
-                        Margem: {(p?.margemPercent ?? 0).toFixed(2)}%
+                        Margem Operacional: {(p?.margemPercent ?? 0).toFixed(2)}%
                       </span>
                     </div>
                     <span className="font-black text-xl text-emerald-700 dark:text-emerald-400">
@@ -489,6 +547,101 @@ export function PricingStep({
           </div>
         </SectionBlock>
       </div>
+
+      {/* RESUMO COMERCIAL ALL-IN */}
+      {showAllIn && (
+        <SectionBlock label="Resumo Comercial">
+          <Card className="bg-muted/30 border p-5 space-y-4">
+            {/* Rota */}
+            <div className="flex items-center gap-2 text-sm">
+              <PackageCheck className="w-4 h-4 text-primary shrink-0" />
+              <span className="font-bold">
+                {watchOrigin || '—'} → {watchDestination || '—'}
+              </span>
+              {watchKmDistance != null && watchKmDistance > 0 && (
+                <Badge variant="outline" className="ml-auto text-[10px]">
+                  {Math.round(watchKmDistance)} km
+                </Badge>
+              )}
+            </div>
+
+            {/* Modalidade */}
+            <div className="text-xs text-muted-foreground">
+              Modalidade:{' '}
+              <span className="font-medium text-foreground">
+                {watchModality === 'fracionado' ? 'Fracionado (LTL)' : 'Lotação (FTL)'}
+              </span>
+            </div>
+
+            <Separator />
+
+            {/* Total ALL-IN */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
+                  Valor Total ALL-IN
+                </p>
+                <p className="text-primary font-bold text-xl">
+                  {formatCurrency(t?.totalCliente ?? 0)}
+                </p>
+              </div>
+              <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">
+                D+{deliveryDays.min}
+                {deliveryDays.max !== deliveryDays.min && `–${deliveryDays.max}`}
+              </Badge>
+            </div>
+
+            {/* Inclui */}
+            {includedComponents.length > 0 && (
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <span className="font-semibold">Inclui:</span> {includedComponents.join(' · ')}
+              </p>
+            )}
+
+            {/* Validade */}
+            <p className="text-[11px] text-muted-foreground">
+              Proposta válida por <span className="font-medium text-foreground">7 dias</span> a
+              partir da emissão.
+            </p>
+
+            <Separator />
+
+            {/* Observações — relocado do bloco Entradas */}
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-semibold">Observações adicionais</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      className="h-20"
+                      placeholder="Condições especiais, restrições de horário, etc."
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </Card>
+        </SectionBlock>
+      )}
+
+      {/* Fallback: notes field when ALL-IN is not visible (non-legacy without calc result) */}
+      {!isLegacy && !showAllIn && (
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs font-semibold">Notas</FormLabel>
+              <FormControl>
+                <Textarea {...field} className="h-20" />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      )}
     </div>
   );
 }
