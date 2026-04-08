@@ -43,7 +43,7 @@ function assertOpenClawChatUrlForNonDryRun(dryRun: boolean) {
     throw new Error(
       'OPENCLAW_CHAT_COMPLETIONS_URL é obrigatório em execução real (não dry_run). ' +
         'A Edge do Supabase não alcança 127.0.0.1; configure URL pública do gateway até /v1/chat/completions. ' +
-        'Para testes locais: ALLOW_LOCALHOST_OPENCLAW=true.',
+        'Para testes locais: ALLOW_LOCALHOST_OPENCLAW=true.'
     );
   }
   const lower = url.toLowerCase();
@@ -53,7 +53,7 @@ function assertOpenClawChatUrlForNonDryRun(dryRun: boolean) {
     lower.startsWith('http://0.0.0.0');
   if (isLocal && String(Deno.env.get('ALLOW_LOCALHOST_OPENCLAW') ?? '').toLowerCase() !== 'true') {
     throw new Error(
-      'OPENCLAW_CHAT_COMPLETIONS_URL aponta para host local; bloqueado na Edge até ALLOW_LOCALHOST_OPENCLAW=true (somente dev).',
+      'OPENCLAW_CHAT_COMPLETIONS_URL aponta para host local; bloqueado na Edge até ALLOW_LOCALHOST_OPENCLAW=true (somente dev).'
     );
   }
 }
@@ -62,17 +62,13 @@ const OPENCLAW_CHAT_MODEL =
   Deno.env.get('OPENCLAW_CHAT_MODEL') ?? 'openclaw/commercial-followup-agent';
 
 const OPENCLAW_GATEWAY_TOKEN =
-  Deno.env.get('OPENCLAW_GATEWAY_TOKEN') ??
-  Deno.env.get('OPENCLAW_API_KEY') ??
-  '';
+  Deno.env.get('OPENCLAW_GATEWAY_TOKEN') ?? Deno.env.get('OPENCLAW_API_KEY') ?? '';
 
 /** Mesma URL usada pelo notification-hub (Evolution/OpenClaw ingress) */
 const OPENCLAW_WEBHOOK_URL = Deno.env.get('OPENCLAW_WEBHOOK_URL') ?? '';
 
 const OPENCLAW_OUTBOUND_TOKEN =
-  Deno.env.get('OPENCLAW_OUTBOUND_TOKEN') ??
-  Deno.env.get('OPENCLAW_API_KEY') ??
-  '';
+  Deno.env.get('OPENCLAW_OUTBOUND_TOKEN') ?? Deno.env.get('OPENCLAW_API_KEY') ?? '';
 
 const INTERNAL_BEARER =
   Deno.env.get('INTERNAL_FUNCTION_BEARER') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -88,8 +84,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Content-Type': 'application/json',
 };
@@ -314,7 +309,7 @@ serve(async (req) => {
         ok: false,
         error: error?.message ?? String(error),
       },
-      500,
+      500
     );
   }
 });
@@ -552,10 +547,7 @@ function buildCandidates({
       const dueAt = addMinutes(anchorDate, offsetMinutes);
       if (now < dueAt) continue;
 
-      const recipient =
-        rule.channel === 'email'
-          ? contact.email
-          : normalizePhone(contact.phone);
+      const recipient = rule.channel === 'email' ? contact.email : normalizePhone(contact.phone);
 
       if (!recipient) continue;
 
@@ -563,7 +555,7 @@ function buildCandidates({
       const existingRuns = runsMap.get(runKey) ?? [];
 
       const hasBlockingRun = existingRuns.some((run) =>
-        ['sent', 'delivered', 'replied', 'cancelled', 'skipped'].includes(run.status),
+        ['sent', 'delivered', 'replied', 'cancelled', 'skipped'].includes(run.status)
       );
 
       if (hasBlockingRun) continue;
@@ -656,7 +648,7 @@ function resolveAnchorDate(quote: any, rule: any) {
 function pickDisplayName(
   entityContactName: string | null | undefined,
   quoteLevelName: string | null | undefined,
-  entityTableName: string | null | undefined,
+  entityTableName: string | null | undefined
 ): string {
   const cn = String(entityContactName ?? '').trim();
   if (cn) return cn;
@@ -678,7 +670,7 @@ function buildContactContext(quote: any, schemaInfo: any) {
   const client = quote.clients ?? {};
 
   const rawTarget = hasColumn(schemaInfo.quoteColumns, 'followup_target_type')
-    ? quote.followup_target_type ?? 'shipper'
+    ? (quote.followup_target_type ?? 'shipper')
     : 'shipper';
   const targetType = String(rawTarget).trim().toLowerCase() === 'client' ? 'client' : 'shipper';
 
@@ -697,9 +689,10 @@ function buildContactContext(quote: any, schemaInfo: any) {
     contactName: pickDisplayName(shipper.contact_name, quote.shipper_name, shipper.name),
     companyName: quote.shipper_name || shipper.name || null,
     phone: shipper.phone ? String(shipper.phone).trim() : null,
-    email: (quote.shipper_email || shipper.email)
-      ? String(quote.shipper_email || shipper.email).trim()
-      : null,
+    email:
+      quote.shipper_email || shipper.email
+        ? String(quote.shipper_email || shipper.email).trim()
+        : null,
   };
 }
 
@@ -739,15 +732,9 @@ function groupCandidates(candidates: any[]) {
   for (const group of groups) {
     group.items.sort((a: any, b: any) => {
       const aKey =
-        a.quote.estimated_loading_date ||
-        a.quote.proposal_sent_at ||
-        a.quote.quote_code ||
-        '';
+        a.quote.estimated_loading_date || a.quote.proposal_sent_at || a.quote.quote_code || '';
       const bKey =
-        b.quote.estimated_loading_date ||
-        b.quote.proposal_sent_at ||
-        b.quote.quote_code ||
-        '';
+        b.quote.estimated_loading_date || b.quote.proposal_sent_at || b.quote.quote_code || '';
       return String(aKey).localeCompare(String(bKey));
     });
   }
@@ -761,7 +748,12 @@ function groupCandidates(candidates: any[]) {
 
 async function generateCommercialMessage(group: any) {
   try {
-    const prompt = buildCommercialAgentUserPrompt(group);
+    const first = group.items[0];
+    const mirofishCtx = await fetchMirofishContextForRoute(
+      first?.quote?.origin ?? null,
+      first?.quote?.destination ?? null
+    ).catch(() => null);
+    const prompt = buildCommercialAgentUserPrompt(group, mirofishCtx);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -855,7 +847,7 @@ async function generateCommercialMessage(group: any) {
   }
 }
 
-function buildCommercialAgentUserPrompt(group: any) {
+function buildCommercialAgentUserPrompt(group: any, mirofishContext?: any) {
   const first = group.items[0];
   const quotes = group.items.map((item: any) => ({
     quote_code: item.quote.quote_code ?? null,
@@ -868,7 +860,7 @@ function buildCommercialAgentUserPrompt(group: any) {
     cargo_type: item.quote.cargo_type ?? null,
   }));
 
-  const facts = {
+  const facts: any = {
     target_type: group.contact.targetType,
     target_name: group.contact.contactName,
     company_name: group.contact.companyName,
@@ -880,6 +872,11 @@ function buildCommercialAgentUserPrompt(group: any) {
     commercial_owner_name: first?.quote?.commercial_owner_name ?? 'Marcelo',
   };
 
+  // Inject MiroFish intelligence context if available
+  if (mirofishContext) {
+    facts.market_intelligence = mirofishContext;
+  }
+
   return [
     'Gere a mensagem comercial conforme o seu AGENTS.md.',
     'Use apenas os fatos abaixo. Não invente dados.',
@@ -887,9 +884,42 @@ function buildCommercialAgentUserPrompt(group: any) {
     'Use exatamente estas chaves string no JSON:',
     'target_type, target_name, channel, strategy_key, message_text, classification_intent, handoff_required, handoff_reason',
     'handoff_reason deve ser string ou null.',
+    mirofishContext
+      ? 'Se market_intelligence estiver presente, mencione de forma consultiva o impacto de mercado relevante na mensagem (ex: ajuste NTC, rota high-margin) sem forçar venda.'
+      : '',
     '',
     JSON.stringify(facts, null, 2),
   ].join('\n');
+}
+
+async function fetchMirofishContextForRoute(origin: string | null, destination: string | null) {
+  if (!origin || !destination) return null;
+  // Extract state codes from "Cidade/UF" format (e.g. "Florianópolis/SC" → "SC")
+  const originState = origin.split('/').pop()?.trim().toUpperCase();
+  const destState = destination.split('/').pop()?.trim().toUpperCase();
+  if (!originState || !destState) return null;
+
+  const route = `${originState}-${destState}`;
+
+  const { data: routeInsight } = await supabase
+    .from('mirofish_route_insights')
+    .select('route, avg_ticket, ntc_impact, volume_ctes')
+    .eq('route', route)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!routeInsight) return null;
+
+  return {
+    route: routeInsight.route,
+    avg_market_ticket: routeInsight.avg_ticket,
+    ntc_impact_per_cte: routeInsight.ntc_impact,
+    volume_ctes: routeInsight.volume_ctes,
+    intelligence_note: routeInsight.ntc_impact
+      ? `A rota ${route} teve ajuste NTC de R$${routeInsight.ntc_impact?.toFixed(2)} por CT-e`
+      : null,
+  };
 }
 
 function extractChatCompletionContent(raw: any) {
@@ -1257,7 +1287,7 @@ async function persistSuccessfulDispatch(group: any, sendResult: any, schemaInfo
           '[followup-dispatcher] duplicate commercial_followup_runs ignorado (corrida entre workers):',
           item.quote.id,
           item.rule.id,
-          item.attemptNo,
+          item.attemptNo
         );
         continue;
       }
@@ -1267,7 +1297,9 @@ async function persistSuccessfulDispatch(group: any, sendResult: any, schemaInfo
 }
 
 function isPostgresUniqueViolation(err: any): boolean {
-  return err?.code === '23505' || /duplicate key|unique constraint/i.test(String(err?.message ?? ''));
+  return (
+    err?.code === '23505' || /duplicate key|unique constraint/i.test(String(err?.message ?? ''))
+  );
 }
 
 async function persistFailedRuns(group: any, reason: string) {
@@ -1456,9 +1488,7 @@ function renderSingleMessageStatic(item: any) {
     ? ` com previsão de coleta para ${formatDateBR(item.quote.estimated_loading_date)}`
     : '';
 
-  const quoteRef = item.quote.quote_code
-    ? `da cotação ${item.quote.quote_code}`
-    : 'da cotação';
+  const quoteRef = item.quote.quote_code ? `da cotação ${item.quote.quote_code}` : 'da cotação';
 
   if (item.rule.strategy_key === 'consultive') {
     return `Olá, ${item.contact.contactName}. Tudo bem? Estou retomando ${quoteRef}${route ? ` da rota ${route}` : ''}${dateCtx}. Queria entender como está o cenário por aí e se ainda faz sentido seguirmos com essa programação. Se precisar, posso te ajudar a revisar janela, formato da operação ou qualquer ajuste para ficar mais aderente ao que você precisa.`;
@@ -1514,7 +1544,7 @@ function formatDateBR(input?: string | Date | null) {
 
   const date = parseFlexibleDate(
     input,
-    typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input),
+    typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)
   );
 
   return new Intl.DateTimeFormat('pt-BR', {
