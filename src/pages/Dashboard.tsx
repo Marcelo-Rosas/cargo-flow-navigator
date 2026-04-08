@@ -18,6 +18,7 @@ import { OverviewTab } from '@/components/dashboard/tabs/OverviewTab';
 import { CommercialTab } from '@/components/dashboard/tabs/CommercialTab';
 import { OperationsTab } from '@/components/dashboard/tabs/OperationsTab';
 import { NtcInsightsTab } from '@/components/dashboard/tabs/NtcInsightsTab';
+import { MirofishInsightsTab } from '@/components/dashboard/tabs/MirofishInsightsTab';
 import { NtcIndicesCard } from '@/components/dashboard/NtcIndicesCard';
 import { NewsTab } from '@/components/dashboard/tabs/NewsTab';
 import {
@@ -281,6 +282,7 @@ export default function Dashboard() {
           <TabsTrigger value="operations">Operacional</TabsTrigger>
           <TabsTrigger value="ntc-insights">Inteligência NTC</TabsTrigger>
           <TabsTrigger value="news">News</TabsTrigger>
+          <TabsTrigger value="mirofish">Inteligência MiroFish</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -319,6 +321,10 @@ export default function Dashboard() {
 
         <TabsContent value="news" className="space-y-6">
           <NewsTab />
+        </TabsContent>
+
+        <TabsContent value="mirofish" className="space-y-6">
+          <MirofishInsightsTab />
         </TabsContent>
       </Tabs>
     </MainLayout>

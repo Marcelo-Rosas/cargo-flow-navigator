@@ -1,6 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import {
   GripVertical,
   MoreHorizontal,
@@ -29,6 +31,25 @@ import { Database } from '@/integrations/supabase/types';
 import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
+
+/** Single shared query — React Query deduplicates across all cards */
+function useMirofishRouteMap() {
+  return useQuery({
+    queryKey: ['mirofish_route_insights'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('mirofish_route_insights')
+        .select('route, avg_ticket, ntc_impact')
+        .order('created_at', { ascending: false });
+      const map: Record<string, { avg_ticket: number | null; ntc_impact: number | null }> = {};
+      for (const r of data ?? []) {
+        if (!map[r.route]) map[r.route] = { avg_ticket: r.avg_ticket, ntc_impact: r.ntc_impact };
+      }
+      return map;
+    },
+    staleTime: 30 * 60 * 1000, // 30 min — shared cache, no per-card fetches
+  });
+}
 
 interface QuoteCardProps {
   quote: Quote;
@@ -91,6 +112,11 @@ export function QuoteCard({
 
   const canEmail = quote.stage === 'enviado' || quote.stage === 'negociacao';
   const canConvert = quote.stage === 'ganho';
+
+  const { data: mirofishMap } = useMirofishRouteMap();
+  // routeUfLabel is "SC/SP" — normalize to "SC-SP" for lookup
+  const mirofishKey = routeUfLabel?.replace('/', '-').toUpperCase() ?? null;
+  const mirofishInsight = mirofishKey ? mirofishMap?.[mirofishKey] : null;
 
   return (
     <motion.div
@@ -216,6 +242,11 @@ export function QuoteCard({
             <span className="truncate">{quote.origin}</span>
             <span>→</span>
             <span className="truncate">{quote.destination}</span>
+            {mirofishInsight && (
+              <span className="ml-auto shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
+                MF↑
+              </span>
+            )}
           </div>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs space-y-2 text-xs">
@@ -225,6 +256,27 @@ export function QuoteCard({
               {routeUfLabel}
               {kmBandLabel && ` • ${kmBandLabel} km`}
             </p>
+          )}
+          {mirofishInsight && (
+            <div className="border-t border-border pt-2 space-y-0.5">
+              {mirofishInsight.avg_ticket != null && (
+                <p className="text-emerald-600 font-medium">
+                  ↑ Ticket médio mercado:{' '}
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    mirofishInsight.avg_ticket
+                  )}
+                </p>
+              )}
+              {mirofishInsight.ntc_impact != null && (
+                <p className="text-amber-600">
+                  Impacto NTC: +
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    mirofishInsight.ntc_impact
+                  )}{' '}
+                  / CT-e
+                </p>
+              )}
+            </div>
           )}
           {quote.shipper_name && (
             <p>
