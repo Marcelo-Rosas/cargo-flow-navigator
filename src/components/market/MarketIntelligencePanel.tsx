@@ -179,6 +179,27 @@ export function MarketIntelligencePanel() {
     );
   }
 
+  if (!insights.indices || !insights.combustivel) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="w-5 h-5" />
+              Dados Incompletos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Índices NTC indisponíveis no momento. Tente recarregar a página.
+            </p>
+          </CardContent>
+        </Card>
+        {dieselPetrobrasCard}
+      </div>
+    );
+  }
+
   const alertStyles = getAlertStyles(insights.alerta_nivel);
 
   const fmtPct = (v: number) => {

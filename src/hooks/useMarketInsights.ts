@@ -85,7 +85,11 @@ export function useMarketInsights() {
       });
 
       if (!response.ok) throw new Error('Falha ao buscar dados de inteligência de mercado');
-      return response.json();
+      const json = await response.json();
+      if (!json || typeof json !== 'object' || !json.indices || !json.combustivel) {
+        throw new Error('market-insights: payload inválido recebido da Edge Function');
+      }
+      return json as MarketInsights;
     },
     staleTime: 1000 * 60 * 60, // 1h fresco dentro do dia
     gcTime: 1000 * 60 * 60 * 2, // 2h em memória (era 24h — causa do banner persistir entre sessões)
