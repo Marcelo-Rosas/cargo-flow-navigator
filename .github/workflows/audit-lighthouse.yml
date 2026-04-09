@@ -48,7 +48,7 @@ jobs:
         env:
           LIGHTHOUSE_URL: "http://localhost:3000"
         run: |
-          cat > run-lighthouse.js << 'EOF'
+          cat > run-lighthouse.cjs << 'EOF'
           const { execSync } = require('child_process');
 
           const config = {
@@ -99,7 +99,7 @@ jobs:
           }
           EOF
 
-          node run-lighthouse.js
+          node run-lighthouse.cjs
 
       - name: Upload Lighthouse Report
         if: always()
