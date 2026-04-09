@@ -917,7 +917,7 @@ async function fetchMirofishContextForRoute(origin: string | null, destination: 
     ntc_impact_per_cte: routeInsight.ntc_impact,
     volume_ctes: routeInsight.volume_ctes,
     intelligence_note: routeInsight.ntc_impact
-      ? `A rota ${route} teve ajuste NTC de R$${routeInsight.ntc_impact?.toFixed(2)} por CT-e`
+      ? `A rota ${route} teve ajuste NTC de R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(routeInsight.ntc_impact)} por CT-e`
       : null,
   };
 }
