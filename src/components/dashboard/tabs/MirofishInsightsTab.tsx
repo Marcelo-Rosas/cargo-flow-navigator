@@ -26,6 +26,33 @@ import { supabase } from '@/integrations/supabase/client';
 import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import { formatCurrency } from '@/lib/utils';
 
+// ─── Local types ──────────────────────────────────────────────────────────────
+interface MirofishSyncResult {
+  reports_synced?: number;
+}
+interface RouteInsight {
+  id: string;
+  route: string;
+  avg_ticket: number | null;
+  volume_ctes: number | null;
+  revenue: number | null;
+  ntc_impact: number | null;
+}
+interface ShipperInsight {
+  id: string;
+  shipper_name: string;
+  ctes: number | null;
+  revenue: number | null;
+  avg_ticket: number | null;
+}
+interface MirofishRecommendation {
+  id: string;
+  status: string;
+  action: string;
+  target_routes: string[] | null;
+  priority: string;
+}
+
 // ─── Data hooks ───────────────────────────────────────────────────────────────
 
 function useMirofishRoutes() {
@@ -113,7 +140,7 @@ function SyncButton() {
 
   const mutation = useMutation({
     mutationFn: () => invokeEdgeFunction('mirofish-sync', {}),
-    onSuccess: (data: any) => {
+    onSuccess: (data: MirofishSyncResult | null) => {
       queryClient.invalidateQueries({ queryKey: ['mirofish_route_insights'] });
       queryClient.invalidateQueries({ queryKey: ['mirofish_shipper_insights'] });
       queryClient.invalidateQueries({ queryKey: ['mirofish_recommendations'] });
@@ -207,7 +234,7 @@ export function MirofishInsightsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {routes.data.map((r: any) => (
+              {routes.data.map((r: RouteInsight) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-mono font-semibold">{r.route}</TableCell>
                   <TableCell className="text-right font-mono">
@@ -260,7 +287,7 @@ export function MirofishInsightsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {shippers.data.map((s: any) => (
+              {shippers.data.map((s: ShipperInsight) => (
                 <TableRow key={s.id}>
                   <TableCell className="font-semibold">{s.shipper_name}</TableCell>
                   <TableCell className="text-right font-mono">{s.ctes ?? '—'}</TableCell>
@@ -288,7 +315,7 @@ export function MirofishInsightsTab() {
             <span className="font-semibold text-sm">Recomendações Estratégicas</span>
           </div>
           <div className="divide-y divide-border">
-            {recs.data.map((rec: any) => (
+            {recs.data.map((rec: MirofishRecommendation) => (
               <div key={rec.id} className="flex items-start gap-3 px-5 py-4">
                 <StatusIcon status={rec.status} />
                 <div className="flex-1 min-w-0">

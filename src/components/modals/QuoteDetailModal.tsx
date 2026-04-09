@@ -207,6 +207,8 @@ export function QuoteDetailModal({
     setSelectedAdvancePercent(String(p ?? 0));
   }, [paymentTerm]);
 
+  const { downloadQuotePdf, loading: pdfLoading } = usePdfDownload();
+
   // Early return AFTER all hooks
   if (!quote) return null;
 
@@ -621,7 +623,6 @@ export function QuoteDetailModal({
 
   const vehicleName = (vehicleType as { name?: string } | null)?.name ?? null;
   const vehicleCode = (vehicleType as { code?: string } | null)?.code ?? null;
-  const { downloadQuotePdf, loading: pdfLoading } = usePdfDownload();
   const hasOperacao =
     vehicleType ||
     quote.cargo_type ||
