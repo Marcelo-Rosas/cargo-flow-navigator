@@ -165,6 +165,7 @@ if (applyMode) {
     console.error('❌ Set SUPABASE_URL and SUPABASE_SERVICE_KEY env vars');
     process.exit(1);
   }
+  // createClient without type params returns SupabaseClient<any> — no cast needed
   const supabase = createClient(supabaseUrl, serviceKey);
   const CHUNK = 200;
   let inserted = 0;
@@ -174,8 +175,9 @@ if (applyMode) {
       preco_medio: r.preco_medio,
       periodo_coleta: r.periodo_coleta,
       fetched_at: r.periodo_coleta + 'T00:00:00Z',
+      source: 'anp',
     }));
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('petrobras_diesel_prices')
       .upsert(chunk, { onConflict: 'uf,periodo_coleta', ignoreDuplicates: true });
     if (error) {
