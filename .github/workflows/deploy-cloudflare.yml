@@ -142,7 +142,7 @@ jobs:
     needs: [detect-changes, deploy-migrations]
     if: |
       always() &&
-      needs.detect-changes.outputs.frontend == 'true' &&
+      (needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch') &&
       (needs.deploy-migrations.result == 'success' || needs.deploy-migrations.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
