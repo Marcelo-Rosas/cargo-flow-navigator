@@ -15,6 +15,9 @@ on:
       - 'package.json'
       - 'vite.config.ts'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   lighthouse:
     runs-on: ubuntu-latest
@@ -48,58 +51,54 @@ jobs:
         env:
           LIGHTHOUSE_URL: "http://localhost:3000"
         run: |
-          cat > run-lighthouse.cjs << 'EOF'
-          const { execSync } = require('child_process');
+          cat > run-lighthouse.mjs << 'EOF'
+import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
 
-          const config = {
-            url: process.env.LIGHTHOUSE_URL || 'http://localhost:3000',
-            thresholds: {
-              performance: 75,
-              accessibility: 90,
-              'best-practices': 85,
-              seo: 90
-            }
-          };
+const config = {
+  url: process.env.LIGHTHOUSE_URL || 'http://localhost:3000',
+  thresholds: {
+    performance: 75,
+    accessibility: 90,
+    'best-practices': 85,
+    seo: 90
+  }
+};
 
-          console.log('🚀 Starting Lighthouse audit via DevTools MCP...');
-          console.log(`📍 Target URL: ${config.url}`);
+console.log('Starting Lighthouse audit...');
+console.log(`Target URL: ${config.url}`);
 
-          try {
-            // Run Lighthouse audit
-            const result = execSync(`npx lighthouse ${config.url} --output=json --output-path=./lighthouse-report.json`, {
-              encoding: 'utf-8',
-              stdio: 'inherit'
-            });
+try {
+  execSync(
+    `npx lighthouse ${config.url} --output=json --output-path=./lighthouse-report.json --chrome-flags="--headless --no-sandbox"`,
+    { encoding: 'utf-8', stdio: 'inherit' }
+  );
 
-            console.log('✅ Lighthouse audit completed');
+  console.log('Lighthouse audit completed');
 
-            // Parse results
-            const fs = require('fs');
-            const report = JSON.parse(fs.readFileSync('./lighthouse-report.json', 'utf-8'));
-            const scores = report.categories;
+  const report = JSON.parse(readFileSync('./lighthouse-report.json', 'utf-8'));
+  const scores = report.categories;
 
-            // Check thresholds
-            let allPass = true;
-            Object.entries(config.thresholds).forEach(([category, threshold]) => {
-              const score = Math.round(scores[category].score * 100);
-              const status = score >= threshold ? '✅' : '❌';
-              console.log(`${status} ${category}: ${score}/${threshold}`);
-              if (score < threshold) allPass = false;
-            });
+  let allPass = true;
+  for (const [category, threshold] of Object.entries(config.thresholds)) {
+    const score = Math.round(scores[category].score * 100);
+    const status = score >= threshold ? 'PASS' : 'FAIL';
+    console.log(`${status} ${category}: ${score} (min ${threshold})`);
+    if (score < threshold) allPass = false;
+  }
 
-            if (!allPass) {
-              console.error('\n❌ Some audits failed the threshold');
-              process.exit(1);
-            }
+  if (!allPass) {
+    console.error('Some audits failed the threshold');
+    process.exit(1);
+  }
 
-            console.log('\n✅ All audits passed!');
-          } catch (error) {
-            console.error('❌ Audit failed:', error.message);
-            process.exit(1);
-          }
-          EOF
-
-          node run-lighthouse.cjs
+  console.log('All audits passed!');
+} catch (error) {
+  console.error('Audit failed:', error.message);
+  process.exit(1);
+}
+EOF
+          node run-lighthouse.mjs
 
       - name: Upload Lighthouse Report
         if: always()
