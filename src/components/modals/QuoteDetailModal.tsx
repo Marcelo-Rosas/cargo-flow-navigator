@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { SectionBlock } from '@/components/ui/section-block';
 import { DataCard } from '@/components/ui/data-card';
@@ -634,6 +634,12 @@ export function QuoteDetailModal({
     <>
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[900px] max-h-[96vh] p-0 flex flex-col overflow-hidden gap-0">
+          <DialogTitle className="sr-only">
+            Detalhes da cotação {quote.quote_code ?? ''}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Visualize resumo financeiro, rota, operação e abas de composição da cotação.
+          </DialogDescription>
           {/* ── Header fixo ──────────────────────────────────── */}
           <div className="shrink-0 bg-background border-b px-6 pt-5 pb-4">
             <QuoteModalHeader
@@ -659,9 +665,11 @@ export function QuoteDetailModal({
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 className="gap-2 text-sm"
+                aria-label="Baixar PDF simplificado para cliente"
                 disabled={pdfLoading === 'quote:simplified'}
                 onClick={() => downloadQuotePdf(quote.id, 'simplified')}
               >
@@ -674,9 +682,11 @@ export function QuoteDetailModal({
               </Button>
 
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 className="gap-2 text-sm"
+                aria-label="Baixar PDF detalhado interno"
                 disabled={pdfLoading === 'quote:detailed'}
                 onClick={() => downloadQuotePdf(quote.id, 'detailed')}
               >
