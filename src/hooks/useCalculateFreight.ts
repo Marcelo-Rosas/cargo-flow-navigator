@@ -117,6 +117,9 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
     profitability: {
       custoMotorista: response.profitability.custo_motorista,
       custosCarreteiro: response.profitability.custos_carreteiro,
+      custoMotoristaAntt: response.profitability.custo_motorista_antt,
+      custoMotoristaContratado: response.profitability.custo_motorista_contratado,
+      custoMotoristaReal: response.profitability.custo_motorista_real ?? null,
       custosDescarga: response.profitability.custos_descarga,
       custosDiretos: response.profitability.custos_diretos,
       receitaLiquida: response.profitability.receita_liquida,
@@ -216,6 +219,9 @@ export function buildStoredBreakdownFromEdgeResponse(
     profitability: {
       custoMotorista: response.profitability.custo_motorista,
       custosCarreteiro: response.profitability.custos_carreteiro,
+      custoMotoristaAntt: response.profitability.custo_motorista_antt,
+      custoMotoristaContratado: response.profitability.custo_motorista_contratado,
+      custoMotoristaReal: response.profitability.custo_motorista_real ?? null,
       custosDescarga: response.profitability.custos_descarga,
       custosDiretos: response.profitability.custos_diretos,
       receitaLiquida: response.profitability.receita_liquida,

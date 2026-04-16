@@ -88,8 +88,13 @@ export interface FreightTotals {
 }
 
 export interface FreightProfitability {
+  // Campos legados — mantidos para compatibilidade durante migração (VEC-121)
   custos_carreteiro: number;
   custo_motorista?: number;
+  // Novos campos semânticos (VEC-121)
+  custo_motorista_contratado?: number; // previsto pelo motor (base NTC)
+  custo_motorista_antt?: number; // piso mínimo ANTT (MP 1.343/2026)
+  custo_motorista_real?: number | null; // valor negociado na OS (alimentado externamente)
   custos_descarga: number;
   custos_diretos: number;
   receita_liquida?: number;
