@@ -88,6 +88,23 @@ jobs:
           fi
           echo "functions=$FUNCTIONS" >> "$GITHUB_OUTPUT"
 
+  # ─── Sync check: Edge types ↔ Client types ───
+  check-freight-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check freight types in sync (VEC-124)
+        run: npx tsx scripts/check-freight-types-sync.ts
+
   # ─── Supabase Migrations ───
   deploy-migrations:
     needs: detect-changes
@@ -142,11 +159,12 @@ jobs:
 
   # ─── Build + Deploy Cloudflare Pages ───
   deploy-frontend:
-    needs: [detect-changes, deploy-migrations]
+    needs: [detect-changes, deploy-migrations, check-freight-types]
     if: |
       always() &&
       (needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch') &&
-      (needs.deploy-migrations.result == 'success' || needs.deploy-migrations.result == 'skipped')
+      (needs.deploy-migrations.result == 'success' || needs.deploy-migrations.result == 'skipped') &&
+      needs.check-freight-types.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
