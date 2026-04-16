@@ -35,6 +35,16 @@ export interface FreightMeta {
   price_table_row_id?: string;
   /** NTC Lotação Dez/25: frete_peso + frete_valor + gris + tso */
   ntc_base?: number;
+  /** MP 1.343/2026: piso mínimo ANTT calculado */
+  antt_piso_carreteiro?: number;
+  /** MP 1.343/2026: true se o piso ANTT foi aplicado como custoMotoristaAntt */
+  antt_floor_applied?: boolean;
+  /** frete_peso original antes da aplicação do piso ANTT */
+  frete_peso_original?: number;
+  /** true se o peso mínimo LTL (1t) foi aplicado */
+  ltl_min_weight_applied?: boolean;
+  /** peso real informado antes da trava 1t LTL */
+  original_weight_kg?: number;
 }
 
 export interface FreightComponents {
@@ -95,6 +105,7 @@ export interface FreightProfitability {
   custo_motorista_contratado?: number; // previsto pelo motor (base NTC)
   custo_motorista_antt?: number; // piso mínimo ANTT (MP 1.343/2026)
   custo_motorista_real?: number | null; // valor negociado na OS (alimentado externamente)
+  custos_servicos?: number;
   custos_descarga: number;
   custos_diretos: number;
   receita_liquida?: number;
