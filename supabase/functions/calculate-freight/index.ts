@@ -137,15 +137,18 @@ Deno.serve(async (req) => {
     // GET PARAMETERS (pricing_rules_config with fallback to pricing_parameters)
     // =====================================================
 
+    // VEC-120: query única captura id + axes_count para evitar roundtrip duplicado (reusado em WAITING TIME e ANTT floor)
     let vehicleTypeIdForRules: string | null = null;
+    let vehicleTypeAxesCountForRules: number | null = null;
     if (input.vehicle_type_code) {
       const { data: vt } = await supabase
         .from('vehicle_types')
-        .select('id')
+        .select('id, axes_count')
         .eq('code', input.vehicle_type_code)
         .eq('active', true)
         .maybeSingle();
       vehicleTypeIdForRules = vt?.id ?? null;
+      vehicleTypeAxesCountForRules = vt?.axes_count ?? null;
     }
 
     const { data: allRules } = await supabase
@@ -318,14 +321,15 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (ltlRow) {
+        // VEC-122: ?? preserva zeros intencionais (ex: dispatch_fee=0 para isenção de taxa)
         ltlParams = {
-          min_freight: Number(ltlRow.min_freight) || 9.28,
-          min_freight_cargo_limit: Number(ltlRow.min_freight_cargo_limit) || 3093.81,
-          min_tso: Number(ltlRow.min_tso) || 4.64,
-          gris_percent: Number(ltlRow.gris_percent) || 0.3,
-          gris_min: Number(ltlRow.gris_min) || 9.28,
-          gris_min_cargo_limit: Number(ltlRow.gris_min_cargo_limit) || 3093.81,
-          dispatch_fee: Number(ltlRow.dispatch_fee) || 102.9,
+          min_freight: Number(ltlRow.min_freight ?? 9.28),
+          min_freight_cargo_limit: Number(ltlRow.min_freight_cargo_limit ?? 3093.81),
+          min_tso: Number(ltlRow.min_tso ?? 4.64),
+          gris_percent: Number(ltlRow.gris_percent ?? 0.3),
+          gris_min: Number(ltlRow.gris_min ?? 9.28),
+          gris_min_cargo_limit: Number(ltlRow.gris_min_cargo_limit ?? 3093.81),
+          dispatch_fee: Number(ltlRow.dispatch_fee ?? 102.9),
         };
       } else {
         // Fallback NTC Dez/25
@@ -570,19 +574,9 @@ Deno.serve(async (req) => {
     // =====================================================
 
     let waitingTimeCost = 0;
-    let vehicleTypeId: string | null = null;
-    let axesCount: number | null = null;
-
-    if (input.vehicle_type_code) {
-      const { data: vt } = await supabase
-        .from('vehicle_types')
-        .select('id, axes_count')
-        .eq('code', input.vehicle_type_code)
-        .eq('active', true)
-        .maybeSingle();
-      vehicleTypeId = vt?.id ?? null;
-      axesCount = vt?.axes_count ?? null;
-    }
+    // VEC-120: reutiliza resultado da query feita no início (vehicleTypeIdForRules / vehicleTypeAxesCountForRules)
+    const vehicleTypeId = vehicleTypeIdForRules;
+    const axesCount = vehicleTypeAxesCountForRules;
 
     if (input.waiting_hours !== undefined && input.waiting_hours > 0) {
       let waitingRule = null;
@@ -815,10 +809,11 @@ Deno.serve(async (req) => {
     // MP 1.343/2026: em lotação, custo motorista não pode ser inferior ao Piso ANTT
     const anttFloorApplied =
       modality === 'lotacao' && pisoAnttCarreteiro > 0 && pisoAnttCarreteiro > frete_peso;
-    const custoMotorista = anttFloorApplied ? pisoAnttCarreteiro : frete_peso;
+    // custoMotoristaAntt: piso mínimo da tabela ANTT (MP 1.343/2026) — ou frete_peso se piso não aplicar
+    const custoMotoristaAntt = anttFloorApplied ? pisoAnttCarreteiro : frete_peso;
     if (anttFloorApplied) {
       console.log(
-        `[calculate-freight] ANTT floor applied: frete_peso=${frete_peso}, pisoAntt=${pisoAnttCarreteiro}, custoMotorista=${custoMotorista}`
+        `[calculate-freight] ANTT floor applied: frete_peso=${frete_peso}, pisoAntt=${pisoAnttCarreteiro}, custoMotoristaAntt=${custoMotoristaAntt}`
       );
     }
     const custoServicos =
@@ -835,9 +830,10 @@ Deno.serve(async (req) => {
       aluguelMaquinasValue +
       tacAdjustment +
       paymentAdjustment;
-    const custosCarreteiro = ntc_base;
+    // custoMotoristaContratado: valor previsto pelo motor de cálculo (base NTC = frete_peso + frete_valor + gris + tso + dispatchFee)
+    const custoMotoristaContratado = ntc_base;
     const custosDescarga = descargaValue;
-    const custosDiretos = custoMotorista + custoServicos + custosDescarga;
+    const custosDiretos = custoMotoristaAntt + custoServicos + custosDescarga;
 
     let regimeFiscal: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
     let icmsNoDivisor: boolean;
@@ -922,10 +918,14 @@ Deno.serve(async (req) => {
     const totalImpostos = das + icms + pis + cofins + irpj + csll;
     const receitaLiquida = roundCurrency(totalCliente - totalImpostos);
     const overhead = roundCurrency(receitaLiquida * (overheadPercent / 100));
+    // resultadoLiquido: visão DRE — usa custo contratado (NTC base) sem extras de serviço
     const resultadoLiquido = roundCurrency(
-      receitaLiquida - overhead - custosCarreteiro - custosDescarga
+      receitaLiquida - overhead - custoMotoristaContratado - custosDescarga
     );
-    const margemBruta = roundCurrency(receitaLiquida - overhead - custoMotorista - custoServicos);
+    // margemBruta: margem de contribuição completa — usa piso ANTT + todos os serviços (sem descarga)
+    const margemBruta = roundCurrency(
+      receitaLiquida - overhead - custoMotoristaAntt - custoServicos
+    );
     const margemPercent =
       totalCliente > 0 ? roundCurrency((resultadoLiquido / totalCliente) * 100) : 0;
 
@@ -956,8 +956,8 @@ Deno.serve(async (req) => {
     };
 
     const components: FreightComponents = {
-      base_cost: roundCurrency(custoMotorista),
-      base_freight: roundCurrency(custoMotorista),
+      base_cost: roundCurrency(custoMotoristaAntt),
+      base_freight: roundCurrency(custoMotoristaAntt),
       toll: roundCurrency(toll),
       gris: roundCurrency(gris),
       tso: roundCurrency(tso),
@@ -1004,8 +1004,13 @@ Deno.serve(async (req) => {
     };
 
     const profitability: FreightProfitability = {
-      custos_carreteiro: roundCurrency(custosCarreteiro),
-      custo_motorista: roundCurrency(custoMotorista),
+      // Campos legados — mantidos para compatibilidade durante migração (VEC-121)
+      custos_carreteiro: roundCurrency(custoMotoristaContratado),
+      custo_motorista: roundCurrency(custoMotoristaAntt),
+      // Novos campos semânticos (VEC-121)
+      custo_motorista_contratado: roundCurrency(custoMotoristaContratado),
+      custo_motorista_antt: roundCurrency(custoMotoristaAntt),
+      custo_motorista_real: null, // a ser alimentado via OS após negociação
       custos_servicos: roundCurrency(custoServicos),
       custos_descarga: roundCurrency(custosDescarga),
       custos_diretos: roundCurrency(custosDiretos),

@@ -263,6 +263,10 @@ export interface FreightCalculationOutput {
   profitability: {
     custoMotorista: number;
     custosCarreteiro: number;
+    // Novos campos semânticos (VEC-121)
+    custoMotoristaAntt?: number;
+    custoMotoristaContratado?: number;
+    custoMotoristaReal?: number | null;
     custosDescarga: number;
     custoServicos: number;
     custosDiretos: number;
@@ -409,6 +413,10 @@ export interface StoredPricingBreakdown {
   profitability: {
     custoMotorista?: number;
     custosCarreteiro: number;
+    // Novos campos semânticos (VEC-121)
+    custoMotoristaAntt?: number;
+    custoMotoristaContratado?: number;
+    custoMotoristaReal?: number | null;
     custosDescarga: number;
     custoServicos?: number;
     custosDiretos: number;
