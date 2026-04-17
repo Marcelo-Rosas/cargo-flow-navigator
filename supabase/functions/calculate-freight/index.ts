@@ -259,7 +259,13 @@ Deno.serve(async (req) => {
       toFiniteNumber(resolveRule(key, vehicleTypeIdForRules));
 
     // Ad Valorem Lotação — resolve from Central de Riscos
-    const adValoremLotacaoPercent = resolveRulePercent('ad_valorem_lotacao_percent') ?? 0.03;
+    const adValoremResolved = resolveRulePercent('ad_valorem_lotacao_percent');
+    if (adValoremResolved == null)
+      fallbacksApplied.push(
+        `ad_valorem_lotacao_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_AD_VALOREM_LOTACAO_PERCENT}`
+      );
+    const adValoremLotacaoPercent =
+      adValoremResolved ?? FREIGHT_CONSTANTS.DEFAULT_AD_VALOREM_LOTACAO_PERCENT;
 
     // =====================================================
     // DETECT MODALITY (lotacao vs fracionado)
