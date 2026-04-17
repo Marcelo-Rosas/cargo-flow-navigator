@@ -22,6 +22,7 @@ export const FREIGHT_CONSTANTS = {
   NTC_TDE_PERCENT: 20,
   NTC_TEAR_PERCENT: 20,
   DEFAULT_ICMS_PERCENT: 12,
+  DEFAULT_AD_VALOREM_LOTACAO_PERCENT: 0.03,
 } as const;
 
 // ============================================
