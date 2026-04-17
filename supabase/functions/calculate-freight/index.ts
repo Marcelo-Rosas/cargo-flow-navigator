@@ -703,7 +703,8 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (icmsRow?.rate_percent !== undefined) {
-        icmsPercent = normalizeIcmsRate(Number(icmsRow.rate_percent));
+        // VEC-125: icms_rates armazena alíquotas já no formato correto (ex: 12, 7)
+        icmsPercent = Number(icmsRow.rate_percent);
       } else {
         const icmsFromRules = resolveIcmsFromRules();
         if (icmsFromRules !== undefined) {
