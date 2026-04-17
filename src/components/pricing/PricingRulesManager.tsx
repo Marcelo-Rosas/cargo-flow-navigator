@@ -13,7 +13,9 @@ import {
   Wrench,
   Plus,
   Trash2,
+  SlidersHorizontal,
 } from 'lucide-react';
+import { LtlParametersSection } from './LtlParametersSection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
@@ -436,6 +438,10 @@ export function PricingRulesManager() {
                 </Badge>
               </TabsTrigger>
             ))}
+            <TabsTrigger value="ntc-fracionado" className="flex items-center gap-2 text-xs">
+              <SlidersHorizontal className="h-4 w-4" />
+              NTC Fracionado
+            </TabsTrigger>
           </TabsList>
           {CATEGORIES.map(({ id, label }) => (
             <TabsContent key={id} value={id} className="mt-4">
@@ -583,6 +589,9 @@ export function PricingRulesManager() {
               </div>
             </TabsContent>
           ))}
+          <TabsContent value="ntc-fracionado" className="mt-4">
+            <LtlParametersSection />
+          </TabsContent>
         </Tabs>
       </div>
 
