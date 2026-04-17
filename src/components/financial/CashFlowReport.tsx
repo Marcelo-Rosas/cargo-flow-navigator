@@ -227,9 +227,17 @@ function LiquiditySummaryBlock() {
   if (isLoading || !result) return null;
 
   const indicators = [
-    { label: 'Corrente', value: result.liquidezCorrente, status: result.statusCorrente },
-    { label: 'Seca', value: result.liquidezSeca, status: result.statusSeca },
-    { label: 'Imediata', value: result.liquidezImediata, status: result.statusImediata },
+    {
+      label: 'Corrente',
+      value: result?.liquidezCorrente ?? null,
+      status: result?.statusCorrente ?? 0,
+    },
+    { label: 'Seca', value: result?.liquidezSeca ?? null, status: result?.statusSeca ?? 0 },
+    {
+      label: 'Imediata',
+      value: result?.liquidezImediata ?? null,
+      status: result?.statusImediata ?? 0,
+    },
   ] as const;
 
   return (
