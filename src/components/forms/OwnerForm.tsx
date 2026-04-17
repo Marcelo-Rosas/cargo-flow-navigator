@@ -6,7 +6,13 @@ import { Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -212,6 +218,9 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
       <DialogContent className="sm:max-w-[520px] max-h-[96vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Proprietário' : 'Novo Proprietário'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Cadastre ou edite dados pessoais e de contato do proprietário do veículo.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

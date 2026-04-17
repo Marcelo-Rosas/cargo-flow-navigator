@@ -6,7 +6,13 @@ import { Loader2, Truck, User, Building2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -161,6 +167,9 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
             <Truck className="w-5 h-5 text-primary" />
             {isEditing ? 'Editar Veículo' : 'Novo Veículo'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Preencha placa, características e vínculos do veículo com motorista e proprietário.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

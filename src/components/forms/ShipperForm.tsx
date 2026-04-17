@@ -6,7 +6,13 @@ import { Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -211,6 +217,9 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Embarcador' : 'Novo Embarcador'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Informe os dados cadastrais e de contato do embarcador para salvar o registro.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

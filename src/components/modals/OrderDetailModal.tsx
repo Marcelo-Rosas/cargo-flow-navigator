@@ -30,7 +30,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { DocumentList } from '@/components/documents/DocumentList';
 import { OccurrenceForm } from '@/components/forms/OccurrenceForm';
@@ -679,6 +685,10 @@ export function OrderDetailModal({
                 )}
               </div>
             </div>
+            <DialogDescription className="sr-only">
+              Visualize e gerencie os detalhes da ordem de serviço, incluindo documentos, risco e
+              ocorrências.
+            </DialogDescription>
           </DialogHeader>
 
           {/* VG gate banner */}

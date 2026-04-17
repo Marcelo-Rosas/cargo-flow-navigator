@@ -4,7 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import type {
@@ -232,6 +238,9 @@ export function RouteMetricsCards(props: RouteMetricsCardsProps) {
             <DialogTitle>
               Configurar rota {selected ? `${selected.origin_uf} → ${selected.destination_uf}` : ''}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Defina metas e limites de R$/KM para monitoramento da rota selecionada.
+            </DialogDescription>
           </DialogHeader>
 
           {form && (

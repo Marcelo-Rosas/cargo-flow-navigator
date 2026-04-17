@@ -17,6 +17,7 @@ import { Progress } from '@/components/ui/progress';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -67,6 +68,9 @@ function BudgetSettingsDialog() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base">Configuração de Budget AI</DialogTitle>
+          <DialogDescription className="sr-only">
+            Ajuste limites de orçamento e alertas para uso de recursos de IA.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           {configs.map((config) => (
@@ -81,9 +85,7 @@ function BudgetSettingsDialog() {
                   min="0"
                   placeholder={String(config.value)}
                   value={getConfigValue(config.key)}
-                  onChange={(e) =>
-                    setValues((prev) => ({ ...prev, [config.key]: e.target.value }))
-                  }
+                  onChange={(e) => setValues((prev) => ({ ...prev, [config.key]: e.target.value }))}
                   className="h-8 text-sm"
                 />
                 <Button
@@ -236,7 +238,8 @@ export function AiUsageDashboard() {
   const dailyLimit = Number(stats.daily_limit) || 2;
   const monthlyLimit = Number(stats.monthly_limit) || 30;
   const alertThreshold = Number(stats.alert_threshold) || 0.8;
-  const isAlert = dailySpend / dailyLimit >= alertThreshold || monthlySpend / monthlyLimit >= alertThreshold;
+  const isAlert =
+    dailySpend / dailyLimit >= alertThreshold || monthlySpend / monthlyLimit >= alertThreshold;
 
   return (
     <motion.div
