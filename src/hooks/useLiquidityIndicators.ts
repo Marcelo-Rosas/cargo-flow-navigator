@@ -1,3 +1,3 @@
 export function useLiquidityIndicators() {
-  return { data: null, isLoading: false };
+  return { result: null, isLoading: false };
 }
