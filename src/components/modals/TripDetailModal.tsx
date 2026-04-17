@@ -1,6 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Truck, DollarSign, Loader2, ShieldCheck, ShieldAlert, Plus, Trash2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -30,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import {
   Dialog as InlineDialog,
   DialogContent as InlineDialogContent,
+  DialogDescription as InlineDialogDescription,
   DialogHeader as InlineDialogHeader,
   DialogTitle as InlineDialogTitle,
 } from '@/components/ui/dialog';
@@ -142,6 +149,12 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
     return (
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent>
+          <DialogHeader className="sr-only">
+            <DialogTitle>Carregando viagem</DialogTitle>
+            <DialogDescription>
+              Carrega os dados detalhados da viagem selecionada.
+            </DialogDescription>
+          </DialogHeader>
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
@@ -164,6 +177,9 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
             <Badge variant="secondary">{trip.status_operational}</Badge>
             {reconciliation?.trip_reconciled && <Badge variant="success">Conciliado</Badge>}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Visualize os detalhes da viagem, ordens vinculadas, risco e conciliação financeira.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-y-auto space-y-6 pt-2">
@@ -647,6 +663,9 @@ export function TripDetailModal({ open, onClose, tripId }: TripDetailModalProps)
           <InlineDialogContent className="sm:max-w-[700px]">
             <InlineDialogHeader>
               <InlineDialogTitle>Adicionar OS à viagem</InlineDialogTitle>
+              <InlineDialogDescription className="sr-only">
+                Busque ordens de serviço elegíveis para vincular à viagem atual.
+              </InlineDialogDescription>
             </InlineDialogHeader>
             <div className="space-y-4">
               <div className="flex gap-2 items-end">

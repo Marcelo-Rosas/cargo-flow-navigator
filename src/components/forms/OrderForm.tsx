@@ -6,7 +6,13 @@ import { Loader2, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -215,6 +221,9 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
           <DialogTitle>
             {isEditing ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Preencha os dados da ordem de serviço, rota e informações de transporte antes de salvar.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

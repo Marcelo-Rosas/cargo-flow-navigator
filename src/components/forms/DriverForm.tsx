@@ -6,7 +6,13 @@ import { Loader2, User, Truck, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -186,6 +192,9 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
             <User className="w-5 h-5 text-primary" />
             {isEditing ? 'Editar Motorista' : 'Novo Motorista'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Cadastre ou atualize dados pessoais, habilitação e status do motorista.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -133,6 +134,9 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
             <ShieldCheck className="w-5 h-5 text-amber-500" />
             {approval.title}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Revise os dados da solicitação, análise de risco e registre sua decisão de aprovação.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

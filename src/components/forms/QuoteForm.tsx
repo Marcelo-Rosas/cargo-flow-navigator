@@ -7,7 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DatePickerString } from '@/components/ui/date-picker';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -1531,6 +1537,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
               </Badge>
             )}
           </div>
+          <DialogDescription className="sr-only">
+            Configure os dados da cotação, rota, carga e custos antes de salvar.
+          </DialogDescription>
         </DialogHeader>
 
         {showChoice ? (

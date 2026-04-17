@@ -4,7 +4,13 @@ import { z } from 'zod';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -95,6 +101,9 @@ export function OccurrenceForm({ open, onClose, orderId, osNumber }: OccurrenceF
             <AlertTriangle className="w-5 h-5 text-warning" />
             Registrar Ocorrência
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Registre uma ocorrência operacional informando a gravidade e a descrição detalhada.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="mb-4 p-3 rounded-lg bg-muted/50">

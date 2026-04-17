@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { SectionBlock } from '@/components/ui/section-block';
@@ -99,6 +105,12 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[900px] max-h-[96vh] p-0 flex flex-col overflow-hidden gap-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Detalhe financeiro</DialogTitle>
+          <DialogDescription>
+            Exibe composição financeira do documento, conciliação e vínculos da operação.
+          </DialogDescription>
+        </DialogHeader>
         {/* ── Header fixo ──────────────────────────────────── */}
         <div className="shrink-0 bg-background border-b px-6 pt-5 pb-4">
           <div className="flex items-start justify-between gap-4">
@@ -158,7 +170,11 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
                 )}
                 {margemPercent != null && (
                   <Badge
-                    variant={margemPercent < FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT ? 'destructive' : 'default'}
+                    variant={
+                      margemPercent < FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT
+                        ? 'destructive'
+                        : 'default'
+                    }
                     className={
                       margemPercent >= FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT
                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
