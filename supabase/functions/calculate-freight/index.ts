@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     const fallbacksApplied: string[] = [];
 
     // =====================================================
-    // GET PARAMETERS (pricing_rules_config with fallback to pricing_parameters)
+    // GET PARAMETERS (pricing_rules_config — única fonte de verdade, VEC-126)
     // =====================================================
 
     // VEC-120: query única captura id + axes_count para evitar roundtrip duplicado (reusado em WAITING TIME e ANTT floor)
@@ -174,64 +174,41 @@ Deno.serve(async (req) => {
       return val;
     }
 
-    // Fallback: pricing_parameters (legacy)
-    const { data: allParams } = await supabase.from('pricing_parameters').select('key, value');
-    const paramsMap = new Map<string, number>();
-    allParams?.forEach((p: { key: string; value: number }) =>
-      paramsMap.set(p.key, Number(p.value))
-    );
-
-    const cubageFactor = paramsMap.get('cubage_factor') ?? FREIGHT_CONSTANTS.CUBAGE_FACTOR_KG_M3;
+    // VEC-126: pricing_parameters depreciado — pricing_rules_config é a única fonte de verdade
+    const cubageFactor = FREIGHT_CONSTANTS.CUBAGE_FACTOR_KG_M3;
     const dasPercent =
       input.das_percent ??
       resolveRule('das_percent', vehicleTypeIdForRules) ??
-      paramsMap.get('das_percent') ??
       FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT;
     const markupPercent =
       input.markup_percent ??
       resolveRule('markup_percent', vehicleTypeIdForRules) ??
-      paramsMap.get('markup_percent') ??
       FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT;
     const overheadPercent =
       input.overhead_percent ??
       resolveRule('overhead_percent', vehicleTypeIdForRules) ??
-      paramsMap.get('overhead_percent') ??
       FREIGHT_CONSTANTS.DEFAULT_OVERHEAD_PERCENT;
     const profitMarginPercent =
       resolveRule('profit_margin_percent', vehicleTypeIdForRules) ??
-      paramsMap.get('profit_margin_percent') ??
       FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
     const regimeSimplesNacional =
       (resolveRule('regime_simples_nacional', vehicleTypeIdForRules) ?? 1) === 1;
     const excessoSublimite = (resolveRule('excesso_sublimite', vehicleTypeIdForRules) ?? 0) === 1;
 
     const regimeLucroPresumido =
-      (resolveRule('regime_lucro_presumido', vehicleTypeIdForRules) ??
-        paramsMap.get('tax_regime_lucro_presumido') ??
-        0) === 1;
+      (resolveRule('regime_lucro_presumido', vehicleTypeIdForRules) ?? 0) === 1;
     const pisPercent = resolveRule('pis_percent', vehicleTypeIdForRules) ?? 0;
     const cofinsPercent = resolveRule('cofins_percent', vehicleTypeIdForRules) ?? 0;
     const irpjEffectivePercent = resolveRule('irpj_effective_percent', vehicleTypeIdForRules) ?? 0;
     const csllEffectivePercent = resolveRule('csll_effective_percent', vehicleTypeIdForRules) ?? 0;
 
-    const carreteiroPercent = input.carreteiro_percent ?? paramsMap.get('carreteiro_percent') ?? 0;
+    const carreteiroPercent = input.carreteiro_percent ?? 0;
     const descargaValue = input.descarga_value ?? 0;
     const aluguelMaquinasValue = input.aluguel_maquinas_value ?? 0;
 
-    const correctionFactor = paramsMap.get('correction_factor_inctf') ?? 1.0;
+    const correctionFactor = resolveRule('correction_factor_inctf', vehicleTypeIdForRules) ?? 1.0;
 
     const isSimples = regimeSimplesNacional && !excessoSublimite && !regimeLucroPresumido;
-
-    if (!paramsMap.has('das_percent'))
-      fallbacksApplied.push(
-        `das_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_DAS_PERCENT}%`
-      );
-    if (!paramsMap.has('markup_percent'))
-      fallbacksApplied.push(
-        `markup_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_MARKUP_PERCENT}%`
-      );
-    if (!paramsMap.has('correction_factor_inctf'))
-      fallbacksApplied.push('correction_factor_inctf: não encontrado, usando 1.0');
 
     // NTC Lotação Dez/25: correctionFactor e markup não aplicados ao frete peso
     fallbacksApplied.push('ntc_mode: correctionFactor/markup ignored');
@@ -523,14 +500,9 @@ Deno.serve(async (req) => {
     const conditionalFeesBreakdown: Record<string, number> = {};
     let conditionalFeesTotal = 0;
 
-    // FORBID_CONDITIONAL_FEES: when pricing_parameters has this key set to 'true',
-    // conditional_fees from input are ignored (v5 manages them locally via Taxas Adicionais).
-    const { data: forbidParam } = await supabase
-      .from('pricing_parameters')
-      .select('value')
-      .eq('key', 'FORBID_CONDITIONAL_FEES')
-      .maybeSingle();
-    const forbidConditionalFees = forbidParam?.value === 'true';
+    // FORBID_CONDITIONAL_FEES: quando a regra está ativa (valor=1), taxas condicionais do input são ignoradas.
+    const forbidConditionalFees =
+      (resolveRule('forbid_conditional_fees', vehicleTypeIdForRules) ?? 0) === 1;
 
     if (!forbidConditionalFees && input.conditional_fees && input.conditional_fees.length > 0) {
       const { data: fees } = await supabase
@@ -899,7 +871,8 @@ Deno.serve(async (req) => {
         csll = roundCurrency(receitaFinal * (csllEffectivePercent / 100));
         icms = roundCurrency(receitaFinal * (icmsPercent / 100));
       } else {
-        const dasProvisionMinValue = paramsMap.get('das_provision_min_value') ?? 0;
+        const dasProvisionMinValue =
+          resolveRule('das_provision_min_value', vehicleTypeIdForRules) ?? 0;
         das = roundCurrency(Math.max(receitaFinal * (dasPercent / 100), dasProvisionMinValue));
         icms = roundCurrency(receitaFinal * (icmsPercent / 100));
       }
