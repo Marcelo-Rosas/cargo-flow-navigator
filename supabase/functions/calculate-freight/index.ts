@@ -806,16 +806,14 @@ Deno.serve(async (req) => {
     // Alinhado com freightCalculator client-side.
     // =====================================================
 
-    // MP 1.343/2026: em lotação, custo motorista não pode ser inferior ao Piso ANTT
-    const anttFloorApplied =
-      modality === 'lotacao' && pisoAnttCarreteiro > 0 && pisoAnttCarreteiro > frete_peso;
-    // custoMotoristaAntt: piso mínimo da tabela ANTT (MP 1.343/2026) — ou frete_peso se piso não aplicar
+    // MP 1.343/2026: custoMotoristaAntt = piso legal ANTT *sempre* (quando lotação e tabela disponível).
+    // NÃO usa max(ANTT, frete_peso): o field deve refletir o mínimo legal, não o valor praticado.
+    // O spread (custoMotoristaContratado / custoMotoristaAntt - 1) é o KPI de premium sobre o piso.
+    const anttFloorApplied = modality === 'lotacao' && pisoAnttCarreteiro > 0;
     const custoMotoristaAntt = anttFloorApplied ? pisoAnttCarreteiro : frete_peso;
-    if (anttFloorApplied) {
-      console.log(
-        `[calculate-freight] ANTT floor applied: frete_peso=${frete_peso}, pisoAntt=${pisoAnttCarreteiro}, custoMotoristaAntt=${custoMotoristaAntt}`
-      );
-    }
+    console.log(
+      `[calculate-freight] ANTT floor: pisoAntt=${pisoAnttCarreteiro}, frete_peso=${frete_peso}, applied=${anttFloorApplied}, spread=${pisoAnttCarreteiro > 0 ? ((frete_peso / pisoAnttCarreteiro - 1) * 100).toFixed(1) + '%' : 'n/a'}`
+    );
     const custoServicos =
       toll +
       gris +
@@ -833,7 +831,9 @@ Deno.serve(async (req) => {
     // custoMotoristaContratado: valor previsto pelo motor de cálculo (base NTC = frete_peso + frete_valor + gris + tso + dispatchFee)
     const custoMotoristaContratado = ntc_base;
     const custosDescarga = descargaValue;
-    const custosDiretos = custoMotoristaAntt + custoServicos + custosDescarga;
+    // custosDiretos usa custoMotoristaContratado (NTC realista) para precificação do cliente.
+    // custoMotoristaAntt (piso legal) é usado apenas em margemBruta como base de custo mínimo.
+    const custosDiretos = custoMotoristaContratado + custoServicos + custosDescarga;
 
     let regimeFiscal: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
     let icmsNoDivisor: boolean;
@@ -956,8 +956,8 @@ Deno.serve(async (req) => {
     };
 
     const components: FreightComponents = {
-      base_cost: roundCurrency(custoMotoristaAntt),
-      base_freight: roundCurrency(custoMotoristaAntt),
+      base_cost: roundCurrency(custoMotoristaContratado),
+      base_freight: roundCurrency(custoMotoristaContratado),
       toll: roundCurrency(toll),
       gris: roundCurrency(gris),
       tso: roundCurrency(tso),
