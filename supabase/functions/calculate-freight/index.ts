@@ -828,8 +828,10 @@ Deno.serve(async (req) => {
       aluguelMaquinasValue +
       tacAdjustment +
       paymentAdjustment;
-    // custoMotoristaContratado: valor previsto pelo motor de cálculo (base NTC = frete_peso + frete_valor + gris + tso + dispatchFee)
-    const custoMotoristaContratado = ntc_base;
+    // custoMotoristaContratado: o que o motorista recebe = frete_peso apenas.
+    // gris/tso/frete_valor/dispatchFee são receita/repasse da Vectra, não custo do motorista.
+    // ntc_base mantido como referência de mercado NTC (meta) mas não entra no custo direto.
+    const custoMotoristaContratado = frete_peso;
     const custosDescarga = descargaValue;
     // custosDiretos usa custoMotoristaContratado (NTC realista) para precificação do cliente.
     // custoMotoristaAntt (piso legal) é usado apenas em margemBruta como base de custo mínimo.
