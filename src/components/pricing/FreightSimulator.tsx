@@ -60,25 +60,32 @@ export function FreightSimulator() {
 
   const activeTables = priceTables?.filter((t) => t.active) || [];
 
+  // Rejeita notação científica (1e5, 2.5e2) e caracteres não numéricos
+  const safeParseFloat = (s: string): number => {
+    const sanitized = s.replace(/[^0-9.,]/g, '').replace(',', '.');
+    const n = parseFloat(sanitized);
+    return isNaN(n) ? 0 : n;
+  };
+
   const handleCalculate = async () => {
     try {
-      const rawWeight = parseFloat(weightValue) || 0;
+      const rawWeight = safeParseFloat(weightValue);
       const weightKgValue = weightUnit === 'ton' ? rawWeight * 1000 : rawWeight;
       const response = await calculateFreight.mutateAsync({
         origin,
         destination,
         weight_kg: weightKgValue,
-        volume_m3: parseFloat(volumeM3) || 0,
-        cargo_value: parseFloat(cargoValue) || 0,
-        km_distance: kmDistance ? parseFloat(kmDistance) : 0,
-        toll_value: parseFloat(tollValue) || 0,
+        volume_m3: safeParseFloat(volumeM3),
+        cargo_value: safeParseFloat(cargoValue),
+        km_distance: kmDistance ? safeParseFloat(kmDistance) : 0,
+        toll_value: safeParseFloat(tollValue),
         price_table_id: priceTableId || undefined,
         vehicle_type_code: vehicleTypeCode || undefined,
         payment_term_code: paymentTermCode || undefined,
         tde_enabled: tdeEnabled,
         tear_enabled: tearEnabled,
         conditional_fees: selectedFees.length > 0 ? selectedFees : undefined,
-        waiting_hours: waitingHours ? parseFloat(waitingHours) : undefined,
+        waiting_hours: waitingHours ? safeParseFloat(waitingHours) : undefined,
       });
       setResult(response);
     } catch (error) {
@@ -420,8 +427,8 @@ export function FreightSimulator() {
                     <p className="font-medium">
                       {(
                         (weightUnit === 'ton'
-                          ? parseFloat(weightValue) * 1000
-                          : parseFloat(weightValue)) || 0
+                          ? safeParseFloat(weightValue) * 1000
+                          : safeParseFloat(weightValue)) || 0
                       ).toLocaleString('pt-BR')}{' '}
                       kg
                     </p>
