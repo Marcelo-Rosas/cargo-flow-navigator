@@ -272,9 +272,10 @@ export function normalizeIcmsRate(rate: number): number {
     if (times10 >= 3 && times10 <= 25) return times10;
   }
 
-  // Entre 1 e 3: 1.2 = 12%, 2.6 = 26% (VEC-125: remover <= 25 para não silenciar 2.6-2.9)
+  // Entre 1 e 3: pode ser 1.2 = 12%
   if (rate >= 1 && rate < 3) {
-    return rate * 10; // resultado sempre 10-30, dentro de qualquer alíquota ICMS real
+    const times10 = rate * 10;
+    if (times10 >= 3 && times10 <= 25) return times10;
   }
 
   // Muito alto: > 25
@@ -283,8 +284,7 @@ export function normalizeIcmsRate(rate: number): number {
     if (divided >= 3 && divided <= 25) return divided;
   }
 
-  // Fallback: valor não reconhecido — loga e retorna como está
-  console.warn(`[normalizeIcmsRate] Taxa ICMS não reconhecida: ${rate} — retornando sem conversão`);
+  // Fallback: retorna o valor original
   return rate;
 }
 
