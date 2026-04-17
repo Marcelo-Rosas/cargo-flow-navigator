@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
 
     const { data: allRules } = await supabase
       .from('pricing_rules_config')
-      .select('key, value, vehicle_type_id')
+      .select('key, value, vehicle_type_id, min_value, max_value')
       .eq('is_active', true);
 
     function resolveRule(key: string, vtId: string | null | undefined): number | undefined {
@@ -167,7 +167,11 @@ Deno.serve(async (req) => {
         (r: { vehicle_type_id: string | null }) => r.vehicle_type_id == null
       );
       const rule = vehicleRule ?? globalRule;
-      return rule ? Number(rule.value) : undefined;
+      if (!rule) return undefined;
+      let val = Number(rule.value);
+      if (rule.min_value != null && val < Number(rule.min_value)) val = Number(rule.min_value);
+      if (rule.max_value != null && val > Number(rule.max_value)) val = Number(rule.max_value);
+      return val;
     }
 
     // Fallback: pricing_parameters (legacy)

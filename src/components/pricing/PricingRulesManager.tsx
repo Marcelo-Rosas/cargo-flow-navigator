@@ -74,8 +74,10 @@ const CATEGORIES = [
   { id: 'carga_descarga', label: 'Carga e Descarga', icon: Package },
   { id: 'aluguel', label: 'Aluguel', icon: Wrench },
   { id: 'veiculo', label: 'Por Veículo', icon: Truck },
-  { id: 'estadia', label: 'Estadia', icon: Gauge },
-  { id: 'prazo', label: 'Prazo', icon: Calendar },
+  { id: 'conteiner', label: 'Contêiner', icon: Package },
+  { id: 'pedagio', label: 'Pedágio Fallback', icon: Gauge },
+  { id: 'estadia', label: 'Estadia', icon: Calendar },
+  { id: 'prazo', label: 'Prazo', icon: Receipt },
 ] as const;
 
 const PROTECTED_RULE_KEYS = new Set([
@@ -259,8 +261,8 @@ export function PricingRulesManager() {
     'overhead_percent',
     'pis_percent',
     'cofins_percent',
-    'irpj_percent',
-    'csll_percent',
+    'irpj_effective_percent',
+    'csll_effective_percent',
     'profit_margin_percent',
   ] as const;
   const activeFinanceiroKeys = regimeLucroPresumido ? lpKeys : financeiroKeys;
