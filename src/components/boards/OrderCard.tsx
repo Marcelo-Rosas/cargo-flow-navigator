@@ -133,6 +133,7 @@ export function OrderCard({
               {...attributes}
               {...listeners}
               data-testid={`order-card-drag-handle-${order.id}`}
+              aria-label="Arrastar ordem de serviço"
               className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => e.stopPropagation()}
             >

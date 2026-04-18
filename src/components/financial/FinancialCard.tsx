@@ -58,6 +58,7 @@ export function FinancialCard({ row, onEdit, canManageActions = true }: Financia
               {...attributes}
               {...listeners}
               data-testid={`financial-card-drag-handle-${row.id}`}
+              aria-label="Arrastar cartão"
               className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => e.stopPropagation()}
             >

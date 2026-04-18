@@ -142,6 +142,7 @@ export function QuoteCard({
               {...attributes}
               {...listeners}
               data-testid={`quote-card-drag-handle-${quote.id}`}
+              aria-label="Arrastar cotação"
               className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => e.stopPropagation()}
             >

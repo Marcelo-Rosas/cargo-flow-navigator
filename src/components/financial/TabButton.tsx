@@ -5,7 +5,7 @@ interface TabButtonProps {
   active: boolean;
   onClick: () => void;
   label: string;
-  count: number;
+  count?: number;
   overdueCount?: number;
 }
 
@@ -22,7 +22,7 @@ export function TabButton({ active, onClick, label, count, overdueCount = 0 }: T
       )}
     >
       {label}
-      <span className="text-xs opacity-90">({count})</span>
+      {count !== undefined && <span className="text-xs opacity-90">({count})</span>}
       {overdueCount > 0 && (
         <Badge variant={active ? 'secondary' : 'destructive'} className="text-xs">
           {overdueCount} atrasados

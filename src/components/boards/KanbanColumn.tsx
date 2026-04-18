@@ -27,7 +27,7 @@ export function KanbanColumn({ id, title, count, color, children, items }: Kanba
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
           <div className={cn('w-3 h-3 rounded-full', color || 'bg-muted')} />
-          <h3 className="font-semibold text-foreground">{title}</h3>
+          <h2 className="font-semibold text-foreground text-sm">{title}</h2>
           <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
             {count}
           </span>

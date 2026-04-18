@@ -93,10 +93,13 @@ export default function Financial() {
               active={tab === 'fluxo'}
               onClick={() => setTab('fluxo')}
               label="Fluxo de Caixa"
-              count={0}
             />
-            <TabButton active={tab === 'dre'} onClick={() => setTab('dre')} label="DRE" count={0} />
-            <TabButton active={tab === 'liquidez'} onClick={() => setTab('liquidez')} label="Liquidez" count={0} />
+            <TabButton active={tab === 'dre'} onClick={() => setTab('dre')} label="DRE" />
+            <TabButton
+              active={tab === 'liquidez'}
+              onClick={() => setTab('liquidez')}
+              label="Liquidez"
+            />
           </div>
           {tab === 'pagar' && (
             <ToggleGroup
@@ -168,11 +171,9 @@ export default function Financial() {
           )}
       </div>
 
-      <FinancialDetailModal
-        open={!!selectedDoc}
-        onClose={() => setSelectedDoc(null)}
-        doc={selectedDoc}
-      />
+      {selectedDoc && (
+        <FinancialDetailModal open onClose={() => setSelectedDoc(null)} doc={selectedDoc} />
+      )}
 
       <TripDetailModal
         open={!!selectedTripId}
