@@ -246,10 +246,12 @@ export function usePendingInstallments(limit = 50) {
       >();
 
       if (fatSourceIds.length > 0) {
-        const { data: reconData } = await supabase
-          .from('v_quote_payment_reconciliation' as never)
+        const { data: reconData, error: reconError } = await supabase
+          .from('v_quote_payment_reconciliation')
           .select('quote_id, paid_amount, delta_amount, is_reconciled')
           .in('quote_id', fatSourceIds);
+
+        if (reconError) throw reconError;
 
         const reconRows = (reconData ?? []) as {
           quote_id: string;
@@ -259,11 +261,13 @@ export function usePendingInstallments(limit = 50) {
         }[];
 
         // Also fetch proof types per quote for label
-        const { data: proofData } = await supabase
-          .from('quote_payment_proofs' as never)
+        const { data: proofData, error: proofError } = await supabase
+          .from('quote_payment_proofs')
           .select('quote_id, proof_type, amount')
           .in('quote_id', fatSourceIds)
           .not('amount', 'is', null);
+
+        if (proofError) throw proofError;
 
         const proofsByQuote = new Map<string, string[]>();
         for (const p of (proofData ?? []) as {
@@ -336,6 +340,74 @@ export function useDeleteInstallments() {
       const { error } = await supabase.from('financial_installments').delete().in('id', ids);
       if (error) throw error;
       return ids;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-installments'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+    },
+  });
+}
+
+type ResyncItem = Pick<PendingInstallment, 'id' | 'source_id' | 'document_type'>;
+
+export function useResyncInstallmentAmounts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: ResyncItem[]) => {
+      if (items.length === 0) return [];
+
+      const fatItems = items.filter((i) => i.document_type === 'FAT' && i.source_id);
+      const pagItems = items.filter((i) => i.document_type === 'PAG' && i.source_id);
+
+      // installment id → novo amount
+      const amountMap = new Map<string, number>();
+
+      if (fatItems.length > 0) {
+        const { data: quotes, error } = await supabase
+          .from('quotes')
+          .select('id, value')
+          .in(
+            'id',
+            fatItems.map((i) => i.source_id!)
+          );
+        if (error) throw error;
+        const quoteMap = new Map((quotes ?? []).map((q) => [q.id, Number(q.value)]));
+        for (const item of fatItems) {
+          const val = quoteMap.get(item.source_id!);
+          if (val != null) amountMap.set(item.id, val);
+        }
+      }
+
+      if (pagItems.length > 0) {
+        const { data: orders, error } = await supabase
+          .from('orders')
+          .select('id, value, carreteiro_real')
+          .in(
+            'id',
+            pagItems.map((i) => i.source_id!)
+          );
+        if (error) throw error;
+        const orderMap = new Map(
+          (orders ?? []).map((o) => [o.id, Number(o.carreteiro_real ?? o.value)])
+        );
+        for (const item of pagItems) {
+          const val = orderMap.get(item.source_id!);
+          if (val != null) amountMap.set(item.id, val);
+        }
+      }
+
+      const results = await Promise.allSettled(
+        Array.from(amountMap.entries()).map(([id, amount]) =>
+          supabase.from('financial_installments').update({ amount }).eq('id', id)
+        )
+      );
+
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length > 0)
+        throw new Error(`${failed.length} parcela(s) não puderam ser atualizadas`);
+
+      return Array.from(amountMap.keys());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
