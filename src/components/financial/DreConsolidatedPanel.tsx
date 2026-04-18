@@ -2,39 +2,59 @@ import { useState } from 'react';
 import { Receipt, Loader2, Info, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/formatters';
-import { useDreComparativoReport } from '@/hooks/useDreComparativoReport';
+import { useDreOperacionalReport } from '@/hooks/useDreOperacionalReport';
 import { cn } from '@/lib/utils';
-import type { DreGroupBy } from '@/modules/dre';
+import type { DreTable } from '@/modules/dre';
 import { Link } from 'react-router-dom';
 
-const DRE_GROUP_OPTIONS: { value: DreGroupBy; label: string }[] = [
-  { value: 'order', label: 'Por OS' },
-  { value: 'trip', label: 'Por Viagem' },
-  { value: 'quote', label: 'Por Cotação' },
-];
+const CURRENT_YEAR = new Date().getFullYear();
 
-const REPORT_THIS_YEAR = new Date().getFullYear();
+function getToday(): string {
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+function extractTotals(tables: DreTable[]) {
+  let faturamentoBruto = 0;
+  let resultadoPresumido = 0;
+  let resultadoReal = 0;
+  for (const table of tables) {
+    for (const row of table.rows) {
+      if (row.line_code === 'faturamento_bruto') {
+        faturamentoBruto += row.presumed_value;
+      } else if (row.line_code === 'resultado_liquido') {
+        resultadoPresumido += row.presumed_value;
+        resultadoReal += row.real_value;
+      }
+    }
+  }
+  return { faturamentoBruto, resultadoPresumido, resultadoReal };
+}
 
 export function DreConsolidatedPanel() {
-  const [year] = useState<number>(REPORT_THIS_YEAR);
-  const [month] = useState<number | null>(null);
-  const [groupBy, setGroupBy] = useState<DreGroupBy>('order');
+  const [dateFrom, setDateFrom] = useState<string>(`01/01/${CURRENT_YEAR}`);
+  const [dateTo, setDateTo] = useState<string>(getToday());
 
-  const { data: dreRows, isLoading } = useDreComparativoReport({
-    year,
-    month,
-    vehicleTypeId: null,
-    groupBy,
+  const { data: dreTables, isLoading } = useDreOperacionalReport({
+    dateFrom,
+    dateTo,
+    quoteCode: null,
+    osNumber: null,
+    periodType: 'detail',
     enabled: true,
   });
 
-  const totalPresumido = dreRows?.reduce((s, r) => s + r.resultadoPresumido, 0) ?? 0;
-  const totalReal = dreRows?.reduce((s, r) => s + r.resultadoReal, 0) ?? 0;
-  const delta = totalReal - totalPresumido;
+  const { faturamentoBruto, resultadoPresumido, resultadoReal } = dreTables
+    ? extractTotals(dreTables)
+    : { faturamentoBruto: 0, resultadoPresumido: 0, resultadoReal: 0 };
+
+  const delta = resultadoReal - resultadoPresumido;
   const deltaPositive = delta >= 0;
-  const receitaTotal = dreRows?.reduce((s, r) => s + r.receitaPresumida, 0) ?? 0;
-  const margemPresumidaPercent = receitaTotal > 0 ? (totalPresumido / receitaTotal) * 100 : 0;
-  const margemRealPercent = receitaTotal > 0 ? (totalReal / receitaTotal) * 100 : 0;
+  const margemPresumidaPercent =
+    faturamentoBruto > 0 ? (resultadoPresumido / faturamentoBruto) * 100 : 0;
+  const margemRealPercent = faturamentoBruto > 0 ? (resultadoReal / faturamentoBruto) * 100 : 0;
 
   return (
     <div className="space-y-6">
@@ -49,17 +69,24 @@ export function DreConsolidatedPanel() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value as DreGroupBy)}
-            className="text-sm border border-border rounded-md px-3 py-2 bg-background"
-          >
-            {DRE_GROUP_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground whitespace-nowrap">De</span>
+            <input
+              type="text"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              placeholder="dd/mm/aaaa"
+              className="w-28 border border-border rounded-md px-2 py-1.5 bg-background text-sm"
+            />
+            <span className="text-muted-foreground whitespace-nowrap">Até</span>
+            <input
+              type="text"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              placeholder="dd/mm/aaaa"
+              className="w-28 border border-border rounded-md px-2 py-1.5 bg-background text-sm"
+            />
+          </div>
           <Button variant="outline" size="sm" asChild>
             <Link to="/relatorios">
               <ExternalLink className="w-4 h-4 mr-1.5" />
@@ -73,15 +100,13 @@ export function DreConsolidatedPanel() {
         <div className="flex justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      ) : !dreRows || dreRows.length === 0 ? (
+      ) : !dreTables || dreTables.length === 0 ? (
         <div className="rounded-xl border border-border bg-muted/20 p-12 text-center">
           <Info className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
-          <p className="text-muted-foreground">
-            Nenhuma OS com carreteiro real preenchido em {year}.
-          </p>
+          <p className="text-muted-foreground">Nenhuma OS com dados DRE no período selecionado.</p>
           <p className="text-sm text-muted-foreground mt-1">
-            O DRE comparativo exibe margem presumida vs real. Preencha o valor do carreteiro nas OS
-            para ver a variação.
+            O DRE comparativo exibe margem presumida vs real. Selecione um período com cotações
+            ganhas.
           </p>
         </div>
       ) : (
@@ -98,11 +123,11 @@ export function DreConsolidatedPanel() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="rounded-xl border border-border p-4 bg-card">
               <p className="text-xs text-muted-foreground mb-1">Resultado Presumido</p>
-              <p className="text-xl font-bold tabular-nums">{formatCurrency(totalPresumido)}</p>
+              <p className="text-xl font-bold tabular-nums">{formatCurrency(resultadoPresumido)}</p>
             </div>
             <div className="rounded-xl border border-border p-4 bg-card">
               <p className="text-xs text-muted-foreground mb-1">Resultado Real</p>
-              <p className="text-xl font-bold tabular-nums">{formatCurrency(totalReal)}</p>
+              <p className="text-xl font-bold tabular-nums">{formatCurrency(resultadoReal)}</p>
             </div>
             <div
               className={cn(
@@ -134,9 +159,7 @@ export function DreConsolidatedPanel() {
           </div>
 
           <p className="text-sm text-muted-foreground">
-            {dreRows.length}{' '}
-            {groupBy === 'order' ? 'OS' : groupBy === 'trip' ? 'viagens' : 'cotações'} com custo
-            real no período.
+            {dreTables.length} OS/cotações com dados no período.
           </p>
         </>
       )}
