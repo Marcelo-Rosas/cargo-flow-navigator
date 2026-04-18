@@ -224,7 +224,7 @@ function LiquiditySummaryBlock() {
   const [expanded, setExpanded] = useState(false);
   const { result, isLoading } = useLiquidityIndicators();
 
-  if (isLoading) return null;
+  if (isLoading || !result) return null;
 
   const indicators = [
     { label: 'Corrente', value: result.liquidezCorrente, status: result.statusCorrente },
@@ -249,10 +249,7 @@ function LiquiditySummaryBlock() {
         <div className="px-4 pb-4 pt-1">
           <div className="grid grid-cols-3 gap-3">
             {indicators.map((ind) => (
-              <div
-                key={ind.label}
-                className="rounded-lg border p-3 text-center space-y-1"
-              >
+              <div key={ind.label} className="rounded-lg border p-3 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase">
                   {ind.label}
                 </p>
@@ -261,10 +258,7 @@ function LiquiditySummaryBlock() {
                 >
                   {ind.value !== null ? ind.value.toFixed(2) : '—'}
                 </p>
-                <Badge
-                  variant={getLiquidityStatusBadgeVariant(ind.status)}
-                  className="text-[9px]"
-                >
+                <Badge variant={getLiquidityStatusBadgeVariant(ind.status)} className="text-[9px]">
                   {getLiquidityStatusLabel(ind.status)}
                 </Badge>
               </div>
