@@ -40,4 +40,4 @@ VALUES
     true,
     '{"description": "1 = bloqueia todas as taxas condicionais no cálculo. 0 = taxas condicionais ativas."}'
   )
-ON CONFLICT (key) DO NOTHING;
+ON CONFLICT (key, vehicle_type_id) DO NOTHING;
