@@ -194,6 +194,7 @@ export interface PendingInstallment {
   document_code: string | null;
   document_type: 'FAT' | 'PAG';
   source_id: string | null;
+  payment_method: string | null;
   recon_paid: number | null;
   recon_delta: number | null;
   recon_reconciled: boolean | null;
@@ -206,7 +207,9 @@ export function usePendingInstallments(limit = 50) {
     queryFn: async (): Promise<PendingInstallment[]> => {
       const { data, error } = await supabase
         .from('financial_installments')
-        .select('id, amount, due_date, status, financial_documents(code, type, source_id)')
+        .select(
+          'id, amount, due_date, status, payment_method, financial_documents(code, type, source_id)'
+        )
         .eq('status', 'pendente')
         .order('due_date', { ascending: true })
         .limit(limit);
@@ -231,6 +234,7 @@ export function usePendingInstallments(limit = 50) {
         document_code: row.financial_documents?.code ?? null,
         document_type: (row.financial_documents?.type ?? 'PAG') as 'FAT' | 'PAG',
         source_id: row.financial_documents?.source_id ?? null,
+        payment_method: row.payment_method ?? null,
       }));
 
       // Fetch reconciliation for FAT rows
