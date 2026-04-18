@@ -23,8 +23,22 @@ CREATE INDEX IF NOT EXISTS idx_petrobras_diesel_uf_fetched
 
 ALTER TABLE petrobras_diesel_prices ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "authenticated_read" ON petrobras_diesel_prices
-  FOR SELECT TO authenticated USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'petrobras_diesel_prices' AND policyname = 'authenticated_read'
+  ) THEN
+    CREATE POLICY "authenticated_read" ON petrobras_diesel_prices
+      FOR SELECT TO authenticated USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY "service_role_all" ON petrobras_diesel_prices
-  FOR ALL TO service_role USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'petrobras_diesel_prices' AND policyname = 'service_role_all'
+  ) THEN
+    CREATE POLICY "service_role_all" ON petrobras_diesel_prices
+      FOR ALL TO service_role USING (true) WITH CHECK (true);
+  END IF;
+END $$;
