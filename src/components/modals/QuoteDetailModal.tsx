@@ -467,6 +467,53 @@ export function QuoteDetailModal({
             (quote as { balance_due_date?: string | null }).balance_due_date ||
             new Date().toISOString().slice(0, 10);
 
+          // --- Validate payment proofs before creating installments ---
+          const { data: proofs, error: proofsError } = await supabase
+            .from('quote_payment_proofs' as never)
+            .select('proof_type, amount, expected_amount')
+            .eq('quote_id', asDb(quote.id));
+
+          if (proofsError) {
+            console.error('[handleConvertToFAT] Falha ao buscar payment proofs:', proofsError);
+            toast.warning(
+              'Não foi possível buscar comprovantes de pagamento. Parcelas criadas com valor estimado.'
+            );
+          } else if (
+            !proofs ||
+            (
+              proofs as {
+                proof_type: string;
+                amount: number | null;
+                expected_amount: number | null;
+              }[]
+            ).length === 0
+          ) {
+            console.warn(
+              '[handleConvertToFAT] Nenhum payment proof encontrado para quote',
+              quote.id
+            );
+            toast.warning(
+              'Nenhum comprovante de pagamento encontrado para esta cotação. Verifique a seção de documentos.'
+            );
+          } else {
+            const proofRows = proofs as {
+              proof_type: string;
+              amount: number | null;
+              expected_amount: number | null;
+            }[];
+            const nullAmounts = proofRows.filter((p) => p.amount == null);
+            if (nullAmounts.length > 0) {
+              console.error(
+                '[handleConvertToFAT] Payment proofs sem valor confirmado:',
+                nullAmounts.map((p) => p.proof_type)
+              );
+              toast.warning(
+                `Comprovante(s) sem valor confirmado: ${nullAmounts.map((p) => p.proof_type).join(', ')}. Valor esperado usado como referência.`
+              );
+            }
+          }
+          // --- End validation ---
+
           if (advPercent > 0 && fatTotal > 0) {
             const advAmount = Math.round(fatTotal * (advPercent / 100) * 100) / 100;
             const balAmount = Math.round((fatTotal - advAmount) * 100) / 100;

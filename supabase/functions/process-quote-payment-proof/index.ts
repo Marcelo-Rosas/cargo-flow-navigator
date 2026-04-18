@@ -121,6 +121,10 @@ Deno.serve(async (req) => {
           : (totalValue * (100 - advancePercent)) / 100;
     }
 
+    // amount defaults to expectedAmount so it is never null after creation.
+    // It will be overwritten when the actual payment confirmation arrives.
+    const initialAmount = expectedAmount;
+
     const { data: upserted, error: upsertErr } = await sb
       .from('quote_payment_proofs')
       .upsert(
@@ -128,9 +132,9 @@ Deno.serve(async (req) => {
           quote_id: d.quote_id,
           document_id: d.id,
           proof_type: proofType,
-          amount: null,
+          amount: initialAmount,
           expected_amount: expectedAmount,
-          status: 'pending',
+          status: initialAmount != null ? 'pending' : 'pending',
           extracted_fields: {},
         },
         { onConflict: 'document_id', ignoreDuplicates: false }
@@ -145,11 +149,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (initialAmount == null) {
+      console.error(
+        `[process-quote-payment-proof] WARNING: amount is null for proof ${(upserted as { id: string }).id} (quote=${d.quote_id}, type=${proofType}). payment_term may be missing advance_percent.`
+      );
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         quotePaymentProofId: (upserted as { id: string }).id,
-        extracted: { amount: null, status: 'pending' },
+        extracted: { amount: initialAmount, status: 'pending' },
+        warning:
+          initialAmount == null
+            ? 'amount_null: payment_term sem advance_percent configurado'
+            : undefined,
       }),
       { status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' } }
     );
