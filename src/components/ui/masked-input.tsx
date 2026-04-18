@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 
-type MaskType = 'cep' | 'cnpj' | 'cpf' | 'phone' | 'currency';
+type MaskType = 'cep' | 'cnpj' | 'cpf' | 'phone' | 'currency' | 'currencyInteger' | 'date';
 
 interface MaskedInputProps extends Omit<React.ComponentProps<'input'>, 'onChange'> {
   mask: MaskType;
@@ -44,8 +44,12 @@ const maskConfig: Record<MaskType, { maxDigits: number; format: (value: string) 
   phone: {
     maxDigits: 11,
     format: (value: string) => {
-      if (value.length <= 2) return value.length > 0 ? `(${value}` : '';
-      if (value.length <= 7) return `(${value.slice(0, 2)}) ${value.slice(2)}`;
+      if (value.length === 0) return '';
+      if (value.length <= 2) return `(${value}`;
+      if (value.length <= 6) return `(${value.slice(0, 2)}) ${value.slice(2)}`;
+      // fixo: (XX) XXXX-XXXX — celular: (XX) XXXXX-XXXX
+      if (value.length <= 10)
+        return `(${value.slice(0, 2)}) ${value.slice(2, 6)}-${value.slice(6)}`;
       return `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7, 11)}`;
     },
   },
@@ -57,6 +61,22 @@ const maskConfig: Record<MaskType, { maxDigits: number; format: (value: string) 
       const reais = value.slice(0, -2) || '0';
       const formatted = reais.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
       return `${formatted},${cents}`;
+    },
+  },
+  currencyInteger: {
+    maxDigits: 12,
+    format: (value: string) => {
+      if (value.length === 0) return '';
+      const stripped = value.replace(/^0+/, '') || '0';
+      return stripped.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    },
+  },
+  date: {
+    maxDigits: 8,
+    format: (value: string) => {
+      if (value.length <= 2) return value;
+      if (value.length <= 4) return `${value.slice(0, 2)}/${value.slice(2)}`;
+      return `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4, 8)}`;
     },
   },
 };

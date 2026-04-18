@@ -5,6 +5,7 @@ import {
   Download,
   CheckSquare,
   Trash2,
+  RefreshCw,
   Calendar,
   BarChart3,
   FileSpreadsheet,
@@ -44,6 +45,7 @@ import {
   useSettledInstallments,
   useSettleInstallments,
   useDeleteInstallments,
+  useResyncInstallmentAmounts,
 } from '@/hooks/useCashFlowSummary';
 import type {
   CashFlowByMonth,
@@ -293,6 +295,7 @@ export function CashFlowReport() {
   const { data: settledInstallments } = useSettledInstallments({ monthFrom, monthTo });
   const settleMutation = useSettleInstallments();
   const deleteMutation = useDeleteInstallments();
+  const resyncMutation = useResyncInstallmentAmounts();
 
   const pendingRows = useMemo(() => pendingInstallments ?? [], [pendingInstallments]);
   const settledRows = useMemo(() => settledInstallments ?? [], [settledInstallments]);
@@ -340,6 +343,22 @@ export function CashFlowReport() {
       },
     });
   }, [selectedIds, deleteMutation]);
+
+  const handleResyncSelected = useCallback(() => {
+    const items = pendingRows
+      .filter((r) => selectedIds.has(r.id))
+      .map(({ id, source_id, document_type }) => ({ id, source_id, document_type }));
+    if (items.length === 0) return;
+    resyncMutation.mutate(items, {
+      onSuccess: (updated) => {
+        toast.success(`${updated.length} valor(es) sincronizado(s) com o documento de origem`);
+        setSelectedIds(new Set());
+      },
+      onError: (err) => {
+        toast.error(err instanceof Error ? err.message : 'Erro ao sincronizar valores');
+      },
+    });
+  }, [selectedIds, pendingRows, resyncMutation]);
 
   // ── Loading / Error ──
   if (isLoading) {
@@ -554,6 +573,18 @@ export function CashFlowReport() {
             <Button
               size="sm"
               variant="outline"
+              onClick={handleResyncSelected}
+              disabled={selectedIds.size === 0 || resyncMutation.isPending}
+              className="gap-1.5"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${resyncMutation.isPending ? 'animate-spin' : ''}`}
+              />
+              {resyncMutation.isPending ? 'Sincronizando...' : `Atualizar (${selectedIds.size})`}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               onClick={handleSettleSelected}
               disabled={selectedIds.size === 0 || settleMutation.isPending}
               className="gap-1.5"
@@ -642,23 +673,27 @@ export function CashFlowReport() {
                         {formatCurrency(row.amount)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {row.document_type === 'FAT' && row.recon_paid != null ? (
-                          <div className="space-y-0.5">
-                            <span
-                              className={`text-xs font-medium ${
-                                row.recon_reconciled ? 'text-emerald-600' : 'text-destructive'
-                              }`}
-                            >
-                              {row.recon_reconciled
-                                ? 'Conciliado'
-                                : formatCurrency(row.recon_delta ?? 0)}
+                        {row.document_type === 'FAT' ? (
+                          row.recon_paid == null ? (
+                            <span className="text-muted-foreground text-xs">sem dados</span>
+                          ) : row.recon_reconciled ? (
+                            <span className="text-xs font-medium text-emerald-600">Conciliado</span>
+                          ) : row.recon_paid === 0 ? (
+                            <span className="text-xs font-medium text-yellow-600">
+                              Sem pagamento
                             </span>
-                            {row.recon_proof_label && (
-                              <p className="text-[10px] text-muted-foreground">
-                                {row.recon_proof_label}
-                              </p>
-                            )}
-                          </div>
+                          ) : (
+                            <div className="space-y-0.5">
+                              <span className="text-xs font-medium text-destructive">
+                                Δ {formatCurrency(row.recon_delta ?? 0)}
+                              </span>
+                              {row.recon_proof_label && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  {row.recon_proof_label}
+                                </p>
+                              )}
+                            </div>
+                          )
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
