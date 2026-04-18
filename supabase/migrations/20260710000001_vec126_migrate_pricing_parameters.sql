@@ -1,6 +1,9 @@
 -- VEC-126: Migrar chaves restantes de pricing_parameters → pricing_rules_config
 -- pricing_parameters será depreciado; pricing_rules_config é a única fonte de verdade.
 
+-- Adiciona categoria 'ntc' ao enum se ainda não existir
+ALTER TYPE pricing_rule_category ADD VALUE IF NOT EXISTS 'ntc';
+
 INSERT INTO pricing_rules_config (key, label, category, value_type, value, is_active, metadata)
 VALUES
   (
