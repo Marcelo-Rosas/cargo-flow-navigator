@@ -421,57 +421,73 @@ export function CashFlowReport() {
             <BarChart3 className="w-4 h-4" />
             Fluxo de Caixa Mensal
           </h3>
-          <ResponsiveContainer width="100%" height={320}>
-            <ComposedChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="periodLabel" tick={{ fontSize: 11 }} />
-              <YAxis
-                tick={{ fontSize: 11 }}
-                tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))}
-              />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <ReferenceLine y={0} stroke="hsl(var(--border))" />
-              <Bar
-                dataKey="entradas"
-                name="Entradas"
-                fill="hsl(152, 60%, 45%)"
-                radius={[3, 3, 0, 0]}
-                maxBarSize={40}
-              />
-              <Bar
-                dataKey="saidas"
-                name="Saídas"
-                fill="hsl(0, 72%, 51%)"
-                radius={[3, 3, 0, 0]}
-                maxBarSize={40}
-              />
-              <Bar
-                dataKey="entradasPrevistas"
-                name="Entradas Previstas"
-                fill="hsl(152, 60%, 45%)"
-                fillOpacity={0.3}
-                radius={[3, 3, 0, 0]}
-                maxBarSize={40}
-              />
-              <Bar
-                dataKey="saidasPrevistas"
-                name="Saídas Previstas"
-                fill="hsl(0, 72%, 51%)"
-                fillOpacity={0.3}
-                radius={[3, 3, 0, 0]}
-                maxBarSize={40}
-              />
-              <Line
-                dataKey="saldoAcumulado"
-                name="Saldo Acumulado"
-                stroke="hsl(217, 91%, 60%)"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                type="monotone"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <div className="overflow-x-auto -mx-4 px-4">
+            <div style={{ minWidth: Math.max(520, chartData.length * 90) }}>
+              <ResponsiveContainer width="100%" height={320}>
+                <ComposedChart
+                  data={chartData}
+                  margin={{ top: 5, right: 20, bottom: 20, left: 10 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis
+                    dataKey="periodLabel"
+                    tick={{ fontSize: 10 }}
+                    angle={-30}
+                    textAnchor="end"
+                    interval={0}
+                    height={50}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v: number) =>
+                      v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
+                    }
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <ReferenceLine y={0} stroke="hsl(var(--border))" />
+                  <Bar
+                    dataKey="entradas"
+                    name="Entradas"
+                    fill="hsl(152, 60%, 45%)"
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={28}
+                  />
+                  <Bar
+                    dataKey="saidas"
+                    name="Saídas"
+                    fill="hsl(0, 72%, 51%)"
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={28}
+                  />
+                  <Bar
+                    dataKey="entradasPrevistas"
+                    name="Entradas Previstas"
+                    fill="hsl(152, 60%, 45%)"
+                    fillOpacity={0.3}
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={28}
+                  />
+                  <Bar
+                    dataKey="saidasPrevistas"
+                    name="Saídas Previstas"
+                    fill="hsl(0, 72%, 51%)"
+                    fillOpacity={0.3}
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={28}
+                  />
+                  <Line
+                    dataKey="saldoAcumulado"
+                    name="Saldo Acumulado"
+                    stroke="hsl(217, 91%, 60%)"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    type="monotone"
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       )}
 
@@ -631,6 +647,7 @@ export function CashFlowReport() {
                   </TableHead>
                   <TableHead>Documento</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Parcela</TableHead>
                   <TableHead className="text-right">Vencimento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-right">Conciliação</TableHead>
@@ -661,6 +678,9 @@ export function CashFlowReport() {
                         >
                           {row.document_type === 'FAT' ? 'Receber' : 'Pagar'}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {row.payment_method ?? row.recon_proof_label ?? '—'}
                       </TableCell>
                       <TableCell className="text-right">
                         {new Date(row.due_date).toLocaleDateString('pt-BR')}
