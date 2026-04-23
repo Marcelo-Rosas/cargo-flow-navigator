@@ -46,6 +46,7 @@ const triggerConfig: Record<TriggerSource, { label: string; icon: typeof Zap }> 
   batch: { label: 'Batch', icon: Clock },
   on_save: { label: 'Auto', icon: Zap },
   manual: { label: 'Manual', icon: Hand },
+  realtime: { label: 'Tempo real', icon: Zap },
 };
 
 const routeModelConfig: Record<string, { label: string; icon: typeof Globe; className: string }> = {
@@ -94,7 +95,7 @@ export function LoadCompositionCard({
   compact = false,
 }: LoadCompositionCardProps) {
   const status = statusConfig[suggestion.status];
-  const trigger = triggerConfig[suggestion.trigger_source ?? 'batch'];
+  const trigger = triggerConfig[suggestion.trigger_source ?? 'batch'] ?? triggerConfig.batch;
   const TriggerIcon = trigger.icon;
   const isExecutable = suggestion.status === 'pending' && suggestion.is_feasible;
   const hasDiscounts = suggestion.discounts && suggestion.discounts.length > 0;
