@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
 import type { LoadCompositionSuggestion } from '@/types/load-composition';
 
 const MIN_SCORE = 60;
@@ -27,12 +26,17 @@ function showConsolidationToast(
   });
 }
 
-export function useProactiveConsolidationToast() {
+type RealtimeSuggestionPayload = Pick<
+  LoadCompositionSuggestion,
+  'id' | 'estimated_savings_brl' | 'consolidation_score' | 'status' | 'trigger_source'
+>;
+
+export function useProactiveConsolidationToast(enabled = true) {
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   // Check on mount for suggestions that already exist in the DB
   useEffect(() => {
+    if (!enabled) return;
     async function checkExisting() {
       const {
         data: { session },
@@ -57,17 +61,18 @@ export function useProactiveConsolidationToast() {
     }
 
     checkExisting();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Real-time listener for new inserts while the user is on the page
   useEffect(() => {
+    if (!enabled) return;
     const channel = supabase
       .channel('proactive-consolidation')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'load_composition_suggestions' },
         (payload) => {
-          const s = payload.new as any;
+          const s = payload.new as RealtimeSuggestionPayload;
           if (
             ['on_save', 'realtime'].includes(s.trigger_source) &&
             s.status === 'pending' &&
@@ -83,5 +88,5 @@ export function useProactiveConsolidationToast() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [toast, navigate]);
+  }, [enabled, toast]);
 }
