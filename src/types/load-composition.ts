@@ -1,4 +1,4 @@
-export type TriggerSource = 'batch' | 'on_save' | 'manual';
+export type TriggerSource = 'batch' | 'on_save' | 'manual' | 'realtime';
 
 export interface LoadCompositionSuggestion {
   id: string;
