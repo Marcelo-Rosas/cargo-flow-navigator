@@ -598,31 +598,43 @@ export function PricingStep({
               </p>
             )}
 
-            {/* Validade */}
-            <p className="text-[11px] text-muted-foreground">
-              Proposta válida por <span className="font-medium text-foreground">7 dias</span> a
-              partir da emissão.
-            </p>
-
             <Separator />
 
-            {/* Observações — relocado do bloco Entradas */}
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-semibold">Observações adicionais</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      className="h-20"
-                      placeholder="Condições especiais, restrições de horário, etc."
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            {/* Validade + Observações */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+              <FormField
+                control={form.control}
+                name="validity_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold">Validade da proposta</FormLabel>
+                    <FormControl>
+                      <DatePickerString
+                        value={field.value || ''}
+                        onChange={(val) => field.onChange(val)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold">Observações adicionais</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        className="h-20"
+                        placeholder="Condições especiais, restrições de horário, etc."
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
           </Card>
         </SectionBlock>
       )}
