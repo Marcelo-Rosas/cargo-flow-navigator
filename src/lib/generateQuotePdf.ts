@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency, formatDate } from '@/lib/formatters';
+import logoUrl from '@/assets/logo_vectra_cargo.png?url';
 
 type QuotePdfMode = 'simplified' | 'detailed';
 
@@ -82,26 +83,19 @@ function drawArrow(doc: PdfDoc, cx: number, cy: number): void {
 }
 
 async function loadLogoBase64(): Promise<string | null> {
-  const paths = ['/brand/logo_vectra_cargo.png', '/logo_vectra_cargo.png'];
-  for (const path of paths) {
-    try {
-      const res = await fetch(path);
-      if (!res.ok) continue;
-      const ct = res.headers.get('content-type') ?? '';
-      if (!ct.startsWith('image/')) continue; // SPA catch-all returns HTML with 200
-      const blob = await res.blob();
-      const b64 = await new Promise<string | null>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(blob);
-      });
-      if (b64) return b64;
-    } catch {
-      continue;
-    }
+  try {
+    const res = await fetch(logoUrl);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
   }
-  return null;
 }
 
 // ── Section drawers ────────────────────────────────────────────────────────────
