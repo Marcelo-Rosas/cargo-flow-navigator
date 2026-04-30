@@ -6,22 +6,38 @@
 -- checks, so all existing RLS policies on the base tables are correctly enforced.
 --
 -- Safe: all underlying tables have authenticated SELECT policies in place.
+-- Views only present in production use EXECUTE + EXCEPTION to skip in preview.
 
-ALTER VIEW financial_documents_kanban       SET (security_invoker = true);
-ALTER VIEW financial_payable_kanban         SET (security_invoker = true);
-ALTER VIEW financial_receivable_kanban      SET (security_invoker = true);
-ALTER VIEW insurance_metrics_error_breakdown SET (security_invoker = true);
-ALTER VIEW insurance_metrics_latency        SET (security_invoker = true);
-ALTER VIEW insurance_metrics_volume         SET (security_invoker = true);
-ALTER VIEW load_composition_discount_summary SET (security_invoker = true);
-ALTER VIEW load_composition_summary         SET (security_invoker = true);
-ALTER VIEW orders_rs_per_km                 SET (security_invoker = true);
-ALTER VIEW trip_financial_summary           SET (security_invoker = true);
-ALTER VIEW v_cash_flow_summary              SET (security_invoker = true);
-ALTER VIEW v_order_payment_reconciliation   SET (security_invoker = true);
-ALTER VIEW v_quote_order_divergence         SET (security_invoker = true);
-ALTER VIEW v_quote_payment_reconciliation   SET (security_invoker = true);
-ALTER VIEW vw_ntc_publish_pattern           SET (security_invoker = true);
-ALTER VIEW vw_ntc_scrape_history            SET (security_invoker = true);
-ALTER VIEW vw_order_risk_status             SET (security_invoker = true);
-ALTER VIEW vw_trip_risk_summary             SET (security_invoker = true);
+DO $$
+DECLARE
+  views TEXT[] := ARRAY[
+    'financial_documents_kanban',
+    'financial_payable_kanban',
+    'financial_receivable_kanban',
+    'insurance_metrics_error_breakdown',
+    'insurance_metrics_latency',
+    'insurance_metrics_volume',
+    'load_composition_discount_summary',
+    'load_composition_summary',
+    'orders_rs_per_km',
+    'trip_financial_summary',
+    'v_cash_flow_summary',
+    'v_order_payment_reconciliation',
+    'v_quote_order_divergence',
+    'v_quote_payment_reconciliation',
+    'vw_ntc_publish_pattern',
+    'vw_ntc_scrape_history',
+    'vw_order_risk_status',
+    'vw_trip_risk_summary'
+  ];
+  v TEXT;
+BEGIN
+  FOREACH v IN ARRAY views LOOP
+    BEGIN
+      EXECUTE format('ALTER VIEW public.%I SET (security_invoker = true)', v);
+    EXCEPTION WHEN undefined_table THEN
+      -- view does not exist in this environment (preview branch), skip
+      NULL;
+    END;
+  END LOOP;
+END $$;
