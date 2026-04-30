@@ -118,14 +118,26 @@ jobs:
           version: latest
 
       - name: Link Supabase project
-        run: supabase link --project-ref epgedaiukjippepujuzc
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          for attempt in 1 2 3; do
+            supabase link --project-ref epgedaiukjippepujuzc && break
+            [ $attempt -eq 3 ] && exit 1
+            echo "Link attempt $attempt failed — retrying in 20s..."
+            sleep 20
+          done
 
       - name: Push migrations
-        run: supabase db push --include-all
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          for attempt in 1 2 3; do
+            supabase db push --include-all && break
+            [ $attempt -eq 3 ] && exit 1
+            echo "Push attempt $attempt failed — retrying in 20s..."
+            sleep 20
+          done
 
   # ─── Supabase Edge Functions ───
   deploy-edge-functions:
