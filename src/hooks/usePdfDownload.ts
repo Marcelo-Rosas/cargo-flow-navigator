@@ -30,20 +30,32 @@ export function usePdfDownload() {
   const downloadQuotePdf = useCallback(async (quoteId: string, mode: QuotePdfMode) => {
     setLoading(`quote:${mode}`);
     try {
-      const { data, error } = (await supabase
+      const { data: rawQuote, error } = (await supabase
         .from('quotes')
         .select(
-          'id, quote_code, client_name, origin, destination, value, cargo_type, weight, volume, km_distance, estimated_loading_date, created_at, updated_at'
+          'id, quote_code, client_name, origin, destination, value, cargo_type, weight, volume, km_distance, estimated_loading_date, validity_date, notes, created_at, updated_at, payment_term_id'
         )
         .eq('id', quoteId)
         .single()) as {
-        data: QuotePdfPayload | null;
+        data: (QuotePdfPayload & { payment_term_id?: string | null }) | null;
         error: { message: string } | null;
       };
 
-      if (error || !data) {
+      if (error || !rawQuote) {
         throw new Error(error?.message || 'Cotação não encontrada para gerar PDF.');
       }
+
+      let payment_term_name: string | null = null;
+      if (rawQuote.payment_term_id) {
+        const { data: termData } = await supabase
+          .from('payment_terms')
+          .select('name')
+          .eq('id', rawQuote.payment_term_id)
+          .maybeSingle();
+        payment_term_name = (termData as { name?: string | null } | null)?.name ?? null;
+      }
+
+      const data: QuotePdfPayload = { ...rawQuote, payment_term_name };
 
       const { blob, fileName } = await generateQuotePdf({
         quote: data,
