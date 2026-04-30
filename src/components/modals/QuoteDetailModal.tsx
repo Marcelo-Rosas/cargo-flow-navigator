@@ -69,6 +69,8 @@ import {
   QuoteModalEquipmentItemsTab,
   QuoteModalHistoryTab,
 } from '@/components/modals/quote-detail';
+import { AnttFloorBanner } from '@/components/modals/quote-detail/AnttFloorBanner';
+import { AnttFloorAlertDialog } from '@/components/modals/quote-detail/AnttFloorAlertDialog';
 import { formatCurrency } from '@/lib/formatters';
 import { usePdfDownload } from '@/hooks/usePdfDownload';
 
@@ -103,6 +105,12 @@ export function QuoteDetailModal({
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
   const [isConvertingToFat, setIsConvertingToFat] = useState(false);
+  const [anttDialog, setAnttDialog] = useState<{
+    open: boolean;
+    suggestedValue: number;
+    piso: number;
+  }>({ open: false, suggestedValue: 0, piso: 0 });
+  const [isApplyingAnttFloor, setIsApplyingAnttFloor] = useState(false);
   const [selectedAdvancePercent, setSelectedAdvancePercent] = useState<string>('0');
   const [activePaymentTermId, setActivePaymentTermId] = useState<string | null>(
     quote?.payment_term_id ?? null
@@ -241,6 +249,15 @@ export function QuoteDetailModal({
     (breakdown?.profitability as { receitaLiquida?: number } | undefined)?.receitaLiquida ?? null;
 
   const pisoAnttView = Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0);
+  // Piso de compliance: usa anttCalc (taxa atual) ou breakdown meta como fallback
+  const pisoAnttCompliance = anttCalc?.total ?? breakdown?.meta?.anttPisoCarreteiro ?? 0;
+  const currentQuoteValue = Number(quote?.value ?? 0);
+  const priceTableModality = (priceTable as { modality?: string } | null)?.modality;
+  const isQuoteBelowAnttFloor =
+    priceTableModality === 'lotacao' &&
+    pisoAnttCompliance > 0 &&
+    currentQuoteValue > 0 &&
+    currentQuoteValue < pisoAnttCompliance;
   const custosCarreteiroView =
     breakdown?.profitability?.custosCarreteiro ??
     (breakdown?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
@@ -399,7 +416,14 @@ export function QuoteDetailModal({
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       const currentValue = Number(quote.value) || 0;
       const newCalcValue = response.totals.total_cliente;
-      if (newCalcValue > currentValue && currentValue > 0) {
+      const pisoFromResponse =
+        (response.meta as { antt_piso_carreteiro?: number }).antt_piso_carreteiro ?? 0;
+      const floorApplied = (response.meta as { antt_floor_applied?: boolean }).antt_floor_applied;
+
+      if (floorApplied && pisoFromResponse > 0 && currentValue < pisoFromResponse) {
+        // Valor abaixo do piso ANTT — abrir dialog de confirmação
+        setAnttDialog({ open: true, suggestedValue: newCalcValue, piso: pisoFromResponse });
+      } else if (newCalcValue > currentValue && currentValue > 0) {
         toast.warning(
           `Memória recalculada. Valor sugerido (R$ ${newCalcValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) é maior que o valor atual. Avalie reajuste.`,
           { duration: 8000 }
@@ -411,6 +435,64 @@ export function QuoteDetailModal({
       toast.error(
         e instanceof Error ? e.message : 'Erro ao recalcular. Verifique os dados da cotação.'
       );
+    }
+  };
+
+  const handleApplyAnttFloor = async () => {
+    if (!quote) return;
+    const bd = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+    const weightKg = Number(quote.weight) || 0;
+    const volumeM3 = Number(quote.volume) || 0;
+    setIsApplyingAnttFloor(true);
+    try {
+      const payload: CalculateFreightInput = {
+        origin: quote.origin,
+        destination: quote.destination,
+        km_distance: Number(quote.km_distance) || 0,
+        weight_kg: weightKg > 0 ? weightKg : 1,
+        volume_m3: volumeM3,
+        cargo_value: Number(quote.cargo_value) || 0,
+        toll_value: Number(quote.toll_value ?? bd?.components?.toll ?? 0),
+        price_table_id: quote.price_table_id ?? undefined,
+        vehicle_type_code: (vehicleType as { code?: string } | null)?.code,
+        payment_term_code: (paymentTerm as { code?: string } | null)?.code ?? 'D30',
+        descarga_value: bd?.profitability?.custosDescarga ?? 0,
+        aluguel_maquinas_value: bd?.components?.aluguelMaquinas ?? 0,
+        waiting_hours: bd?.meta?.waitingTimeHours ?? undefined,
+        enforce_antt_floor: true,
+      };
+      const prevValue = Number(quote.value) || 0;
+      const response = await calculateFreightMutation.mutateAsync(payload);
+      const newBreakdown = buildStoredBreakdownFromEdgeResponse(response, bd);
+      const newValue = response.totals.total_cliente;
+      await updateQuoteMutation.mutateAsync({
+        id: quote.id,
+        updates: {
+          value: newValue,
+          pricing_breakdown: newBreakdown as unknown as Json,
+        },
+      });
+      // Audit log
+      await supabase.from('audit_logs').insert(
+        asInsert({
+          table_name: 'quotes',
+          record_id: quote.id,
+          action: 'antt_floor_applied',
+          old_values: { value: prevValue } as Json,
+          new_values: {
+            value: newValue,
+            piso: (response.meta as { antt_piso_carreteiro?: number }).antt_piso_carreteiro,
+            gap: newValue - prevValue,
+          } as Json,
+        })
+      );
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      setAnttDialog({ open: false, suggestedValue: 0, piso: 0 });
+      toast.success(`Valor ajustado para ${formatCurrency(newValue)} (Piso ANTT aplicado)`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao aplicar piso ANTT.');
+    } finally {
+      setIsApplyingAnttFloor(false);
     }
   };
 
@@ -705,11 +787,32 @@ export function QuoteDetailModal({
               onRecalcular={handleRecalcular}
               onEdit={() => setIsEditFormOpen(true)}
               showRecalcular={!!(breakdown && quote?.price_table_id && quote?.km_distance)}
+              anttFloorBlocked={isQuoteBelowAnttFloor}
+              recalcularTitle={
+                isQuoteBelowAnttFloor
+                  ? 'Atualizar — valor abaixo do Piso ANTT!'
+                  : 'Recalcular memória de cálculo'
+              }
             />
           </div>
 
           {/* ── Corpo scrollável ─────────────────────────────── */}
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+            {/* Banner ANTT — aparece quando value < piso */}
+            {isQuoteBelowAnttFloor && (
+              <AnttFloorBanner
+                anttStatus={{
+                  status: 'below_floor',
+                  piso: pisoAnttCompliance,
+                  currentValue: currentQuoteValue,
+                  gap: pisoAnttCompliance - currentQuoteValue,
+                  modality: 'lotacao',
+                  isStale: false,
+                }}
+                onApplyFloor={handleRecalcular}
+                disabled={calculateFreightMutation.isPending || updateQuoteMutation.isPending}
+              />
+            )}
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Button
                 type="button"
@@ -719,7 +822,8 @@ export function QuoteDetailModal({
                 aria-label="Baixar PDF simplificado para cliente"
                 id="btn-cotacao-pdf-cliente"
                 data-testid="btn-cotacao-pdf-cliente"
-                disabled={pdfLoading === 'quote:simplified'}
+                disabled={pdfLoading === 'quote:simplified' || isQuoteBelowAnttFloor}
+                title={isQuoteBelowAnttFloor ? 'Resolva o Piso ANTT antes de exportar' : undefined}
                 onClick={() => downloadQuotePdf(quote.id, 'simplified')}
               >
                 {pdfLoading === 'quote:simplified' ? (
@@ -1162,6 +1266,17 @@ export function QuoteDetailModal({
         open={canManage && isConvertModalOpen}
         onClose={() => setIsConvertModalOpen(false)}
         quote={quote}
+      />
+
+      {/* Dialog de confirmação de Piso ANTT */}
+      <AnttFloorAlertDialog
+        open={anttDialog.open}
+        currentValue={currentQuoteValue}
+        piso={anttDialog.piso}
+        suggestedValue={anttDialog.suggestedValue}
+        isApplying={isApplyingAnttFloor}
+        onApply={handleApplyAnttFloor}
+        onCancel={() => setAnttDialog({ open: false, suggestedValue: 0, piso: 0 })}
       />
     </>
   );

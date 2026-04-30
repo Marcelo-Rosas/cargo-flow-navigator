@@ -28,6 +28,7 @@ export const calculateFreightInputSchema = z
     carreteiro_percent: z.number().min(0).max(100).optional(),
     descarga_value: z.number().min(0).optional(),
     aluguel_maquinas_value: z.number().min(0).optional(),
+    enforce_antt_floor: z.boolean().optional(),
   })
   .refine(
     (data: { weight_kg: number; volume_m3: number }) => data.weight_kg > 0 || data.volume_m3 > 0,

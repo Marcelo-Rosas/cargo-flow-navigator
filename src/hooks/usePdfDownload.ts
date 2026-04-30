@@ -45,6 +45,39 @@ export function usePdfDownload() {
         throw new Error(error?.message || 'Cotação não encontrada para gerar PDF.');
       }
 
+      // Gate ANTT: validar piso antes de gerar qualquer PDF
+      const { data: anttCheck } = await supabase.rpc('validate_quote_antt_floor', {
+        p_quote_id: quoteId,
+      });
+      const anttResult = anttCheck as {
+        is_below_antt_floor?: boolean;
+        piso?: number;
+        current_value?: number;
+        modality?: string;
+      } | null;
+
+      if (anttResult?.is_below_antt_floor) {
+        if (mode === 'simplified') {
+          const pisoFmt = (anttResult.piso ?? 0).toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+          });
+          const valueFmt = (anttResult.current_value ?? 0).toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+          });
+          throw new Error(
+            `PDF do cliente bloqueado: valor ${valueFmt} está abaixo do Piso ANTT (${pisoFmt}). Abra a cotação e clique em "Aplicar Piso ANTT".`
+          );
+        }
+        // Modo detailed: permitir com flag para watermark
+        (rawQuote as QuotePdfPayload & { antt_compliance?: unknown }).antt_compliance = {
+          piso: anttResult.piso ?? 0,
+          below: true,
+          modality: anttResult.modality ?? 'lotacao',
+        };
+      }
+
       let payment_term_name: string | null = null;
       if (rawQuote.payment_term_id) {
         const { data: termData } = await supabase

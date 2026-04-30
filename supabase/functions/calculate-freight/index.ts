@@ -616,13 +616,14 @@ Deno.serve(async (req) => {
     // =====================================================
 
     let pisoAnttCarreteiro = 0;
+    let anttFloorRateId: string | undefined;
 
     if (axesCount != null && axesCount > 0 && input.km_distance != null && input.km_distance > 0) {
       const kmBand = Math.ceil(Number(input.km_distance));
 
       const { data: anttRate } = await supabase
         .from('antt_floor_rates')
-        .select('ccd, cc')
+        .select('id, ccd, cc')
         .eq('operation_table', 'A')
         .eq('cargo_type', 'carga_geral')
         .eq('axes_count', axesCount)
@@ -632,6 +633,7 @@ Deno.serve(async (req) => {
 
       if (anttRate?.ccd != null && anttRate?.cc != null) {
         pisoAnttCarreteiro = roundCurrency(kmBand * Number(anttRate.ccd) + Number(anttRate.cc));
+        anttFloorRateId = (anttRate as { id?: string }).id ?? undefined;
       }
     }
 
@@ -793,6 +795,10 @@ Deno.serve(async (req) => {
     // NÃO usa max(ANTT, frete_peso): o field deve refletir o mínimo legal, não o valor praticado.
     // O spread (custoMotoristaContratado / custoMotoristaAntt - 1) é o KPI de premium sobre o piso.
     const anttFloorApplied = modality === 'lotacao' && pisoAnttCarreteiro > 0;
+    const enforceAnttFloor = !!(input as { enforce_antt_floor?: boolean }).enforce_antt_floor;
+    const anttFloorForced = enforceAnttFloor && anttFloorApplied && pisoAnttCarreteiro > frete_peso;
+    // Quando enforce_antt_floor=true e o piso é maior, gross-up parte do piso como base de custo
+    const fretePesoForGrossUp = anttFloorForced ? pisoAnttCarreteiro : frete_peso;
     const custoMotoristaAntt = anttFloorApplied ? pisoAnttCarreteiro : frete_peso;
     console.log(
       `[calculate-freight] ANTT floor: pisoAntt=${pisoAnttCarreteiro}, frete_peso=${frete_peso}, applied=${anttFloorApplied}, spread=${pisoAnttCarreteiro > 0 ? ((frete_peso / pisoAnttCarreteiro - 1) * 100).toFixed(1) + '%' : 'n/a'}`
@@ -811,10 +817,10 @@ Deno.serve(async (req) => {
       aluguelMaquinasValue +
       tacAdjustment +
       paymentAdjustment;
-    // custoMotoristaContratado: o que o motorista recebe = frete_peso apenas.
+    // custoMotoristaContratado: o que o motorista recebe = frete_peso (ou piso ANTT quando forçado).
     // gris/tso/frete_valor/dispatchFee são receita/repasse da Vectra, não custo do motorista.
     // ntc_base mantido como referência de mercado NTC (meta) mas não entra no custo direto.
-    const custoMotoristaContratado = frete_peso;
+    const custoMotoristaContratado = fretePesoForGrossUp;
     const custosDescarga = descargaValue;
     // custosDiretos usa custoMotoristaContratado (NTC realista) para precificação do cliente.
     // custoMotoristaAntt (piso legal) é usado apenas em margemBruta como base de custo mínimo.
@@ -937,6 +943,9 @@ Deno.serve(async (req) => {
       antt_piso_carreteiro: roundCurrency(pisoAnttCarreteiro),
       antt_floor_applied: anttFloorApplied,
       ...(anttFloorApplied && { frete_peso_original: roundCurrency(frete_peso) }),
+      ...(anttFloorRateId && { antt_floor_rate_id: anttFloorRateId }),
+      antt_calculated_at: new Date().toISOString(),
+      ...(anttFloorForced && { antt_floor_forced: true }),
       ...(ltlMinWeightApplied && { ltl_min_weight_applied: true }),
       ...(ltlMinWeightApplied && { original_weight_kg: roundCurrency(originalWeightKg) }),
     };

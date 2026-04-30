@@ -178,6 +178,10 @@ export function buildStoredBreakdownFromEdgeResponse(
       anttFloorApplied:
         (response.meta as { antt_floor_applied?: boolean }).antt_floor_applied || undefined,
       fretePesoOriginal: (response.meta as { frete_peso_original?: number }).frete_peso_original,
+      anttPisoCarreteiro: (response.meta as { antt_piso_carreteiro?: number }).antt_piso_carreteiro,
+      anttCalculatedAt: (response.meta as { antt_calculated_at?: string }).antt_calculated_at,
+      anttFloorForced:
+        (response.meta as { antt_floor_forced?: boolean }).antt_floor_forced || undefined,
     },
     weights: {
       cubageWeight: cubKg,
