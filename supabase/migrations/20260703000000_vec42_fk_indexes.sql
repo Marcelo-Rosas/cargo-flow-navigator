@@ -68,17 +68,25 @@ BEGIN
 END $$;
 
 -- ─── driver_offer_sequences ──────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_accepted_driver_id
-  ON driver_offer_sequences (accepted_driver_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'driver_offer_sequences'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_accepted_driver_id
+      ON driver_offer_sequences (accepted_driver_id);
 
-CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_order_id
-  ON driver_offer_sequences (order_id);
+    CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_order_id
+      ON driver_offer_sequences (order_id);
 
-CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_trip_id
-  ON driver_offer_sequences (trip_id);
+    CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_trip_id
+      ON driver_offer_sequences (trip_id);
 
-CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_vehicle_type_id
-  ON driver_offer_sequences (vehicle_type_id);
+    CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_vehicle_type_id
+      ON driver_offer_sequences (vehicle_type_id);
+  END IF;
+END $$;
 
 -- ─── financial_documents ─────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_financial_documents_owner_id
