@@ -8,6 +8,9 @@
 -- Before this fix, expected_amount was always q.value regardless of proof breakdown,
 -- causing adiantamento/a_vista proofs that individually reconcile to appear as
 -- divergent because their expected_amount (~R$300) != q.value (R$1.000).
+--
+-- Note: delta_reason column (added in 20260601100000) is NOT referenced here;
+-- unjustified_count logic is added later by 20260601200000_reconciliation_justified_delta.
 
 begin;
 
@@ -26,14 +29,7 @@ with proof_sums as (
     ) as expected_amount,
     coalesce(sum(qpp.amount) filter (where qpp.amount is not null), 0) as paid_amount,
     count(qpp.id) as proofs_count,
-    -- all proofs have amount filled
-    (count(qpp.id) = count(qpp.amount)) as all_amounts_filled,
-    -- count of proofs with |delta| > 1 and no justification reason
-    count(*) filter (
-      where qpp.amount is not null
-        and abs(coalesce(qpp.amount, 0) - coalesce(qpp.expected_amount, 0)) > 1
-        and qpp.delta_reason is null
-    ) as unjustified_count
+    (count(qpp.id) = count(qpp.amount)) as all_amounts_filled
   from public.quotes q
   left join public.quote_payment_proofs qpp on qpp.quote_id = q.id
   group by q.id
@@ -44,10 +40,7 @@ select
   ps.expected_amount,
   ps.paid_amount,
   (ps.paid_amount - ps.expected_amount) as delta_amount,
-  (
-    abs(ps.paid_amount - ps.expected_amount) <= 1
-    or (ps.proofs_count > 0 and ps.all_amounts_filled and ps.unjustified_count = 0)
-  ) as is_reconciled,
+  (abs(ps.paid_amount - ps.expected_amount) <= 1) as is_reconciled,
   ps.proofs_count
 from public.quotes q
 join proof_sums ps on ps.quote_id = q.id;
