@@ -22,6 +22,8 @@ export interface QuotePdfPayload {
   created_at: string | null;
   updated_at: string | null;
   payment_term_name?: string | null;
+  /** Preenchido quando value < piso ANTT. Só usado no modo detailed para watermark. */
+  antt_compliance?: { piso: number; below: boolean; modality: string };
 }
 
 type PdfDoc = jsPDF & { lastAutoTable?: { finalY?: number } };
@@ -456,6 +458,20 @@ export async function generateQuotePdf({
 
   let y = drawHeader(doc, mode, logoBase64);
   y += 7;
+
+  // Banner de compliance ANTT para PDF interno (modo detailed)
+  if (mode === 'detailed' && quote.antt_compliance?.below) {
+    const { piso } = quote.antt_compliance;
+    const banner = `ATENCAO: VALOR ABAIXO DO PISO ANTT (${formatCurrency(piso)}). NAO ENVIAR AO CLIENTE.`;
+    doc.setFillColor(220, 38, 38); // vermelho
+    doc.rect(ML, y, CW, 10, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.white);
+    doc.text(banner, ML + CW / 2, y + 6.5, { align: 'center' });
+    y += 14;
+  }
+
   y = drawClientBlock(doc, quote, y);
   y = drawRoute(doc, quote, y);
   y = drawCargoInfo(doc, quote, y);

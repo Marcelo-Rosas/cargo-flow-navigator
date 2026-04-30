@@ -211,6 +211,12 @@ export interface FreightCalculationOutput {
     anttFloorApplied?: boolean;
     /** Frete peso original da tabela (antes do piso ANTT) */
     fretePesoOriginal?: number;
+    /** Valor do piso ANTT calculado (R$) */
+    anttPisoCarreteiro?: number;
+    /** ISO timestamp de quando o piso foi calculado (detectar staleness) */
+    anttCalculatedAt?: string;
+    /** true quando enforce_antt_floor forçou gross-up a partir do piso */
+    anttFloorForced?: boolean;
   };
 
   components: {
