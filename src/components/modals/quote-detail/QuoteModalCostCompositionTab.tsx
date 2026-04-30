@@ -109,37 +109,50 @@ export function QuoteModalCostCompositionTab({
   const anttFloorApplied = breakdown.meta?.anttFloorApplied === true;
   const fretePesoOriginal = breakdown.meta?.fretePesoOriginal ?? 0;
 
-  const composicaoRows: { label: string; value: number }[] = [];
+  const composicaoRows: { label: string; value: number; field: string }[] = [];
   if (breakdown.components) {
     if ((breakdown.components.aluguelMaquinas ?? 0) > 0)
       composicaoRows.push({
         label: 'Aluguel de Máquinas',
         value: breakdown.components.aluguelMaquinas ?? 0,
+        field: 'aluguel_maquinas',
       });
     if ((breakdown.components.rctrc ?? 0) > 0)
       composicaoRows.push({
         label: `RCTR-C (${breakdown.rates?.costValuePercent?.toFixed(2) ?? 0}%)`,
         value: breakdown.components.rctrc ?? 0,
+        field: 'rctrc',
       });
     if ((breakdown.components.gris ?? 0) > 0)
       composicaoRows.push({
         label: `GRIS (${breakdown.rates?.grisPercent?.toFixed(2) ?? 0}%)`,
         value: breakdown.components.gris ?? 0,
+        field: 'gris',
       });
     if ((breakdown.components.tso ?? 0) > 0)
       composicaoRows.push({
         label: `TSO (${breakdown.rates?.tsoPercent?.toFixed(2) ?? 0}%)`,
         value: breakdown.components.tso ?? 0,
+        field: 'tso',
       });
     if (adValoremValue > 0)
       composicaoRows.push({
         label: `Ad Valorem (${breakdown.rates?.adValoremPercent?.toFixed(3) ?? '0.030'}%)`,
         value: adValoremValue,
+        field: 'ad_valorem',
       });
     if ((breakdown.components.tde ?? 0) > 0)
-      composicaoRows.push({ label: 'TDE (NTC)', value: breakdown.components.tde ?? 0 });
+      composicaoRows.push({
+        label: 'TDE (NTC)',
+        value: breakdown.components.tde ?? 0,
+        field: 'tde',
+      });
     if ((breakdown.components.tear ?? 0) > 0)
-      composicaoRows.push({ label: 'TEAR (NTC)', value: breakdown.components.tear ?? 0 });
+      composicaoRows.push({
+        label: 'TEAR (NTC)',
+        value: breakdown.components.tear ?? 0,
+        field: 'tear',
+      });
   }
 
   const breakdownVersion = breakdown.version ?? 'legacy';
@@ -168,10 +181,28 @@ export function QuoteModalCostCompositionTab({
         <TabsList
           className={cn('grid w-full', hasFees ? 'grid-cols-4' : 'grid-cols-3', 'overflow-x-auto')}
         >
-          <TabsTrigger value="memoria">Memória</TabsTrigger>
-          <TabsTrigger value="dre">DRE</TabsTrigger>
-          <TabsTrigger value="custos">Custos</TabsTrigger>
-          {hasFees && <TabsTrigger value="taxas">Taxas</TabsTrigger>}
+          <TabsTrigger
+            value="memoria"
+            id="tab-composicao-memoria"
+            data-testid="tab-composicao-memoria"
+          >
+            Memória
+          </TabsTrigger>
+          <TabsTrigger value="dre" id="tab-composicao-dre" data-testid="tab-composicao-dre">
+            DRE
+          </TabsTrigger>
+          <TabsTrigger
+            value="custos"
+            id="tab-composicao-custos"
+            data-testid="tab-composicao-custos"
+          >
+            Custos
+          </TabsTrigger>
+          {hasFees && (
+            <TabsTrigger value="taxas" id="tab-composicao-taxas" data-testid="tab-composicao-taxas">
+              Taxas
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="memoria" className="mt-4">
@@ -179,24 +210,40 @@ export function QuoteModalCostCompositionTab({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="font-semibold">Item</TableHead>
-                  <TableHead className="text-right font-semibold">Valor</TableHead>
+                  <TableHead scope="col" className="font-semibold">
+                    Item
+                  </TableHead>
+                  <TableHead scope="col" className="text-right font-semibold">
+                    Valor
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {/* Grupo: Subtotal Motorista (Base de Negociação) */}
                 {anttFloorApplied && fretePesoOriginal > 0 && (
                   <TableRow>
-                    <TableCell className="text-muted-foreground line-through">
+                    <TableCell
+                      data-field="frete_peso_tabela"
+                      data-testid="row-frete-peso-tabela-label"
+                      className="text-muted-foreground line-through"
+                    >
                       Frete Peso (tabela)
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums text-muted-foreground line-through">
+                    <TableCell
+                      data-field="frete_peso_tabela_valor"
+                      data-testid="row-frete-peso-tabela-value"
+                      className="text-right font-medium tabular-nums text-muted-foreground line-through"
+                    >
                       {formatCurrency(fretePesoOriginal)}
                     </TableCell>
                   </TableRow>
                 )}
                 <TableRow>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell
+                    data-field="frete_base"
+                    data-testid="row-frete-base-label"
+                    className="text-muted-foreground"
+                  >
                     Frete Base
                     {anttFloorApplied && (
                       <span className="ml-1 text-xs text-amber-600 font-medium">
@@ -204,79 +251,161 @@ export function QuoteModalCostCompositionTab({
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
+                  <TableCell
+                    data-field="frete_base_valor"
+                    data-testid="row-frete-base-value"
+                    className="text-right font-medium tabular-nums"
+                  >
                     {formatCurrency(baseFreight)}
                   </TableCell>
                 </TableRow>
                 {pedagioMemoria > 0 && (
                   <TableRow>
-                    <TableCell className="text-muted-foreground">(+) Pedágio</TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
+                    <TableCell
+                      data-field="pedagio"
+                      data-testid="row-pedagio-label"
+                      className="text-muted-foreground"
+                    >
+                      (+) Pedágio
+                    </TableCell>
+                    <TableCell
+                      data-field="pedagio_valor"
+                      data-testid="row-pedagio-value"
+                      className="text-right font-medium tabular-nums"
+                    >
                       {formatCurrency(pedagioMemoria)}
                     </TableCell>
                   </TableRow>
                 )}
                 <TableRow className="border-t bg-primary/5">
-                  <TableCell className="font-semibold text-primary">
+                  <TableCell
+                    data-field="subtotal_motorista"
+                    data-testid="row-subtotal-motorista-label"
+                    className="font-semibold text-primary"
+                  >
                     Subtotal Motorista (Base de Negociação)
                   </TableCell>
-                  <TableCell className="text-right font-bold tabular-nums text-primary">
+                  <TableCell
+                    data-field="subtotal_motorista_valor"
+                    data-testid="row-subtotal-motorista-value"
+                    className="text-right font-bold tabular-nums text-primary"
+                  >
                     {formatCurrency(subtotalMotorista)}
                   </TableCell>
                 </TableRow>
                 {composicaoRows.map((r) => (
                   <TableRow key={r.label}>
-                    <TableCell className="text-muted-foreground">{r.label}</TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
+                    <TableCell
+                      data-field={r.field}
+                      data-testid={`row-${r.field}-label`}
+                      className="text-muted-foreground"
+                    >
+                      {r.label}
+                    </TableCell>
+                    <TableCell
+                      data-field={`${r.field}_valor`}
+                      data-testid={`row-${r.field}-value`}
+                      className="text-right font-medium tabular-nums"
+                    >
                       {formatCurrency(r.value)}
                     </TableCell>
                   </TableRow>
                 ))}
                 <TableRow>
-                  <TableCell className="font-semibold">Receita Bruta</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
+                  <TableCell
+                    data-field="receita_bruta"
+                    data-testid="row-receita-bruta-label"
+                    className="font-semibold"
+                  >
+                    Receita Bruta
+                  </TableCell>
+                  <TableCell
+                    data-field="receita_bruta_valor"
+                    data-testid="row-receita-bruta-value"
+                    className="text-right font-medium tabular-nums"
+                  >
                     {formatCurrency(breakdown.totals.receitaBruta || 0)}
                   </TableCell>
                 </TableRow>
                 {isLucroPresumido ? (
                   <>
                     <TableRow>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell
+                        data-field="pis"
+                        data-testid="row-pis-label"
+                        className="text-muted-foreground"
+                      >
                         PIS ({breakdown.rates?.pisPercent?.toFixed(2) ?? 0}%)
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell
+                        data-field="pis_valor"
+                        data-testid="row-pis-value"
+                        className="text-right tabular-nums"
+                      >
                         {formatCurrency(breakdown.totals.pis ?? 0)}
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell
+                        data-field="cofins"
+                        data-testid="row-cofins-label"
+                        className="text-muted-foreground"
+                      >
                         COFINS ({breakdown.rates?.cofinsPercent?.toFixed(2) ?? 0}%)
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell
+                        data-field="cofins_valor"
+                        data-testid="row-cofins-value"
+                        className="text-right tabular-nums"
+                      >
                         {formatCurrency(breakdown.totals.cofins ?? 0)}
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell
+                        data-field="irpj"
+                        data-testid="row-irpj-label"
+                        className="text-muted-foreground"
+                      >
                         IRPJ provisao ({breakdown.rates?.irpjPercent?.toFixed(2) ?? 0}%)
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell
+                        data-field="irpj_valor"
+                        data-testid="row-irpj-value"
+                        className="text-right tabular-nums"
+                      >
                         {formatCurrency(breakdown.totals.irpj ?? 0)}
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell
+                        data-field="csll"
+                        data-testid="row-csll-label"
+                        className="text-muted-foreground"
+                      >
                         CSLL provisao ({breakdown.rates?.csllPercent?.toFixed(2) ?? 0}%)
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell
+                        data-field="csll_valor"
+                        data-testid="row-csll-value"
+                        className="text-right tabular-nums"
+                      >
                         {formatCurrency(breakdown.totals.csll ?? 0)}
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell
+                        data-field="icms"
+                        data-testid="row-icms-label"
+                        className="text-muted-foreground"
+                      >
                         ICMS ({breakdown.rates?.icmsPercent?.toFixed(2) ?? 0}%)
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell
+                        data-field="icms_valor"
+                        data-testid="row-icms-value"
+                        className="text-right tabular-nums"
+                      >
                         {formatCurrency(breakdown.totals.icms ?? 0)}
                       </TableCell>
                     </TableRow>
@@ -284,20 +413,36 @@ export function QuoteModalCostCompositionTab({
                 ) : (
                   <>
                     <TableRow>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell
+                        data-field="provisionamento_das"
+                        data-testid="row-provisionamento-das-label"
+                        className="text-muted-foreground"
+                      >
                         Provisionamento DAS ({breakdown.rates?.dasPercent?.toFixed(2) ?? 0}%)
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell
+                        data-field="provisionamento_das_valor"
+                        data-testid="row-provisionamento-das-value"
+                        className="text-right tabular-nums"
+                      >
                         {formatCurrency(breakdown.totals.das || 0)}
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell
+                        data-field="icms"
+                        data-testid="row-icms-label"
+                        className="text-muted-foreground"
+                      >
                         ICMS (
                         {isSimplesNacional ? '0' : (breakdown.rates?.icmsPercent?.toFixed(2) ?? 0)}
                         %)
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell
+                        data-field="icms_valor"
+                        data-testid="row-icms-value"
+                        className="text-right tabular-nums"
+                      >
                         {formatCurrency(isSimplesNacional ? 0 : breakdown.totals.icms || 0)}
                       </TableCell>
                     </TableRow>
@@ -305,19 +450,35 @@ export function QuoteModalCostCompositionTab({
                 )}
                 {discountValue > 0 && (
                   <TableRow className="bg-orange-50/50 dark:bg-orange-900/10">
-                    <TableCell className="text-orange-700 dark:text-orange-400">
+                    <TableCell
+                      data-field="desconto_comercial"
+                      data-testid="row-desconto-comercial-label"
+                      className="text-orange-700 dark:text-orange-400"
+                    >
                       (-) Desconto Comercial
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums text-orange-700 dark:text-orange-400">
+                    <TableCell
+                      data-field="desconto_comercial_valor"
+                      data-testid="row-desconto-comercial-value"
+                      className="text-right font-medium tabular-nums text-orange-700 dark:text-orange-400"
+                    >
                       -{formatCurrency(discountValue)}
                     </TableCell>
                   </TableRow>
                 )}
                 <TableRow className="bg-primary/5">
-                  <TableCell className="font-semibold text-primary">
+                  <TableCell
+                    data-field="total_cliente"
+                    data-testid="row-total-cliente-label"
+                    className="font-semibold text-primary"
+                  >
                     Total Cliente{discountValue > 0 ? ' (com desconto)' : ''}
                   </TableCell>
-                  <TableCell className="text-right font-bold text-primary tabular-nums">
+                  <TableCell
+                    data-field="total_cliente_valor"
+                    data-testid="row-total-cliente-value"
+                    className="text-right font-bold text-primary tabular-nums"
+                  >
                     {formatCurrency(totalCliente)}
                   </TableCell>
                 </TableRow>
@@ -353,8 +514,12 @@ export function QuoteModalCostCompositionTab({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="font-semibold">Item</TableHead>
-                  <TableHead className="text-right font-semibold">Valor</TableHead>
+                  <TableHead scope="col" className="font-semibold">
+                    Item
+                  </TableHead>
+                  <TableHead scope="col" className="text-right font-semibold">
+                    Valor
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -669,8 +834,12 @@ export function QuoteModalCostCompositionTab({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="font-semibold">Custo</TableHead>
-                  <TableHead className="text-right font-semibold">Valor</TableHead>
+                  <TableHead scope="col" className="font-semibold">
+                    Custo
+                  </TableHead>
+                  <TableHead scope="col" className="text-right font-semibold">
+                    Valor
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -721,8 +890,12 @@ export function QuoteModalCostCompositionTab({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="font-semibold">Taxa</TableHead>
-                    <TableHead className="text-right font-semibold">Valor</TableHead>
+                    <TableHead scope="col" className="font-semibold">
+                      Taxa
+                    </TableHead>
+                    <TableHead scope="col" className="text-right font-semibold">
+                      Valor
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

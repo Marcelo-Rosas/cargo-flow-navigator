@@ -1,50 +1,92 @@
 -- VEC-42: Create indexes on 35 FK columns without supporting indexes.
 -- All indexes created with IF NOT EXISTS to be idempotent.
 -- CONCURRENTLY cannot run inside a transaction block, so these are plain CREATE INDEX.
+-- Tables that only exist in production (commercial_*, partner_*) are wrapped in
+-- DO blocks so preview branches skip them gracefully.
 
 -- ─── commercial_closeout_events ──────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_commercial_closeout_events_message_event_id
-  ON commercial_closeout_events (message_event_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'commercial_closeout_events'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_commercial_closeout_events_message_event_id
+      ON commercial_closeout_events (message_event_id);
 
-CREATE INDEX IF NOT EXISTS idx_commercial_closeout_events_quote_id
-  ON commercial_closeout_events (quote_id);
+    CREATE INDEX IF NOT EXISTS idx_commercial_closeout_events_quote_id
+      ON commercial_closeout_events (quote_id);
+  END IF;
+END $$;
 
 -- ─── commercial_followup_runs ────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_commercial_followup_runs_notification_log_id
-  ON commercial_followup_runs (notification_log_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'commercial_followup_runs'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_commercial_followup_runs_notification_log_id
+      ON commercial_followup_runs (notification_log_id);
 
-CREATE INDEX IF NOT EXISTS idx_commercial_followup_runs_quote_id
-  ON commercial_followup_runs (quote_id);
+    CREATE INDEX IF NOT EXISTS idx_commercial_followup_runs_quote_id
+      ON commercial_followup_runs (quote_id);
 
-CREATE INDEX IF NOT EXISTS idx_commercial_followup_runs_rule_id
-  ON commercial_followup_runs (rule_id);
+    CREATE INDEX IF NOT EXISTS idx_commercial_followup_runs_rule_id
+      ON commercial_followup_runs (rule_id);
+  END IF;
+END $$;
 
 -- ─── commercial_message_events ───────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_commercial_message_events_client_id
-  ON commercial_message_events (client_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'commercial_message_events'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_commercial_message_events_client_id
+      ON commercial_message_events (client_id);
 
-CREATE INDEX IF NOT EXISTS idx_commercial_message_events_shipper_id
-  ON commercial_message_events (shipper_id);
+    CREATE INDEX IF NOT EXISTS idx_commercial_message_events_shipper_id
+      ON commercial_message_events (shipper_id);
+  END IF;
+END $$;
 
 -- ─── commercial_operational_handoffs ─────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_commercial_operational_handoffs_order_id
-  ON commercial_operational_handoffs (order_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'commercial_operational_handoffs'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_commercial_operational_handoffs_order_id
+      ON commercial_operational_handoffs (order_id);
 
-CREATE INDEX IF NOT EXISTS idx_commercial_operational_handoffs_quote_id
-  ON commercial_operational_handoffs (quote_id);
+    CREATE INDEX IF NOT EXISTS idx_commercial_operational_handoffs_quote_id
+      ON commercial_operational_handoffs (quote_id);
+  END IF;
+END $$;
 
 -- ─── driver_offer_sequences ──────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_accepted_driver_id
-  ON driver_offer_sequences (accepted_driver_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'driver_offer_sequences'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_accepted_driver_id
+      ON driver_offer_sequences (accepted_driver_id);
 
-CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_order_id
-  ON driver_offer_sequences (order_id);
+    CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_order_id
+      ON driver_offer_sequences (order_id);
 
-CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_trip_id
-  ON driver_offer_sequences (trip_id);
+    CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_trip_id
+      ON driver_offer_sequences (trip_id);
 
-CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_vehicle_type_id
-  ON driver_offer_sequences (vehicle_type_id);
+    CREATE INDEX IF NOT EXISTS idx_driver_offer_sequences_vehicle_type_id
+      ON driver_offer_sequences (vehicle_type_id);
+  END IF;
+END $$;
 
 -- ─── financial_documents ─────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_financial_documents_owner_id
@@ -83,8 +125,16 @@ CREATE INDEX IF NOT EXISTS idx_orders_vehicle_type_id
   ON orders (vehicle_type_id);
 
 -- ─── partner_users ───────────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_partner_users_shipper_id
-  ON partner_users (shipper_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'partner_users'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_partner_users_shipper_id
+      ON partner_users (shipper_id);
+  END IF;
+END $$;
 
 -- ─── quotes ──────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_quotes_payment_term_id
