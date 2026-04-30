@@ -87,6 +87,8 @@ async function loadLogoBase64(): Promise<string | null> {
     try {
       const res = await fetch(path);
       if (!res.ok) continue;
+      const ct = res.headers.get('content-type') ?? '';
+      if (!ct.startsWith('image/')) continue; // SPA catch-all returns HTML with 200
       const blob = await res.blob();
       const b64 = await new Promise<string | null>((resolve) => {
         const reader = new FileReader();
