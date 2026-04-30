@@ -68,7 +68,7 @@ export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
+            <Button variant="ghost" size="icon" className="relative" aria-label="Notificações">
               <Bell className="w-5 h-5" />
               <Badge
                 variant="destructive"
@@ -108,7 +108,12 @@ export function Topbar({ onNewQuote, onNewOrder }: TopbarProps) {
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              aria-label="Menu do usuário"
+            >
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
                 <User className="w-4 h-4 text-primary-foreground" />
               </div>

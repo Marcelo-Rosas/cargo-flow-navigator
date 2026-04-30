@@ -16,8 +16,12 @@ import {
   AlertTriangle,
   Pencil,
   Trash2,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +35,8 @@ import { Database } from '@/integrations/supabase/types';
 import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
+
+const MotionCard = motion(Card);
 
 /** Single shared query — React Query deduplicates across all cards */
 function useMirofishRouteMap() {
@@ -47,7 +53,7 @@ function useMirofishRouteMap() {
       }
       return map;
     },
-    staleTime: 30 * 60 * 1000, // 30 min — shared cache, no per-card fetches
+    staleTime: 30 * 60 * 1000,
   });
 }
 
@@ -60,6 +66,17 @@ interface QuoteCardProps {
   onConvert?: () => void;
   canManageActions?: boolean;
 }
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+
+const formatDate = (date: string) =>
+  new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(date));
 
 export function QuoteCard({
   quote,
@@ -79,32 +96,12 @@ export function QuoteCard({
     transition,
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
-
-  const formatDate = (date: string) => {
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-    }).format(new Date(date));
-  };
-
   const tags = quote.tags || [];
 
-  // Extract route UF label from breakdown or generate from origin/destination
   const breakdown = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
   const routeUfLabel =
     breakdown?.meta?.routeUfLabel || formatRouteUf(quote.origin, quote.destination);
-
   const anttTotal = breakdown?.meta?.antt?.total;
-
-  // Get km band from pricing_breakdown
   const kmBandLabel = breakdown?.meta?.kmBandLabel || null;
   const kmStatus = breakdown?.meta?.kmStatus || 'OK';
   const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
@@ -114,12 +111,11 @@ export function QuoteCard({
   const canConvert = quote.stage === 'ganho';
 
   const { data: mirofishMap } = useMirofishRouteMap();
-  // routeUfLabel is "SC/SP" — normalize to "SC-SP" for lookup
   const mirofishKey = routeUfLabel?.replace('/', '-').toUpperCase() ?? null;
   const mirofishInsight = mirofishKey ? mirofishMap?.[mirofishKey] : null;
 
   return (
-    <motion.div
+    <MotionCard
       ref={setNodeRef}
       data-testid={`quote-card-${quote.id}`}
       style={style}
@@ -127,195 +123,207 @@ export function QuoteCard({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className={cn(
-        'bg-card rounded-lg border border-border shadow-card p-4 cursor-pointer group',
+        'cursor-pointer group overflow-hidden shadow-card',
         'hover:shadow-card-hover hover:border-primary/30 transition-all duration-200',
         isDragging && 'opacity-90 rotate-2 scale-[1.02] shadow-lg z-50',
         marginStatus === 'BELOW_TARGET' && 'border-l-4 border-l-warning'
       )}
       onClick={onEdit}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          {canManageActions && (
-            <button
-              {...attributes}
-              {...listeners}
-              data-testid={`quote-card-drag-handle-${quote.id}`}
-              className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <GripVertical className="w-4 h-4 text-muted-foreground" />
-            </button>
-          )}
-          <div className="flex flex-col min-w-0">
-            <h4 className="font-semibold text-foreground">{quote.quote_code ?? '—'}</h4>
-            <p className="text-sm text-muted-foreground truncate max-w-[160px]">
-              {quote.client_name}
-            </p>
-          </div>
-        </div>
-
-        {canManageActions && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+      <CardContent className="p-4 pb-3 space-y-3">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2">
+            {canManageActions && (
+              <button
+                {...attributes}
+                {...listeners}
+                data-testid={`quote-card-drag-handle-${quote.id}`}
+                aria-label="Arrastar cotação"
+                className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={(e) => e.stopPropagation()}
               >
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {/* Sempre: Editar */}
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit?.();
-                }}
-              >
-                <Pencil className="w-4 h-4 mr-2" /> Editar
-              </DropdownMenuItem>
+                <GripVertical className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+            <div className="flex flex-col min-w-0">
+              <h4 className="font-semibold text-foreground">{quote.quote_code ?? '—'}</h4>
+              <p className="text-sm text-muted-foreground truncate max-w-[160px]">
+                {quote.client_name}
+              </p>
+            </div>
+          </div>
 
-              {/* Sempre: Clonar */}
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClone?.();
-                }}
-              >
-                <Copy className="w-4 h-4 mr-2" /> Clonar
-              </DropdownMenuItem>
+          <div className="flex items-center gap-1.5">
+            {marginStatus === 'BELOW_TARGET' && (
+              <Badge variant="warning" className="text-[10px] px-1.5 py-0 h-5 gap-0.5">
+                <AlertTriangle className="w-2.5 h-2.5" />
+                {marginPercent !== undefined ? `${marginPercent.toFixed(0)}%` : 'Margem'}
+              </Badge>
+            )}
+            {canManageActions && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit?.();
+                    }}
+                  >
+                    <Pencil className="w-4 h-4 mr-2" /> Editar
+                  </DropdownMenuItem>
 
-              {/* Só: Enviado e Negociação */}
-              {canEmail && (
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSendEmail?.();
-                  }}
-                >
-                  <Mail className="w-4 h-4 mr-2" /> Enviar E-mail
-                </DropdownMenuItem>
-              )}
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClone?.();
+                    }}
+                  >
+                    <Copy className="w-4 h-4 mr-2" /> Clonar
+                  </DropdownMenuItem>
 
-              {/* Só: Ganho */}
-              {canConvert && (
-                <>
+                  {canEmail && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSendEmail?.();
+                      }}
+                    >
+                      <Mail className="w-4 h-4 mr-2" /> Enviar E-mail
+                    </DropdownMenuItem>
+                  )}
+
+                  {canConvert && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onConvert?.();
+                        }}
+                        className="text-success"
+                      >
+                        <ArrowRightLeft className="w-4 h-4 mr-2" />
+                        Converter para OS
+                      </DropdownMenuItem>
+                    </>
+                  )}
+
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
-                      onConvert?.();
+                      onDelete?.();
                     }}
-                    className="text-success"
+                    className="text-destructive"
                   >
-                    <ArrowRightLeft className="w-4 h-4 mr-2" />
-                    Converter para OS
+                    <Trash2 className="w-4 h-4 mr-2" /> Delete
                   </DropdownMenuItem>
-                </>
-              )}
-
-              {/* Sempre: Delete */}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete?.();
-                }}
-                className="text-destructive"
-              >
-                <Trash2 className="w-4 h-4 mr-2" /> Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
-
-      {/* Rota visível, detalhes secundários no tooltip */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3 cursor-help min-h-[20px]">
-            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="truncate">{quote.origin}</span>
-            <span>→</span>
-            <span className="truncate">{quote.destination}</span>
-            {mirofishInsight && (
-              <span className="ml-auto shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
-                MF↑
-              </span>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs space-y-2 text-xs">
-          {routeUfLabel && (
-            <p>
-              <Route className="inline w-3 h-3 mr-1" />
-              {routeUfLabel}
-              {kmBandLabel && ` • ${kmBandLabel} km`}
-            </p>
-          )}
-          {mirofishInsight && (
-            <div className="border-t border-border pt-2 space-y-0.5">
-              {mirofishInsight.avg_ticket != null && (
-                <p className="text-emerald-600 font-medium">
-                  ↑ Ticket médio mercado:{' '}
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    mirofishInsight.avg_ticket
-                  )}
-                </p>
-              )}
-              {mirofishInsight.ntc_impact != null && (
-                <p className="text-amber-600">
-                  Impacto NTC: +
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    mirofishInsight.ntc_impact
-                  )}{' '}
-                  / CT-e
-                </p>
+        </div>
+
+        {/* Route */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground cursor-help min-h-[20px]">
+              <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate">{quote.origin}</span>
+              <span>→</span>
+              <span className="truncate">{quote.destination}</span>
+              {mirofishInsight && (
+                <Badge
+                  variant="success"
+                  className="ml-auto text-[10px] px-1.5 py-0 h-5 gap-0.5 shrink-0"
+                >
+                  <TrendingUp className="w-2.5 h-2.5" />
+                  MF
+                </Badge>
               )}
             </div>
-          )}
-          {quote.shipper_name && (
-            <p>
-              <Building2 className="inline w-3 h-3 mr-1" />
-              Embarcador: {quote.shipper_name}
-            </p>
-          )}
-          {(quote.freight_type || quote.freight_modality) && (
-            <p>
-              Tipo: {quote.freight_type || '—'}{' '}
-              {quote.freight_modality &&
-                `• ${quote.freight_modality === 'lotacao' ? 'Lot' : 'Frac'}`}
-            </p>
-          )}
-          {anttTotal != null && <p>Piso ANTT: {formatCurrency(Number(anttTotal))}</p>}
-          {tags.length > 0 && <p>Tags: {tags.join(', ')}</p>}
-          {quote.email_sent && (
-            <p>
-              <Mail className="inline w-3 h-3 mr-1" />
-              E-mail enviado
-            </p>
-          )}
-          {kmStatus === 'OUT_OF_RANGE' && (
-            <p className="text-destructive">
-              <AlertTriangle className="inline w-3 h-3 mr-1" />
-              Fora da faixa
-            </p>
-          )}
-          {marginStatus === 'BELOW_TARGET' && marginPercent !== undefined && (
-            <p className="text-warning-foreground">
-              <AlertTriangle className="inline w-3 h-3 mr-1" />
-              Margem: {marginPercent.toFixed(1)}%
-            </p>
-          )}
-        </TooltipContent>
-      </Tooltip>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs space-y-2 text-xs">
+            {routeUfLabel && (
+              <p>
+                <Route className="inline w-3 h-3 mr-1" />
+                {routeUfLabel}
+                {kmBandLabel && ` • ${kmBandLabel} km`}
+              </p>
+            )}
+            {mirofishInsight && (
+              <div className="border-t border-border pt-2 space-y-0.5">
+                {mirofishInsight.avg_ticket != null && (
+                  <p className="text-success font-medium">
+                    ↑ Ticket médio mercado: {formatCurrency(mirofishInsight.avg_ticket)}
+                  </p>
+                )}
+                {mirofishInsight.ntc_impact != null && (
+                  <p className="text-warning-foreground">
+                    Impacto NTC: +{formatCurrency(mirofishInsight.ntc_impact)} / CT-e
+                  </p>
+                )}
+              </div>
+            )}
+            {quote.shipper_name && (
+              <p>
+                <Building2 className="inline w-3 h-3 mr-1" />
+                Embarcador: {quote.shipper_name}
+              </p>
+            )}
+            {(quote.freight_type || quote.freight_modality) && (
+              <p>
+                Tipo: {quote.freight_type || '—'}{' '}
+                {quote.freight_modality &&
+                  `• ${quote.freight_modality === 'lotacao' ? 'Lot' : 'Frac'}`}
+              </p>
+            )}
+            {anttTotal != null && <p>Piso ANTT: {formatCurrency(Number(anttTotal))}</p>}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {quote.email_sent && (
+              <p>
+                <Mail className="inline w-3 h-3 mr-1" />
+                E-mail enviado
+              </p>
+            )}
+            {kmStatus === 'OUT_OF_RANGE' && (
+              <p className="text-destructive">
+                <AlertTriangle className="inline w-3 h-3 mr-1" />
+                Fora da faixa
+              </p>
+            )}
+            {marginStatus === 'BELOW_TARGET' && marginPercent !== undefined && (
+              <p className="text-warning-foreground">
+                <AlertTriangle className="inline w-3 h-3 mr-1" />
+                Margem: {marginPercent.toFixed(1)}%
+              </p>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      </CardContent>
 
-      {/* Footer: Valor e Data */}
-      <div className="flex items-center justify-between pt-2 border-t border-border">
+      <Separator />
+
+      <CardFooter className="px-4 py-2.5 flex items-center justify-between">
         <span className="text-lg font-bold text-foreground">
           {formatCurrency(Number(quote.value))}
         </span>
@@ -323,7 +331,7 @@ export function QuoteCard({
           <Calendar className="w-3 h-3" />
           {formatDate(quote.created_at)}
         </span>
-      </div>
-    </motion.div>
+      </CardFooter>
+    </MotionCard>
   );
 }

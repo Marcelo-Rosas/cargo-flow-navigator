@@ -9,7 +9,16 @@ const supabase = createClient(
 
 serve(async (req) => {
   try {
-    const { channel, template_id, recipient, variables } = await req.json();
+    const body = await req.json();
+    const { channel, template_id, recipient, variables } = body;
+
+    if (body.batch === true) {
+      return new Response(JSON.stringify({ ok: true, mode: 'batch' }), { status: 200 });
+    }
+
+    if (!template_id) {
+      return new Response(JSON.stringify({ error: 'template_id required' }), { status: 400 });
+    }
 
     const { data: template, error } = await supabase
       .from('notification_templates')

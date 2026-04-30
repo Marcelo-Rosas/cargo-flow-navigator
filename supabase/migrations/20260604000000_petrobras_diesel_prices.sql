@@ -1,4 +1,6 @@
 -- Petrobras diesel prices (scraped daily from precos.petrobras.com.br)
+-- Note: 20260409235959 creates this table earlier in the sequence for migrations
+-- that reference it in April. All DDL here is idempotent.
 CREATE TABLE IF NOT EXISTS petrobras_diesel_prices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   uf text NOT NULL,                          -- 'BR', 'SP', 'RJ', etc.
@@ -14,13 +16,28 @@ CREATE TABLE IF NOT EXISTS petrobras_diesel_prices (
 );
 
 -- Index for fast lookups
-CREATE INDEX idx_petrobras_diesel_uf_fetched ON petrobras_diesel_prices (uf, fetched_at DESC);
+CREATE INDEX IF NOT EXISTS idx_petrobras_diesel_uf_fetched ON petrobras_diesel_prices (uf, fetched_at DESC);
 
 -- RLS
 ALTER TABLE petrobras_diesel_prices ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "authenticated_read" ON petrobras_diesel_prices
-  FOR SELECT TO authenticated USING (true);
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'petrobras_diesel_prices' AND policyname = 'authenticated_read'
+  ) THEN
+    CREATE POLICY "authenticated_read" ON petrobras_diesel_prices
+      FOR SELECT TO authenticated USING (true);
+  END IF;
+END $$;
 
 -- Service role can insert/update (Edge Function)
-CREATE POLICY "service_role_all" ON petrobras_diesel_prices
-  FOR ALL TO service_role USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'petrobras_diesel_prices' AND policyname = 'service_role_all'
+  ) THEN
+    CREATE POLICY "service_role_all" ON petrobras_diesel_prices
+      FOR ALL TO service_role USING (true) WITH CHECK (true);
+  END IF;
+END $$;

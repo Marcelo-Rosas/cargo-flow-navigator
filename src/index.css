@@ -60,7 +60,7 @@
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 203 70% 22%;
     --sidebar-ring: 203 82% 50%;
-    --sidebar-muted: 203 40% 40%;
+    --sidebar-muted: 203 35% 55%;
 
     /* Custom Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(203, 82%, 26%), hsl(203, 82%, 36%));

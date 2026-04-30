@@ -1,7 +1,7 @@
 -- VEC-43: Restrict overly-broad USING(true) / WITH CHECK(true) write policies.
 -- Strategy: lock all write operations to is_admin() — service_role bypasses RLS
 -- so Edge Functions are unaffected. SELECT policies are preserved as-is.
--- Validation: test with ADMIN user only (per VEC-43 comment).
+-- Tables only present in production are wrapped in DO blocks to skip in preview.
 
 -- ============================================================
 -- CONFIG TABLES — admin-only writes
@@ -15,30 +15,72 @@ CREATE POLICY "equipment_rental_rates_write_admin"
   USING (is_admin())
   WITH CHECK (is_admin());
 
--- ltl_parameters
-DROP POLICY IF EXISTS "ltl_parameters_insert" ON public.ltl_parameters;
-DROP POLICY IF EXISTS "ltl_parameters_update" ON public.ltl_parameters;
-CREATE POLICY "ltl_parameters_write_admin"
-  ON public.ltl_parameters
-  FOR ALL
-  USING (is_admin())
-  WITH CHECK (is_admin());
+-- ltl_parameters (production-only table)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'ltl_parameters'
+  ) THEN
+    DROP POLICY IF EXISTS "ltl_parameters_insert" ON public.ltl_parameters;
+    DROP POLICY IF EXISTS "ltl_parameters_update" ON public.ltl_parameters;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'ltl_parameters'
+        AND policyname = 'ltl_parameters_write_admin'
+    ) THEN
+      CREATE POLICY "ltl_parameters_write_admin"
+        ON public.ltl_parameters
+        FOR ALL
+        USING (is_admin())
+        WITH CHECK (is_admin());
+    END IF;
+  END IF;
+END $$;
 
--- pricing_route_overrides
-DROP POLICY IF EXISTS "Authenticated users can manage route overrides" ON public.pricing_route_overrides;
-CREATE POLICY "pricing_route_overrides_write_admin"
-  ON public.pricing_route_overrides
-  FOR ALL
-  USING (is_admin())
-  WITH CHECK (is_admin());
+-- pricing_route_overrides (production-only table)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'pricing_route_overrides'
+  ) THEN
+    DROP POLICY IF EXISTS "Authenticated users can manage route overrides" ON public.pricing_route_overrides;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'pricing_route_overrides'
+        AND policyname = 'pricing_route_overrides_write_admin'
+    ) THEN
+      CREATE POLICY "pricing_route_overrides_write_admin"
+        ON public.pricing_route_overrides
+        FOR ALL
+        USING (is_admin())
+        WITH CHECK (is_admin());
+    END IF;
+  END IF;
+END $$;
 
--- route_metrics_config
-DROP POLICY IF EXISTS "route_metrics_config_write_authenticated" ON public.route_metrics_config;
-CREATE POLICY "route_metrics_config_write_admin"
-  ON public.route_metrics_config
-  FOR ALL
-  USING (is_admin())
-  WITH CHECK (is_admin());
+-- route_metrics_config (production-only table)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'route_metrics_config'
+  ) THEN
+    DROP POLICY IF EXISTS "route_metrics_config_write_authenticated" ON public.route_metrics_config;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'route_metrics_config'
+        AND policyname = 'route_metrics_config_write_admin'
+    ) THEN
+      CREATE POLICY "route_metrics_config_write_admin"
+        ON public.route_metrics_config
+        FOR ALL
+        USING (is_admin())
+        WITH CHECK (is_admin());
+    END IF;
+  END IF;
+END $$;
 
 -- unloading_cost_rates
 DROP POLICY IF EXISTS "unloading_cost_rates_all_authenticated" ON public.unloading_cost_rates;
@@ -60,29 +102,71 @@ CREATE POLICY "trips_write_admin"
   USING (is_admin())
   WITH CHECK (is_admin());
 
--- trip_orders
-DROP POLICY IF EXISTS "Authenticated users can manage trip_orders" ON public.trip_orders;
-CREATE POLICY "trip_orders_write_admin"
-  ON public.trip_orders
-  FOR ALL
-  USING (is_admin())
-  WITH CHECK (is_admin());
+-- trip_orders (production-only table)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'trip_orders'
+  ) THEN
+    DROP POLICY IF EXISTS "Authenticated users can manage trip_orders" ON public.trip_orders;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'trip_orders'
+        AND policyname = 'trip_orders_write_admin'
+    ) THEN
+      CREATE POLICY "trip_orders_write_admin"
+        ON public.trip_orders
+        FOR ALL
+        USING (is_admin())
+        WITH CHECK (is_admin());
+    END IF;
+  END IF;
+END $$;
 
--- trip_cost_items
-DROP POLICY IF EXISTS "Authenticated users can manage trip_cost_items" ON public.trip_cost_items;
-CREATE POLICY "trip_cost_items_write_admin"
-  ON public.trip_cost_items
-  FOR ALL
-  USING (is_admin())
-  WITH CHECK (is_admin());
+-- trip_cost_items (production-only table)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'trip_cost_items'
+  ) THEN
+    DROP POLICY IF EXISTS "Authenticated users can manage trip_cost_items" ON public.trip_cost_items;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'trip_cost_items'
+        AND policyname = 'trip_cost_items_write_admin'
+    ) THEN
+      CREATE POLICY "trip_cost_items_write_admin"
+        ON public.trip_cost_items
+        FOR ALL
+        USING (is_admin())
+        WITH CHECK (is_admin());
+    END IF;
+  END IF;
+END $$;
 
--- delivery_assessments
-DROP POLICY IF EXISTS "authenticated_write" ON public.delivery_assessments;
-CREATE POLICY "delivery_assessments_write_admin"
-  ON public.delivery_assessments
-  FOR ALL
-  USING (is_admin())
-  WITH CHECK (is_admin());
+-- delivery_assessments (production-only table)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'delivery_assessments'
+  ) THEN
+    DROP POLICY IF EXISTS "authenticated_write" ON public.delivery_assessments;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'delivery_assessments'
+        AND policyname = 'delivery_assessments_write_admin'
+    ) THEN
+      CREATE POLICY "delivery_assessments_write_admin"
+        ON public.delivery_assessments
+        FOR ALL
+        USING (is_admin())
+        WITH CHECK (is_admin());
+    END IF;
+  END IF;
+END $$;
 
 -- driver_qualifications
 DROP POLICY IF EXISTS "Authenticated users can insert driver_qualifications" ON public.driver_qualifications;

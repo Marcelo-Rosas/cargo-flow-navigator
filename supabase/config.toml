@@ -153,32 +153,3 @@ verify_jwt = false  # Chamado por cron/pg_cron com service role
 
 [functions.petrobras-diesel]
 verify_jwt = false  # Chamado por cron/pg_cron com service role
-
-# ── Funções remote-only (deployadas, sem código local) ───────────
-
-[functions.ntc-monitor]
-verify_jwt = false  # Cron: monitora índices NTC
-
-[functions.partner-auth]
-verify_jwt = false  # Autenticação de parceiros via API key própria
-
-[functions.partner-quote]
-verify_jwt = false  # API pública de cotação para parceiros
-
-[functions.navi-calculate-freight]
-verify_jwt = false  # Chamado pelo Navi com service role do CFN
-
-[functions.navi-create-quote]
-verify_jwt = false  # Chamado pelo Navi com service role do CFN
-
-[functions.avaliar-entrega]
-verify_jwt = false  # Chamado pelo Navi com service role do CFN
-
-[functions.cowork-pdf-extractor]
-verify_jwt = false  # Chamado pelo Navi com service role do CFN
-
-[functions.cowork-empilhadeira]
-verify_jwt = false  # Chamado pelo Navi com service role do CFN
-
-[functions.navi-router]
-verify_jwt = false  # Roteador multi-agente; chamado pelos webhooks do Navi

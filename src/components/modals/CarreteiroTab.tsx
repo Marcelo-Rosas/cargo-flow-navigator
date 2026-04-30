@@ -218,12 +218,20 @@ export function CarreteiroTab({ order, canManage }: CarreteiroTabProps) {
         totalAmount: carreteiroRealValue,
       });
 
-      const { data: finDoc } = await supabase
+      const { data: finDoc, error: finDocError } = await supabase
         .from('financial_documents')
         .select('id')
         .eq('source_id', order.id)
         .eq('type', 'PAG')
         .maybeSingle();
+
+      if (finDocError || !finDoc?.id) {
+        console.error('[handleEnviarParaPAG] Falha ao buscar PAG após criação:', finDocError);
+        toast.error(
+          'PAG criado, mas não foi possível buscar o documento para criar parcelas. Verifique no Financeiro.'
+        );
+        return;
+      }
 
       if (finDoc?.id) {
         const { data: existingInstallments } = await supabase

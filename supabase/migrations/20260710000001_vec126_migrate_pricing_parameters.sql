@@ -1,6 +1,7 @@
 -- VEC-126: Migrar chaves restantes de pricing_parameters → pricing_rules_config
 -- pricing_parameters será depreciado; pricing_rules_config é a única fonte de verdade.
 
+
 INSERT INTO pricing_rules_config (key, label, category, value_type, value, is_active, metadata)
 VALUES
   (
@@ -39,4 +40,4 @@ VALUES
     true,
     '{"description": "1 = bloqueia todas as taxas condicionais no cálculo. 0 = taxas condicionais ativas."}'
   )
-ON CONFLICT (key) DO NOTHING;
+ON CONFLICT (key, vehicle_type_id) DO NOTHING;

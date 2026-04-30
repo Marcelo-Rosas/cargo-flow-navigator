@@ -467,6 +467,53 @@ export function QuoteDetailModal({
             (quote as { balance_due_date?: string | null }).balance_due_date ||
             new Date().toISOString().slice(0, 10);
 
+          // --- Validate payment proofs before creating installments ---
+          const { data: proofs, error: proofsError } = await supabase
+            .from('quote_payment_proofs' as never)
+            .select('proof_type, amount, expected_amount')
+            .eq('quote_id', asDb(quote.id));
+
+          if (proofsError) {
+            console.error('[handleConvertToFAT] Falha ao buscar payment proofs:', proofsError);
+            toast.warning(
+              'Não foi possível buscar comprovantes de pagamento. Parcelas criadas com valor estimado.'
+            );
+          } else if (
+            !proofs ||
+            (
+              proofs as {
+                proof_type: string;
+                amount: number | null;
+                expected_amount: number | null;
+              }[]
+            ).length === 0
+          ) {
+            console.warn(
+              '[handleConvertToFAT] Nenhum payment proof encontrado para quote',
+              quote.id
+            );
+            toast.warning(
+              'Nenhum comprovante de pagamento encontrado para esta cotação. Verifique a seção de documentos.'
+            );
+          } else {
+            const proofRows = proofs as {
+              proof_type: string;
+              amount: number | null;
+              expected_amount: number | null;
+            }[];
+            const nullAmounts = proofRows.filter((p) => p.amount == null);
+            if (nullAmounts.length > 0) {
+              console.error(
+                '[handleConvertToFAT] Payment proofs sem valor confirmado:',
+                nullAmounts.map((p) => p.proof_type)
+              );
+              toast.warning(
+                `Comprovante(s) sem valor confirmado: ${nullAmounts.map((p) => p.proof_type).join(', ')}. Valor esperado usado como referência.`
+              );
+            }
+          }
+          // --- End validation ---
+
           if (advPercent > 0 && fatTotal > 0) {
             const advAmount = Math.round(fatTotal * (advPercent / 100) * 100) / 100;
             const balAmount = Math.round((fatTotal - advAmount) * 100) / 100;
@@ -513,7 +560,7 @@ export function QuoteDetailModal({
 
       toast.success(res?.data?.created ? 'FAT criado com sucesso' : 'FAT já existente');
       queryClient.invalidateQueries({ queryKey: ['financial-documents'] });
-      queryClient.invalidateQueries({ queryKey: ['cash-flow-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-flow-dashboard'] });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao converter para FAT';
       toast.error(msg);
@@ -670,6 +717,8 @@ export function QuoteDetailModal({
                 size="sm"
                 className="gap-2 text-sm"
                 aria-label="Baixar PDF simplificado para cliente"
+                id="btn-cotacao-pdf-cliente"
+                data-testid="btn-cotacao-pdf-cliente"
                 disabled={pdfLoading === 'quote:simplified'}
                 onClick={() => downloadQuotePdf(quote.id, 'simplified')}
               >
@@ -687,6 +736,8 @@ export function QuoteDetailModal({
                 size="sm"
                 className="gap-2 text-sm"
                 aria-label="Baixar PDF detalhado interno"
+                id="btn-cotacao-pdf-interno"
+                data-testid="btn-cotacao-pdf-interno"
                 disabled={pdfLoading === 'quote:detailed'}
                 onClick={() => downloadQuotePdf(quote.id, 'detailed')}
               >
@@ -844,17 +895,37 @@ export function QuoteDetailModal({
               <TabsList
                 className={cn('grid w-full', showDocFatTab ? 'grid-cols-5' : 'grid-cols-4')}
               >
-                <TabsTrigger value="composicao" className="gap-1.5 text-xs">
+                <TabsTrigger
+                  value="composicao"
+                  id="tab-cotacao-composicao"
+                  data-testid="tab-cotacao-composicao"
+                  className="gap-1.5 text-xs"
+                >
                   <Receipt className="w-3.5 h-3.5" />
                   Composição
                 </TabsTrigger>
-                <TabsTrigger value="itens" className="gap-1.5 text-xs">
+                <TabsTrigger
+                  value="itens"
+                  id="tab-cotacao-itens"
+                  data-testid="tab-cotacao-itens"
+                  className="gap-1.5 text-xs"
+                >
                   Itens
                 </TabsTrigger>
-                <TabsTrigger value="historico" className="gap-1.5 text-xs">
+                <TabsTrigger
+                  value="historico"
+                  id="tab-cotacao-historico"
+                  data-testid="tab-cotacao-historico"
+                  className="gap-1.5 text-xs"
+                >
                   Histórico
                 </TabsTrigger>
-                <TabsTrigger value="pedagios" className="gap-1.5 text-xs">
+                <TabsTrigger
+                  value="pedagios"
+                  id="tab-cotacao-pedagios"
+                  data-testid="tab-cotacao-pedagios"
+                  className="gap-1.5 text-xs"
+                >
                   <Landmark className="w-3.5 h-3.5" />
                   Pedágios
                   {tollPlazas.length > 0 && (
@@ -864,7 +935,12 @@ export function QuoteDetailModal({
                   )}
                 </TabsTrigger>
                 {showDocFatTab && (
-                  <TabsTrigger value="doc_fat" className="gap-1.5 text-xs">
+                  <TabsTrigger
+                    value="doc_fat"
+                    id="tab-cotacao-doc-fat"
+                    data-testid="tab-cotacao-doc-fat"
+                    className="gap-1.5 text-xs"
+                  >
                     <FileText className="w-3.5 h-3.5" />
                     Doc Fat
                   </TabsTrigger>
@@ -939,11 +1015,17 @@ export function QuoteDetailModal({
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-10 text-center">#</TableHead>
-                            <TableHead>Praça</TableHead>
-                            <TableHead>Cidade/UF</TableHead>
-                            <TableHead className="text-right">Valor</TableHead>
-                            <TableHead className="text-right">TAG</TableHead>
+                            <TableHead scope="col" className="w-10 text-center">
+                              #
+                            </TableHead>
+                            <TableHead scope="col">Praça</TableHead>
+                            <TableHead scope="col">Cidade/UF</TableHead>
+                            <TableHead scope="col" className="text-right">
+                              Valor
+                            </TableHead>
+                            <TableHead scope="col" className="text-right">
+                              TAG
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>

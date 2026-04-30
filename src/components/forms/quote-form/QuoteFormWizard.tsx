@@ -46,7 +46,7 @@ const STEP_FIELDS: (keyof QuoteFormData)[][] = [
     'payment_term_id',
     'km_distance',
   ],
-  ['toll', 'cargo_value', 'notes'],
+  ['toll', 'cargo_value', 'notes', 'validity_date'],
   ['insurance_coverage_type'], // Insurance step fields
   [],
 ];

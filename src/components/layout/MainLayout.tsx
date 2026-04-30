@@ -4,6 +4,8 @@ import { LayoutProvider } from './LayoutContext';
 import { useLayout } from './useLayout';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { useProactiveConsolidationToast } from '@/hooks/useProactiveConsolidationToast';
+import { useLocation } from 'react-router-dom';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -11,6 +13,11 @@ interface MainLayoutProps {
 
 function MainLayoutInner({ children }: MainLayoutProps) {
   const { sidebarWidth } = useLayout();
+  const { pathname } = useLocation();
+
+  // Keep proactive consolidation side effects scoped to Commercial route.
+  useProactiveConsolidationToast(pathname.startsWith('/comercial'));
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
