@@ -125,6 +125,9 @@ verify_jwt = false  # Gateway 401 Invalid JWT; chamado pelo front com Bearer de 
 [functions.buonny-professional-check]
 verify_jwt = false  # Chamado pelo front no stage OS/atribuição de motorista; gateway 401 bloqueia preflight CORS
 
+[functions.antt-rntrc-check]
+verify_jwt = false  # Chamado pelo wizard de risco; CORS + gateway JWT
+
 [functions.generate-optimal-route]
 verify_jwt = false  # Gateway 401 Invalid JWT; chamado pelo front com Bearer de usuário
 

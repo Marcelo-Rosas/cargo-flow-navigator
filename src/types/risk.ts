@@ -68,7 +68,12 @@ export interface RiskEvaluation {
 export interface RiskEvidence {
   id: string;
   evaluation_id: string;
-  evidence_type: 'buonny_check' | 'document' | 'route_analysis' | 'manual_note';
+  evidence_type:
+    | 'buonny_check'
+    | 'antt_rntrc_check'
+    | 'document'
+    | 'route_analysis'
+    | 'manual_note';
   document_id: string | null;
   payload: Record<string, unknown>;
   status: 'valid' | 'expired' | 'rejected';
@@ -125,6 +130,7 @@ export const CRITICALITY_CONFIG: Record<
 export const REQUIREMENT_LABELS: Record<string, string> = {
   buonny_consulta: 'Consulta Buonny',
   buonny_cadastro: 'Cadastro Buonny',
+  antt_rntrc: 'Consulta ANTT (RNTRC)',
   monitoramento: 'Monitoramento',
   gr_doc: 'Análise GR',
   rota_doc: 'Rota Documentada',
