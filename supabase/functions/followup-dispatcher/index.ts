@@ -36,26 +36,23 @@ function getOpenClawChatCompletionsUrl(): string {
   return '';
 }
 
-function assertOpenClawChatUrlForNonDryRun(dryRun: boolean) {
-  if (dryRun) return;
+/**
+ * Returns null when ready to proceed, or a skip-reason string when not configured.
+ * Never throws — callers should early-return 200 on a non-null result.
+ */
+function checkOpenClawChatUrl(dryRun: boolean): string | null {
+  if (dryRun) return null;
   const url = getOpenClawChatCompletionsUrl();
-  if (!url) {
-    throw new Error(
-      'OPENCLAW_CHAT_COMPLETIONS_URL é obrigatório em execução real (não dry_run). ' +
-        'A Edge do Supabase não alcança 127.0.0.1; configure URL pública do gateway até /v1/chat/completions. ' +
-        'Para testes locais: ALLOW_LOCALHOST_OPENCLAW=true.'
-    );
-  }
+  if (!url) return 'openclaw_chat_url_not_configured';
   const lower = url.toLowerCase();
   const isLocal =
     lower.includes('127.0.0.1') ||
     lower.includes('localhost') ||
     lower.startsWith('http://0.0.0.0');
   if (isLocal && String(Deno.env.get('ALLOW_LOCALHOST_OPENCLAW') ?? '').toLowerCase() !== 'true') {
-    throw new Error(
-      'OPENCLAW_CHAT_COMPLETIONS_URL aponta para host local; bloqueado na Edge até ALLOW_LOCALHOST_OPENCLAW=true (somente dev).'
-    );
+    return 'openclaw_chat_url_is_local_blocked';
   }
+  return null;
 }
 
 const OPENCLAW_CHAT_MODEL =
@@ -152,7 +149,17 @@ serve(async (req) => {
     const filterPhone = body?.filter_phone ?? null;
     const now = body?.now_iso ? new Date(body.now_iso) : new Date();
 
-    assertOpenClawChatUrlForNonDryRun(dryRun);
+    const skipReason = checkOpenClawChatUrl(dryRun);
+    if (skipReason) {
+      return jsonResponse({
+        ok: true,
+        dry_run: dryRun,
+        sent: 0,
+        failed: 0,
+        skipped: 0,
+        reason: skipReason,
+      });
+    }
 
     const schemaInfo = getSchemaInfoStatic();
 
