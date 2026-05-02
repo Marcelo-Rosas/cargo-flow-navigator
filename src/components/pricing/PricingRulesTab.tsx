@@ -19,7 +19,6 @@ import { PaymentTermsSection } from './PaymentTermsSection';
 
 import {
   usePricingParameters,
-  useVehicleTypes,
   useWaitingTimeRules,
   useConditionalFees,
   useTacRates,
@@ -27,11 +26,12 @@ import {
   usePaymentTerms,
   usePricingRulesConfig,
 } from '@/hooks/usePricingRules';
+import { useVehicleTypesAdmin } from '@/hooks/useVehicleTypes';
 
 export function PricingRulesTab() {
   const { data: parameters } = usePricingParameters();
   const { data: pricingRules } = usePricingRulesConfig(false);
-  const { data: vehicleTypes } = useVehicleTypes(false);
+  const { data: vehicleTypes } = useVehicleTypesAdmin();
   const { data: waitingRules } = useWaitingTimeRules();
   const { data: conditionalFees } = useConditionalFees(false);
   const { data: tacRates } = useTacRates();

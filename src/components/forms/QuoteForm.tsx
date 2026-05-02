@@ -54,8 +54,8 @@ import { useAnalyzeLoadComposition } from '@/hooks/useAnalyzeLoadComposition';
 import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { usePriceTables } from '@/hooks/usePriceTables';
+import { useVehicleTypesOperational } from '@/hooks/useVehicleTypes';
 import {
-  useVehicleTypes,
   usePaymentTerms,
   usePricingParameter,
   useConditionalFees,
@@ -80,6 +80,8 @@ import {
 } from '@/components/quotes/EquipmentRentalSection';
 import { useIcmsRateForPricing } from '@/hooks/useIcmsRates';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
+import { useActivePolicies } from '@/hooks/useRiskPolicies';
+import { useInsuranceOptions } from '@/hooks/useInsuranceOptionsRefactored';
 import { useAuth } from '@/hooks/useAuth';
 import { invokeEdgeFunction } from '@/lib/supabase-invoke';
 import { toast } from 'sonner';
@@ -98,6 +100,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { QuoteFormWizard } from '@/components/forms/quote-form/QuoteFormWizard';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
+type PriceTableRow = Database['public']['Tables']['price_tables']['Row'];
 
 const USE_WIZARD = true;
 
@@ -311,6 +314,7 @@ const quoteSchema = z
     tear_enabled: z.boolean().optional().default(false),
     discount: z.number().min(0, 'Desconto não pode ser negativo').optional().default(0),
     notes: z.string().max(500, 'Observações muito longas').optional(),
+    validity_date: z.string().optional(),
     delivery_days_min: z.number().min(0).optional(),
     delivery_days_max: z.number().min(0).optional(),
     delivery_notes: z.string().max(500).optional(),
@@ -408,7 +412,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: clients } = useClients();
   const { data: shippers } = useShippers();
   const { data: priceTables } = usePriceTables();
-  const { data: vehicleTypes } = useVehicleTypes();
+  const { data: vehicleTypes } = useVehicleTypesOperational();
   const { data: paymentTerms } = usePaymentTerms();
   const { data: conditionalFeesData } = useConditionalFees(true);
   const createQuoteMutation = useCreateQuote();
@@ -486,6 +490,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       tde_enabled: false,
       tear_enabled: false,
       notes: '',
+      validity_date: '',
       advance_due_date: '',
       balance_due_date: '',
       estimated_loading_date: '',
@@ -604,6 +609,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     error: priceRowError,
   } = usePriceTableRowByKmRange(debounced.priceTableId || '', debouncedKmBand);
 
+  const selectedPriceTable: PriceTableRow | null =
+    (priceTables?.find((t) => t.id === watchedPriceTableId) as PriceTableRow | undefined) ?? null;
+
   const kmRounded = kmBand;
 
   // Label da faixa de km (a partir do km_distance + price_table_rows) para o badge
@@ -689,6 +697,27 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     99_999_999.99
   );
 
+  // Insurance hooks — centralized here so queries survive step navigation
+  const insuranceOriginUf = useMemo(() => extractUf(watchedOrigin || '') ?? '', [watchedOrigin]);
+  const insuranceDestinationUf = useMemo(
+    () => extractUf(watchedDestination || '') ?? '',
+    [watchedDestination]
+  );
+  const watchedCargoType = form.watch('cargo_type');
+  const { data: activePolicies = [], isLoading: loadingPolicies } = useActivePolicies();
+  const {
+    data: insuranceOptions = [],
+    isLoading: isLoadingInsuranceOptions,
+    error: insuranceOptionsError,
+    selectedOption: selectedInsuranceOption,
+    setSelectedOption: setSelectedInsuranceOption,
+  } = useInsuranceOptions({
+    origin_uf: insuranceOriginUf,
+    destination_uf: insuranceDestinationUf,
+    weight: effectiveWeightKg,
+    product_type: watchedCargoType || undefined,
+  });
+
   // R$/KM — custo ANTT por km (referência ao vivo)
   // Prioridade: 1) rate do banco (mais atualizado) 2) coeficientes salvos no breakdown
   const savedAnttMeta =
@@ -722,6 +751,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       kmDistance: debouncedKmBand,
       priceTableRow: priceTableRow || null,
       priceTableId: debounced.priceTableId || undefined,
+      priceTableAdValoremLotacaoPercent: selectedPriceTable?.ad_valorem_lotacao_percent ?? null,
       modality: debounced.freightModality,
       icmsRatePercent: icmsRate,
       kmByUf: kmByUf ?? undefined,
@@ -744,6 +774,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debounced.freightModality,
     debouncedKmBand,
     priceTableRow,
+    selectedPriceTable,
     icmsRate,
     kmByUf,
     icmsByUfMap,
@@ -805,6 +836,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       kmDistance: debouncedKmBand,
       priceTableRow: priceTableRow || null,
       priceTableId: debounced.priceTableId || undefined,
+      priceTableAdValoremLotacaoPercent: selectedPriceTable?.ad_valorem_lotacao_percent ?? null,
       modality: debounced.freightModality,
       icmsRatePercent: icmsRate,
       kmByUf: kmByUf ?? undefined,
@@ -833,6 +865,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debounced.freightModality,
     debouncedKmBand,
     priceTableRow,
+    selectedPriceTable,
     icmsRate,
     kmByUf,
     icmsByUfMap,
@@ -919,6 +952,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             Number((quote as unknown as Record<string, unknown>).discount_value)) ||
           0,
         notes: quote.notes || '',
+        validity_date: quote.validity_date || '',
         advance_due_date: (quote as { advance_due_date?: string | null })?.advance_due_date || '',
         balance_due_date: (quote as { balance_due_date?: string | null })?.balance_due_date || '',
         estimated_loading_date:
@@ -968,6 +1002,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         tde_enabled: false,
         tear_enabled: false,
         notes: '',
+        validity_date: '',
         advance_due_date: '',
         balance_due_date: '',
         additional_recipients: [],
@@ -1148,9 +1183,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         waypoints: waypoints.length > 0 ? waypoints : undefined,
         origin_uf: originUfForApi,
         destination_uf: destinationUfForApi,
-        categoria_veiculo:
-          (selectedVehicle as { ailog_category?: string | null } | undefined)?.ailog_category ??
-          undefined,
+        categoria_veiculo: selectedVehicle?.ailog_category ?? undefined,
         axes_count: selectedVehicle?.axes_count ?? undefined,
       });
 
@@ -1269,6 +1302,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
           volume: data.volume ?? undefined,
           toll_value: data.toll ?? undefined,
           notes: data.notes || undefined,
+          validity_date: data.validity_date?.trim() || undefined,
         });
         toast.success('Cotação antiga criada com FAT e PAG');
         onClose();
@@ -1452,6 +1486,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
           },
         } as unknown as Database['public']['Tables']['quotes']['Row']['pricing_breakdown'],
         notes: data.notes || null,
+        validity_date: data.validity_date?.trim() || null,
         advance_due_date: data.advance_due_date?.trim() || null,
         balance_due_date: data.balance_due_date?.trim() || null,
         estimated_loading_date: data.estimated_loading_date?.trim() || null,
@@ -1688,6 +1723,15 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                       isLoadingPriceRow={isLoadingPriceRow}
                       preserveOriginalPrice={preserveOriginalPrice}
                       onPreserveOriginalPriceChange={setPreserveOriginalPrice}
+                      activePolicies={activePolicies}
+                      loadingPolicies={loadingPolicies}
+                      insuranceOptions={insuranceOptions}
+                      isLoadingInsuranceOptions={isLoadingInsuranceOptions}
+                      insuranceOptionsError={insuranceOptionsError}
+                      selectedInsuranceOption={selectedInsuranceOption}
+                      setSelectedInsuranceOption={setSelectedInsuranceOption}
+                      insuranceOriginUf={insuranceOriginUf}
+                      insuranceDestinationUf={insuranceDestinationUf}
                     />
                   </div>
                 ) : (

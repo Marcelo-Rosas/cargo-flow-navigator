@@ -834,6 +834,7 @@ export type Database = {
         Row: {
           assigned_to: string | null;
           cargo_type: string | null;
+          cargo_value: number | null;
           driver_id: string | null;
           carrier_advance_date: string | null;
           carrier_balance_date: string | null;
@@ -902,6 +903,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null;
           cargo_type?: string | null;
+          cargo_value?: number | null;
           carrier_advance_date?: string | null;
           carrier_balance_date?: string | null;
           carrier_payment_term_id?: string | null;
@@ -969,6 +971,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null;
           cargo_type?: string | null;
+          cargo_value?: number | null;
           carrier_advance_date?: string | null;
           carrier_balance_date?: string | null;
           carrier_payment_term_id?: string | null;
@@ -1334,6 +1337,7 @@ export type Database = {
       price_tables: {
         Row: {
           active: boolean;
+          ad_valorem_lotacao_percent: number | null;
           created_at: string;
           created_by: string | null;
           id: string;
@@ -1347,6 +1351,7 @@ export type Database = {
         };
         Insert: {
           active?: boolean;
+          ad_valorem_lotacao_percent?: number | null;
           created_at?: string;
           created_by?: string | null;
           id?: string;
@@ -1360,6 +1365,7 @@ export type Database = {
         };
         Update: {
           active?: boolean;
+          ad_valorem_lotacao_percent?: number | null;
           created_at?: string;
           created_by?: string | null;
           id?: string;

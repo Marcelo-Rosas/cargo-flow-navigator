@@ -26,7 +26,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { useTollRoutes, useVehicleTypes } from '@/hooks/usePricingRules';
+import { useTollRoutes } from '@/hooks/usePricingRules';
+import { useVehicleTypesOperational } from '@/hooks/useVehicleTypes';
 import {
   useCreateTollRoute,
   useUpdateTollRoute,
@@ -72,7 +73,7 @@ type TollRouteWithVehicle = TollRoute & {
 
 export function TollRoutesSection() {
   const { data: routes, isLoading } = useTollRoutes();
-  const { data: vehicleTypes } = useVehicleTypes();
+  const { data: vehicleTypes } = useVehicleTypesOperational();
   const createMutation = useCreateTollRoute();
   const updateMutation = useUpdateTollRoute();
   const deleteMutation = useDeleteTollRoute();

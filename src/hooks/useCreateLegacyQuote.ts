@@ -24,6 +24,7 @@ export interface LegacyQuotePayload {
   volume?: number | null;
   toll_value?: number | null;
   notes?: string | null;
+  validity_date?: string | null;
   // Order (PAG)
   carreteiro_real: number;
   os_number?: string | null;
@@ -77,6 +78,7 @@ export function useCreateLegacyQuote() {
         volume: payload.volume ?? null,
         toll_value: payload.toll_value ?? null,
         notes: payload.notes || null,
+        validity_date: payload.validity_date?.trim() || null,
       });
 
       const { data: quote, error: quoteError } = await supabase

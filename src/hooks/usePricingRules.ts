@@ -4,7 +4,6 @@ import { asDb, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-u
 import { supabase } from '@/integrations/supabase/client';
 import type {
   PricingParameter,
-  VehicleType,
   WaitingTimeRule,
   TollRoute,
   TacRate,
@@ -42,27 +41,6 @@ export function usePricingParameter(key: string) {
       return filterSupabaseSingle<PricingParameter>(data);
     },
     enabled: !!key,
-  });
-}
-
-// =====================================================
-// VEHICLE TYPES
-// =====================================================
-
-export function useVehicleTypes(activeOnly = true) {
-  return useQuery({
-    queryKey: ['vehicle-types', { activeOnly }],
-    queryFn: async () => {
-      let query = supabase.from('vehicle_types').select('*').order('axes_count');
-
-      if (activeOnly) {
-        query = query.eq('active', asDb(true));
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return filterSupabaseRows<VehicleType>(data);
-    },
   });
 }
 

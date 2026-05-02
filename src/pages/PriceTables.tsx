@@ -204,13 +204,18 @@ function PriceTablesTab() {
   const filteredTables =
     tables?.filter((t) => filterModality === 'all' || t.modality === filterModality) || [];
 
-  const handleCreate = async (data: { name: string; modality: string }) => {
+  const handleCreate = async (data: {
+    name: string;
+    modality: string;
+    ad_valorem_lotacao_percent?: number | null;
+  }) => {
     try {
       await createTable.mutateAsync({
         name: data.name,
         modality: data.modality,
         active: false,
         version: 1,
+        ad_valorem_lotacao_percent: data.ad_valorem_lotacao_percent ?? null,
       });
       toast.success('Tabela criada com sucesso');
       setIsCreateOpen(false);
@@ -219,9 +224,18 @@ function PriceTablesTab() {
     }
   };
 
-  const handleUpdate = async (id: string, data: { name: string }) => {
+  const handleUpdate = async (
+    id: string,
+    data: { name: string; modality: string; ad_valorem_lotacao_percent?: number | null }
+  ) => {
     try {
-      await updateTable.mutateAsync({ id, updates: { name: data.name } });
+      await updateTable.mutateAsync({
+        id,
+        updates: {
+          name: data.name,
+          ad_valorem_lotacao_percent: data.ad_valorem_lotacao_percent ?? null,
+        },
+      });
       toast.success('Tabela atualizada');
       setEditingTable(null);
     } catch (error) {
@@ -413,14 +427,25 @@ function PriceTablesTab() {
 }
 
 interface PriceTableFormProps {
-  initialData?: { name: string; modality: string };
-  onSubmit: (data: { name: string; modality: string }) => void;
+  initialData?: { name: string; modality: string; ad_valorem_lotacao_percent?: number | null };
+  onSubmit: (data: {
+    name: string;
+    modality: string;
+    ad_valorem_lotacao_percent?: number | null;
+  }) => void;
   isLoading: boolean;
 }
 
 function PriceTableForm({ initialData, onSubmit, isLoading }: PriceTableFormProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [modality, setModality] = useState(initialData?.modality || 'lotacao');
+  const [adValoremRaw, setAdValoremRaw] = useState(
+    initialData?.ad_valorem_lotacao_percent != null
+      ? String(initialData.ad_valorem_lotacao_percent)
+      : ''
+  );
+
+  const isLotacao = modality === 'lotacao';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -428,7 +453,17 @@ function PriceTableForm({ initialData, onSubmit, isLoading }: PriceTableFormProp
       toast.error('Nome é obrigatório');
       return;
     }
-    onSubmit({ name, modality });
+    const adValorem =
+      isLotacao && adValoremRaw.trim() !== '' ? Number(adValoremRaw.replace(',', '.')) : null;
+    if (
+      isLotacao &&
+      adValoremRaw.trim() !== '' &&
+      (isNaN(adValorem!) || adValorem! < 0 || adValorem! > 2)
+    ) {
+      toast.error('Ad Valorem deve ser um percentual entre 0 e 2');
+      return;
+    }
+    onSubmit({ name, modality, ad_valorem_lotacao_percent: adValorem });
   };
 
   return (
@@ -463,6 +498,24 @@ function PriceTableForm({ initialData, onSubmit, isLoading }: PriceTableFormProp
                 <SelectItem value="fracionado">Fracionado</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        )}
+        {isLotacao && (
+          <div className="space-y-2">
+            <Label htmlFor="adValorem">Ad Valorem Lotação (%)</Label>
+            <Input
+              id="adValorem"
+              type="number"
+              step="0.001"
+              min="0"
+              max="2"
+              value={adValoremRaw}
+              onChange={(e) => setAdValoremRaw(e.target.value)}
+              placeholder="Ex: 0.45 — vazio = herdar global"
+            />
+            <p className="text-xs text-muted-foreground">
+              Substitui GRIS+TSO em lotação. Vazio = herdar da Central de Riscos.
+            </p>
           </div>
         )}
       </div>
@@ -585,6 +638,16 @@ function ActiveTableCard({ title, table, variant }: ActiveTableCardProps) {
                   {format(new Date(table.valid_from), 'dd/MM/yyyy', { locale: ptBR })}
                   {table.valid_until &&
                     ` até ${format(new Date(table.valid_until), 'dd/MM/yyyy', { locale: ptBR })}`}
+                </p>
+              </div>
+            )}
+            {!isLtl && (
+              <div className="pt-2 border-t">
+                <p className="text-sm text-muted-foreground">Ad Valorem Lotação</p>
+                <p className="font-medium">
+                  {table.ad_valorem_lotacao_percent != null
+                    ? `${table.ad_valorem_lotacao_percent}% (tabela)`
+                    : 'Herdado da Central de Riscos'}
                 </p>
               </div>
             )}

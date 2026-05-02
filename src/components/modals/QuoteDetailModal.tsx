@@ -14,6 +14,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Separator } from '@/components/ui/separator';
 import { SectionBlock } from '@/components/ui/section-block';
 import { DataCard } from '@/components/ui/data-card';
@@ -111,6 +121,12 @@ export function QuoteDetailModal({
     piso: number;
   }>({ open: false, suggestedValue: 0, piso: 0 });
   const [isApplyingAnttFloor, setIsApplyingAnttFloor] = useState(false);
+  const [suggestedValueDialog, setSuggestedValueDialog] = useState<{
+    open: boolean;
+    newBreakdown: StoredPricingBreakdown | null;
+    newCalcValue: number;
+  }>({ open: false, newBreakdown: null, newCalcValue: 0 });
+  const [isApplyingSuggestedValue, setIsApplyingSuggestedValue] = useState(false);
   const [selectedAdvancePercent, setSelectedAdvancePercent] = useState<string>('0');
   const [activePaymentTermId, setActivePaymentTermId] = useState<string | null>(
     quote?.payment_term_id ?? null
@@ -404,16 +420,6 @@ export function QuoteDetailModal({
     try {
       const response = await calculateFreightMutation.mutateAsync(payload);
       const newBreakdown = buildStoredBreakdownFromEdgeResponse(response, bd);
-      // Apenas atualiza pricing_breakdown (memória de cálculo / ANTT / margem).
-      // NÃO sobrescreve value — o preço negociado com o cliente é preservado.
-      // Para alterar o value, o comercial deve passar pelo Wizard.
-      await updateQuoteMutation.mutateAsync({
-        id: quote.id,
-        updates: {
-          pricing_breakdown: newBreakdown as unknown as Json,
-        },
-      });
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
       const currentValue = Number(quote.value) || 0;
       const newCalcValue = response.totals.total_cliente;
       const pisoFromResponse =
@@ -421,20 +427,68 @@ export function QuoteDetailModal({
       const floorApplied = (response.meta as { antt_floor_applied?: boolean }).antt_floor_applied;
 
       if (floorApplied && pisoFromResponse > 0 && currentValue < pisoFromResponse) {
-        // Valor abaixo do piso ANTT — abrir dialog de confirmação
+        // Valor abaixo do piso ANTT — salva breakdown e abre dialog de conformidade
+        await updateQuoteMutation.mutateAsync({
+          id: quote.id,
+          updates: { pricing_breakdown: newBreakdown as unknown as Json },
+        });
+        queryClient.invalidateQueries({ queryKey: ['quotes'] });
         setAnttDialog({ open: true, suggestedValue: newCalcValue, piso: pisoFromResponse });
       } else if (newCalcValue > currentValue && currentValue > 0) {
-        toast.warning(
-          `Memória recalculada. Valor sugerido (R$ ${newCalcValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) é maior que o valor atual. Avalie reajuste.`,
-          { duration: 8000 }
-        );
+        // Valor sugerido maior que o negociado — apresentar escolha ao usuário
+        setSuggestedValueDialog({ open: true, newBreakdown, newCalcValue });
       } else {
+        // Sem divergência — atualiza apenas a memória de cálculo
+        await updateQuoteMutation.mutateAsync({
+          id: quote.id,
+          updates: { pricing_breakdown: newBreakdown as unknown as Json },
+        });
+        queryClient.invalidateQueries({ queryKey: ['quotes'] });
         toast.success('Memória de cálculo recalculada com sucesso');
       }
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : 'Erro ao recalcular. Verifique os dados da cotação.'
       );
+    }
+  };
+
+  const handleApplySuggestedValue = async () => {
+    if (!quote || !suggestedValueDialog.newBreakdown) return;
+    setIsApplyingSuggestedValue(true);
+    try {
+      await updateQuoteMutation.mutateAsync({
+        id: quote.id,
+        updates: {
+          value: suggestedValueDialog.newCalcValue,
+          pricing_breakdown: suggestedValueDialog.newBreakdown as unknown as Json,
+        },
+      });
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      setSuggestedValueDialog({ open: false, newBreakdown: null, newCalcValue: 0 });
+      toast.success(`Valor atualizado para ${formatCurrency(suggestedValueDialog.newCalcValue)}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao atualizar valor.');
+    } finally {
+      setIsApplyingSuggestedValue(false);
+    }
+  };
+
+  const handleKeepCurrentValue = async () => {
+    if (!quote || !suggestedValueDialog.newBreakdown) return;
+    setIsApplyingSuggestedValue(true);
+    try {
+      await updateQuoteMutation.mutateAsync({
+        id: quote.id,
+        updates: { pricing_breakdown: suggestedValueDialog.newBreakdown as unknown as Json },
+      });
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      setSuggestedValueDialog({ open: false, newBreakdown: null, newCalcValue: 0 });
+      toast.success('Memória de cálculo atualizada. Valor da cotação mantido.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao salvar memória de cálculo.');
+    } finally {
+      setIsApplyingSuggestedValue(false);
     }
   };
 
@@ -1278,6 +1332,46 @@ export function QuoteDetailModal({
         onApply={handleApplyAnttFloor}
         onCancel={() => setAnttDialog({ open: false, suggestedValue: 0, piso: 0 })}
       />
+
+      {/* Dialog de valor sugerido — aparece quando recálculo resulta em valor maior que o negociado */}
+      <AlertDialog open={suggestedValueDialog.open}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Valor sugerido maior que o atual</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  O recálculo resultou em{' '}
+                  <span className="font-semibold text-foreground">
+                    {formatCurrency(suggestedValueDialog.newCalcValue)}
+                  </span>
+                  , superior ao valor negociado atual de{' '}
+                  <span className="font-semibold text-foreground">
+                    {formatCurrency(currentQuoteValue)}
+                  </span>
+                  .
+                </p>
+                <p className="text-muted-foreground">
+                  Deseja aplicar o valor sugerido ou manter o valor negociado e apenas atualizar a
+                  memória de cálculo?
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleKeepCurrentValue} disabled={isApplyingSuggestedValue}>
+              Manter valor atual
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleApplySuggestedValue}
+              disabled={isApplyingSuggestedValue}
+            >
+              {isApplyingSuggestedValue && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Aplicar {formatCurrency(suggestedValueDialog.newCalcValue)}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

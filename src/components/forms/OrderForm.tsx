@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Truck } from 'lucide-react';
+import { Loader2, Truck, ShieldCheck, ShieldAlert, ShieldQuestion, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -36,6 +36,11 @@ import { useVehicles } from '@/hooks/useVehicles';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from '@/types/pricing';
+import {
+  useBuonnyProfessionalCheck,
+  type ProfessionalCheckResponse,
+} from '@/hooks/useBuonnyProfessionalCheck';
+import { cn } from '@/lib/utils';
 
 const orderSchema = z.object({
   client_id: z.string().optional(),
@@ -46,7 +51,13 @@ const orderSchema = z.object({
   driver_id: z.string().optional(),
   driver_name: z.string().optional(),
   driver_phone: z.string().optional(),
+  driver_cnh: z.string().optional(),
+  driver_antt: z.string().optional(),
   vehicle_plate: z.string().optional(),
+  vehicle_brand: z.string().optional(),
+  vehicle_model: z.string().optional(),
+  vehicle_type_name: z.string().optional(),
+  vehicle_type_id: z.string().optional(),
   owner_name: z.string().optional(),
   owner_phone: z.string().optional(),
   eta: z.string().optional(),
@@ -63,15 +74,23 @@ interface OrderFormProps {
   order?: OrderWithOccurrences | null;
 }
 
+function extractUF(location: string): string {
+  const m = location.trim().match(/,?\s*([A-Z]{2})\s*$/i);
+  return m ? m[1].toUpperCase() : 'SC';
+}
+
 export function OrderForm({ open, onClose, order }: OrderFormProps) {
   const { user } = useAuth();
   const { data: clients } = useClients();
   const { data: drivers } = useDrivers();
   const [selectedDriverId, setSelectedDriverId] = useState<string | undefined>(undefined);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | undefined>(undefined);
   const { data: vehicles } = useVehicles(selectedDriverId);
   const createOrderMutation = useCreateOrder();
   const updateOrderMutation = useUpdateOrder();
   const isEditing = !!order;
+  const buonnyCheck = useBuonnyProfessionalCheck();
+  const [buonnyResult, setBuonnyResult] = useState<ProfessionalCheckResponse | null>(null);
 
   const form = useForm<OrderFormData>({
     resolver: zodResolver(orderSchema),
@@ -84,7 +103,13 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
       driver_id: '',
       driver_name: '',
       driver_phone: '',
+      driver_cnh: '',
+      driver_antt: '',
       vehicle_plate: '',
+      vehicle_brand: '',
+      vehicle_model: '',
+      vehicle_type_name: '',
+      vehicle_type_id: '',
       owner_name: '',
       owner_phone: '',
       eta: '',
@@ -97,6 +122,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
   useEffect(() => {
     if (order) {
       setSelectedDriverId(order.driver_id || undefined);
+      setSelectedVehicleId(undefined); // synced after vehicles load via separate effect
       form.reset({
         client_id: order.client_id || '',
         client_name: order.client_name,
@@ -106,7 +132,13 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         driver_id: order.driver_id || '',
         driver_name: order.driver_name || '',
         driver_phone: order.driver_phone || '',
+        driver_cnh: order.driver_cnh || '',
+        driver_antt: order.driver_antt || '',
         vehicle_plate: order.vehicle_plate || '',
+        vehicle_brand: order.vehicle_brand || '',
+        vehicle_model: order.vehicle_model || '',
+        vehicle_type_name: order.vehicle_type_name || '',
+        vehicle_type_id: order.vehicle_type_id || '',
         owner_name: order.owner_name || '',
         owner_phone: order.owner_phone || '',
         eta: order.eta ? new Date(order.eta).toISOString().slice(0, 16) : '',
@@ -118,6 +150,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
       });
     } else {
       setSelectedDriverId(undefined);
+      setSelectedVehicleId(undefined);
       form.reset({
         client_id: '',
         client_name: '',
@@ -127,7 +160,13 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         driver_id: '',
         driver_name: '',
         driver_phone: '',
+        driver_cnh: '',
+        driver_antt: '',
         vehicle_plate: '',
+        vehicle_brand: '',
+        vehicle_model: '',
+        vehicle_type_name: '',
+        vehicle_type_id: '',
         owner_name: '',
         owner_phone: '',
         eta: '',
@@ -137,6 +176,14 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
       });
     }
   }, [order, form]);
+
+  // Quando os veículos do motorista carregam no modo edição, pré-seleciona o veículo atual
+  const watchedPlate = form.watch('vehicle_plate');
+  useEffect(() => {
+    if (!vehicles?.length || !watchedPlate || selectedVehicleId) return;
+    const match = vehicles.find((v) => v.plate === watchedPlate);
+    if (match) setSelectedVehicleId(match.id);
+  }, [vehicles, watchedPlate, selectedVehicleId]);
 
   const handleClientSelect = (clientId: string) => {
     const selectedClient = clients?.find((c) => c.id === clientId);
@@ -150,19 +197,33 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
     const selectedDriver = drivers?.find((d) => d.id === driverId);
     if (selectedDriver) {
       setSelectedDriverId(driverId);
+      setSelectedVehicleId(undefined);
       form.setValue('driver_id', driverId);
       form.setValue('driver_name', selectedDriver.name);
       form.setValue('driver_phone', selectedDriver.phone || '');
+      form.setValue('driver_cnh', selectedDriver.cnh || '');
+      form.setValue('driver_antt', selectedDriver.antt || '');
+      // Limpa campos do veículo ao trocar motorista
       form.setValue('vehicle_plate', '');
+      form.setValue('vehicle_brand', '');
+      form.setValue('vehicle_model', '');
+      form.setValue('vehicle_type_name', '');
+      form.setValue('vehicle_type_id', '');
       form.setValue('owner_name', '');
       form.setValue('owner_phone', '');
+      setBuonnyResult(null);
     }
   };
 
   const handleVehicleSelect = (vehicleId: string) => {
     const selectedVehicle = vehicles?.find((v) => v.id === vehicleId);
     if (selectedVehicle) {
+      setSelectedVehicleId(vehicleId);
       form.setValue('vehicle_plate', selectedVehicle.plate);
+      form.setValue('vehicle_brand', selectedVehicle.brand ?? '');
+      form.setValue('vehicle_model', selectedVehicle.model ?? '');
+      form.setValue('vehicle_type_name', selectedVehicle.vehicle_type?.name ?? '');
+      form.setValue('vehicle_type_id', selectedVehicle.vehicle_type?.id ?? '');
       form.setValue('owner_name', selectedVehicle.owner?.name ?? '');
       form.setValue('owner_phone', selectedVehicle.owner?.phone ?? '');
     }
@@ -184,7 +245,13 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         driver_id: data.driver_id || null,
         driver_name: data.driver_name || null,
         driver_phone: data.driver_phone || null,
+        driver_cnh: data.driver_cnh || null,
+        driver_antt: data.driver_antt || null,
         vehicle_plate: data.vehicle_plate || null,
+        vehicle_brand: data.vehicle_brand || null,
+        vehicle_model: data.vehicle_model || null,
+        vehicle_type_name: data.vehicle_type_name || null,
+        vehicle_type_id: data.vehicle_type_id || null,
         owner_name: data.owner_name || null,
         owner_phone: data.owner_phone || null,
         eta: data.eta ? new Date(data.eta).toISOString() : null,
@@ -462,6 +529,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                 <FormLabel>Veículo</FormLabel>
                 <Select
                   onValueChange={(value) => handleVehicleSelect(value)}
+                  value={selectedVehicleId || ''}
                   disabled={!selectedDriverId}
                 >
                   <SelectTrigger>
@@ -491,6 +559,136 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                   </p>
                 )}
               </FormItem>
+
+              {/* ── Verificação Buonny ───────────────────────────────── */}
+              {(() => {
+                const plate = form.watch('vehicle_plate');
+                const driverId = form.watch('driver_id');
+                const selectedDriver = drivers?.find((d) => d.id === driverId);
+                const driverCpf = selectedDriver?.cpf;
+
+                if (!plate || !driverId || !driverCpf) return null;
+
+                const handleCheck = () => {
+                  const origin = form.getValues('origin');
+                  const destination = form.getValues('destination');
+                  const cargoValue = form.getValues('value');
+                  buonnyCheck.mutate(
+                    {
+                      order_id: order?.id ?? 'pending',
+                      driver_cpf: driverCpf,
+                      vehicle_plate: plate,
+                      cargo_value: cargoValue,
+                      origin_uf: extractUF(origin),
+                      destination_uf: extractUF(destination),
+                      origin_city: origin.split(',')[0]?.trim(),
+                      destination_city: destination.split(',')[0]?.trim(),
+                    },
+                    { onSuccess: (data) => setBuonnyResult(data) }
+                  );
+                };
+
+                const statusConfig: Record<
+                  string,
+                  { label: string; icon: typeof ShieldCheck; color: string }
+                > = {
+                  'PERFIL ADEQUADO AO RISCO': {
+                    label: 'Aprovado',
+                    icon: ShieldCheck,
+                    color: 'text-green-600 bg-green-50 border-green-200',
+                  },
+                  'PERFIL DIVERGENTE': {
+                    label: 'Divergente',
+                    icon: ShieldAlert,
+                    color: 'text-red-600 bg-red-50 border-red-200',
+                  },
+                  'PERFIL EXPIRADO': {
+                    label: 'Expirado',
+                    icon: ShieldAlert,
+                    color: 'text-red-600 bg-red-50 border-red-200',
+                  },
+                  'PERFIL COM INSUFICIÊNCIA DE DADOS': {
+                    label: 'Insuficiência',
+                    icon: ShieldQuestion,
+                    color: 'text-orange-600 bg-orange-50 border-orange-200',
+                  },
+                  'EM ANÁLISE': {
+                    label: 'Em análise',
+                    icon: Clock,
+                    color: 'text-blue-600 bg-blue-50 border-blue-200',
+                  },
+                };
+
+                return (
+                  <div className="rounded-md border p-3 space-y-2 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-primary" />
+                        Verificação Buonny
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={buonnyCheck.isPending}
+                        onClick={handleCheck}
+                      >
+                        {buonnyCheck.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                        {buonnyCheck.isPending
+                          ? 'Consultando...'
+                          : buonnyResult
+                            ? 'Reconsultar'
+                            : 'Consultar motorista'}
+                      </Button>
+                    </div>
+
+                    {!driverCpf && (
+                      <p className="text-xs text-muted-foreground">
+                        CPF do motorista não cadastrado.
+                      </p>
+                    )}
+
+                    {buonnyCheck.isError && (
+                      <p className="text-xs text-red-600">Erro: {buonnyCheck.error?.message}</p>
+                    )}
+
+                    {buonnyResult &&
+                      (() => {
+                        const cfg =
+                          statusConfig[buonnyResult.status] ?? statusConfig['PERFIL DIVERGENTE'];
+                        const Icon = cfg.icon;
+                        return (
+                          <div
+                            className={cn(
+                              'rounded border px-3 py-2 flex flex-col gap-1',
+                              cfg.color
+                            )}
+                          >
+                            <div className="flex items-center gap-1.5 text-sm font-semibold">
+                              <Icon className="w-4 h-4" />
+                              {cfg.label}
+                              {buonnyResult.is_stub && (
+                                <span className="ml-1 text-xs font-normal opacity-60">(stub)</span>
+                              )}
+                            </div>
+                            {buonnyResult.numero_liberacao && (
+                              <p className="text-xs">
+                                Liberação:{' '}
+                                <span className="font-mono font-medium">
+                                  {buonnyResult.numero_liberacao}
+                                </span>
+                              </p>
+                            )}
+                            {buonnyResult.message && (
+                              <p className="text-xs opacity-80">{buonnyResult.message}</p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                  </div>
+                );
+              })()}
+              {/* ──────────────────────────────────────────────────────── */}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

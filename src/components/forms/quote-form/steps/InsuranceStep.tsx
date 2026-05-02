@@ -1,5 +1,5 @@
 import type { UseFormReturn } from 'react-hook-form';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, Shield } from 'lucide-react';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -9,13 +9,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { SectionBlock } from '@/components/ui/section-block';
 import {
-  useActivePolicies,
   calculatePremium,
   validateCoverage,
   validateValidity,
   type RiskPolicy,
 } from '@/hooks/useRiskPolicies';
-import { useInsuranceOptions } from '@/hooks/useInsuranceOptionsRefactored';
+import type { InsuranceOption } from '@/hooks/useInsuranceOptionsRefactored';
+import type { BuonnyError } from '@/lib/errors/BuonnyError';
 import { InsuranceSelectorLazy } from '@/components/insurance/InsuranceSelectorLazy';
 import { InsuranceSummary } from '@/components/insurance/InsuranceSummary';
 import { formatCurrency } from '@/lib/formatters';
@@ -23,15 +23,15 @@ import type { QuoteFormData } from '../types';
 
 interface InsuranceStepProps {
   form: UseFormReturn<QuoteFormData>;
-}
-
-/**
- * Extrai UF de uma string "CITY, UF" ou "UF"
- */
-function extractUf(location: string): string {
-  if (!location) return '';
-  const ufMatch = location.match(/([A-Z]{2})$/);
-  return ufMatch ? ufMatch[1] : '';
+  activePolicies: RiskPolicy[];
+  loadingPolicies: boolean;
+  insuranceOptions: InsuranceOption[];
+  isLoadingOptions: boolean;
+  optionsError: BuonnyError | null;
+  selectedOption: InsuranceOption | null;
+  setSelectedOption: (option: InsuranceOption | null) => void;
+  originUf: string;
+  destinationUf: string;
 }
 
 /**
@@ -141,16 +141,21 @@ function MandatoryPolicyCard({ policy, cargoValue }: MandatoryPolicyCardProps) {
 // InsuranceStep — step principal
 // ---------------------------------------------------------------------------
 
-export function InsuranceStep({ form }: InsuranceStepProps) {
+export function InsuranceStep({
+  form,
+  activePolicies,
+  loadingPolicies,
+  insuranceOptions,
+  isLoadingOptions,
+  optionsError,
+  selectedOption,
+  setSelectedOption,
+  originUf,
+  destinationUf,
+}: InsuranceStepProps) {
   const cargoValue = form.watch('cargo_value') || 0;
-  const originUf = useMemo(() => extractUf(form.watch('origin') || ''), [form]);
-  const destinationUf = useMemo(() => extractUf(form.watch('destination') || ''), [form]);
-  const weight = form.watch('weight') || 0;
-  const cargoType = form.watch('cargo_type') || 'general';
 
   // ---------- Mandatory policies from risk_policies ----------
-  const { data: activePolicies = [], isLoading: loadingPolicies } = useActivePolicies();
-
   const mandatoryPolicies = useMemo(
     () => activePolicies.filter((p) => p.policy_type === 'RCTR-C' || p.policy_type === 'RC-DC'),
     [activePolicies]
@@ -174,33 +179,22 @@ export function InsuranceStep({ form }: InsuranceStepProps) {
 
   // ---------- Optional Buonny insurance (existing flow) ----------
   const insuranceEligible = form.watch('insurance_eligible') ?? false;
-
-  const {
-    data: insuranceOptions = [],
-    isLoading: isLoadingOptions,
-    error: optionsError,
-    selectedOption,
-    setSelectedOption,
-  } = useInsuranceOptions({
-    origin_uf: originUf,
-    destination_uf: destinationUf,
-    weight,
-    product_type: cargoType,
-  });
-
   const insuranceCoverageType = form.watch('insurance_coverage_type');
 
-  // Sync form value with selectedOption when coverage changes
+  // Hydrate selectedOption from saved form value once (edit mode).
+  // Uses a ref guard so it fires only once per mount, avoiding a bidirectional loop.
+  const hydratedRef = useRef(false);
   useEffect(() => {
-    if (insuranceCoverageType) {
-      const matching = insuranceOptions.find((opt) => opt.coverage_type === insuranceCoverageType);
-      if (matching) {
-        setSelectedOption(matching);
-      }
+    if (hydratedRef.current) return;
+    if (!insuranceOptions.length || !insuranceCoverageType) return;
+    const matching = insuranceOptions.find((opt) => opt.coverage_type === insuranceCoverageType);
+    if (matching) {
+      setSelectedOption(matching);
+      hydratedRef.current = true;
     }
-  }, [insuranceCoverageType, insuranceOptions, setSelectedOption]);
+  }, [insuranceOptions, insuranceCoverageType, setSelectedOption]);
 
-  // Update form when selectedOption changes
+  // Unidirectional sync: state → form (normal selection path)
   useEffect(() => {
     if (selectedOption) {
       form.setValue('insurance_coverage_type', selectedOption.coverage_type);
