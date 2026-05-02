@@ -19,6 +19,10 @@ interface QuoteModalHeaderProps {
   onRecalcular: () => void;
   onEdit: () => void;
   showRecalcular: boolean;
+  /** Bloqueia FAT quando cotação está abaixo do piso ANTT */
+  anttFloorBlocked?: boolean;
+  /** Tooltip dinâmico para o botão Recalcular */
+  recalcularTitle?: string;
 }
 
 export function QuoteModalHeader({
@@ -37,6 +41,8 @@ export function QuoteModalHeader({
   onRecalcular,
   onEdit,
   showRecalcular,
+  anttFloorBlocked = false,
+  recalcularTitle,
 }: QuoteModalHeaderProps) {
   return (
     <>
@@ -70,7 +76,7 @@ export function QuoteModalHeader({
               className="h-8 w-8"
               onClick={onRecalcular}
               disabled={isRecalculating}
-              title="Recalcular memória de cálculo"
+              title={recalcularTitle ?? 'Recalcular memória de cálculo'}
             >
               {isRecalculating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -97,7 +103,8 @@ export function QuoteModalHeader({
             variant="outline"
             size="sm"
             onClick={onConvertToFAT}
-            disabled={isConvertingToFat}
+            disabled={isConvertingToFat || anttFloorBlocked}
+            title={anttFloorBlocked ? 'Resolva o Piso ANTT antes de faturar' : undefined}
             className="gap-1.5"
           >
             {isConvertingToFat ? (

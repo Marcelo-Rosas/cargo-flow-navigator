@@ -69,6 +69,8 @@ export interface CalculateFreightInput {
   carreteiro_percent?: number;
   descarga_value?: number;
   aluguel_maquinas_value?: number;
+  /** Forçar piso ANTT no cálculo: recalcula gross-up partindo de pisoAnttCarreteiro como frete_peso */
+  enforce_antt_floor?: boolean;
 }
 
 // ============================================
@@ -98,6 +100,12 @@ export interface FreightMeta {
   ltl_min_weight_applied?: boolean;
   /** Peso real informado (antes da trava 1t) */
   original_weight_kg?: number;
+  /** UUID da linha de antt_floor_rates usada (rastreabilidade temporal) */
+  antt_floor_rate_id?: string;
+  /** ISO timestamp de quando o piso foi calculado (detectar staleness) */
+  antt_calculated_at?: string;
+  /** true quando enforce_antt_floor forçou gross-up a partir do piso */
+  antt_floor_forced?: boolean;
 }
 
 export interface FreightComponents {
