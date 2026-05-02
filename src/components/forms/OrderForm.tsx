@@ -72,6 +72,7 @@ interface OrderFormProps {
   open: boolean;
   onClose: () => void;
   order?: OrderWithOccurrences | null;
+  hideDriverSection?: boolean;
 }
 
 function extractUF(location: string): string {
@@ -79,7 +80,7 @@ function extractUF(location: string): string {
   return m ? m[1].toUpperCase() : 'SC';
 }
 
-export function OrderForm({ open, onClose, order }: OrderFormProps) {
+export function OrderForm({ open, onClose, order, hideDriverSection }: OrderFormProps) {
   const { user } = useAuth();
   const { data: clients } = useClients();
   const { data: drivers } = useDrivers();
@@ -467,229 +468,241 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
               </div>
             </div>
 
-            <Separator />
+            {!hideDriverSection && (
+              <>
+                <Separator />
 
-            {/* Motorista Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Truck className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold text-foreground">Dados do Transporte</h3>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="driver_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Motorista</FormLabel>
-                      <Select
-                        onValueChange={(value) => handleDriverSelect(value)}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar motorista..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {drivers?.map((driver) => (
-                            <SelectItem key={driver.id} value={driver.id}>
-                              {driver.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="driver_phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Telefone do Motorista</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="(11) 99999-9999"
-                          {...field}
-                          readOnly
-                          className="bg-muted/50"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormItem>
-                <FormLabel>Veículo</FormLabel>
-                <Select
-                  onValueChange={(value) => handleVehicleSelect(value)}
-                  value={selectedVehicleId || ''}
-                  disabled={!selectedDriverId}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        selectedDriverId
-                          ? 'Selecionar veículo...'
-                          : 'Selecione um motorista primeiro'
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vehicles?.map((vehicle) => (
-                      <SelectItem key={vehicle.id} value={vehicle.id}>
-                        {vehicle.plate}{' '}
-                        {vehicle.brand && vehicle.model
-                          ? `- ${vehicle.brand} ${vehicle.model}`
-                          : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.watch('vehicle_plate') && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Placa selecionada:{' '}
-                    <span className="font-mono font-medium">{form.watch('vehicle_plate')}</span>
-                  </p>
-                )}
-              </FormItem>
-
-              {/* ── Verificação Buonny ───────────────────────────────── */}
-              {(() => {
-                const plate = form.watch('vehicle_plate');
-                const driverId = form.watch('driver_id');
-                const selectedDriver = drivers?.find((d) => d.id === driverId);
-                const driverCpf = selectedDriver?.cpf;
-
-                if (!plate || !driverId || !driverCpf) return null;
-
-                const handleCheck = () => {
-                  const origin = form.getValues('origin');
-                  const destination = form.getValues('destination');
-                  const cargoValue = form.getValues('value');
-                  buonnyCheck.mutate(
-                    {
-                      order_id: order?.id ?? 'pending',
-                      driver_cpf: driverCpf,
-                      vehicle_plate: plate,
-                      cargo_value: cargoValue,
-                      origin_uf: extractUF(origin),
-                      destination_uf: extractUF(destination),
-                      origin_city: origin.split(',')[0]?.trim(),
-                      destination_city: destination.split(',')[0]?.trim(),
-                    },
-                    { onSuccess: (data) => setBuonnyResult(data) }
-                  );
-                };
-
-                const statusConfig: Record<
-                  string,
-                  { label: string; icon: typeof ShieldCheck; color: string }
-                > = {
-                  'PERFIL ADEQUADO AO RISCO': {
-                    label: 'Aprovado',
-                    icon: ShieldCheck,
-                    color: 'text-green-600 bg-green-50 border-green-200',
-                  },
-                  'PERFIL DIVERGENTE': {
-                    label: 'Divergente',
-                    icon: ShieldAlert,
-                    color: 'text-red-600 bg-red-50 border-red-200',
-                  },
-                  'PERFIL EXPIRADO': {
-                    label: 'Expirado',
-                    icon: ShieldAlert,
-                    color: 'text-red-600 bg-red-50 border-red-200',
-                  },
-                  'PERFIL COM INSUFICIÊNCIA DE DADOS': {
-                    label: 'Insuficiência',
-                    icon: ShieldQuestion,
-                    color: 'text-orange-600 bg-orange-50 border-orange-200',
-                  },
-                  'EM ANÁLISE': {
-                    label: 'Em análise',
-                    icon: Clock,
-                    color: 'text-blue-600 bg-blue-50 border-blue-200',
-                  },
-                };
-
-                return (
-                  <div className="rounded-md border p-3 space-y-2 bg-muted/20">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4 text-primary" />
-                        Verificação Buonny
-                      </p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={buonnyCheck.isPending}
-                        onClick={handleCheck}
-                      >
-                        {buonnyCheck.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                        {buonnyCheck.isPending
-                          ? 'Consultando...'
-                          : buonnyResult
-                            ? 'Reconsultar'
-                            : 'Consultar motorista'}
-                      </Button>
-                    </div>
-
-                    {!driverCpf && (
-                      <p className="text-xs text-muted-foreground">
-                        CPF do motorista não cadastrado.
-                      </p>
-                    )}
-
-                    {buonnyCheck.isError && (
-                      <p className="text-xs text-red-600">Erro: {buonnyCheck.error?.message}</p>
-                    )}
-
-                    {buonnyResult &&
-                      (() => {
-                        const cfg =
-                          statusConfig[buonnyResult.status] ?? statusConfig['PERFIL DIVERGENTE'];
-                        const Icon = cfg.icon;
-                        return (
-                          <div
-                            className={cn(
-                              'rounded border px-3 py-2 flex flex-col gap-1',
-                              cfg.color
-                            )}
-                          >
-                            <div className="flex items-center gap-1.5 text-sm font-semibold">
-                              <Icon className="w-4 h-4" />
-                              {cfg.label}
-                              {buonnyResult.is_stub && (
-                                <span className="ml-1 text-xs font-normal opacity-60">(stub)</span>
-                              )}
-                            </div>
-                            {buonnyResult.numero_liberacao && (
-                              <p className="text-xs">
-                                Liberação:{' '}
-                                <span className="font-mono font-medium">
-                                  {buonnyResult.numero_liberacao}
-                                </span>
-                              </p>
-                            )}
-                            {buonnyResult.message && (
-                              <p className="text-xs opacity-80">{buonnyResult.message}</p>
-                            )}
-                          </div>
-                        );
-                      })()}
+                {/* Motorista Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold text-foreground">Dados do Transporte</h3>
                   </div>
-                );
-              })()}
-              {/* ──────────────────────────────────────────────────────── */}
-            </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="driver_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Motorista</FormLabel>
+                          <Select
+                            onValueChange={(value) => handleDriverSelect(value)}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar motorista..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {drivers?.map((driver) => (
+                                <SelectItem key={driver.id} value={driver.id}>
+                                  {driver.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="driver_phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Telefone do Motorista</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="(11) 99999-9999"
+                              {...field}
+                              readOnly
+                              className="bg-muted/50"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormItem>
+                    <FormLabel>Veículo</FormLabel>
+                    <Select
+                      onValueChange={(value) => handleVehicleSelect(value)}
+                      value={selectedVehicleId || ''}
+                      disabled={!selectedDriverId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            selectedDriverId
+                              ? 'Selecionar veículo...'
+                              : 'Selecione um motorista primeiro'
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vehicles?.map((vehicle) => (
+                          <SelectItem key={vehicle.id} value={vehicle.id}>
+                            {vehicle.plate}{' '}
+                            {vehicle.brand && vehicle.model
+                              ? `- ${vehicle.brand} ${vehicle.model}`
+                              : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.watch('vehicle_plate') && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Placa selecionada:{' '}
+                        <span className="font-mono font-medium">{form.watch('vehicle_plate')}</span>
+                      </p>
+                    )}
+                  </FormItem>
+
+                  {/* ── Verificação Buonny ───────────────────────────────── */}
+                  {!isEditing &&
+                    (() => {
+                      const plate = form.watch('vehicle_plate');
+                      const driverId = form.watch('driver_id');
+                      const selectedDriver = drivers?.find((d) => d.id === driverId);
+                      const driverCpf = selectedDriver?.cpf;
+
+                      if (!plate || !driverId || !driverCpf) return null;
+
+                      const handleCheck = () => {
+                        const origin = form.getValues('origin');
+                        const destination = form.getValues('destination');
+                        const cargoValue = form.getValues('value');
+                        buonnyCheck.mutate(
+                          {
+                            order_id: order?.id ?? 'pending',
+                            driver_cpf: driverCpf,
+                            vehicle_plate: plate,
+                            cargo_value: cargoValue,
+                            origin_uf: extractUF(origin),
+                            destination_uf: extractUF(destination),
+                            origin_city: origin.split(',')[0]?.trim(),
+                            destination_city: destination.split(',')[0]?.trim(),
+                          },
+                          { onSuccess: (data) => setBuonnyResult(data) }
+                        );
+                      };
+
+                      const statusConfig: Record<
+                        string,
+                        { label: string; icon: typeof ShieldCheck; color: string }
+                      > = {
+                        'PERFIL ADEQUADO AO RISCO': {
+                          label: 'Aprovado',
+                          icon: ShieldCheck,
+                          color: 'text-green-600 bg-green-50 border-green-200',
+                        },
+                        'PERFIL DIVERGENTE': {
+                          label: 'Divergente',
+                          icon: ShieldAlert,
+                          color: 'text-red-600 bg-red-50 border-red-200',
+                        },
+                        'PERFIL EXPIRADO': {
+                          label: 'Expirado',
+                          icon: ShieldAlert,
+                          color: 'text-red-600 bg-red-50 border-red-200',
+                        },
+                        'PERFIL COM INSUFICIÊNCIA DE DADOS': {
+                          label: 'Insuficiência',
+                          icon: ShieldQuestion,
+                          color: 'text-orange-600 bg-orange-50 border-orange-200',
+                        },
+                        'EM ANÁLISE': {
+                          label: 'Em análise',
+                          icon: Clock,
+                          color: 'text-blue-600 bg-blue-50 border-blue-200',
+                        },
+                      };
+
+                      return (
+                        <div className="rounded-md border p-3 space-y-2 bg-muted/20">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                              <ShieldCheck className="w-4 h-4 text-primary" />
+                              Verificação Buonny
+                            </p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={buonnyCheck.isPending}
+                              onClick={handleCheck}
+                            >
+                              {buonnyCheck.isPending && (
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              )}
+                              {buonnyCheck.isPending
+                                ? 'Consultando...'
+                                : buonnyResult
+                                  ? 'Reconsultar'
+                                  : 'Consultar motorista'}
+                            </Button>
+                          </div>
+
+                          {!driverCpf && (
+                            <p className="text-xs text-muted-foreground">
+                              CPF do motorista não cadastrado.
+                            </p>
+                          )}
+
+                          {buonnyCheck.isError && (
+                            <p className="text-xs text-red-600">
+                              Erro: {buonnyCheck.error?.message}
+                            </p>
+                          )}
+
+                          {buonnyResult &&
+                            (() => {
+                              const cfg =
+                                statusConfig[buonnyResult.status] ??
+                                statusConfig['PERFIL DIVERGENTE'];
+                              const Icon = cfg.icon;
+                              return (
+                                <div
+                                  className={cn(
+                                    'rounded border px-3 py-2 flex flex-col gap-1',
+                                    cfg.color
+                                  )}
+                                >
+                                  <div className="flex items-center gap-1.5 text-sm font-semibold">
+                                    <Icon className="w-4 h-4" />
+                                    {cfg.label}
+                                    {buonnyResult.is_stub && (
+                                      <span className="ml-1 text-xs font-normal opacity-60">
+                                        (stub)
+                                      </span>
+                                    )}
+                                  </div>
+                                  {buonnyResult.numero_liberacao && (
+                                    <p className="text-xs">
+                                      Liberação:{' '}
+                                      <span className="font-mono font-medium">
+                                        {buonnyResult.numero_liberacao}
+                                      </span>
+                                    </p>
+                                  )}
+                                  {buonnyResult.message && (
+                                    <p className="text-xs opacity-80">{buonnyResult.message}</p>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                        </div>
+                      );
+                    })()}
+                  {/* ──────────────────────────────────────────────────────── */}
+                </div>
+              </>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
