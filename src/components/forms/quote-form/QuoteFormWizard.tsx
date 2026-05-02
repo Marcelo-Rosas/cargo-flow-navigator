@@ -26,6 +26,9 @@ import type { AdditionalFeesSelection } from '@/components/quotes/AdditionalFees
 import type { EquipmentRentalItem } from '@/components/quotes/EquipmentRentalSection';
 import type { UnloadingCostItem } from '@/components/quotes/UnloadingCostSection';
 import type { Database } from '@/integrations/supabase/types';
+import type { RiskPolicy } from '@/hooks/useRiskPolicies';
+import type { InsuranceOption } from '@/hooks/useInsuranceOptionsRefactored';
+import type { BuonnyError } from '@/lib/errors/BuonnyError';
 
 const STEPS = [
   { id: 'identification', label: 'Identificação' },
@@ -109,6 +112,16 @@ interface QuoteFormWizardProps {
   isLoadingPriceRow: boolean;
   preserveOriginalPrice?: boolean;
   onPreserveOriginalPriceChange?: (value: boolean) => void;
+  // Insurance data (lifted to QuoteForm so queries survive step navigation)
+  activePolicies: RiskPolicy[];
+  loadingPolicies: boolean;
+  insuranceOptions: InsuranceOption[];
+  isLoadingInsuranceOptions: boolean;
+  insuranceOptionsError: BuonnyError | null;
+  selectedInsuranceOption: InsuranceOption | null;
+  setSelectedInsuranceOption: (option: InsuranceOption | null) => void;
+  insuranceOriginUf: string;
+  insuranceDestinationUf: string;
 }
 
 export function QuoteFormWizard({
@@ -151,6 +164,15 @@ export function QuoteFormWizard({
   isLoadingPriceRow,
   preserveOriginalPrice = false,
   onPreserveOriginalPriceChange,
+  activePolicies,
+  loadingPolicies,
+  insuranceOptions,
+  isLoadingInsuranceOptions,
+  insuranceOptionsError,
+  selectedInsuranceOption,
+  setSelectedInsuranceOption,
+  insuranceOriginUf,
+  insuranceDestinationUf,
 }: QuoteFormWizardProps) {
   const [step, setStep] = useState(0);
   const canNext = step < STEPS.length - 1;
@@ -309,7 +331,20 @@ export function QuoteFormWizard({
             onUnloadingCostChange={onUnloadingCostChange}
           />
         )}
-        {step === 3 && <InsuranceStep form={form} />}
+        {step === 3 && (
+          <InsuranceStep
+            form={form}
+            activePolicies={activePolicies}
+            loadingPolicies={loadingPolicies}
+            insuranceOptions={insuranceOptions}
+            isLoadingOptions={isLoadingInsuranceOptions}
+            optionsError={insuranceOptionsError}
+            selectedOption={selectedInsuranceOption}
+            setSelectedOption={setSelectedInsuranceOption}
+            originUf={insuranceOriginUf}
+            destinationUf={insuranceDestinationUf}
+          />
+        )}
         {step === 4 && (
           <ReviewStep
             form={form}

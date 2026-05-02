@@ -1,5 +1,15 @@
 import { useState, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { useBuonnyProfessionalCheck } from '@/hooks/useBuonnyProfessionalCheck';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  useActivePolicies,
+  useDriverActiveExposure,
+  validateCoverage,
+  validateValidity,
+  calculatePremium,
+} from '@/hooks/useRiskPolicies';
 import {
   Shield,
   CheckCircle2,
@@ -40,6 +50,8 @@ interface RiskWorkflowWizardProps {
   vehiclePlate?: string | null;
   vehicleTypeName?: string | null;
   tripId?: string | null;
+  originUf?: string;
+  destinationUf?: string;
 }
 
 const STEPS = [
@@ -61,6 +73,8 @@ export function RiskWorkflowWizard({
   vehiclePlate,
   vehicleTypeName,
   tripId,
+  originUf = 'SC',
+  destinationUf = 'SP',
 }: RiskWorkflowWizardProps) {
   const qc = useQueryClient();
   const [currentStep, setCurrentStep] = useState<StepKey>('buonny');
@@ -69,8 +83,86 @@ export function RiskWorkflowWizard({
   const { data: policies } = useRiskPolicies();
   const activePolicy = policies?.[0];
   const { data: rules } = useRiskPolicyRules(activePolicy?.id);
+  const { data: activePolicies = [] } = useActivePolicies();
+
+  // Busca CPF do motorista diretamente quando o prop não vem preenchido
+  const { data: driverRecord } = useQuery({
+    queryKey: ['wizard-driver-cpf', orderId],
+    enabled: !driverCpf,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('orders')
+        .select('driver_id, drivers!orders_driver_id_fkey(cpf)')
+        .eq('id', orderId)
+        .single();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = data as any;
+      return {
+        cpf: (d?.drivers?.cpf as string | null) ?? null,
+        driver_id: (d?.driver_id as string | null) ?? null,
+      };
+    },
+  });
+
+  const resolvedDriverCpf = driverCpf || driverRecord?.cpf || undefined;
+  const resolvedDriverId = driverRecord?.driver_id ?? null;
+
+  const { data: driverExposure } = useDriverActiveExposure(resolvedDriverId, orderId);
+
+  const policyChecks = useMemo(
+    () =>
+      activePolicies.map((p) => ({
+        policy: p,
+        coverage: validateCoverage(p, cargoValue, { destinationUf }),
+        validity: validateValidity(p),
+        premium: calculatePremium(p, cargoValue),
+      })),
+    [activePolicies, cargoValue, destinationUf]
+  );
+
+  const aggregateExposureWarning = useMemo(() => {
+    if (!driverExposure?.totalOtherOrders || !activePolicies.length) return null;
+    const totalExposure = cargoValue + driverExposure.totalOtherOrders;
+    const minLimit = Math.min(...activePolicies.map((p) => p.coverage_limit ?? Infinity));
+    if (totalExposure > minLimit) {
+      return {
+        totalExposure,
+        limit: minLimit,
+        otherOrders: driverExposure.rows,
+      };
+    }
+    return null;
+  }, [driverExposure, cargoValue, activePolicies]);
+
+  const coverageOk =
+    activePolicies.length === 0 ||
+    (policyChecks.every((c) => c.coverage.ok && c.validity.ok) && !aggregateExposureWarning);
   const { data: evaluation } = useRiskEvaluationByEntity('order', orderId);
   const { data: evidence } = useRiskEvidence(evaluation?.id);
+
+  // Fallback: busca evidência Buonny válida em outras avaliações do mesmo driver+placa
+  const { data: crossEvidence } = useQuery({
+    queryKey: ['buonny-cross-evidence', resolvedDriverCpf, vehiclePlate],
+    enabled: !!resolvedDriverCpf && !!vehiclePlate,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('risk_evidence' as 'documents')
+        .select('*')
+        .eq('evidence_type', 'buonny_check')
+        .eq('status', 'valid')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(10);
+      const rows = (data ?? []) as import('@/types/risk').RiskEvidence[];
+      return (
+        rows.find((e) => {
+          const p = e.payload as Record<string, unknown> | null;
+          return p?.driver_cpf === resolvedDriverCpf && p?.vehicle_plate === vehiclePlate;
+        }) ?? null
+      );
+    },
+    staleTime: 2 * 60 * 1000,
+  });
   const { data: servicesCatalog } = useRiskServicesCatalog();
 
   const evaluateRisk = useEvaluateRisk();
@@ -78,7 +170,8 @@ export function RiskWorkflowWizard({
   const updateEvaluation = useUpdateRiskEvaluation();
   const [buonnyModalOpen, setBuonnyModalOpen] = useState(false);
 
-  const isEditable = orderStage === 'documentacao';
+  const isBuonnyEditable = orderStage === 'busca_motorista' || orderStage === 'documentacao';
+  const isEditable = orderStage === 'busca_motorista' || orderStage === 'documentacao';
   const isTerminal = evaluation?.status === 'approved' || evaluation?.status === 'rejected';
 
   // Evaluate criticality from rules
@@ -87,12 +180,24 @@ export function RiskWorkflowWizard({
     return evaluateCriticality(rules, cargoValue, kmDistance);
   }, [rules, cargoValue, kmDistance]);
 
-  // Check Buonny evidence
-  const buonnyEvidence = evidence?.find(
-    (e) => e.evidence_type === 'buonny_check' && e.status === 'valid'
-  );
+  // Check Buonny evidence — must match current driver CPF and vehicle plate.
+  // Falls back to cross-evaluation evidence when this OS has no Buonny check yet.
+  const buonnyEvidence = (() => {
+    const localMatch = evidence?.find((e) => {
+      if (e.evidence_type !== 'buonny_check' || e.status !== 'valid') return false;
+      const p = e.payload as Record<string, unknown> | null;
+      if (p?.driver_cpf) {
+        if (!resolvedDriverCpf || p.driver_cpf !== resolvedDriverCpf) return false;
+      }
+      if (p?.vehicle_plate) {
+        if (!vehiclePlate || p.vehicle_plate !== vehiclePlate) return false;
+      }
+      return true;
+    });
+    return localMatch ?? crossEvidence ?? undefined;
+  })();
   const buonnyValid =
-    buonnyEvidence && buonnyEvidence.expires_at
+    !!buonnyEvidence && !!buonnyEvidence.expires_at
       ? new Date(buonnyEvidence.expires_at) > new Date()
       : false;
 
@@ -162,6 +267,61 @@ export function RiskWorkflowWizard({
 
     // Await evidence refetch so buonnyValid updates immediately
     await qc.refetchQueries({ queryKey: ['risk-evidence', evalId] });
+  };
+
+  const buonnyCheck = useBuonnyProfessionalCheck();
+
+  const handleAutoCheck = async () => {
+    if (!resolvedDriverCpf) {
+      toast.error('CPF do motorista não cadastrado');
+      return;
+    }
+    if (!vehiclePlate) {
+      toast.error('Placa do veículo não atribuída');
+      return;
+    }
+
+    type AutoStatus = 'adequado' | 'insuficiente' | 'divergente' | 'expirado';
+    type EvidSt = 'valid' | 'pending' | 'invalid' | 'expired';
+    const apiMap: Record<string, { status_buonny: AutoStatus; evidenceStatus: EvidSt }> = {
+      'PERFIL ADEQUADO AO RISCO': { status_buonny: 'adequado', evidenceStatus: 'valid' },
+      'PERFIL DIVERGENTE': { status_buonny: 'divergente', evidenceStatus: 'invalid' },
+      'PERFIL COM INSUFICIÊNCIA DE DADOS': {
+        status_buonny: 'insuficiente',
+        evidenceStatus: 'pending',
+      },
+      'EM ANÁLISE': { status_buonny: 'insuficiente', evidenceStatus: 'pending' },
+      'PERFIL EXPIRADO': { status_buonny: 'expirado', evidenceStatus: 'expired' },
+    };
+
+    try {
+      const resp = await buonnyCheck.mutateAsync({
+        order_id: orderId,
+        driver_cpf: resolvedDriverCpf,
+        vehicle_plate: vehiclePlate,
+        cargo_value: cargoValue,
+        origin_uf: originUf,
+        destination_uf: destinationUf,
+      });
+      const mapped = apiMap[resp.status] ?? {
+        status_buonny: 'divergente' as AutoStatus,
+        evidenceStatus: 'invalid' as EvidSt,
+      };
+      await handleBuonnyRegistration({
+        ...mapped,
+        codigo_liberacao: resp.numero_liberacao ?? '',
+        numero_conjunto: '',
+        validade: 'um_embarque',
+        driver_cpf: resolvedDriverCpf,
+        driver_name: driverName ?? '',
+        vehicle_plate: vehiclePlate,
+        vehicle_type: vehicleTypeName ?? '',
+        proprietario: '',
+      });
+      toast.success(`Buonny: ${resp.status}${resp.is_stub ? ' (stub)' : ''}`);
+    } catch (err) {
+      toast.error(`Erro na consulta: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const handleToggleRequirement = async (req: string, met: boolean) => {
@@ -266,13 +426,16 @@ export function RiskWorkflowWizard({
             <>
               <StepBuonny
                 driverName={driverName}
-                driverCpf={driverCpf}
+                driverCpf={resolvedDriverCpf}
                 vehiclePlate={vehiclePlate}
                 vehicleTypeName={vehicleTypeName}
                 buonnyEvidence={buonnyEvidence}
                 buonnyValid={buonnyValid}
-                isEditable={isEditable}
+                isEditable={isBuonnyEditable}
                 onOpenRegistration={() => setBuonnyModalOpen(true)}
+                onAutoCheck={handleAutoCheck}
+                isAutoChecking={buonnyCheck.isPending}
+                autoCheckError={buonnyCheck.isError ? (buonnyCheck.error?.message ?? 'Erro') : null}
                 canAdvance={step1Complete}
                 onNext={() => setCurrentStep('rules')}
               />
@@ -280,7 +443,7 @@ export function RiskWorkflowWizard({
                 open={buonnyModalOpen}
                 onOpenChange={setBuonnyModalOpen}
                 driverName={driverName}
-                driverCpf={driverCpf}
+                driverCpf={resolvedDriverCpf}
                 vehiclePlate={vehiclePlate}
                 vehicleTypeName={vehicleTypeName}
                 onSubmit={handleBuonnyRegistration}
@@ -294,6 +457,8 @@ export function RiskWorkflowWizard({
               cargoValue={cargoValue}
               kmDistance={kmDistance}
               evaluation={evaluation}
+              policyChecks={policyChecks}
+              aggregateExposureWarning={aggregateExposureWarning}
               isEditable={isEditable}
               canAdvance={step2Complete}
               onNext={() => setCurrentStep('evidence')}
@@ -319,6 +484,9 @@ export function RiskWorkflowWizard({
               critResult={critResult}
               allMet={allMet}
               buonnyValid={buonnyValid}
+              coverageOk={coverageOk}
+              policyChecks={policyChecks}
+              aggregateExposureWarning={aggregateExposureWarning}
               cargoValue={cargoValue}
               totalEstimatedCost={totalEstimatedCost}
               notes={notes}
@@ -359,6 +527,9 @@ function StepBuonny({
   buonnyValid,
   isEditable,
   onOpenRegistration,
+  onAutoCheck,
+  isAutoChecking,
+  autoCheckError,
   canAdvance,
   onNext,
 }: {
@@ -370,6 +541,9 @@ function StepBuonny({
   buonnyValid: boolean;
   isEditable: boolean;
   onOpenRegistration: () => void;
+  onAutoCheck: () => void;
+  isAutoChecking: boolean;
+  autoCheckError?: string | null;
   canAdvance: boolean;
   onNext: () => void;
 }) {
@@ -448,25 +622,44 @@ function StepBuonny({
         </div>
       )}
 
-      <div className="flex justify-between">
+      <div className="flex justify-between items-center">
         {isEditable && !buonnyValid && (
-          <Button variant="outline" size="sm" onClick={onOpenRegistration}>
-            Registrar Consulta Buonny
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={onAutoCheck} disabled={isAutoChecking}>
+              {isAutoChecking && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              {isAutoChecking ? 'Consultando...' : 'Consultar Buonny'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onOpenRegistration}
+              disabled={isAutoChecking}
+            >
+              Registrar manualmente
+            </Button>
+          </div>
         )}
         <Button size="sm" onClick={onNext} disabled={!canAdvance} className="ml-auto">
           Próximo <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
 
+      {autoCheckError && <p className="text-xs text-destructive">{autoCheckError}</p>}
+
       {!canAdvance && isEditable && (
         <p className="text-xs text-muted-foreground">
-          Registre o retorno da consulta Buonny para avançar.
+          Consulte ou registre o retorno da Buonny para avançar.
         </p>
       )}
     </div>
   );
 }
+
+type AggregateExposureWarning = {
+  totalExposure: number;
+  limit: number;
+  otherOrders: { id: string; cargo_value: number | null; os_number: string; stage: string }[];
+} | null;
 
 // Step 2: Rules & Criticality
 function StepRules({
@@ -474,6 +667,8 @@ function StepRules({
   cargoValue,
   kmDistance,
   evaluation,
+  policyChecks,
+  aggregateExposureWarning,
   isEditable,
   canAdvance,
   onNext,
@@ -483,6 +678,15 @@ function StepRules({
   cargoValue: number;
   kmDistance: number;
   evaluation: unknown;
+  policyChecks: ReturnType<typeof validateCoverage> extends infer R
+    ? {
+        policy: import('@/hooks/useRiskPolicies').RiskPolicy;
+        coverage: ReturnType<typeof validateCoverage>;
+        validity: ReturnType<typeof validateValidity>;
+        premium: number;
+      }[]
+    : never;
+  aggregateExposureWarning: AggregateExposureWarning;
   isEditable: boolean;
   canAdvance: boolean;
   onNext: () => void;
@@ -531,6 +735,82 @@ function StepRules({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Insurance policy coverage */}
+      {policyChecks.length > 0 && (
+        <div className="space-y-2">
+          <span className="text-sm font-medium">Cobertura do Seguro</span>
+          {policyChecks.map(({ policy, coverage, validity, premium }) => {
+            const ok = coverage.ok && validity.ok;
+            return (
+              <div
+                key={policy.id}
+                className={cn(
+                  'rounded-lg border p-3 text-xs space-y-1',
+                  ok
+                    ? 'border-green-200 bg-green-50 dark:bg-green-950/20'
+                    : 'border-red-200 bg-red-50 dark:bg-red-950/20'
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">{policy.policy_type}</span>
+                  {ok ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-500" />
+                  )}
+                </div>
+                <div className="text-muted-foreground">{policy.insurer}</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                  <span className="text-muted-foreground">Limite:</span>
+                  <span className="font-medium tabular-nums">
+                    {formatCurrency(policy.coverage_limit ?? 0)}
+                  </span>
+                  <span className="text-muted-foreground">Prêmio estimado:</span>
+                  <span className="font-medium tabular-nums">{formatCurrency(premium)}</span>
+                  <span className="text-muted-foreground">Vigência até:</span>
+                  <span className="font-medium">
+                    {policy.valid_until
+                      ? new Date(policy.valid_until + 'T12:00:00').toLocaleDateString('pt-BR')
+                      : '—'}
+                  </span>
+                </div>
+                {!coverage.ok && <p className="text-red-600 font-medium">{coverage.message}</p>}
+                {!validity.ok && <p className="text-red-600 font-medium">{validity.message}</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {aggregateExposureWarning && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2 text-sm">
+          <div className="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-300">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            Exposição agregada excede o limite da apólice
+          </div>
+          <div className="text-xs text-amber-700 dark:text-amber-400 space-y-1">
+            <div>
+              Total deste motorista:{' '}
+              <span className="font-medium tabular-nums">
+                {formatCurrency(aggregateExposureWarning.totalExposure)}
+              </span>{' '}
+              — Limite:{' '}
+              <span className="font-medium tabular-nums">
+                {formatCurrency(aggregateExposureWarning.limit)}
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              <span className="font-medium">Outras OS ativas deste motorista:</span>
+              {aggregateExposureWarning.otherOrders.map((o) => (
+                <div key={o.id} className="pl-3">
+                  • OS {o.os_number} — {formatCurrency(o.cargo_value ?? 0)}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -647,6 +927,9 @@ function StepSubmit({
   critResult,
   allMet,
   buonnyValid,
+  coverageOk,
+  policyChecks,
+  aggregateExposureWarning,
   cargoValue,
   totalEstimatedCost,
   notes,
@@ -660,6 +943,14 @@ function StepSubmit({
   critResult: ReturnType<typeof evaluateCriticality> | null;
   allMet: boolean;
   buonnyValid: boolean;
+  coverageOk: boolean;
+  policyChecks: {
+    policy: import('@/hooks/useRiskPolicies').RiskPolicy;
+    coverage: ReturnType<typeof validateCoverage>;
+    validity: ReturnType<typeof validateValidity>;
+    premium: number;
+  }[];
+  aggregateExposureWarning: AggregateExposureWarning;
   cargoValue: number;
   totalEstimatedCost: number;
   notes: string;
@@ -674,6 +965,7 @@ function StepSubmit({
     !!evaluation &&
     buonnyValid &&
     allMet &&
+    coverageOk &&
     isEditable &&
     eval_?.status !== 'evaluated' &&
     eval_?.status !== 'approved';
@@ -683,7 +975,8 @@ function StepSubmit({
     critResult &&
     (critResult.criticality === 'LOW' || critResult.criticality === 'MEDIUM') &&
     allMet &&
-    buonnyValid;
+    buonnyValid &&
+    coverageOk;
 
   return (
     <div className="space-y-4" data-testid="risk-step-submit">
@@ -714,6 +1007,40 @@ function StepSubmit({
           )}
           <span>Avaliação de criticidade</span>
         </div>
+        <div className="flex items-center gap-2">
+          {coverageOk ? (
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+          ) : (
+            <XCircle className="h-4 w-4 text-red-500" />
+          )}
+          <span>Cobertura do seguro</span>
+          {!coverageOk && policyChecks.length > 0 && (
+            <span className="text-xs text-red-600">
+              —{' '}
+              {policyChecks.find((c) => !c.coverage.ok || !c.validity.ok)?.coverage.message ??
+                policyChecks.find((c) => !c.validity.ok)?.validity.message}
+            </span>
+          )}
+        </div>
+        {aggregateExposureWarning && (
+          <div className="flex items-start gap-2">
+            <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+            <div className="space-y-1">
+              <span>Exposição agregada do motorista</span>
+              <div className="text-xs text-red-600 font-medium">
+                Total {formatCurrency(aggregateExposureWarning.totalExposure)} excede limite{' '}
+                {formatCurrency(aggregateExposureWarning.limit)}
+              </div>
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                {aggregateExposureWarning.otherOrders.map((o) => (
+                  <div key={o.id} className="pl-2">
+                    • OS {o.os_number} — {formatCurrency(o.cargo_value ?? 0)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {critResult && (
@@ -751,8 +1078,8 @@ function StepSubmit({
 
       {isSubmitted && !isAutoApproved && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-3 flex items-center gap-2 text-sm">
-          <Clock className="h-4 w-4 text-blue-600" />
-          Avaliação enviada. Aguardando aprovação gerencial.
+          <CheckCircle2 className="h-4 w-4 text-blue-600" />
+          Avaliação de risco salva.
         </div>
       )}
 
@@ -760,17 +1087,15 @@ function StepSubmit({
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ChevronLeft className="h-4 w-4" /> Voltar
         </Button>
-        {isEditable && !isSubmitted && !isAutoApproved && (
+        {!isSubmitted && !isAutoApproved && (
           <Button size="sm" onClick={onSubmit} disabled={!canSubmit || isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                Enviando...
+                Salvando...
               </>
-            ) : willAutoApprove ? (
-              'Aprovar Automaticamente'
             ) : (
-              'Enviar para Aprovação'
+              'Salvar Avaliação de Risco'
             )}
           </Button>
         )}
