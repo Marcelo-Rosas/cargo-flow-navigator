@@ -13,14 +13,12 @@ export interface GeminiResult {
   model: GeminiModel;
 }
 
-export async function callGemini(
+async function callGeminiModel(
   prompt: string,
-  model: GeminiModel = 'gemini-2.0-flash',
-  temperature = 0.4
+  model: GeminiModel,
+  temperature: number,
+  apiKey: string
 ): Promise<GeminiResult> {
-  const apiKey = (globalThis as any).Deno.env.get('GEMINI_API_KEY');
-  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
-
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
@@ -30,7 +28,7 @@ export async function callGemini(
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 2048,
           responseMimeType: 'application/json',
         },
       }),
@@ -39,7 +37,7 @@ export async function callGemini(
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${err}`);
+    throw new Error(`Gemini API error ${res.status} (model=${model}): ${err}`);
   }
 
   const data = await res.json();
@@ -50,6 +48,29 @@ export async function callGemini(
   };
 
   return { text, usage, model };
+}
+
+export async function callGemini(
+  prompt: string,
+  model: GeminiModel = 'gemini-2.0-flash',
+  temperature = 0.4
+): Promise<GeminiResult> {
+  const apiKey = (globalThis as any).Deno.env.get('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+
+  try {
+    return await callGeminiModel(prompt, model, temperature, apiKey);
+  } catch (primaryErr) {
+    // Fallback to flash if a non-flash model fails (model not found, quota, etc.)
+    if (model !== 'gemini-2.0-flash') {
+      console.warn(
+        `[gemini] primary model ${model} failed, falling back to gemini-2.0-flash:`,
+        primaryErr
+      );
+      return await callGeminiModel(prompt, 'gemini-2.0-flash', temperature, apiKey);
+    }
+    throw primaryErr;
+  }
 }
 
 /** Mapeia analysisType → modelo Gemini */
