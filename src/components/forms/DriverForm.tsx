@@ -26,6 +26,7 @@ import { useCreateDriver, useUpdateDriver } from '@/hooks/useDrivers';
 import { useCreateOwner } from '@/hooks/useOwners';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useUpdateVehicle } from '@/hooks/useVehicles';
+import { useCnhCategories } from '@/hooks/useCnhCategories';
 import { toast } from 'sonner';
 import type { Driver } from '@/hooks/useDrivers';
 import { zodPhone } from '@/lib/validators';
@@ -47,7 +48,7 @@ const driverSchema = z.object({
       (v) => !v || /^\d{11}$/.test(v.replace(/\D/g, '')),
       'CNH inválida – informe 11 dígitos'
     ),
-  cnh_category: z.enum(['A', 'AB', 'B', 'C', 'D', 'E', '']).optional(),
+  cnh_category: z.string().optional(),
   antt: z.string().optional(),
   is_owner: z.boolean(),
   active: z.boolean(),
@@ -182,7 +183,7 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
 
   const isLoading = createDriverMutation.isPending || updateDriverMutation.isPending;
 
-  const cnhCategories = ['', 'A', 'AB', 'B', 'C', 'D', 'E'] as const;
+  const { data: cnhCategories = [] } = useCnhCategories();
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -302,9 +303,10 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
                           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                           {...field}
                         >
+                          <option value="">Selecionar...</option>
                           {cnhCategories.map((cat) => (
-                            <option key={cat} value={cat}>
-                              {cat === '' ? 'Selecionar...' : `Categoria ${cat}`}
+                            <option key={cat.code} value={cat.code}>
+                              {`${cat.code} — ${cat.description}`}
                             </option>
                           ))}
                         </select>
