@@ -85,7 +85,8 @@ export function BuonnyRegistrationModal({
         .select('owners!vehicles_owner_id_fkey(name)')
         .eq('plate', vehiclePlate!)
         .single();
-      return ((data as any)?.owners?.name as string | null) ?? null;
+      const row = data as { owners: { name: string } | null } | null;
+      return row?.owners?.name ?? null;
     },
   });
 
