@@ -64,7 +64,7 @@ import {
   resolvePricingRule,
   type PricingRuleConfig,
 } from '@/hooks/usePricingRules';
-import { useVehicleTypesOperational } from '@/hooks/useVehicleTypes';
+import { useVehicleTypes as useVehicleTypesOperational } from '@/hooks/useVehicleTypes';
 import { usePriceTableRowByKmRange, usePriceTableRows } from '@/hooks/usePriceTableRows';
 import {
   AdditionalFeesSection,
