@@ -96,14 +96,17 @@ export function RiskWorkflowWizard({
   const { data: rules } = useRiskPolicyRules(activePolicy?.id);
   const { data: activePolicies = [] } = useActivePolicies();
 
-  // Busca CPF do motorista diretamente quando o prop não vem preenchido
+  // Busca dados do motorista/veículo direto da OS quando os props chegam nulos
+  // (janela de propagação após "Aplicar à OS" antes do refetch do componente pai)
   const { data: driverRecord } = useQuery({
     queryKey: ['wizard-driver-cpf', orderId],
-    enabled: !driverCpf,
+    enabled: !driverCpf || !vehiclePlate || !driverName,
     queryFn: async () => {
       const { data } = await supabase
         .from('orders')
-        .select('driver_id, drivers!orders_driver_id_fkey(cpf)')
+        .select(
+          'driver_id, driver_name, vehicle_plate, vehicle_type_name, drivers!orders_driver_id_fkey(cpf)'
+        )
         .eq('id', orderId)
         .single();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -111,12 +114,18 @@ export function RiskWorkflowWizard({
       return {
         cpf: (d?.drivers?.cpf as string | null) ?? null,
         driver_id: (d?.driver_id as string | null) ?? null,
+        driver_name: (d?.driver_name as string | null) ?? null,
+        vehicle_plate: (d?.vehicle_plate as string | null) ?? null,
+        vehicle_type_name: (d?.vehicle_type_name as string | null) ?? null,
       };
     },
   });
 
   const resolvedDriverCpf = driverCpf || driverRecord?.cpf || undefined;
   const resolvedDriverId = driverRecord?.driver_id ?? null;
+  const resolvedDriverName = driverName || driverRecord?.driver_name || undefined;
+  const resolvedVehiclePlate = vehiclePlate || driverRecord?.vehicle_plate || undefined;
+  const resolvedVehicleTypeName = vehicleTypeName || driverRecord?.vehicle_type_name || undefined;
 
   const { data: driverExposure } = useDriverActiveExposure(resolvedDriverId, orderId);
 
@@ -153,8 +162,8 @@ export function RiskWorkflowWizard({
 
   // Fallback: busca evidência Buonny válida em outras avaliações do mesmo driver+placa
   const { data: crossEvidence } = useQuery({
-    queryKey: ['buonny-cross-evidence', resolvedDriverCpf, vehiclePlate],
-    enabled: !!resolvedDriverCpf && !!vehiclePlate,
+    queryKey: ['buonny-cross-evidence', resolvedDriverCpf, resolvedVehiclePlate],
+    enabled: !!resolvedDriverCpf && !!resolvedVehiclePlate,
     queryFn: async () => {
       const { data } = await supabase
         .from('risk_evidence' as 'documents')
@@ -168,7 +177,7 @@ export function RiskWorkflowWizard({
       return (
         rows.find((e) => {
           const p = e.payload as Record<string, unknown> | null;
-          return p?.driver_cpf === resolvedDriverCpf && p?.vehicle_plate === vehiclePlate;
+          return p?.driver_cpf === resolvedDriverCpf && p?.vehicle_plate === resolvedVehiclePlate;
         }) ?? null
       );
     },
@@ -176,8 +185,8 @@ export function RiskWorkflowWizard({
   });
 
   const { data: crossAnttEvidence } = useQuery({
-    queryKey: ['antt-cross-evidence', resolvedDriverCpf, vehiclePlate],
-    enabled: !!resolvedDriverCpf && !!vehiclePlate,
+    queryKey: ['antt-cross-evidence', resolvedDriverCpf, resolvedVehiclePlate],
+    enabled: !!resolvedDriverCpf && !!resolvedVehiclePlate,
     queryFn: async () => {
       const { data } = await supabase
         .from('risk_evidence' as 'documents')
@@ -189,7 +198,7 @@ export function RiskWorkflowWizard({
         .limit(10);
       const rows = (data ?? []) as RiskEvidence[];
       const cpfNorm = onlyDigits(resolvedDriverCpf ?? '');
-      const plateNorm = normalizePlate(vehiclePlate ?? '');
+      const plateNorm = normalizePlate(resolvedVehiclePlate ?? '');
       return (
         rows.find((e) => {
           const p = e.payload as Record<string, unknown> | null;
@@ -231,7 +240,7 @@ export function RiskWorkflowWizard({
         if (!resolvedDriverCpf || p.driver_cpf !== resolvedDriverCpf) return false;
       }
       if (p?.vehicle_plate) {
-        if (!vehiclePlate || p.vehicle_plate !== vehiclePlate) return false;
+        if (!resolvedVehiclePlate || p.vehicle_plate !== resolvedVehiclePlate) return false;
       }
       return true;
     });
@@ -252,8 +261,8 @@ export function RiskWorkflowWizard({
       }
       if (p?.vehicle_plate) {
         if (
-          !vehiclePlate ||
-          normalizePlate(String(p.vehicle_plate)) !== normalizePlate(vehiclePlate)
+          !resolvedVehiclePlate ||
+          normalizePlate(String(p.vehicle_plate)) !== normalizePlate(resolvedVehiclePlate)
         )
           return false;
       }
@@ -362,7 +371,7 @@ export function RiskWorkflowWizard({
       toast.error('Informe um CPF (11) ou CNPJ (14 dígitos) válido no cadastro do motorista');
       return;
     }
-    if (!vehiclePlate) {
+    if (!resolvedVehiclePlate) {
       toast.error('Placa do veículo não atribuída');
       return;
     }
@@ -370,7 +379,7 @@ export function RiskWorkflowWizard({
       const resp = await anttCheck.mutateAsync({
         order_id: orderId,
         cpf_cnpj: digits,
-        vehicle_plate: vehiclePlate,
+        vehicle_plate: resolvedVehiclePlate,
       });
       const evalId = await ensureEvaluationId();
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -386,7 +395,7 @@ export function RiskWorkflowWizard({
           situacao: resp.situacao,
           rntrc: resp.rntrc ?? null,
           cpf_cnpj: digits,
-          vehicle_plate: normalizePlate(vehiclePlate),
+          vehicle_plate: normalizePlate(resolvedVehiclePlate),
           is_stub: resp.is_stub,
           consult_source: 'auto',
         },
@@ -403,7 +412,7 @@ export function RiskWorkflowWizard({
       toast.error('CPF do motorista não cadastrado');
       return;
     }
-    if (!vehiclePlate) {
+    if (!resolvedVehiclePlate) {
       toast.error('Placa do veículo não atribuída');
       return;
     }
@@ -425,7 +434,7 @@ export function RiskWorkflowWizard({
       const resp = await buonnyCheck.mutateAsync({
         order_id: orderId,
         driver_cpf: resolvedDriverCpf,
-        vehicle_plate: vehiclePlate,
+        vehicle_plate: resolvedVehiclePlate,
         cargo_value: cargoValue,
         origin_uf: originUf,
         destination_uf: destinationUf,
@@ -440,9 +449,9 @@ export function RiskWorkflowWizard({
         numero_conjunto: '',
         validade: 'um_embarque',
         driver_cpf: resolvedDriverCpf,
-        driver_name: driverName ?? '',
-        vehicle_plate: vehiclePlate,
-        vehicle_type: vehicleTypeName ?? '',
+        driver_name: resolvedDriverName ?? '',
+        vehicle_plate: resolvedVehiclePlate,
+        vehicle_type: resolvedVehicleTypeName ?? '',
         proprietario: '',
       });
       toast.success(`Buonny: ${resp.status}${resp.is_stub ? ' (stub)' : ''}`);
@@ -556,10 +565,10 @@ export function RiskWorkflowWizard({
         <CardContent className="pt-6">
           {currentStep === 'antt' && (
             <StepAntt
-              driverName={driverName}
+              driverName={resolvedDriverName}
               driverCpf={resolvedDriverCpf}
-              vehiclePlate={vehiclePlate}
-              vehicleTypeName={vehicleTypeName}
+              vehiclePlate={resolvedVehiclePlate}
+              vehicleTypeName={resolvedVehicleTypeName}
               anttEvidence={anttEvidence}
               anttValid={anttValid}
               isEditable={isBuonnyEditable}
@@ -573,10 +582,10 @@ export function RiskWorkflowWizard({
           {currentStep === 'buonny' && (
             <>
               <StepBuonny
-                driverName={driverName}
+                driverName={resolvedDriverName}
                 driverCpf={resolvedDriverCpf}
-                vehiclePlate={vehiclePlate}
-                vehicleTypeName={vehicleTypeName}
+                vehiclePlate={resolvedVehiclePlate}
+                vehicleTypeName={resolvedVehicleTypeName}
                 buonnyEvidence={buonnyEvidence}
                 buonnyValid={buonnyValid}
                 isEditable={isBuonnyEditable}
@@ -591,10 +600,10 @@ export function RiskWorkflowWizard({
               <BuonnyRegistrationModal
                 open={buonnyModalOpen}
                 onOpenChange={setBuonnyModalOpen}
-                driverName={driverName}
+                driverName={resolvedDriverName}
                 driverCpf={resolvedDriverCpf}
-                vehiclePlate={vehiclePlate}
-                vehicleTypeName={vehicleTypeName}
+                vehiclePlate={resolvedVehiclePlate}
+                vehicleTypeName={resolvedVehicleTypeName}
                 onSubmit={handleBuonnyRegistration}
                 isLoading={addEvidence.isPending || evaluateRisk.isPending}
               />
