@@ -51,21 +51,72 @@ export function calculatePremium(policy: RiskPolicy, cargoValue: number): number
   return Math.round(cargoValue * (premiumRate / 100) * 100) / 100;
 }
 
+const RJ_UF = 'RJ';
+
+function fmt(v: number) {
+  return v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+}
+
 /**
  * Verifica se a carga está dentro da cobertura da apólice.
+ * Aplica sublimites regionais do metadata.lmg_breakdown quando a rota passa pelo RJ metropolitano.
  */
 export function validateCoverage(
   policy: RiskPolicy,
-  cargoValue: number
-): { ok: boolean; message?: string } {
-  if (!policy.coverage_limit) return { ok: true };
-  if (cargoValue > policy.coverage_limit) {
+  cargoValue: number,
+  context?: { destinationUf?: string }
+): { ok: boolean; message?: string; appliedLimit: number } {
+  const lmg = policy.metadata?.lmg_breakdown as Record<string, number> | null | undefined;
+  const baseLimit = policy.coverage_limit ?? 0;
+
+  // Sublimite RJ metropolitano (Berkley: R$ 600.000)
+  const isRjRoute = context?.destinationUf?.toUpperCase() === RJ_UF;
+  const rjLimit = lmg?.rj_metropolitano;
+  const appliedLimit = isRjRoute && rjLimit ? rjLimit : baseLimit;
+
+  if (!appliedLimit) return { ok: true, appliedLimit: 0 };
+
+  if (cargoValue > appliedLimit) {
+    const region = isRjRoute && rjLimit ? ' (sublimite RJ Metropolitano)' : '';
     return {
       ok: false,
-      message: `Valor da carga (R$ ${cargoValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) excede cobertura ${policy.policy_type} (R$ ${policy.coverage_limit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`,
+      appliedLimit,
+      message: `Valor da carga R$ ${fmt(cargoValue)} excede limite ${policy.policy_type}${region}: R$ ${fmt(appliedLimit)}`,
     };
   }
-  return { ok: true };
+  return { ok: true, appliedLimit };
+}
+
+/**
+ * Exposição agregada de um motorista: soma dos cargo_value de todas as OS ativas
+ * no mesmo motorista, excluindo a OS atual.
+ */
+export function useDriverActiveExposure(
+  driverId: string | null | undefined,
+  currentOrderId: string
+) {
+  return useQuery({
+    queryKey: ['driver-exposure', driverId],
+    enabled: !!driverId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, cargo_value, os_number, stage')
+        .eq('driver_id', driverId!)
+        .in('stage', ['busca_motorista', 'documentacao', 'coleta_realizada', 'em_transito'])
+        .neq('id', currentOrderId);
+      if (error) throw error;
+      const rows = (data ?? []) as {
+        id: string;
+        cargo_value: number | null;
+        os_number: string;
+        stage: string;
+      }[];
+      const totalOtherOrders = rows.reduce((s, r) => s + (r.cargo_value ?? 0), 0);
+      return { rows, totalOtherOrders };
+    },
+    staleTime: 60_000,
+  });
 }
 
 /**

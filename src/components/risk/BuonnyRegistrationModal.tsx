@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -74,6 +76,26 @@ export function BuonnyRegistrationModal({
   const [dataValidade, setDataValidade] = useState('');
   const [proprietario, setProprietario] = useState('');
 
+  const { data: ownerName } = useQuery({
+    queryKey: ['vehicle-owner', vehiclePlate],
+    enabled: open && !!vehiclePlate,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('vehicles')
+        .select('owners!vehicles_owner_id_fkey(name)')
+        .eq('plate', vehiclePlate!)
+        .single();
+      const row = data as { owners: { name: string } | null } | null;
+      return row?.owners?.name ?? null;
+    },
+  });
+
+  useEffect(() => {
+    if (ownerName && !proprietario) {
+      setProprietario(ownerName);
+    }
+  }, [ownerName]);
+
   const statusOption = STATUS_OPTIONS.find((s) => s.value === statusBuonny);
   const canSubmit = codigoLiberacao.trim() && statusBuonny && !isLoading;
 
@@ -92,7 +114,6 @@ export function BuonnyRegistrationModal({
       vehicle_type: vehicleTypeName ?? '',
       proprietario: proprietario.trim(),
     });
-    // Reset form
     setCodigoLiberacao('');
     setNumeroConjunto('');
     setStatusBuonny('');
@@ -197,11 +218,7 @@ export function BuonnyRegistrationModal({
           {/* Proprietário */}
           <div className="space-y-1.5">
             <Label>Proprietário do veículo</Label>
-            <Input
-              placeholder="Ex: FAGNER MARTINS DA SILVA"
-              value={proprietario}
-              onChange={(e) => setProprietario(e.target.value)}
-            />
+            <Input placeholder="Buscando via placa..." value={proprietario} readOnly disabled />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

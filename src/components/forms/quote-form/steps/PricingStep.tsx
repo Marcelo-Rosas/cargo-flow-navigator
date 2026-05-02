@@ -89,9 +89,12 @@ export function PricingStep({
 
   const showAllIn = !isLegacy && calculationResult?.status === 'OK' && (t?.totalCliente ?? 0) > 0;
 
-  // Auto-fill delivery days when ALL-IN becomes visible
+  // Auto-fill delivery days only if fields are still empty (respects manual edits)
   useEffect(() => {
-    if (showAllIn) {
+    if (!showAllIn) return;
+    const currentMin = form.getValues('delivery_days_min');
+    const currentMax = form.getValues('delivery_days_max');
+    if (currentMin == null && currentMax == null) {
       form.setValue('delivery_days_min', deliveryDays.min);
       form.setValue('delivery_days_max', deliveryDays.max);
     }

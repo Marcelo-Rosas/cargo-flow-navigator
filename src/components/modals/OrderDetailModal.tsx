@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import {
+  useBuonnyProfessionalCheck,
+  type ProfessionalCheckResponse,
+} from '@/hooks/useBuonnyProfessionalCheck';
+import {
   MapPin,
   Truck,
   Phone,
@@ -24,6 +28,10 @@ import {
   AlertCircle,
   IdCard,
   Shield,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldQuestion,
+  UserX,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -198,11 +206,12 @@ export function OrderDetailModal({
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [plateInput, setPlateInput] = useState('');
   const [plateToSearch, setPlateToSearch] = useState<string | null>(null);
+  const [driverUnlinked, setDriverUnlinked] = useState(false);
 
   const isBuscaMotorista = order?.stage === 'busca_motorista';
   const canConvertToPAG = canManage && order?.stage === 'coleta_realizada';
   const { data: vehicleByPlate, isLoading: vehicleByPlateLoading } = useVehicleByPlate(
-    isBuscaMotorista && plateToSearch ? plateToSearch : null
+    (isBuscaMotorista || driverUnlinked) && plateToSearch ? plateToSearch : null
   );
   const updateOrderMutation = useUpdateOrder();
   const ensureFinancialDocumentMutation = useEnsureFinancialDocument();
@@ -213,11 +222,17 @@ export function OrderDetailModal({
   const tripId = order?.trip_id ?? (tripForOrder as { id?: string } | null)?.id ?? undefined;
   const { data: tripRiskEval } = useRiskEvaluationByEntity('trip', tripId);
 
+  // Reset plate input when the plate changes externally (apply vehicle, new OS, modal reopen)
   useEffect(() => {
     if (order?.vehicle_plate != null) setPlateInput(order.vehicle_plate);
     else setPlateInput('');
     setPlateToSearch(null);
-  }, [order?.id, order?.vehicle_plate, open]);
+  }, [order?.vehicle_plate]);
+
+  // Reset unlink state only when opening a different OS or reopening the modal
+  useEffect(() => {
+    setDriverUnlinked(false);
+  }, [order?.id, open]);
 
   const handleBuscarPorPlaca = () => {
     const trimmed = plateInput.replace(/\s|-/g, '').toUpperCase().trim();
@@ -231,22 +246,60 @@ export function OrderDetailModal({
       await updateOrderMutation.mutateAsync({
         id: order.id,
         updates: {
-          vehicle_plate: vehicleByPlate.plate,
-          vehicle_brand: vehicleByPlate.brand ?? null,
-          vehicle_model: vehicleByPlate.model ?? null,
-          vehicle_type_name: vehicleByPlate.vehicle_type?.name ?? null,
+          driver_id: vehicleByPlate.driver?.id ?? null,
           driver_name: vehicleByPlate.driver?.name ?? null,
           driver_phone: vehicleByPlate.driver?.phone ?? null,
           driver_cnh: vehicleByPlate.driver?.cnh ?? null,
           driver_antt: vehicleByPlate.driver?.antt ?? null,
+          vehicle_plate: vehicleByPlate.plate,
+          vehicle_brand: vehicleByPlate.brand ?? null,
+          vehicle_model: vehicleByPlate.model ?? null,
+          vehicle_type_id: vehicleByPlate.vehicle_type?.id ?? null,
+          vehicle_type_name: vehicleByPlate.vehicle_type?.name ?? null,
           owner_name: vehicleByPlate.owner?.name ?? null,
           owner_phone: vehicleByPlate.owner?.phone ?? null,
         },
       });
       toast.success('Veículo, motorista e proprietário aplicados à OS');
       setPlateToSearch(null);
+      setDriverUnlinked(false);
     } catch {
       toast.error('Erro ao aplicar à OS');
+    }
+  };
+
+  const handleUnlinkDriver = async () => {
+    if (!order?.id) return;
+    if (
+      !window.confirm(
+        'Desvincular motorista e veículo desta OS?\nO histórico de consultas Buonny será mantido, mas você precisará atribuir um novo motorista.'
+      )
+    )
+      return;
+    try {
+      await updateOrderMutation.mutateAsync({
+        id: order.id,
+        updates: {
+          driver_id: null,
+          driver_name: null,
+          driver_phone: null,
+          driver_cnh: null,
+          driver_antt: null,
+          vehicle_plate: null,
+          vehicle_brand: null,
+          vehicle_model: null,
+          vehicle_type_name: null,
+          vehicle_type_id: null,
+          owner_name: null,
+          owner_phone: null,
+        },
+      });
+      setDriverUnlinked(true);
+      setPlateInput('');
+      queryClient.invalidateQueries({ queryKey: ['wizard-driver-cpf', order.id] });
+      toast.success('Motorista desvinculado — atribua um novo pela placa');
+    } catch {
+      toast.error('Erro ao desvincular motorista');
     }
   };
 
@@ -545,6 +598,13 @@ export function OrderDetailModal({
   );
 
   if (!order) return null;
+
+  // Props do wizard — zerados imediatamente no desvínculo, sem depender do refetch
+  const wizardDriverName = driverUnlinked ? undefined : (order.driver_name ?? undefined);
+  const wizardDriverCpf = driverUnlinked ? undefined : (order.driver?.cpf ?? undefined);
+  const wizardVehiclePlate = driverUnlinked ? undefined : (order.vehicle_plate ?? undefined);
+  const wizardVehicleType = driverUnlinked ? undefined : (order.vehicle_type_name ?? undefined);
+  const wizardDriverKey = driverUnlinked ? 'unlinked' : (order.driver_id ?? 'none');
 
   const stageInfo = STAGE_LABELS[order.stage];
 
@@ -914,8 +974,8 @@ export function OrderDetailModal({
                   </div>
                 )}
 
-                {/* Busca por placa (stage Busca Motorista) - preenche veículo, motorista e proprietário na OS */}
-                {isBuscaMotorista && canManage && (
+                {/* Busca por placa - visível em busca_motorista ou quando motorista foi desvinculado */}
+                {canManage && (isBuscaMotorista || driverUnlinked) && (
                   <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
                     <p className="text-sm font-medium text-foreground">
                       Preencher veículo, motorista e proprietário pela placa
@@ -1002,72 +1062,88 @@ export function OrderDetailModal({
                 )}
 
                 {/* Motorista e Proprietário (via veículo) - visível a partir de Busca Motorista */}
-                {showDriverSection && (order.driver_name || order.owner_name) && (
-                  <div className="space-y-3">
-                    {order.driver_name && (
-                      <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Truck className="w-6 h-6 text-primary" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                              Motorista
-                            </p>
-                            <p className="font-semibold text-foreground">{order.driver_name}</p>
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-1">
-                              {order.driver_phone && (
-                                <span className="flex items-center gap-1">
-                                  <Phone className="w-3.5 h-3.5" />
-                                  {order.driver_phone}
-                                </span>
-                              )}
-                              {order.driver_cnh && <span>CNH: {order.driver_cnh}</span>}
-                              {order.driver_antt && <span>ANTT: {order.driver_antt}</span>}
+                {showDriverSection &&
+                  !driverUnlinked &&
+                  (order.driver_name || order.owner_name) && (
+                    <div className="space-y-3">
+                      {order.driver_name && (
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                              <Truck className="w-6 h-6 text-primary" />
                             </div>
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-1">
-                              {order.vehicle_plate && (
-                                <span className="font-mono">{order.vehicle_plate}</span>
-                              )}
-                              {order.vehicle_brand && order.vehicle_model && (
-                                <span>
-                                  {order.vehicle_brand} {order.vehicle_model}
-                                </span>
-                              )}
-                              {order.vehicle_type_name && (
-                                <span>Tipo: {order.vehicle_type_name}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {order.owner_name && (
-                      <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                            <Building2 className="w-6 h-6 text-muted-foreground" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                              Proprietário
-                            </p>
-                            <p className="font-semibold text-foreground">{order.owner_name}</p>
-                            {order.owner_phone && (
-                              <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                                <Phone className="w-3.5 h-3.5" />
-                                {order.owner_phone}
+                            <div className="flex-1">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                Motorista
+                              </p>
+                              <p className="font-semibold text-foreground">{order.driver_name}</p>
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-1">
+                                {order.driver_phone && (
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="w-3.5 h-3.5" />
+                                    {order.driver_phone}
+                                  </span>
+                                )}
+                                {order.driver_cnh && <span>CNH: {order.driver_cnh}</span>}
+                                {order.driver_antt && <span>ANTT: {order.driver_antt}</span>}
                               </div>
-                            )}
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-1">
+                                {order.vehicle_plate && (
+                                  <span className="font-mono">{order.vehicle_plate}</span>
+                                )}
+                                {order.vehicle_brand && order.vehicle_model && (
+                                  <span>
+                                    {order.vehicle_brand} {order.vehicle_model}
+                                  </span>
+                                )}
+                                {order.vehicle_type_name && (
+                                  <span>Tipo: {order.vehicle_type_name}</span>
+                                )}
+                              </div>
+                            </div>
+                            {canManage &&
+                              (order.stage === 'busca_motorista' ||
+                                order.stage === 'documentacao') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                                  onClick={handleUnlinkDriver}
+                                  disabled={updateOrderMutation.isPending}
+                                  title="Desvincular motorista"
+                                >
+                                  <UserX className="h-4 w-4" />
+                                </Button>
+                              )}
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                      {order.owner_name && (
+                        <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                              <Building2 className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                Proprietário
+                              </p>
+                              <p className="font-semibold text-foreground">{order.owner_name}</p>
+                              {order.owner_phone && (
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                                  <Phone className="w-3.5 h-3.5" />
+                                  {order.owner_phone}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                 {/* Qualificação do Motorista (busca_motorista stage) */}
-                {showDriverSection && order.driver_name && (
+                {showDriverSection && !driverUnlinked && order.driver_name && (
                   <DriverQualificationPanel orderId={order.id} canManage={canManage} />
                 )}
 
@@ -1486,15 +1562,20 @@ export function OrderDetailModal({
               {/* Risco Tab */}
               <TabsContent value="risco" className="m-0 space-y-4">
                 <RiskWorkflowWizard
+                  key={`risk-${order.id}-${wizardDriverKey}`}
                   orderId={order.id}
                   orderStage={order.stage}
                   cargoValue={Number(order.cargo_value ?? order.quote?.cargo_value ?? 0)}
                   kmDistance={Number(order.km_distance ?? order.quote?.km_distance ?? 0)}
-                  driverName={order.driver_name ?? undefined}
-                  driverCpf={order.driver?.cpf ?? undefined}
-                  vehiclePlate={order.vehicle_plate ?? undefined}
-                  vehicleTypeName={order.vehicle_type?.name ?? undefined}
+                  driverName={wizardDriverName}
+                  driverCpf={wizardDriverCpf}
+                  vehiclePlate={wizardVehiclePlate}
+                  vehicleTypeName={wizardVehicleType}
                   tripId={order.trip_id}
+                  originUf={order.origin?.match(/,?\s*([A-Z]{2})\s*$/i)?.[1]?.toUpperCase()}
+                  destinationUf={order.destination
+                    ?.match(/,?\s*([A-Z]{2})\s*$/i)?.[1]
+                    ?.toUpperCase()}
                 />
               </TabsContent>
 
