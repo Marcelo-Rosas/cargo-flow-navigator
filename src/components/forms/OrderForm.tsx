@@ -72,7 +72,6 @@ interface OrderFormProps {
   open: boolean;
   onClose: () => void;
   order?: OrderWithOccurrences | null;
-  hideDriverSection?: boolean;
 }
 
 function extractUF(location: string): string {
@@ -80,7 +79,7 @@ function extractUF(location: string): string {
   return m ? m[1].toUpperCase() : 'SC';
 }
 
-export function OrderForm({ open, onClose, order, hideDriverSection }: OrderFormProps) {
+export function OrderForm({ open, onClose, order }: OrderFormProps) {
   const { user } = useAuth();
   const { data: clients } = useClients();
   const { data: drivers } = useDrivers();
@@ -468,7 +467,7 @@ export function OrderForm({ open, onClose, order, hideDriverSection }: OrderForm
               </div>
             </div>
 
-            {!hideDriverSection && (
+            {!isEditing && (
               <>
                 <Separator />
 
@@ -564,141 +563,138 @@ export function OrderForm({ open, onClose, order, hideDriverSection }: OrderForm
                   </FormItem>
 
                   {/* ── Verificação Buonny ───────────────────────────────── */}
-                  {!isEditing &&
-                    (() => {
-                      const plate = form.watch('vehicle_plate');
-                      const driverId = form.watch('driver_id');
-                      const selectedDriver = drivers?.find((d) => d.id === driverId);
-                      const driverCpf = selectedDriver?.cpf;
+                  {(() => {
+                    const plate = form.watch('vehicle_plate');
+                    const driverId = form.watch('driver_id');
+                    const selectedDriver = drivers?.find((d) => d.id === driverId);
+                    const driverCpf = selectedDriver?.cpf;
 
-                      if (!plate || !driverId || !driverCpf) return null;
+                    if (!plate || !driverId || !driverCpf) return null;
 
-                      const handleCheck = () => {
-                        const origin = form.getValues('origin');
-                        const destination = form.getValues('destination');
-                        const cargoValue = form.getValues('value');
-                        buonnyCheck.mutate(
-                          {
-                            order_id: order?.id ?? 'pending',
-                            driver_cpf: driverCpf,
-                            vehicle_plate: plate,
-                            cargo_value: cargoValue,
-                            origin_uf: extractUF(origin),
-                            destination_uf: extractUF(destination),
-                            origin_city: origin.split(',')[0]?.trim(),
-                            destination_city: destination.split(',')[0]?.trim(),
-                          },
-                          { onSuccess: (data) => setBuonnyResult(data) }
-                        );
-                      };
-
-                      const statusConfig: Record<
-                        string,
-                        { label: string; icon: typeof ShieldCheck; color: string }
-                      > = {
-                        'PERFIL ADEQUADO AO RISCO': {
-                          label: 'Aprovado',
-                          icon: ShieldCheck,
-                          color: 'text-green-600 bg-green-50 border-green-200',
+                    const handleCheck = () => {
+                      const origin = form.getValues('origin');
+                      const destination = form.getValues('destination');
+                      const cargoValue = form.getValues('value');
+                      buonnyCheck.mutate(
+                        {
+                          order_id: order?.id ?? 'pending',
+                          driver_cpf: driverCpf,
+                          vehicle_plate: plate,
+                          cargo_value: cargoValue,
+                          origin_uf: extractUF(origin),
+                          destination_uf: extractUF(destination),
+                          origin_city: origin.split(',')[0]?.trim(),
+                          destination_city: destination.split(',')[0]?.trim(),
                         },
-                        'PERFIL DIVERGENTE': {
-                          label: 'Divergente',
-                          icon: ShieldAlert,
-                          color: 'text-red-600 bg-red-50 border-red-200',
-                        },
-                        'PERFIL EXPIRADO': {
-                          label: 'Expirado',
-                          icon: ShieldAlert,
-                          color: 'text-red-600 bg-red-50 border-red-200',
-                        },
-                        'PERFIL COM INSUFICIÊNCIA DE DADOS': {
-                          label: 'Insuficiência',
-                          icon: ShieldQuestion,
-                          color: 'text-orange-600 bg-orange-50 border-orange-200',
-                        },
-                        'EM ANÁLISE': {
-                          label: 'Em análise',
-                          icon: Clock,
-                          color: 'text-blue-600 bg-blue-50 border-blue-200',
-                        },
-                      };
+                        { onSuccess: (data) => setBuonnyResult(data) }
+                      );
+                    };
 
-                      return (
-                        <div className="rounded-md border p-3 space-y-2 bg-muted/20">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                              <ShieldCheck className="w-4 h-4 text-primary" />
-                              Verificação Buonny
-                            </p>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={buonnyCheck.isPending}
-                              onClick={handleCheck}
-                            >
-                              {buonnyCheck.isPending && (
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                              )}
-                              {buonnyCheck.isPending
-                                ? 'Consultando...'
-                                : buonnyResult
-                                  ? 'Reconsultar'
-                                  : 'Consultar motorista'}
-                            </Button>
-                          </div>
+                    const statusConfig: Record<
+                      string,
+                      { label: string; icon: typeof ShieldCheck; color: string }
+                    > = {
+                      'PERFIL ADEQUADO AO RISCO': {
+                        label: 'Aprovado',
+                        icon: ShieldCheck,
+                        color: 'text-green-600 bg-green-50 border-green-200',
+                      },
+                      'PERFIL DIVERGENTE': {
+                        label: 'Divergente',
+                        icon: ShieldAlert,
+                        color: 'text-red-600 bg-red-50 border-red-200',
+                      },
+                      'PERFIL EXPIRADO': {
+                        label: 'Expirado',
+                        icon: ShieldAlert,
+                        color: 'text-red-600 bg-red-50 border-red-200',
+                      },
+                      'PERFIL COM INSUFICIÊNCIA DE DADOS': {
+                        label: 'Insuficiência',
+                        icon: ShieldQuestion,
+                        color: 'text-orange-600 bg-orange-50 border-orange-200',
+                      },
+                      'EM ANÁLISE': {
+                        label: 'Em análise',
+                        icon: Clock,
+                        color: 'text-blue-600 bg-blue-50 border-blue-200',
+                      },
+                    };
 
-                          {!driverCpf && (
-                            <p className="text-xs text-muted-foreground">
-                              CPF do motorista não cadastrado.
-                            </p>
-                          )}
+                    return (
+                      <div className="rounded-md border p-3 space-y-2 bg-muted/20">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4 text-primary" />
+                            Verificação Buonny
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={buonnyCheck.isPending}
+                            onClick={handleCheck}
+                          >
+                            {buonnyCheck.isPending && (
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            )}
+                            {buonnyCheck.isPending
+                              ? 'Consultando...'
+                              : buonnyResult
+                                ? 'Reconsultar'
+                                : 'Consultar motorista'}
+                          </Button>
+                        </div>
 
-                          {buonnyCheck.isError && (
-                            <p className="text-xs text-red-600">
-                              Erro: {buonnyCheck.error?.message}
-                            </p>
-                          )}
+                        {!driverCpf && (
+                          <p className="text-xs text-muted-foreground">
+                            CPF do motorista não cadastrado.
+                          </p>
+                        )}
 
-                          {buonnyResult &&
-                            (() => {
-                              const cfg =
-                                statusConfig[buonnyResult.status] ??
-                                statusConfig['PERFIL DIVERGENTE'];
-                              const Icon = cfg.icon;
-                              return (
-                                <div
-                                  className={cn(
-                                    'rounded border px-3 py-2 flex flex-col gap-1',
-                                    cfg.color
-                                  )}
-                                >
-                                  <div className="flex items-center gap-1.5 text-sm font-semibold">
-                                    <Icon className="w-4 h-4" />
-                                    {cfg.label}
-                                    {buonnyResult.is_stub && (
-                                      <span className="ml-1 text-xs font-normal opacity-60">
-                                        (stub)
-                                      </span>
-                                    )}
-                                  </div>
-                                  {buonnyResult.numero_liberacao && (
-                                    <p className="text-xs">
-                                      Liberação:{' '}
-                                      <span className="font-mono font-medium">
-                                        {buonnyResult.numero_liberacao}
-                                      </span>
-                                    </p>
-                                  )}
-                                  {buonnyResult.message && (
-                                    <p className="text-xs opacity-80">{buonnyResult.message}</p>
+                        {buonnyCheck.isError && (
+                          <p className="text-xs text-red-600">Erro: {buonnyCheck.error?.message}</p>
+                        )}
+
+                        {buonnyResult &&
+                          (() => {
+                            const cfg =
+                              statusConfig[buonnyResult.status] ??
+                              statusConfig['PERFIL DIVERGENTE'];
+                            const Icon = cfg.icon;
+                            return (
+                              <div
+                                className={cn(
+                                  'rounded border px-3 py-2 flex flex-col gap-1',
+                                  cfg.color
+                                )}
+                              >
+                                <div className="flex items-center gap-1.5 text-sm font-semibold">
+                                  <Icon className="w-4 h-4" />
+                                  {cfg.label}
+                                  {buonnyResult.is_stub && (
+                                    <span className="ml-1 text-xs font-normal opacity-60">
+                                      (stub)
+                                    </span>
                                   )}
                                 </div>
-                              );
-                            })()}
-                        </div>
-                      );
-                    })()}
+                                {buonnyResult.numero_liberacao && (
+                                  <p className="text-xs">
+                                    Liberação:{' '}
+                                    <span className="font-mono font-medium">
+                                      {buonnyResult.numero_liberacao}
+                                    </span>
+                                  </p>
+                                )}
+                                {buonnyResult.message && (
+                                  <p className="text-xs opacity-80">{buonnyResult.message}</p>
+                                )}
+                              </div>
+                            );
+                          })()}
+                      </div>
+                    );
+                  })()}
                   {/* ──────────────────────────────────────────────────────── */}
                 </div>
               </>
