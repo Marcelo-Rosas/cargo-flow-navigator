@@ -33,6 +33,7 @@ jobs:
   # Obtenha em: Supabase Dashboard → Connect → Session pooler (porta 5432)
   supabase-migrate-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     # Valida migrations se SUPABASE_DB_URL estiver definido.
@@ -47,5 +48,6 @@ jobs:
 
       - name: Validate Supabase migrations
         if: env.SUPABASE_DB_URL != ''
+        timeout-minutes: 5
         run: |
           npx supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
