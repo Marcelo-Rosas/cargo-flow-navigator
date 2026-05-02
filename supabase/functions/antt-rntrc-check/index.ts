@@ -1,8 +1,15 @@
 /**
  * antt-rntrc-check
- * Consulta pública RNTRC (ANTT) — por enquanto apenas stub.
- * Integração real (ALTCHA + WebForms) deve substituir o bloco stub mantendo o mesmo contrato JSON.
+ * Consulta RNTRC via portal público ANTT (ConsultaRNTRC.aspx).
+ * Fluxo: GET page → extract ViewState → solve ALTCHA PoW → POST UpdatePanel → parse delta.
+ *
+ * Quando a integração falha (portal fora, parsing impreciso), retorna situacao='indeterminado'
+ * com HTTP 200 — nunca 500 — para não bloquear o wizard de risco.
  */
+
+const ANTT_URL = 'https://consultapublica.antt.gov.br/Site/ConsultaRNTRC.aspx';
+const UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +30,14 @@ interface AnttRntrcCheckResponse {
   is_stub: boolean;
 }
 
+interface AltchaChallenge {
+  algorithm: string;
+  challenge: string;
+  salt: string;
+  signature: string;
+  maxnumber?: number;
+}
+
 function onlyDigits(s: string): string {
   return s.replace(/\D/g, '');
 }
@@ -30,6 +45,220 @@ function onlyDigits(s: string): string {
 function normalizePlate(s: string): string {
   return s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
 }
+
+// ─── ASP.NET token extraction ───────────────────────────────────────────────
+
+function extractHidden(html: string, id: string): string {
+  const esc = id.replace(/[[\]$]/g, '\\$&');
+  // id="..." value="..." order
+  const m1 = html.match(new RegExp(`id="${esc}"[^>]*\\bvalue="([^"]*)"`, 'i'));
+  if (m1) return m1[1];
+  // name="..." value="..." order
+  const m2 = html.match(new RegExp(`name="${esc}"[^>]*\\bvalue="([^"]*)"`, 'i'));
+  if (m2) return m2[1];
+  // value="..." id="..." order (ASP.NET sometimes swaps)
+  const m3 = html.match(new RegExp(`\\bvalue="([^"]*)"[^>]*\\bid="${esc}"`, 'i'));
+  if (m3) return m3[1];
+  return '';
+}
+
+// ─── ALTCHA proof-of-work ────────────────────────────────────────────────────
+
+async function solvePoW(
+  salt: string,
+  target: string,
+  maxnumber = 1_000_000
+): Promise<number | null> {
+  try {
+    // Synchronous node:crypto — fast tight loop
+    // deno-lint-ignore no-explicit-any
+    const { createHash } = (await import('node:crypto')) as any;
+    for (let n = 0; n <= maxnumber; n++) {
+      const hex: string = createHash('sha256')
+        .update(salt + String(n))
+        .digest('hex');
+      if (hex === target) return n;
+    }
+    return null;
+  } catch {
+    // Fallback: Web Crypto API (async — viable for low maxnumber)
+    const enc = new TextEncoder();
+    const cap = Math.min(maxnumber, 200_000); // guard against timeout
+    for (let n = 0; n <= cap; n++) {
+      const buf = await crypto.subtle.digest('SHA-256', enc.encode(salt + String(n)));
+      const hex = Array.from(new Uint8Array(buf))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      if (hex === target) return n;
+    }
+    return null;
+  }
+}
+
+function buildAltchaPayload(ch: AltchaChallenge, number: number): string {
+  return btoa(
+    JSON.stringify({
+      algorithm: ch.algorithm,
+      challenge: ch.challenge,
+      number,
+      salt: ch.salt,
+      signature: ch.signature,
+    })
+  );
+}
+
+// ─── UpdatePanel delta parser ────────────────────────────────────────────────
+
+function parseDelta(delta: string): Record<string, string> {
+  const panels: Record<string, string> = {};
+  let i = 0;
+  while (i < delta.length) {
+    const p1 = delta.indexOf('|', i);
+    if (p1 < 0) break;
+    const len = parseInt(delta.slice(i, p1), 10);
+    if (isNaN(len)) break;
+    i = p1 + 1;
+    const p2 = delta.indexOf('|', i);
+    if (p2 < 0) break;
+    const type = delta.slice(i, p2);
+    i = p2 + 1;
+    const p3 = delta.indexOf('|', i);
+    if (p3 < 0) break;
+    const id = delta.slice(i, p3);
+    i = p3 + 1;
+    const content = delta.slice(i, i + len);
+    i += len;
+    if (i < delta.length && delta[i] === '|') i++;
+    if (type === 'updatePanel') panels[id] = content;
+  }
+  return panels;
+}
+
+// ─── Result HTML parser ───────────────────────────────────────────────────────
+
+function extractResult(html: string): {
+  situacao: 'regular' | 'irregular' | 'indeterminado';
+  rntrc: string | null;
+} {
+  const isRegular = /\b(regular|ativo|habilitado)\b/i.test(html);
+  const isIrregular = /\b(irregular|inativo|cancelado|suspenso|impedido)\b/i.test(html);
+  const noResult = /nenhum|n[aã]o.*encontrad|sem.*resultado|0.*registro/i.test(html);
+
+  // RNTRC number: digits adjacent to "RNTRC" label, or 8-10 digit sequence in a table cell
+  const rntrcMatch =
+    html.match(/rntrc[^:>]{0,30}[:>]\s*(?:<[^>]*>)*\s*(\d{6,12})/i) ??
+    html.match(/>\s*(\d{8,10})\s*</);
+  const rntrc = rntrcMatch?.[1] ?? null;
+
+  if (noResult) return { situacao: 'irregular', rntrc: null };
+  if (isRegular && !isIrregular) return { situacao: 'regular', rntrc };
+  if (isIrregular) return { situacao: 'irregular', rntrc };
+  return { situacao: 'indeterminado', rntrc };
+}
+
+// ─── Main consultation flow ───────────────────────────────────────────────────
+
+async function consultaAntt(cpfCnpj: string): Promise<AnttRntrcCheckResponse> {
+  // 1. GET page — tokens + session cookies
+  const getRes = await fetch(ANTT_URL, {
+    headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
+    redirect: 'follow',
+  });
+  if (!getRes.ok) throw new Error(`ANTT GET ${getRes.status}`);
+
+  const pageHtml = await getRes.text();
+  const cookieHeader = (
+    typeof (getRes.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie ===
+    'function'
+      ? ((getRes.headers as Headers & { getSetCookie: () => string[] }).getSetCookie() ?? [])
+      : [getRes.headers.get('set-cookie') ?? ''].filter(Boolean)
+  )
+    .map((c: string) => c.split(';')[0])
+    .join('; ');
+
+  const viewState = extractHidden(pageHtml, '__VIEWSTATE');
+  const viewStateGen = extractHidden(pageHtml, '__VIEWSTATEGENERATOR');
+  const eventValidation = extractHidden(pageHtml, '__EVENTVALIDATION');
+  const altchaUrl =
+    extractHidden(pageHtml, 'ctl00$Corpo$hfAltchaUrl') ||
+    extractHidden(pageHtml, 'Corpo_hfAltchaUrl') ||
+    'https://captcha.srvs.antt.gov.br/altcha';
+
+  if (!viewState) {
+    throw new Error('ViewState não encontrado — estrutura da página pode ter mudado');
+  }
+
+  // 2. Fetch ALTCHA challenge
+  const challengeRes = await fetch(altchaUrl, {
+    headers: { 'User-Agent': UA, Referer: ANTT_URL },
+  });
+  if (!challengeRes.ok) throw new Error(`ALTCHA challenge ${challengeRes.status}`);
+  const challenge: AltchaChallenge = await challengeRes.json();
+
+  // 3. Solve proof-of-work
+  const n = await solvePoW(challenge.salt, challenge.challenge, challenge.maxnumber);
+  if (n === null) throw new Error('ALTCHA: solução PoW não encontrada no intervalo fornecido');
+  const altchaPayload = buildAltchaPayload(challenge, n);
+
+  // 4. POST — UpdatePanel async
+  const formBody = new URLSearchParams({
+    ctl00$ScriptManagerMain: 'ctl00$ScriptManagerMain|ctl00$Corpo$btnConsulta',
+    __EVENTTARGET: '',
+    __EVENTARGUMENT: '',
+    __LASTFOCUS: '',
+    __VIEWSTATE: viewState,
+    __VIEWSTATEGENERATOR: viewStateGen,
+    __EVENTVALIDATION: eventValidation,
+    ctl00$bMostraAlerta: 'true',
+    ctl00$Corpo$hfPnlConsulta: '1',
+    ctl00$Corpo$hfAltchaUrl: altchaUrl,
+    ctl00$Corpo$rbTipoConsulta: '1',
+    ctl00$Corpo$txtRNTRC: '',
+    ctl00$Corpo$txtCpfCnpj: cpfCnpj,
+    altcha: altchaPayload,
+    ctl00$Corpo$btnConsulta: 'Consultar',
+  });
+
+  const postRes = await fetch(ANTT_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'User-Agent': UA,
+      Referer: ANTT_URL,
+      Cookie: cookieHeader,
+      'X-MicrosoftAjax': 'Delta=true',
+      'X-Requested-With': 'XMLHttpRequest',
+      Accept: '*/*',
+    },
+    body: formBody.toString(),
+    redirect: 'follow',
+  });
+  if (!postRes.ok) throw new Error(`ANTT POST ${postRes.status}`);
+
+  const responseText = await postRes.text();
+
+  // 5. Parse — delta or full page fallback
+  const ct = postRes.headers.get('content-type') ?? '';
+  let resultHtml: string;
+  if (
+    ct.includes('text/plain') ||
+    responseText.startsWith('0|') ||
+    responseText.includes('|updatePanel|')
+  ) {
+    const panels = parseDelta(responseText);
+    resultHtml =
+      panels['UpdatePanelMain'] ??
+      panels['Corpo_updPnlTipoConsulta'] ??
+      Object.values(panels).join('');
+  } else {
+    resultHtml = responseText;
+  }
+
+  const { situacao, rntrc } = extractResult(resultHtml);
+  return { situacao, rntrc, is_stub: false };
+}
+
+// ─── Handler ─────────────────────────────────────────────────────────────────
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response('ok', { status: 200, headers: CORS });
@@ -53,15 +282,13 @@ export default async (req: Request): Promise<Response> => {
 
   const cpfCnpj = onlyDigits(body.cpf_cnpj ?? '');
   const plate = normalizePlate(body.vehicle_plate ?? '');
+
   if (!body.order_id || !cpfCnpj || (cpfCnpj.length !== 11 && cpfCnpj.length !== 14)) {
     return new Response(
       JSON.stringify({
         error: 'Campos obrigatórios: order_id, cpf_cnpj (11 ou 14 dígitos), vehicle_plate',
       }),
-      {
-        status: 400,
-        headers: { ...CORS, 'Content-Type': 'application/json' },
-      }
+      { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } }
     );
   }
   if (!plate || plate.length < 7) {
@@ -71,16 +298,25 @@ export default async (req: Request): Promise<Response> => {
     });
   }
 
-  // Stub: substituir por fluxo real (Playwright/serviço) quando disponível.
-  const stub: AnttRntrcCheckResponse = {
-    situacao: 'regular',
-    rntrc: `STUB-${plate.slice(-4)}-${cpfCnpj.slice(-4)}`,
-    message: 'Resultado simulado — configure integração ANTT para consulta real.',
-    is_stub: true,
-  };
-
-  return new Response(JSON.stringify(stub), {
-    status: 200,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  });
+  try {
+    const result = await consultaAntt(cpfCnpj);
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[antt-rntrc-check]', message);
+    // Degrade gracefully — 200 indeterminado em vez de 500 para não bloquear o wizard
+    const fallback: AnttRntrcCheckResponse = {
+      situacao: 'indeterminado',
+      rntrc: null,
+      message: `Consulta indisponível: ${message}`,
+      is_stub: false,
+    };
+    return new Response(JSON.stringify(fallback), {
+      status: 200,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
 };
