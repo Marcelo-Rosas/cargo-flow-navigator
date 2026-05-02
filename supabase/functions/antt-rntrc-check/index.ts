@@ -1,11 +1,13 @@
 /**
  * antt-rntrc-check
- * Consulta RNTRC via portal público ANTT (ConsultaRNTRC.aspx).
- * Fluxo: GET page → extract ViewState → solve ALTCHA PoW → POST UpdatePanel → parse delta.
+ * Consulta RNTRC via portal publico ANTT (ConsultaRNTRC.aspx).
+ * Fluxo: GET page -> extract ViewState -> solve ALTCHA PoW -> POST UpdatePanel -> parse delta.
  *
- * Quando a integração falha (portal fora, timeout, parsing impreciso), retorna
- * situacao='indeterminado' com HTTP 200 — nunca 500 — para não bloquear o wizard.
+ * Quando a integracao falha (portal fora, timeout, parsing impreciso), retorna
+ * situacao='indeterminado' com HTTP 200 -- nunca 500 -- para nao bloquear o wizard.
  * Timeout total: 25 segundos.
+ *
+ * Requer Deno.serve() -- export default nao e reconhecido no Edge Runtime 1.73+ (Deno v2).
  */
 
 const ANTT_URL = 'https://consultapublica.antt.gov.br/Site/ConsultaRNTRC.aspx';
@@ -48,14 +50,13 @@ function normalizePlate(s: string): string {
   return s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
 }
 
-/** Creates an AbortSignal that fires after `ms` milliseconds. */
 function timeoutSignal(ms: number): AbortSignal {
   const ac = new AbortController();
-  setTimeout(() => ac.abort(new DOMException(`Timeout after ${ms}ms`, 'TimeoutError')), ms);
+  setTimeout(() => ac.abort(), ms);
   return ac.signal;
 }
 
-// ─── ASP.NET token extraction ────────────────────────────────────────────────
+// --- ASP.NET token extraction ---
 
 function extractHidden(html: string, id: string): string {
   const esc = id.replace(/[[\]$]/g, '\\$&');
@@ -68,7 +69,7 @@ function extractHidden(html: string, id: string): string {
   return '';
 }
 
-// ─── ALTCHA proof-of-work (Web Crypto only — no node:crypto) ────────────────
+// --- ALTCHA proof-of-work (Web Crypto only) ---
 
 async function solvePoW(
   salt: string,
@@ -101,7 +102,7 @@ function buildAltchaPayload(ch: AltchaChallenge, number: number): string {
   );
 }
 
-// ─── UpdatePanel delta parser ────────────────────────────────────────────────
+// --- UpdatePanel delta parser ---
 
 function parseDelta(delta: string): Record<string, string> {
   const panels: Record<string, string> = {};
@@ -128,7 +129,7 @@ function parseDelta(delta: string): Record<string, string> {
   return panels;
 }
 
-// ─── Result HTML parser ───────────────────────────────────────────────────────
+// --- Result HTML parser ---
 
 function extractResult(html: string): {
   situacao: 'regular' | 'irregular' | 'indeterminado';
@@ -136,7 +137,7 @@ function extractResult(html: string): {
 } {
   const isRegular = /\b(regular|ativo|habilitado)\b/i.test(html);
   const isIrregular = /\b(irregular|inativo|cancelado|suspenso|impedido)\b/i.test(html);
-  const noResult = /nenhum|n[aã]o.*encontrad|sem.*resultado|0.*registro/i.test(html);
+  const noResult = /nenhum|n[ao]o.*encontrad|sem.*resultado|0.*registro/i.test(html);
 
   const rntrcMatch =
     html.match(/rntrc[^:>]{0,30}[:>]\s*(?:<[^>]*>)*\s*(\d{6,12})/i) ??
@@ -149,10 +150,9 @@ function extractResult(html: string): {
   return { situacao: 'indeterminado', rntrc };
 }
 
-// ─── Main consultation flow ───────────────────────────────────────────────────
+// --- Main consultation flow ---
 
 async function consultaAntt(cpfCnpj: string, signal: AbortSignal): Promise<AnttRntrcCheckResponse> {
-  // 1. GET page — tokens + session cookies
   console.log('[antt-rntrc-check] GET page');
   const getRes = await fetch(ANTT_URL, {
     headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
@@ -180,11 +180,10 @@ async function consultaAntt(cpfCnpj: string, signal: AbortSignal): Promise<AnttR
     'https://captcha.srvs.antt.gov.br/altcha';
 
   if (!viewState) {
-    throw new Error('ViewState não encontrado — estrutura da página pode ter mudado');
+    throw new Error('ViewState nao encontrado -- estrutura da pagina pode ter mudado');
   }
 
-  // 2. Fetch ALTCHA challenge
-  console.log('[antt-rntrc-check] GET ALTCHA challenge from', altchaUrl);
+  console.log('[antt-rntrc-check] GET ALTCHA challenge');
   const challengeRes = await fetch(altchaUrl, {
     headers: { 'User-Agent': UA, Referer: ANTT_URL },
     signal,
@@ -192,14 +191,12 @@ async function consultaAntt(cpfCnpj: string, signal: AbortSignal): Promise<AnttR
   if (!challengeRes.ok) throw new Error(`ALTCHA challenge ${challengeRes.status}`);
   const challenge: AltchaChallenge = await challengeRes.json();
 
-  // 3. Solve proof-of-work
   console.log('[antt-rntrc-check] solving PoW maxnumber=', challenge.maxnumber);
   const n = await solvePoW(challenge.salt, challenge.challenge, challenge.maxnumber, signal);
-  if (n === null) throw new Error('ALTCHA: solução PoW não encontrada no intervalo ou timeout');
+  if (n === null) throw new Error('ALTCHA: solucao PoW nao encontrada ou timeout');
   const altchaPayload = buildAltchaPayload(challenge, n);
 
-  // 4. POST — UpdatePanel async
-  console.log('[antt-rntrc-check] POST consulta cpfCnpj length=', cpfCnpj.length);
+  console.log('[antt-rntrc-check] POST consulta');
   const formBody = new URLSearchParams({
     ctl00$ScriptManagerMain: 'ctl00$ScriptManagerMain|ctl00$Corpo$btnConsulta',
     __EVENTTARGET: '',
@@ -236,8 +233,6 @@ async function consultaAntt(cpfCnpj: string, signal: AbortSignal): Promise<AnttR
   if (!postRes.ok) throw new Error(`ANTT POST ${postRes.status}`);
 
   const responseText = await postRes.text();
-
-  // 5. Parse — delta or full page fallback
   const ct = postRes.headers.get('content-type') ?? '';
   let resultHtml: string;
   if (
@@ -259,9 +254,9 @@ async function consultaAntt(cpfCnpj: string, signal: AbortSignal): Promise<AnttR
   return { situacao, rntrc, is_stub: false };
 }
 
-// ─── Handler ─────────────────────────────────────────────────────────────────
+// --- Handler ---
 
-export default async (req: Request): Promise<Response> => {
+Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response('ok', { status: 200, headers: CORS });
 
   if (req.method !== 'POST') {
@@ -275,7 +270,7 @@ export default async (req: Request): Promise<Response> => {
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'JSON inválido' }), {
+    return new Response(JSON.stringify({ error: 'JSON invalido' }), {
       status: 400,
       headers: { ...CORS, 'Content-Type': 'application/json' },
     });
@@ -287,18 +282,19 @@ export default async (req: Request): Promise<Response> => {
   if (!body.order_id || !cpfCnpj || (cpfCnpj.length !== 11 && cpfCnpj.length !== 14)) {
     return new Response(
       JSON.stringify({
-        error: 'Campos obrigatórios: order_id, cpf_cnpj (11 ou 14 dígitos), vehicle_plate',
+        error: 'Campos obrigatorios: order_id, cpf_cnpj (11 ou 14 digitos), vehicle_plate',
       }),
       { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } }
     );
   }
   if (!plate || plate.length < 7) {
-    return new Response(JSON.stringify({ error: 'Placa do veículo inválida' }), {
+    return new Response(JSON.stringify({ error: 'Placa do veiculo invalida' }), {
       status: 400,
       headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
 
+  console.log('[antt-rntrc-check] method=', req.method);
   try {
     const signal = timeoutSignal(FETCH_TIMEOUT_MS);
     const result = await consultaAntt(cpfCnpj, signal);
@@ -308,11 +304,11 @@ export default async (req: Request): Promise<Response> => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('[antt-rntrc-check]', message);
+    console.error('[antt-rntrc-check] error:', message);
     const fallback: AnttRntrcCheckResponse = {
       situacao: 'indeterminado',
       rntrc: null,
-      message: `Consulta indisponível: ${message}`,
+      message: `Consulta indisponivel: ${message}`,
       is_stub: false,
     };
     return new Response(JSON.stringify(fallback), {
@@ -320,4 +316,4 @@ export default async (req: Request): Promise<Response> => {
       headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
-};
+});
