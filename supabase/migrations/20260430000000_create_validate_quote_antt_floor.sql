@@ -75,8 +75,13 @@ BEGIN
     END IF;
 
     -- Staleness: breakdown calculado antes da vigência da taxa atual
+    -- Cast protegido: anttCalculatedAt pode ter formato ISO não-padrão
     IF v_breakdown_ts IS NOT NULL AND v_valid_from IS NOT NULL THEN
-      v_is_stale := (v_breakdown_ts::timestamptz < v_valid_from);
+      BEGIN
+        v_is_stale := (v_breakdown_ts::timestamptz < v_valid_from);
+      EXCEPTION WHEN others THEN
+        v_is_stale := false;
+      END;
     END IF;
   END IF;
 
