@@ -58,7 +58,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { usePricingRulesConfig, useVehicleTypes } from '@/hooks/usePricingRules';
+import { usePricingRulesConfig } from '@/hooks/usePricingRules';
+import { useVehicleTypesAdmin } from '@/hooks/useVehicleTypes';
 import type { PricingRuleConfig } from '@/hooks/usePricingRules';
 import {
   useCreatePricingRuleConfig,
@@ -110,7 +111,7 @@ function formatValue(rule: PricingRuleConfig): string {
 
 export function PricingRulesManager() {
   const { data: rules, isLoading } = usePricingRulesConfig(false);
-  const { data: vehicleTypes } = useVehicleTypes(false);
+  const { data: vehicleTypes } = useVehicleTypesAdmin();
   const createMutation = useCreatePricingRuleConfig();
   const updateMutation = useUpdatePricingRuleConfig();
   const deleteMutation = useDeletePricingRuleConfig();

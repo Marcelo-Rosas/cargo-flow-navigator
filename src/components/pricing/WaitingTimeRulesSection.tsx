@@ -26,7 +26,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { useWaitingTimeRules, useVehicleTypes } from '@/hooks/usePricingRules';
+import { useWaitingTimeRules } from '@/hooks/usePricingRules';
+import { useVehicleTypesOperational } from '@/hooks/useVehicleTypes';
 import type { WaitingTimeRule } from '@/types/pricing';
 import {
   useCreateWaitingTimeRule,
@@ -55,7 +56,7 @@ const CONTEXT_LABELS: Record<string, string> = {
 
 export function WaitingTimeRulesSection() {
   const { data: rules, isLoading } = useWaitingTimeRules();
-  const { data: vehicleTypes } = useVehicleTypes();
+  const { data: vehicleTypes } = useVehicleTypesOperational();
   const createMutation = useCreateWaitingTimeRule();
   const updateMutation = useUpdateWaitingTimeRule();
   const deleteMutation = useDeleteWaitingTimeRule();

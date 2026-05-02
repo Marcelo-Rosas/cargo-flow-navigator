@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { useVehicleTypes } from '@/hooks/usePricingRules';
+import { useVehicleTypesAdmin } from '@/hooks/useVehicleTypes';
 import {
   useCreateVehicleType,
   useUpdateVehicleType,
@@ -31,7 +31,7 @@ import { toast } from 'sonner';
 import type { VehicleType } from '@/types/pricing';
 
 export function VehicleTypesSection() {
-  const { data: vehicles, isLoading } = useVehicleTypes(false);
+  const { data: vehicles, isLoading } = useVehicleTypesAdmin();
   const createMutation = useCreateVehicleType();
   const updateMutation = useUpdateVehicleType();
   const deleteMutation = useDeleteVehicleType();

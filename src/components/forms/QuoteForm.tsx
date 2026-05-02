@@ -54,8 +54,8 @@ import { useAnalyzeLoadComposition } from '@/hooks/useAnalyzeLoadComposition';
 import { useClients } from '@/hooks/useClients';
 import { useShippers } from '@/hooks/useShippers';
 import { usePriceTables } from '@/hooks/usePriceTables';
+import { useVehicleTypesOperational } from '@/hooks/useVehicleTypes';
 import {
-  useVehicleTypes,
   usePaymentTerms,
   usePricingParameter,
   useConditionalFees,
@@ -408,7 +408,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: clients } = useClients();
   const { data: shippers } = useShippers();
   const { data: priceTables } = usePriceTables();
-  const { data: vehicleTypes } = useVehicleTypes();
+  const { data: vehicleTypes } = useVehicleTypesOperational();
   const { data: paymentTerms } = usePaymentTerms();
   const { data: conditionalFeesData } = useConditionalFees(true);
   const createQuoteMutation = useCreateQuote();

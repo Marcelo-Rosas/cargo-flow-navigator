@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useDreOperacionalReport } from '@/hooks/useDreOperacionalReport';
-import { useVehicleTypes } from '@/hooks/usePricingRules';
+import { useVehicleTypesOperational } from '@/hooks/useVehicleTypes';
 import { DreOperacionalTable } from '@/components/reports/DreOperacionalTable';
 import { DateFilterRange } from '@/components/filters/DateFilterRange';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -52,7 +52,7 @@ export default function Reports() {
     setDateTo(range.dateTo);
   };
 
-  const { data: vehicleTypes } = useVehicleTypes();
+  const { data: vehicleTypes } = useVehicleTypesOperational();
   const { data: dreTables, isLoading: isLoadingDre } = useDreOperacionalReport({
     dateFrom,
     dateTo,
