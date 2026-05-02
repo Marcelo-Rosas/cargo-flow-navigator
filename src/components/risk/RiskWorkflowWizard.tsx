@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useBuonnyProfessionalCheck } from '@/hooks/useBuonnyProfessionalCheck';
+import { useAnttRntrcCheck } from '@/hooks/useAnttRntrcCheck';
 import { supabase } from '@/integrations/supabase/client';
 import {
   useActivePolicies,
@@ -39,6 +40,15 @@ import {
 } from '@/hooks/useRiskEvaluation';
 import { CRITICALITY_CONFIG, REQUIREMENT_LABELS, type RiskCriticality } from '@/types/risk';
 import { BuonnyRegistrationModal, type BuonnyRegistrationData } from './BuonnyRegistrationModal';
+import type { RiskEvidence } from '@/types/risk';
+
+function onlyDigits(s: string): string {
+  return s.replace(/\D/g, '');
+}
+
+function normalizePlate(s: string): string {
+  return s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+}
 
 interface RiskWorkflowWizardProps {
   orderId: string;
@@ -55,10 +65,11 @@ interface RiskWorkflowWizardProps {
 }
 
 const STEPS = [
-  { key: 'buonny', label: 'Buonny', short: '1' },
-  { key: 'rules', label: 'Criticidade', short: '2' },
-  { key: 'evidence', label: 'Evidências', short: '3' },
-  { key: 'submit', label: 'Enviar', short: '4' },
+  { key: 'antt', label: 'ANTT', short: '1' },
+  { key: 'buonny', label: 'Buonny', short: '2' },
+  { key: 'rules', label: 'Criticidade', short: '3' },
+  { key: 'evidence', label: 'Evidências', short: '4' },
+  { key: 'submit', label: 'Enviar', short: '5' },
 ] as const;
 
 type StepKey = (typeof STEPS)[number]['key'];
@@ -77,7 +88,7 @@ export function RiskWorkflowWizard({
   destinationUf = 'SP',
 }: RiskWorkflowWizardProps) {
   const qc = useQueryClient();
-  const [currentStep, setCurrentStep] = useState<StepKey>('buonny');
+  const [currentStep, setCurrentStep] = useState<StepKey>('antt');
   const [notes, setNotes] = useState('');
 
   const { data: policies } = useRiskPolicies();
@@ -163,6 +174,36 @@ export function RiskWorkflowWizard({
     },
     staleTime: 2 * 60 * 1000,
   });
+
+  const { data: crossAnttEvidence } = useQuery({
+    queryKey: ['antt-cross-evidence', resolvedDriverCpf, vehiclePlate],
+    enabled: !!resolvedDriverCpf && !!vehiclePlate,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('risk_evidence' as 'documents')
+        .select('*')
+        .eq('evidence_type', 'antt_rntrc_check')
+        .eq('status', 'valid')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(10);
+      const rows = (data ?? []) as RiskEvidence[];
+      const cpfNorm = onlyDigits(resolvedDriverCpf ?? '');
+      const plateNorm = normalizePlate(vehiclePlate ?? '');
+      return (
+        rows.find((e) => {
+          const p = e.payload as Record<string, unknown> | null;
+          return (
+            p != null &&
+            onlyDigits(String(p.cpf_cnpj ?? '')) === cpfNorm &&
+            normalizePlate(String(p.vehicle_plate ?? '')) === plateNorm
+          );
+        }) ?? null
+      );
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
   const { data: servicesCatalog } = useRiskServicesCatalog();
 
   const evaluateRisk = useEvaluateRisk();
@@ -201,6 +242,35 @@ export function RiskWorkflowWizard({
       ? new Date(buonnyEvidence.expires_at) > new Date()
       : false;
 
+  const anttEvidence = (() => {
+    const localMatch = evidence?.find((e) => {
+      if (e.evidence_type !== 'antt_rntrc_check' || e.status !== 'valid') return false;
+      const p = e.payload as Record<string, unknown> | null;
+      if (p?.cpf_cnpj) {
+        if (!resolvedDriverCpf || onlyDigits(String(p.cpf_cnpj)) !== onlyDigits(resolvedDriverCpf))
+          return false;
+      }
+      if (p?.vehicle_plate) {
+        if (
+          !vehiclePlate ||
+          normalizePlate(String(p.vehicle_plate)) !== normalizePlate(vehiclePlate)
+        )
+          return false;
+      }
+      return true;
+    });
+    return localMatch ?? crossAnttEvidence ?? undefined;
+  })();
+
+  const anttValid =
+    !!anttEvidence && !!anttEvidence.expires_at && new Date(anttEvidence.expires_at) > new Date();
+
+  useEffect(() => {
+    if (currentStep === 'buonny' && !anttValid) {
+      setCurrentStep('antt');
+    }
+  }, [currentStep, anttValid]);
+
   // Requirements met status
   const requirementsMet = evaluation?.requirements_met ?? {};
   const requirements = evaluation?.requirements ?? critResult?.requirements ?? [];
@@ -222,9 +292,10 @@ export function RiskWorkflowWizard({
   const totalEstimatedCost = estimatedCosts.reduce((sum, c) => sum + c.cost, 0);
 
   // Step completion checks
-  const step1Complete = buonnyValid;
-  const step2Complete = !!evaluation;
-  const step3Complete = step2Complete && allMet;
+  const anttStepComplete = anttValid;
+  const buonnyStepComplete = buonnyValid;
+  const evalStepComplete = !!evaluation;
+  const evidenceStepComplete = evalStepComplete && allMet;
 
   // Handlers
   const handleBuonnyRegistration = async (data: BuonnyRegistrationData) => {
@@ -270,6 +341,62 @@ export function RiskWorkflowWizard({
   };
 
   const buonnyCheck = useBuonnyProfessionalCheck();
+  const anttCheck = useAnttRntrcCheck();
+
+  const ensureEvaluationId = async (): Promise<string> => {
+    if (evaluation?.id) return evaluation.id;
+    const result = await evaluateRisk.mutateAsync({
+      order_id: orderId,
+      trip_id: tripId ?? undefined,
+    });
+    return result.evaluation.id;
+  };
+
+  const handleAnttConsult = async () => {
+    if (!resolvedDriverCpf) {
+      toast.error('CPF/CNPJ do transportador não cadastrado');
+      return;
+    }
+    const digits = onlyDigits(resolvedDriverCpf);
+    if (digits.length !== 11 && digits.length !== 14) {
+      toast.error('Informe um CPF (11) ou CNPJ (14 dígitos) válido no cadastro do motorista');
+      return;
+    }
+    if (!vehiclePlate) {
+      toast.error('Placa do veículo não atribuída');
+      return;
+    }
+    try {
+      const resp = await anttCheck.mutateAsync({
+        order_id: orderId,
+        cpf_cnpj: digits,
+        vehicle_plate: vehiclePlate,
+      });
+      const evalId = await ensureEvaluationId();
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const ok = resp.situacao === 'regular';
+      await addEvidence.mutateAsync({
+        evaluation_id: evalId,
+        evidence_type: 'antt_rntrc_check',
+        status: ok ? 'valid' : 'rejected',
+        expires_at: ok ? expiresAt : null,
+        notes:
+          resp.message ?? (ok ? 'Consulta ANTT (RNTRC)' : 'Situação irregular na consulta ANTT'),
+        payload: {
+          situacao: resp.situacao,
+          rntrc: resp.rntrc ?? null,
+          cpf_cnpj: digits,
+          vehicle_plate: normalizePlate(vehiclePlate),
+          is_stub: resp.is_stub,
+          consult_source: 'auto',
+        },
+      });
+      await qc.refetchQueries({ queryKey: ['risk-evidence', evalId] });
+      toast.success(`ANTT: ${resp.situacao}${resp.is_stub ? ' (stub)' : ''}`);
+    } catch (err) {
+      toast.error(`Erro na consulta ANTT: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
 
   const handleAutoCheck = async () => {
     if (!resolvedDriverCpf) {
@@ -336,7 +463,11 @@ export function RiskWorkflowWizard({
     if (!evaluation) return;
     const crit = evaluation.criticality ?? critResult?.criticality;
     const canAutoApprove =
-      (crit === 'LOW' || crit === 'MEDIUM') && requirements.length <= 2 && allMet && buonnyValid;
+      (crit === 'LOW' || crit === 'MEDIUM') &&
+      requirements.length <= 2 &&
+      allMet &&
+      anttValid &&
+      buonnyValid;
 
     await updateEvaluation.mutateAsync({
       id: evaluation.id,
@@ -391,10 +522,11 @@ export function RiskWorkflowWizard({
           const isActive = step.key === currentStep;
           const isPast = i < stepIndex;
           const isComplete =
-            (i === 0 && step1Complete) ||
-            (i === 1 && step2Complete) ||
-            (i === 2 && step3Complete) ||
-            (i === 3 && (evaluation?.status === 'evaluated' || evaluation?.status === 'approved'));
+            (i === 0 && anttStepComplete) ||
+            (i === 1 && buonnyStepComplete) ||
+            (i === 2 && evalStepComplete) ||
+            (i === 3 && evidenceStepComplete) ||
+            (i === 4 && (evaluation?.status === 'evaluated' || evaluation?.status === 'approved'));
           return (
             <div key={step.key} className="flex items-center gap-1">
               <div
@@ -422,6 +554,22 @@ export function RiskWorkflowWizard({
       {/* Step Content */}
       <Card>
         <CardContent className="pt-6">
+          {currentStep === 'antt' && (
+            <StepAntt
+              driverName={driverName}
+              driverCpf={resolvedDriverCpf}
+              vehiclePlate={vehiclePlate}
+              vehicleTypeName={vehicleTypeName}
+              anttEvidence={anttEvidence}
+              anttValid={anttValid}
+              isEditable={isBuonnyEditable}
+              onConsult={handleAnttConsult}
+              isConsulting={anttCheck.isPending}
+              consultError={anttCheck.isError ? (anttCheck.error?.message ?? 'Erro') : null}
+              canAdvance={anttStepComplete}
+              onNext={() => setCurrentStep('buonny')}
+            />
+          )}
           {currentStep === 'buonny' && (
             <>
               <StepBuonny
@@ -436,8 +584,9 @@ export function RiskWorkflowWizard({
                 onAutoCheck={handleAutoCheck}
                 isAutoChecking={buonnyCheck.isPending}
                 autoCheckError={buonnyCheck.isError ? (buonnyCheck.error?.message ?? 'Erro') : null}
-                canAdvance={step1Complete}
+                canAdvance={buonnyStepComplete}
                 onNext={() => setCurrentStep('rules')}
+                onBack={() => setCurrentStep('antt')}
               />
               <BuonnyRegistrationModal
                 open={buonnyModalOpen}
@@ -460,7 +609,7 @@ export function RiskWorkflowWizard({
               policyChecks={policyChecks}
               aggregateExposureWarning={aggregateExposureWarning}
               isEditable={isEditable}
-              canAdvance={step2Complete}
+              canAdvance={evalStepComplete}
               onNext={() => setCurrentStep('evidence')}
               onBack={() => setCurrentStep('buonny')}
             />
@@ -473,7 +622,7 @@ export function RiskWorkflowWizard({
               onToggle={handleToggleRequirement}
               estimatedCosts={estimatedCosts}
               totalEstimatedCost={totalEstimatedCost}
-              canAdvance={step3Complete}
+              canAdvance={evidenceStepComplete}
               onNext={() => setCurrentStep('submit')}
               onBack={() => setCurrentStep('rules')}
             />
@@ -483,6 +632,7 @@ export function RiskWorkflowWizard({
               evaluation={evaluation}
               critResult={critResult}
               allMet={allMet}
+              anttValid={anttValid}
               buonnyValid={buonnyValid}
               coverageOk={coverageOk}
               policyChecks={policyChecks}
@@ -517,7 +667,126 @@ export function RiskCriticalityBadge({ criticality }: { criticality: RiskCritica
   );
 }
 
-// Step 1: Buonny
+// Step 1: ANTT / RNTRC
+function StepAntt({
+  driverName,
+  driverCpf,
+  vehiclePlate,
+  vehicleTypeName,
+  anttEvidence,
+  anttValid,
+  isEditable,
+  onConsult,
+  isConsulting,
+  consultError,
+  canAdvance,
+  onNext,
+}: {
+  driverName?: string | null;
+  driverCpf?: string | null;
+  vehiclePlate?: string | null;
+  vehicleTypeName?: string | null;
+  anttEvidence: RiskEvidence | undefined;
+  anttValid: boolean;
+  isEditable: boolean;
+  onConsult: () => void;
+  isConsulting: boolean;
+  consultError?: string | null;
+  canAdvance: boolean;
+  onNext: () => void;
+}) {
+  const payload = anttEvidence?.payload as Record<string, unknown> | undefined;
+  const situacao = payload?.situacao ? String(payload.situacao) : null;
+
+  return (
+    <div className="space-y-4" data-testid="risk-step-antt">
+      <h3 className="font-semibold">Passo 1: Consulta ANTT (RNTRC)</h3>
+      <p className="text-sm text-muted-foreground">
+        Validação cadastral na consulta pública antes da verificação Buonny.
+      </p>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <span className="text-muted-foreground">Motorista:</span>{' '}
+          <span className="font-medium">{driverName ?? 'Não atribuído'}</span>
+        </div>
+        <div>
+          <span className="text-muted-foreground">CPF/CNPJ:</span>{' '}
+          <span className="font-medium">{driverCpf ?? '—'}</span>
+        </div>
+        <div>
+          <span className="text-muted-foreground">Placa:</span>{' '}
+          <span className="font-medium">{vehiclePlate ?? 'Não atribuído'}</span>
+        </div>
+        {vehicleTypeName && (
+          <div>
+            <span className="text-muted-foreground">Tipo:</span>{' '}
+            <span className="font-medium">{vehicleTypeName}</span>
+          </div>
+        )}
+      </div>
+
+      {anttEvidence ? (
+        <div
+          className={cn(
+            'rounded-lg border p-3 space-y-1 text-sm',
+            anttValid
+              ? 'border-green-200 bg-green-50 dark:bg-green-950/20'
+              : 'border-red-200 bg-red-50 dark:bg-red-950/20'
+          )}
+        >
+          <div className="flex items-center gap-2 font-medium">
+            {anttValid ? (
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            ) : (
+              <XCircle className="h-4 w-4 text-red-600" />
+            )}
+            ANTT: {anttValid ? 'Consulta válida' : 'Reprovada / expirada'}
+          </div>
+          {payload?.rntrc != null && String(payload.rntrc).length > 0 && (
+            <div className="text-muted-foreground">RNTRC: {String(payload.rntrc)}</div>
+          )}
+          {situacao && <div className="text-muted-foreground capitalize">Situação: {situacao}</div>}
+          {payload?.is_stub === true && (
+            <div className="text-xs text-amber-700 dark:text-amber-400">
+              Modo simulado — deploy da integração real substitui este resultado.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+          Nenhuma consulta ANTT registrada
+        </div>
+      )}
+
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        {isEditable && !anttValid && (
+          <Button
+            size="sm"
+            onClick={onConsult}
+            disabled={isConsulting}
+            aria-label="Consultar situação ANTT RNTRC"
+          >
+            {isConsulting && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            {isConsulting ? 'Consultando...' : 'Consultar ANTT'}
+          </Button>
+        )}
+        <Button size="sm" onClick={onNext} disabled={!canAdvance} className="ml-auto">
+          Próximo <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {consultError && <p className="text-xs text-destructive">{consultError}</p>}
+
+      {!canAdvance && isEditable && (
+        <p className="text-xs text-muted-foreground">
+          Execute a consulta ANTT para liberar o passo Buonny.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Step 2: Buonny
 function StepBuonny({
   driverName,
   driverCpf,
@@ -532,6 +801,7 @@ function StepBuonny({
   autoCheckError,
   canAdvance,
   onNext,
+  onBack,
 }: {
   driverName?: string | null;
   driverCpf?: string | null;
@@ -546,6 +816,7 @@ function StepBuonny({
   autoCheckError?: string | null;
   canAdvance: boolean;
   onNext: () => void;
+  onBack: () => void;
 }) {
   const payload = (buonnyEvidence as { payload?: Record<string, unknown> })?.payload;
   const statusLabel = payload?.status_buonny
@@ -554,7 +825,7 @@ function StepBuonny({
 
   return (
     <div className="space-y-4" data-testid="risk-step-buonny">
-      <h3 className="font-semibold">Passo 1: Verificação Buonny</h3>
+      <h3 className="font-semibold">Passo 2: Verificação Buonny</h3>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
           <span className="text-muted-foreground">Motorista:</span>{' '}
@@ -622,23 +893,28 @@ function StepBuonny({
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        {isEditable && !buonnyValid && (
-          <div className="flex gap-2">
-            <Button size="sm" onClick={onAutoCheck} disabled={isAutoChecking}>
-              {isAutoChecking && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              {isAutoChecking ? 'Consultando...' : 'Consultar Buonny'}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onOpenRegistration}
-              disabled={isAutoChecking}
-            >
-              Registrar manualmente
-            </Button>
-          </div>
-        )}
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={onBack} aria-label="Voltar para consulta ANTT">
+            <ChevronLeft className="h-4 w-4" /> ANTT
+          </Button>
+          {isEditable && !buonnyValid && (
+            <>
+              <Button size="sm" onClick={onAutoCheck} disabled={isAutoChecking}>
+                {isAutoChecking && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                {isAutoChecking ? 'Consultando...' : 'Consultar Buonny'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onOpenRegistration}
+                disabled={isAutoChecking}
+              >
+                Registrar manualmente
+              </Button>
+            </>
+          )}
+        </div>
         <Button size="sm" onClick={onNext} disabled={!canAdvance} className="ml-auto">
           Próximo <ChevronRight className="h-4 w-4" />
         </Button>
@@ -661,7 +937,7 @@ type AggregateExposureWarning = {
   otherOrders: { id: string; cargo_value: number | null; os_number: string; stage: string }[];
 } | null;
 
-// Step 2: Rules & Criticality
+// Step 3: Rules & Criticality
 function StepRules({
   critResult,
   cargoValue,
@@ -694,7 +970,7 @@ function StepRules({
 }) {
   return (
     <div className="space-y-4" data-testid="risk-step-rules">
-      <h3 className="font-semibold">Passo 2: Criticidade</h3>
+      <h3 className="font-semibold">Passo 3: Criticidade</h3>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
           <span className="text-muted-foreground">Valor da carga:</span>{' '}
@@ -832,7 +1108,7 @@ function StepRules({
   );
 }
 
-// Step 3: Evidence & Requirements
+// Step 4: Evidence & Requirements
 function StepEvidence({
   requirements,
   requirementsMet,
@@ -856,7 +1132,7 @@ function StepEvidence({
 }) {
   return (
     <div className="space-y-4" data-testid="risk-step-evidence">
-      <h3 className="font-semibold">Passo 3: Evidências e Exigências</h3>
+      <h3 className="font-semibold">Passo 4: Evidências e Exigências</h3>
 
       {requirements.length > 0 ? (
         <div className="space-y-2">
@@ -921,11 +1197,12 @@ function StepEvidence({
   );
 }
 
-// Step 4: Review & Submit
+// Step 5: Review & Submit
 function StepSubmit({
   evaluation,
   critResult,
   allMet,
+  anttValid,
   buonnyValid,
   coverageOk,
   policyChecks,
@@ -942,6 +1219,7 @@ function StepSubmit({
   evaluation: unknown;
   critResult: ReturnType<typeof evaluateCriticality> | null;
   allMet: boolean;
+  anttValid: boolean;
   buonnyValid: boolean;
   coverageOk: boolean;
   policyChecks: {
@@ -963,6 +1241,7 @@ function StepSubmit({
   const eval_ = evaluation as { status?: string; criticality?: RiskCriticality } | null;
   const canSubmit =
     !!evaluation &&
+    anttValid &&
     buonnyValid &&
     allMet &&
     coverageOk &&
@@ -975,14 +1254,23 @@ function StepSubmit({
     critResult &&
     (critResult.criticality === 'LOW' || critResult.criticality === 'MEDIUM') &&
     allMet &&
+    anttValid &&
     buonnyValid &&
     coverageOk;
 
   return (
     <div className="space-y-4" data-testid="risk-step-submit">
-      <h3 className="font-semibold">Passo 4: Revisão e Envio</h3>
+      <h3 className="font-semibold">Passo 5: Revisão e Envio</h3>
 
       <div className="space-y-2 text-sm">
+        <div className="flex items-center gap-2">
+          {anttValid ? (
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+          ) : (
+            <XCircle className="h-4 w-4 text-red-500" />
+          )}
+          <span>Consulta ANTT (RNTRC)</span>
+        </div>
         <div className="flex items-center gap-2">
           {buonnyValid ? (
             <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -1057,6 +1345,14 @@ function StepSubmit({
             <span className="text-muted-foreground">Custo risco: </span>
             <span className="font-medium">{formatCurrency(totalEstimatedCost)}</span>
           </div>
+        </div>
+      )}
+
+      {willAutoApprove && !isSubmitted && !isAutoApproved && (
+        <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 p-3 flex items-center gap-2 text-sm text-green-800 dark:text-green-300">
+          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+          Esta avaliação será auto-aprovada (criticidade baixa/média com todos os requisitos
+          atendidos).
         </div>
       )}
 
