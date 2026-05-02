@@ -29,12 +29,13 @@ import { toast } from 'sonner';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useCalculateFreight, type CalculateFreightResponse } from '@/hooks/useCalculateFreight';
 import { usePriceTables } from '@/hooks/usePriceTables';
-import { useVehicleTypes, usePaymentTerms, useConditionalFees } from '@/hooks/usePricingRules';
+import { usePaymentTerms, useConditionalFees } from '@/hooks/usePricingRules';
+import { useVehicleTypesOperational } from '@/hooks/useVehicleTypes';
 
 export function FreightSimulator() {
   const calculateFreight = useCalculateFreight();
   const { data: priceTables } = usePriceTables();
-  const { data: vehicleTypes } = useVehicleTypes();
+  const { data: vehicleTypes } = useVehicleTypesOperational();
   const { data: paymentTerms } = usePaymentTerms();
   const { data: conditionalFees } = useConditionalFees();
 

@@ -3512,6 +3512,7 @@ export type Database = {
       price_tables: {
         Row: {
           active: boolean;
+          ad_valorem_lotacao_percent: number | null;
           created_at: string;
           created_by: string | null;
           id: string;
@@ -3525,6 +3526,7 @@ export type Database = {
         };
         Insert: {
           active?: boolean;
+          ad_valorem_lotacao_percent?: number | null;
           created_at?: string;
           created_by?: string | null;
           id?: string;
@@ -3538,6 +3540,7 @@ export type Database = {
         };
         Update: {
           active?: boolean;
+          ad_valorem_lotacao_percent?: number | null;
           created_at?: string;
           created_by?: string | null;
           id?: string;

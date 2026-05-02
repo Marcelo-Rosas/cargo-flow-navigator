@@ -33,7 +33,7 @@ import { Separator } from '@/components/ui/separator';
 import { useCreateVehicle, useUpdateVehicle } from '@/hooks/useVehicles';
 import { useDrivers } from '@/hooks/useDrivers';
 import { useOwners } from '@/hooks/useOwners';
-import { useVehicleTypes } from '@/hooks/useVehicleTypes';
+import { useVehicleTypesFleetForm } from '@/hooks/useVehicleTypes';
 import { toast } from 'sonner';
 import type { VehicleWithRelations } from '@/hooks/useVehicles';
 import { zodPlate } from '@/lib/validators';
@@ -67,7 +67,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
   const updateVehicleMutation = useUpdateVehicle();
   const { data: drivers, isLoading: driversLoading } = useDrivers(true, { enabled: open });
   const { data: owners, isLoading: ownersLoading } = useOwners(undefined, { enabled: open });
-  const { data: vehicleTypes, isLoading: vehicleTypesLoading } = useVehicleTypes();
+  const { data: vehicleTypes, isLoading: vehicleTypesLoading } = useVehicleTypesFleetForm();
   const isEditing = !!vehicle;
 
   const form = useForm<VehicleFormData>({

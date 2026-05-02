@@ -72,6 +72,8 @@ export interface FreightCalculationInput {
   // Linha da tabela de preços (já selecionada, pode ser null)
   priceTableRow: PriceTableRow | null;
   priceTableId?: string;
+  /** Ad valorem específico da price_table ativa. Quando presente, sobrescreve pricingParams.adValoremLotacaoPercent. */
+  priceTableAdValoremLotacaoPercent?: number | null;
 
   // Modalidade da tabela (lotacao | fracionado)
   modality?: 'lotacao' | 'fracionado';
@@ -916,15 +918,22 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
 
   let grisPercent: number;
   let tsoPercent: number;
-  const costValuePercent = centralCostValuePercent ?? rowCostValuePercent ?? 0.3;
+  // Lotação: tabela tem precedência sobre rule; fracionado mantém rule > tabela
+  const costValuePercent = isLtl
+    ? (centralCostValuePercent ?? rowCostValuePercent ?? 0.3)
+    : (rowCostValuePercent ?? centralCostValuePercent ?? 0.3);
 
   // Ad Valorem para Lotação: substitui GRIS/TSO como componente único de custo de risco
   let adValorem = 0;
   let adValoremPercent = 0;
 
   if (!isLtl) {
-    // LOTAÇÃO: Ad Valorem cobre seguro (RCTR-C + RC-DC) + custos GR
-    adValoremPercent = params.adValoremLotacaoPercent;
+    // LOTAÇÃO: per-table override > pricing_rules_config global
+    const tableAdValorem =
+      input.priceTableAdValoremLotacaoPercent != null
+        ? input.priceTableAdValoremLotacaoPercent
+        : undefined;
+    adValoremPercent = tableAdValorem ?? params.adValoremLotacaoPercent;
     adValorem = round2(input.cargoValue * (adValoremPercent / 100));
     // Lotação: GRIS e TSO zerados (cobertos pelo Ad Valorem)
     grisPercent = 0;

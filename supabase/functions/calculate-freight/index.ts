@@ -258,13 +258,13 @@ Deno.serve(async (req) => {
     const resolveRulePercent = (key: string): number | undefined =>
       toFiniteNumber(resolveRule(key, vehicleTypeIdForRules));
 
-    // Ad Valorem Lotação — resolve from Central de Riscos
+    // Ad Valorem Lotação — resolve from Central de Riscos (may be overridden by price_tables)
     const adValoremResolved = resolveRulePercent('ad_valorem_lotacao_percent');
     if (adValoremResolved == null)
       fallbacksApplied.push(
         `ad_valorem_lotacao_percent: usando default ${FREIGHT_CONSTANTS.DEFAULT_AD_VALOREM_LOTACAO_PERCENT}`
       );
-    const adValoremLotacaoPercent =
+    let adValoremLotacaoPercent =
       adValoremResolved ?? FREIGHT_CONSTANTS.DEFAULT_AD_VALOREM_LOTACAO_PERCENT;
 
     // =====================================================
@@ -276,10 +276,18 @@ Deno.serve(async (req) => {
     if (input.price_table_id) {
       const { data: ptData } = await supabase
         .from('price_tables')
-        .select('modality')
+        .select('modality, ad_valorem_lotacao_percent')
         .eq('id', input.price_table_id)
         .maybeSingle();
       if (ptData?.modality === 'fracionado') modality = 'fracionado';
+      // Per-table ad_valorem takes precedence over global pricing_rules_config
+      const tableAdValorem = toFiniteNumber(ptData?.ad_valorem_lotacao_percent);
+      if (tableAdValorem != null) {
+        adValoremLotacaoPercent = tableAdValorem;
+        fallbacksApplied.push(
+          `ad_valorem_lotacao_percent: sobrescrito pela tabela (${tableAdValorem}%)`
+        );
+      }
     }
 
     // =====================================================
@@ -434,10 +442,11 @@ Deno.serve(async (req) => {
 
             const ruleCostVal = resolveRulePercent('cost_value_percent');
             const ptCostVal = toFiniteNumber(priceRow.cost_value_percent);
-            costValuePercent = ruleCostVal ?? ptCostVal ?? 0.3;
+            // Lotação: tabela tem precedência sobre rule (rule=0 não deve zerar RCTR-C da tabela)
+            costValuePercent = ptCostVal ?? ruleCostVal ?? 0.3;
 
             console.log(
-              `[calculate-freight] Lotação Ad Valorem | Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, frete_peso: ${baseCost}, adValoremPercent: ${adValoremLotacaoPercent}%`
+              `[calculate-freight] Lotação Ad Valorem | Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, frete_peso: ${baseCost}, adValoremPercent: ${adValoremLotacaoPercent}%, costValuePercent: ${costValuePercent}%`
             );
           }
         } else {
