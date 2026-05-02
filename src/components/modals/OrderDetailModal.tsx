@@ -1784,6 +1784,7 @@ export function OrderDetailModal({
         open={canManage && isEditFormOpen}
         onClose={() => setIsEditFormOpen(false)}
         order={order}
+        hideDriverSection={STAGES_WITH_DRIVER.includes(order.stage)}
       />
     </>
   );
