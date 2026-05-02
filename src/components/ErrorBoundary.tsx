@@ -3,6 +3,11 @@ import { useLocation } from 'react-router-dom';
 import { ErrorFallback } from '@/components/ui/ErrorFallback';
 import { logger } from '@/lib/logger';
 
+function isChunkLoadError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /Failed to fetch dynamically imported module|Loading chunk|ChunkLoadError/i.test(msg);
+}
+
 interface SectionErrorBoundaryProps {
   children: React.ReactNode;
   title?: string;
@@ -26,6 +31,10 @@ export function GlobalErrorBoundary({ children }: { children: React.ReactNode })
         </div>
       )}
       onError={(error, info) => {
+        if (isChunkLoadError(error)) {
+          window.location.reload();
+          return;
+        }
         logger.captureException(error, { componentStack: info.componentStack ?? '' });
       }}
     >
@@ -47,6 +56,10 @@ export function SectionErrorBoundary({
         <ErrorFallback {...props} title={title} description={description} />
       )}
       onError={(error, info) => {
+        if (isChunkLoadError(error)) {
+          window.location.reload();
+          return;
+        }
         logger.captureException(error, { componentStack: info.componentStack ?? '' });
       }}
       resetKeys={resetKeys}
