@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import logoUrl from '@/assets/logo_vectra_cargo.png?url';
+import type { StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 type QuotePdfMode = 'simplified' | 'detailed';
 
@@ -24,6 +25,9 @@ export interface QuotePdfPayload {
   payment_term_name?: string | null;
   /** Preenchido quando value < piso ANTT. Só usado no modo detailed para watermark. */
   antt_compliance?: { piso: number; below: boolean; modality: string };
+  /** Breakdown de precificação. Só usado no modo detailed. */
+  pricing_breakdown?: StoredPricingBreakdown | null;
+  freight_modality?: 'lotacao' | 'fracionado' | null;
 }
 
 type PdfDoc = jsPDF & { lastAutoTable?: { finalY?: number } };
@@ -444,6 +448,95 @@ function drawPageFooter(doc: PdfDoc): void {
   doc.text('Proposta comercial - nao constitui contrato.', PW - MR, h - 5, { align: 'right' });
 }
 
+// ── Pricing Breakdown (detailed / internal only) ───────────────────────────────
+
+function drawPricingBreakdown(doc: PdfDoc, bd: StoredPricingBreakdown, y: number): number {
+  const c = bd.components;
+  const t = bd.totals;
+  const p = bd.profitability;
+  const discount = t.discount ?? 0;
+
+  const sectionHeader = (label: string) => {
+    doc.setFillColor(...C.navy);
+    doc.roundedRect(ML, y, CW, 10, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.white);
+    doc.text(label, ML + 5, y + 6.5);
+    y += 13;
+  };
+
+  // ── MEMORIA DE CALCULO ─────────────────────────────────────────────────────
+  sectionHeader('MEMORIA DE CALCULO');
+
+  const memRows: string[][] = [];
+  if ((c.baseFreight ?? 0) > 0) memRows.push(['Frete Peso (Base)', formatCurrency(c.baseFreight)]);
+  if ((c.toll ?? 0) > 0) memRows.push(['Pedagio', formatCurrency(c.toll)]);
+  if ((c.aluguelMaquinas ?? 0) > 0)
+    memRows.push(['Aluguel de Maquinas', formatCurrency(c.aluguelMaquinas)]);
+  if ((c.gris ?? 0) > 0) memRows.push(['GRIS', formatCurrency(c.gris)]);
+  if ((c.tso ?? 0) > 0) memRows.push(['TSO', formatCurrency(c.tso)]);
+  if ((c.rctrc ?? 0) > 0) memRows.push(['RCTR-C', formatCurrency(c.rctrc)]);
+  if ((c.adValorem ?? 0) > 0) memRows.push(['Ad Valorem', formatCurrency(c.adValorem)]);
+  if ((c.tde ?? 0) + (c.tear ?? 0) > 0)
+    memRows.push(['TDE / TEAR', formatCurrency((c.tde ?? 0) + (c.tear ?? 0))]);
+  if ((c.dispatchFee ?? 0) > 0) memRows.push(['Taxa de Expedicao', formatCurrency(c.dispatchFee)]);
+  if ((c.conditionalFeesTotal ?? 0) > 0)
+    memRows.push(['Taxas Condicionais', formatCurrency(c.conditionalFeesTotal)]);
+  if ((c.waitingTimeCost ?? 0) > 0)
+    memRows.push(['Estadia / Hora Parada', formatCurrency(c.waitingTimeCost)]);
+  // custosDescarga está em profitability, não em components — precisa ser incluído aqui
+  // para que os itens visiveis somem ao custosDiretos (base do gross-up)
+  if ((p?.custosDescarga ?? 0) > 0)
+    memRows.push(['Carga / Descarga', formatCurrency(p?.custosDescarga ?? 0)]);
+
+  if (memRows.length > 0) {
+    autoTable(doc as jsPDF, {
+      startY: y,
+      head: [],
+      body: memRows,
+      theme: 'plain',
+      margin: { left: ML, right: MR },
+      styles: {
+        fontSize: 8.5,
+        cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
+        textColor: C.text as number[],
+      },
+      columnStyles: {
+        0: { cellWidth: 68, fontStyle: 'bold', textColor: C.muted as number[] },
+        1: { cellWidth: CW - 68 },
+      },
+    });
+    y = ((doc as PdfDoc).lastAutoTable?.finalY ?? y) + 2;
+  }
+
+  if (discount > 0) {
+    doc.setFillColor(...C.light);
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(ML, y, CW, 8, 2, 2, 'FD');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.muted);
+    doc.text('Desconto comercial', ML + 5, y + 5.5);
+    doc.setTextColor(220, 38, 38);
+    doc.text(`-${formatCurrency(discount)}`, PW - MR - 5, y + 5.5, { align: 'right' });
+    y += 10;
+  }
+
+  const totalFinal = Math.max(0, t.totalCliente - discount);
+  doc.setFillColor(...C.navy);
+  doc.roundedRect(ML, y, CW, 10, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...C.white);
+  doc.text(discount > 0 ? 'Total Final (com desconto)' : 'Total Cliente', ML + 5, y + 6.5);
+  doc.text(formatCurrency(totalFinal), PW - MR - 5, y + 6.5, { align: 'right' });
+  y += 14;
+
+  return y;
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 export async function generateQuotePdf({
@@ -480,9 +573,16 @@ export async function generateQuotePdf({
 
   if (mode === 'detailed') {
     y = drawDetailedSection(doc, quote, y);
+    if (quote.pricing_breakdown?.components) {
+      y = drawPricingBreakdown(doc, quote.pricing_breakdown, y);
+    }
   }
 
-  drawPageFooter(doc);
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    drawPageFooter(doc);
+  }
 
   return { blob: doc.output('blob'), fileName: toFilename(quote.quote_code, mode) };
 }
