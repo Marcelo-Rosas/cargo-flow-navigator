@@ -105,6 +105,17 @@ async function handleQuoteStageChanged(
     if (quoteWonLog) await triggerNotificationHub(quoteWonLog.id);
     actions.push('notification_queued:quote_won');
     actions.push('deferred:os_creation_scheduled_24h');
+
+    try {
+      const contractRes = await callEdgeFunction('generate-contract-pdf', {
+        quote_id: event.entity_id,
+      });
+      if (contractRes?.contract_id) {
+        actions.push(`contract_generated:${contractRes.contract_id}`);
+      }
+    } catch (e) {
+      actions.push(`contract_generation_failed:${(e as Error).message}`);
+    }
   }
 
   // ── precificacao → AI profitability analysis ──────────────────────────────

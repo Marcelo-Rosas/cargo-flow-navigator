@@ -51,6 +51,11 @@ const clientSchema = z.object({
     .transform((v) => v?.toUpperCase()),
   zip_code: zodCep,
   notes: z.string().max(500, 'Observações muito longas').optional(),
+  // Dados para contrato
+  state_registration: z.string().max(30).optional(),
+  legal_representative_name: z.string().max(200).optional(),
+  legal_representative_cpf: z.string().max(20).optional(),
+  legal_representative_role: z.string().max(100).optional(),
 });
 
 type ClientFormData = z.infer<typeof clientSchema>;
@@ -82,6 +87,10 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
       state: '',
       zip_code: '',
       notes: '',
+      state_registration: '',
+      legal_representative_name: '',
+      legal_representative_cpf: '',
+      legal_representative_role: '',
     },
   });
 
@@ -99,6 +108,10 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
         state: client.state || '',
         zip_code: client.zip_code || '',
         notes: client.notes || '',
+        state_registration: client.state_registration || '',
+        legal_representative_name: client.legal_representative_name || '',
+        legal_representative_cpf: client.legal_representative_cpf || '',
+        legal_representative_role: client.legal_representative_role || '',
       });
     } else {
       form.reset({
@@ -113,6 +126,10 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
         state: '',
         zip_code: '',
         notes: '',
+        state_registration: '',
+        legal_representative_name: '',
+        legal_representative_cpf: '',
+        legal_representative_role: '',
       });
     }
   }, [client, form]);
@@ -197,6 +214,10 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
             state: data.state || null,
             zip_code: data.zip_code || null,
             notes: data.notes || null,
+            state_registration: data.state_registration || null,
+            legal_representative_name: data.legal_representative_name || null,
+            legal_representative_cpf: data.legal_representative_cpf || null,
+            legal_representative_role: data.legal_representative_role || null,
           },
         });
         toast.success('Cliente atualizado com sucesso');
@@ -214,6 +235,10 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
           state: data.state || null,
           zip_code: data.zip_code || null,
           notes: data.notes || null,
+          state_registration: data.state_registration || null,
+          legal_representative_name: data.legal_representative_name || null,
+          legal_representative_cpf: data.legal_representative_cpf || null,
+          legal_representative_role: data.legal_representative_role || null,
           created_by: user.id,
         });
         toast.success('Cliente criado com sucesso');
@@ -416,6 +441,68 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                 )}
               />
             </div>
+
+            <details className="group border rounded-md px-3 py-2">
+              <summary className="cursor-pointer text-sm font-medium text-muted-foreground group-open:text-foreground select-none">
+                Dados para Contrato (opcional)
+              </summary>
+              <div className="mt-3 space-y-3">
+                <FormField
+                  control={form.control}
+                  name="state_registration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Inscrição Estadual</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Isento" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="legal_representative_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome do Representante Legal</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Nome completo para assinatura" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="legal_representative_cpf"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CPF do Representante</FormLabel>
+                        <FormControl>
+                          <Input placeholder="000.000.000-00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="legal_representative_role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cargo / Função</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Sócio-Gerente" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </details>
 
             <FormField
               control={form.control}
