@@ -203,7 +203,7 @@ function stubResponse(): { status: BuonnyDriverStatus; numero_liberacao: string;
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
-export default async (req: Request): Promise<Response> => {
+Deno.serve(async (req: Request): Promise<Response> => {
   const CORS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -348,4 +348,4 @@ export default async (req: Request): Promise<Response> => {
     status: 200,
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
-};
+});
