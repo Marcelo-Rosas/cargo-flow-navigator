@@ -396,83 +396,113 @@ export function RiskWorkflowWizard({
   };
 
   const handleAnttConsult = async () => {
-    if (!anttCpfCnpj) {
-      toast.error(
-        isDriverSameAsOwner || !ownerCpfCnpj
-          ? 'CPF/CNPJ do transportador não cadastrado'
-          : 'CPF/CNPJ do proprietário não cadastrado no veículo'
-      );
-      return;
-    }
-    const digits = onlyDigits(anttCpfCnpj);
-    if (digits.length !== 11 && digits.length !== 14) {
-      toast.error('Informe um CPF (11) ou CNPJ (14 dígitos) válido no cadastro do transportador');
-      return;
-    }
     if (!resolvedVehiclePlate) {
       toast.error('Placa do veículo não atribuída');
       return;
     }
 
-    try {
-      // ── Passo 1: Por Transportador (RNTRC) ─────────────────────────────
-      setAnttCheckStage('rntrc');
-      const resp1 = await anttCheck.mutateAsync({
-        order_id: orderId,
-        cpf_cnpj: digits,
-        vehicle_plate: resolvedVehiclePlate,
-        rntrc: resolvedDriverAntt || undefined,
-        operation: 'rntrc',
-      });
+    // TAC path needs driver CPF; Agregado path only needs the plate
+    let digits = '';
+    if (isDriverSameAsOwner) {
+      if (!anttCpfCnpj) {
+        toast.error('CPF/CNPJ do transportador não cadastrado');
+        return;
+      }
+      digits = onlyDigits(anttCpfCnpj);
+      if (digits.length !== 11 && digits.length !== 14) {
+        toast.error('Informe um CPF (11) ou CNPJ (14 dígitos) válido no cadastro do transportador');
+        return;
+      }
+    }
 
+    try {
       type Modalidade = 'tac' | 'agregado' | 'indefinido';
       let modalidade: Modalidade = 'indefinido';
       let veiculoNaFrota: boolean | null = null;
       let ciotFound: boolean | null = null;
       let ciotStatus: string | null = null;
       let ciotMensagem: string | null = null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let firstResp: any = null;
 
-      // ── Passo 2: Por Veículo (verifica se veículo está na frota do motorista) ──
-      if (resp1.situacao === 'regular' && vehicleRenavam) {
+      if (!isDriverSameAsOwner) {
+        // ── Agregado path: consulta Por Veículo (placa) → RNTRC do proprietário ──
+        // Não depende do CPF do proprietário estar cadastrado no banco.
         setAnttCheckStage('veiculo');
-        const resp2 = await anttCheck.mutateAsync({
+        const respV = await anttCheck.mutateAsync({
           order_id: orderId,
-          cpf_cnpj: digits,
           vehicle_plate: resolvedVehiclePlate,
-          rntrc: resp1.rntrc || resolvedDriverAntt || undefined,
           operation: 'veiculo',
         });
-        veiculoNaFrota = resp2.veiculo_na_frota ?? null;
+        firstResp = respV;
+        modalidade = 'agregado';
 
-        if (resp2.veiculo_na_frota === true) {
-          modalidade = 'tac';
-        } else if (resp2.veiculo_na_frota === false) {
-          modalidade = 'agregado';
-
-          // ── Passo 3: CIOT (Agregado — verifica vínculo RNTRC + RENAVAM) ──
-          const rntrcForCiot = resp1.rntrc || resolvedDriverAntt;
-          if (rntrcForCiot) {
+        if (respV.situacao === 'regular') {
+          // RNTRC do proprietário vem da resposta do portal, ou usa o ANTT do motorista como fallback
+          const rntrcForCiot = respV.rntrc ?? resolvedDriverAntt ?? null;
+          if (rntrcForCiot && vehicleRenavam) {
+            // ── Passo 2: CIOT Agregado ──────────────────────────────────────
             setAnttCheckStage('ciot');
-            const resp3 = await anttCheck.mutateAsync({
+            const respC = await anttCheck.mutateAsync({
               order_id: orderId,
-              cpf_cnpj: digits,
               vehicle_plate: resolvedVehiclePlate,
               rntrc: rntrcForCiot,
               renavam: vehicleRenavam,
               operation: 'ciot',
             });
-            ciotFound = resp3.ciot?.found ?? null;
-            ciotStatus = resp3.ciot?.status ?? null;
-            ciotMensagem = resp3.ciot?.mensagem ?? null;
+            ciotFound = respC.ciot?.found ?? null;
+            ciotStatus = respC.ciot?.status ?? null;
+            ciotMensagem = respC.ciot?.mensagem ?? null;
+          }
+        }
+      } else {
+        // ── TAC path: consulta Por Transportador (CPF) → confirma frota ────
+        setAnttCheckStage('rntrc');
+        const resp1 = await anttCheck.mutateAsync({
+          order_id: orderId,
+          cpf_cnpj: digits,
+          vehicle_plate: resolvedVehiclePlate,
+          rntrc: resolvedDriverAntt || undefined,
+          operation: 'rntrc',
+        });
+        firstResp = resp1;
+
+        if (resp1.situacao === 'regular' && vehicleRenavam) {
+          setAnttCheckStage('veiculo');
+          const resp2 = await anttCheck.mutateAsync({
+            order_id: orderId,
+            cpf_cnpj: digits,
+            vehicle_plate: resolvedVehiclePlate,
+            rntrc: resp1.rntrc || resolvedDriverAntt || undefined,
+            operation: 'veiculo',
+          });
+          veiculoNaFrota = resp2.veiculo_na_frota ?? null;
+
+          if (resp2.veiculo_na_frota === true) {
+            modalidade = 'tac';
+          } else if (resp2.veiculo_na_frota === false) {
+            modalidade = 'agregado';
+            const rntrcForCiot = resp1.rntrc || resolvedDriverAntt;
+            if (rntrcForCiot) {
+              setAnttCheckStage('ciot');
+              const resp3 = await anttCheck.mutateAsync({
+                order_id: orderId,
+                cpf_cnpj: digits,
+                vehicle_plate: resolvedVehiclePlate,
+                rntrc: rntrcForCiot,
+                renavam: vehicleRenavam,
+                operation: 'ciot',
+              });
+              ciotFound = resp3.ciot?.found ?? null;
+              ciotStatus = resp3.ciot?.status ?? null;
+              ciotMensagem = resp3.ciot?.mensagem ?? null;
+            }
           }
         }
       }
 
-      // Motorista ATIVO e veículo na frota → TAC
-      // Motorista ATIVO + Agregado + CIOT vigente → autorizado
-      // Tudo mais → rejeitado
       const overallOk =
-        resp1.situacao === 'regular' &&
+        firstResp?.situacao === 'regular' &&
         (modalidade === 'tac' ||
           (modalidade === 'agregado' && ciotFound === true) ||
           modalidade === 'indefinido');
@@ -484,7 +514,7 @@ export function RiskWorkflowWizard({
             ? 'ANTT: Agregado — CIOT vigente, operação autorizada'
             : modalidade === 'agregado'
               ? 'ANTT: Agregado — sem CIOT vigente'
-              : (resp1.message ??
+              : (firstResp?.message ??
                 (overallOk ? 'Consulta ANTT (RNTRC)' : 'Situação irregular na consulta ANTT'));
 
       const evalId = await ensureEvaluationId();
@@ -496,15 +526,15 @@ export function RiskWorkflowWizard({
         expires_at: overallOk ? expiresAt : null,
         notes,
         payload: {
-          situacao: resp1.situacao,
-          situacao_raw: resp1.situacao_raw ?? null,
-          rntrc: resp1.rntrc ?? null,
-          transportador: resp1.transportador ?? null,
-          apto: resp1.apto ?? null,
+          situacao: firstResp?.situacao ?? 'indeterminado',
+          situacao_raw: firstResp?.situacao_raw ?? null,
+          rntrc: firstResp?.rntrc ?? null,
+          transportador: firstResp?.transportador ?? null,
+          apto: firstResp?.apto ?? null,
           renavam: vehicleRenavam ?? null,
-          cpf_cnpj: digits,
+          cpf_cnpj: digits || null,
           vehicle_plate: normalizePlate(resolvedVehiclePlate),
-          is_stub: resp1.is_stub,
+          is_stub: firstResp?.is_stub ?? true,
           consult_source: 'auto',
           modalidade,
           veiculo_na_frota: veiculoNaFrota,
@@ -522,7 +552,9 @@ export function RiskWorkflowWizard({
       } else if (modalidade === 'agregado') {
         toast.warning('ANTT: Agregado sem CIOT vigente — operação não autorizada');
       } else {
-        toast.success(`ANTT: ${resp1.situacao}${resp1.is_stub ? ' (stub)' : ''}`);
+        toast.success(
+          `ANTT: ${firstResp?.situacao ?? 'indeterminado'}${firstResp?.is_stub ? ' (stub)' : ''}`
+        );
       }
     } catch (err) {
       toast.error(`Erro na consulta ANTT: ${err instanceof Error ? err.message : String(err)}`);
@@ -841,7 +873,9 @@ function StepAntt({
 
   const stageLabelMap: Record<string, string> = {
     rntrc: 'Verificando RNTRC...',
-    veiculo: 'Verificando vínculo veículo...',
+    veiculo: ownerName
+      ? 'Consultando transportador (por placa)...'
+      : 'Verificando vínculo veículo...',
     ciot: 'Verificando CIOT...',
   };
   const consultLabel = checkStage
@@ -859,17 +893,22 @@ function StepAntt({
           <span className="text-muted-foreground">Motorista:</span>{' '}
           <span className="font-medium">{driverName ?? 'Não atribuído'}</span>
         </div>
-        <div>
-          <span className="text-muted-foreground">
-            {ownerName ? 'CPF/CNPJ (Proprietário):' : 'CPF/CNPJ:'}
-          </span>{' '}
-          <span className="font-medium">{driverCpf ?? '—'}</span>
-        </div>
-        {ownerName && (
-          <div className="col-span-2">
-            <span className="text-amber-600 dark:text-amber-400 text-xs font-medium">
-              ⚠ Motorista diferente do proprietário — consultando RNTRC sob {ownerName}
-            </span>
+        {ownerName ? (
+          <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-xs space-y-0.5">
+            <div className="font-medium text-amber-700 dark:text-amber-400">
+              ⚠ Veículo agregado — proprietário diferente do motorista
+            </div>
+            <div className="text-amber-700 dark:text-amber-400">
+              Proprietário: <span className="font-semibold">{ownerName}</span>
+            </div>
+            <div className="text-amber-600 dark:text-amber-500">
+              Consulta ANTT por placa (RNTRC do proprietário via portal)
+            </div>
+          </div>
+        ) : (
+          <div>
+            <span className="text-muted-foreground">CPF/CNPJ:</span>{' '}
+            <span className="font-medium">{driverCpf ?? '—'}</span>
           </div>
         )}
         <div>
