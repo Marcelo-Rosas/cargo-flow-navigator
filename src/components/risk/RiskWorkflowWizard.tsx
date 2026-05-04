@@ -379,8 +379,10 @@ export function RiskWorkflowWizard({
       },
     });
 
-    // Await evidence refetch so buonnyValid updates immediately
-    await qc.refetchQueries({ queryKey: ['risk-evidence', evalId] });
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['risk-evidence', evalId] }),
+      qc.invalidateQueries({ queryKey: ['risk-evaluation', 'order', orderId] }),
+    ]);
   };
 
   const buonnyCheck = useBuonnyProfessionalCheck();
@@ -557,7 +559,10 @@ export function RiskWorkflowWizard({
           ciot_mensagem: ciotMensagem,
         },
       });
-      await qc.refetchQueries({ queryKey: ['risk-evidence', evalId] });
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ['risk-evidence', evalId] }),
+        qc.invalidateQueries({ queryKey: ['risk-evaluation', 'order', orderId] }),
+      ]);
 
       if (modalidade === 'tac') {
         toast.success('ANTT: TAC — veículo na frota do motorista');
@@ -922,7 +927,6 @@ function StepAntt({
               {ownerIsCnpj
                 ? '⚠ Veículo terceiro — proprietário empresa (CNPJ)'
                 : '⚠ Veículo agregado — proprietário diferente do motorista'}
-              ⚠ Veículo agregado — proprietário diferente do motorista
             </div>
             <div className="text-amber-700 dark:text-amber-400">
               Proprietário: <span className="font-semibold">{ownerName}</span>
@@ -990,7 +994,7 @@ function StepAntt({
                     : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
                 )}
               >
-                {modalidade === 'tac' ? 'TAC' : 'Agregado'}
+                {modalidade === 'tac' ? 'TAC' : modalidade === 'terceiro' ? 'Terceiro' : 'Agregado'}
               </span>
               {modalidade === 'agregado' && (
                 <span className="text-muted-foreground text-xs">
