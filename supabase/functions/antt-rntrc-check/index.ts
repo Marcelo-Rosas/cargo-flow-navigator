@@ -222,6 +222,38 @@ async function fetchAltchaAndSolve(referer: string, signal: AbortSignal): Promis
 
 // ─── UPDATE PANEL DELTA PARSER ───────────────────────────────────────────────
 
+interface DeltaResult {
+  panels: Record<string, string>;
+  hiddenFields: Record<string, string>;
+}
+
+function parseDeltaFull(delta: string): DeltaResult {
+  const panels: Record<string, string> = {};
+  const hiddenFields: Record<string, string> = {};
+  let i = 0;
+  while (i < delta.length) {
+    const p1 = delta.indexOf('|', i);
+    if (p1 < 0) break;
+    const len = parseInt(delta.slice(i, p1), 10);
+    if (isNaN(len)) break;
+    i = p1 + 1;
+    const p2 = delta.indexOf('|', i);
+    if (p2 < 0) break;
+    const type = delta.slice(i, p2);
+    i = p2 + 1;
+    const p3 = delta.indexOf('|', i);
+    if (p3 < 0) break;
+    const id = delta.slice(i, p3);
+    i = p3 + 1;
+    const content = delta.slice(i, i + len);
+    i += len;
+    if (i < delta.length && delta[i] === '|') i++;
+    if (type === 'updatePanel') panels[id] = content;
+    if (type === 'hiddenField') hiddenFields[id] = content;
+  }
+  return { panels, hiddenFields };
+}
+
 function parseDelta(delta: string): Record<string, string> {
   const panels: Record<string, string> = {};
   let i = 0;
@@ -445,6 +477,71 @@ async function fetchPage(url: string, signal: AbortSignal): Promise<PageTokens> 
 
 // ─── CONSULTATION FLOWS ──────────────────────────────────────────────────────
 
+/**
+ * Autopostback intermediário para selecionar rbTipoConsulta=3 (Por Veículo).
+ *
+ * O ANTT renderiza txtPlaca condicionalmente — só aparece quando o usuário
+ * clica no radio "Por Veículo". Como o GET inicial entrega o modo 1 (Por
+ * Transportador), txtPlaca não está no __EVENTVALIDATION original. Sem este
+ * autopostback, o POST de consulta retorna "Invalid postback or callback
+ * argument" (ASP.NET event validation error, HTTP 500 no delta).
+ */
+async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise<PageTokens> {
+  console.log('[antt] autopostback rbTipoConsulta=3');
+  const selBody = new URLSearchParams({
+    ctl00$ScriptManagerMain: 'ctl00$ScriptManagerMain|ctl00$Corpo$rbTipoConsulta',
+    __EVENTTARGET: 'ctl00$Corpo$rbTipoConsulta',
+    __EVENTARGUMENT: '',
+    __LASTFOCUS: '',
+    __VIEWSTATE: tokens.viewState,
+    __VIEWSTATEGENERATOR: tokens.viewStateGen,
+    __EVENTVALIDATION: tokens.eventValidation,
+    ctl00$bMostraAlerta: 'true',
+    ctl00$Corpo$hfPnlConsulta: '1',
+    ctl00$Corpo$hfAltchaUrl: tokens.altchaUrl,
+    ctl00$Corpo$rbTipoConsulta: '3',
+    ctl00$Corpo$txtPlaca: '',
+    ctl00$Corpo$txtRNTRC: '',
+    ctl00$Corpo$txtCpfCnpj: '',
+  });
+
+  try {
+    const res = await fetch(RNTRC_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'User-Agent': UA,
+        Referer: RNTRC_URL,
+        Cookie: tokens.cookies,
+        'X-MicrosoftAjax': 'Delta=true',
+        'X-Requested-With': 'XMLHttpRequest',
+        Accept: '*/*',
+      },
+      body: selBody.toString(),
+      redirect: 'follow',
+      signal,
+    });
+    const text = await res.text();
+    const { hiddenFields } = parseDeltaFull(text);
+    console.log('[antt] autopostback hiddenFields keys=', Object.keys(hiddenFields).join(','));
+    const vs = hiddenFields['__VIEWSTATE'];
+    const vsg = hiddenFields['__VIEWSTATEGENERATOR'];
+    const ev = hiddenFields['__EVENTVALIDATION'];
+    if (vs && ev) {
+      console.log('[antt] autopostback: fresh tokens obtained');
+      return {
+        ...tokens,
+        viewState: vs,
+        viewStateGen: vsg || tokens.viewStateGen,
+        eventValidation: ev,
+      };
+    }
+  } catch (e) {
+    console.warn('[antt] autopostback error:', String(e), '— using original tokens');
+  }
+  return tokens;
+}
+
 async function consultaRntrc(
   cpfCnpj: string,
   plate: string,
@@ -453,16 +550,20 @@ async function consultaRntrc(
   signal: AbortSignal
 ): Promise<AnttRntrcCheckResponse> {
   console.log('[antt] GET RNTRC page tipo=', tipoConsulta);
-  const { viewState, viewStateGen, eventValidation, altchaUrl, cookies } = await fetchPage(
-    RNTRC_URL,
-    signal
-  );
+  let tokens = await fetchPage(RNTRC_URL, signal);
 
-  if (!viewState) throw new Error('RNTRC ViewState não encontrado');
+  if (!tokens.viewState) throw new Error('RNTRC ViewState não encontrado');
+
+  // tipoConsulta=3 requires an intermediate autopostback so the server
+  // registers txtPlaca in __EVENTVALIDATION before the actual search POST.
+  if (tipoConsulta === '3') {
+    tokens = await switchRntrcMode(tokens, signal);
+  }
 
   const altchaPayload = await fetchAltchaAndSolve(RNTRC_URL, signal);
 
   console.log('[antt] POST RNTRC tipo=', tipoConsulta);
+  const { viewState, viewStateGen, eventValidation, altchaUrl, cookies } = tokens;
   const formBody = new URLSearchParams({
     ctl00$ScriptManagerMain: 'ctl00$ScriptManagerMain|ctl00$Corpo$btnConsulta',
     __EVENTTARGET: '',
