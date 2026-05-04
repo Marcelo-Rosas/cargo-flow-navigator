@@ -451,10 +451,19 @@ function drawPageFooter(doc: PdfDoc): void {
 // ── Pricing Breakdown (detailed / internal only) ───────────────────────────────
 
 function drawPricingBreakdown(doc: PdfDoc, bd: StoredPricingBreakdown, y: number): number {
+function drawPricingBreakdown(
+  doc: PdfDoc,
+  bd: StoredPricingBreakdown,
+  y: number,
+  freightModality?: 'lotacao' | 'fracionado' | null
+): number {
   const c = bd.components;
   const t = bd.totals;
   const p = bd.profitability;
   const discount = t.discount ?? 0;
+  const antt = bd.meta?.antt;
+  const unloading = (bd.meta?.unloadingCost ?? []).filter((i) => i.total > 0);
+  const equipment = (bd.meta?.equipmentRental ?? []).filter((i) => i.selected && i.total > 0);
 
   const sectionHeader = (label: string) => {
     doc.setFillColor(...C.navy);
@@ -534,6 +543,145 @@ function drawPricingBreakdown(doc: PdfDoc, bd: StoredPricingBreakdown, y: number
   doc.text(formatCurrency(totalFinal), PW - MR - 5, y + 6.5, { align: 'right' });
   y += 14;
 
+  // ── RENTABILIDADE ──────────────────────────────────────────────────────────
+  sectionHeader('RENTABILIDADE');
+
+  const profRows: string[][] = [['Receita Bruta', formatCurrency(t.receitaBruta)]];
+  const regime = p?.regimeFiscal;
+  if (regime === 'lucro_presumido') {
+    if ((t.pis ?? 0) > 0) profRows.push(['PIS', formatCurrency(t.pis ?? 0)]);
+    if ((t.cofins ?? 0) > 0) profRows.push(['COFINS', formatCurrency(t.cofins ?? 0)]);
+    if ((t.irpj ?? 0) > 0) profRows.push(['IRPJ (provisao)', formatCurrency(t.irpj ?? 0)]);
+    if ((t.csll ?? 0) > 0) profRows.push(['CSLL (provisao)', formatCurrency(t.csll ?? 0)]);
+  } else if ((t.das ?? 0) > 0) {
+    profRows.push(['DAS (Simples Nacional)', formatCurrency(t.das)]);
+  }
+  if ((t.icms ?? 0) > 0) profRows.push(['ICMS', formatCurrency(t.icms)]);
+  profRows.push(['Margem Bruta', formatCurrency(p?.margemBruta ?? 0)]);
+  if ((p?.overhead ?? 0) > 0)
+    profRows.push(['Overhead (Custos Fixos)', formatCurrency(p?.overhead ?? 0)]);
+
+  autoTable(doc as jsPDF, {
+    startY: y,
+    head: [],
+    body: profRows,
+    theme: 'plain',
+    margin: { left: ML, right: MR },
+    styles: {
+      fontSize: 8.5,
+      cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
+      textColor: C.text as number[],
+    },
+    columnStyles: {
+      0: { cellWidth: 68, fontStyle: 'bold', textColor: C.muted as number[] },
+      1: { cellWidth: CW - 68 },
+    },
+  });
+  y = ((doc as PdfDoc).lastAutoTable?.finalY ?? y) + 2;
+
+  const margemPct = (p?.margemPercent ?? 0).toFixed(1);
+  doc.setFillColor(...C.success);
+  doc.roundedRect(ML, y, CW, 10, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...C.white);
+  doc.text(`Resultado Liquido  (margem ${margemPct}%)`, ML + 5, y + 6.5);
+  doc.text(formatCurrency(p?.resultadoLiquido ?? 0), PW - MR - 5, y + 6.5, { align: 'right' });
+  y += 14;
+
+  // ── PISO ANTT — exclusivo Lotação (Fracionado usa NTC, processo diferente) ─
+  if (antt && freightModality !== 'fracionado') {
+    sectionHeader('PISO ANTT (SUROC)');
+
+    autoTable(doc as jsPDF, {
+      startY: y,
+      head: [],
+      body: [
+        ['Tabela / Tipo de carga', `${antt.operationTable} / ${antt.cargoType}`],
+        ['Eixos do veiculo', String(antt.axesCount)],
+        ['CCD (R$/km)', formatCurrency(antt.ccd)],
+        ['CC (custo fixo)', formatCurrency(antt.cc)],
+        ['Piso calculado (ida)', formatCurrency(antt.total)],
+      ],
+      theme: 'striped',
+      margin: { left: ML, right: MR },
+      headStyles: { fillColor: C.navy as number[], textColor: [255, 255, 255], fontSize: 7.5 },
+      bodyStyles: { fontSize: 8.5, textColor: C.text as number[] },
+      alternateRowStyles: { fillColor: C.light as number[] },
+      columnStyles: {
+        0: { cellWidth: 68, fontStyle: 'bold', textColor: C.muted as number[] },
+        1: { cellWidth: CW - 68 },
+      },
+    });
+    y = ((doc as PdfDoc).lastAutoTable?.finalY ?? y) + 6;
+  }
+
+  // ── ITENS DE CARGA / DESCARGA ──────────────────────────────────────────────
+  if (unloading.length > 0) {
+    sectionHeader('ITENS DE CARGA / DESCARGA');
+
+    autoTable(doc as jsPDF, {
+      startY: y,
+      head: [['Servico', 'Qtd', 'Unit (R$)', 'Total (R$)']],
+      body: unloading.map((i) => [
+        i.name,
+        String(i.quantity),
+        formatCurrency(i.unitValue),
+        formatCurrency(i.total),
+      ]),
+      theme: 'striped',
+      margin: { left: ML, right: MR },
+      headStyles: {
+        fillColor: C.navy as number[],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 7.5,
+      },
+      bodyStyles: { fontSize: 8.5, textColor: C.text as number[] },
+      alternateRowStyles: { fillColor: C.light as number[] },
+      columnStyles: {
+        0: { cellWidth: 90 },
+        1: { cellWidth: 15, halign: 'center' },
+        2: { cellWidth: (CW - 105) / 2, halign: 'right' },
+        3: { cellWidth: (CW - 105) / 2, halign: 'right' },
+      },
+    });
+    y = ((doc as PdfDoc).lastAutoTable?.finalY ?? y) + 6;
+  }
+
+  // ── ALUGUEL DE MAQUINAS ────────────────────────────────────────────────────
+  if (equipment.length > 0) {
+    sectionHeader('ALUGUEL DE MAQUINAS');
+
+    autoTable(doc as jsPDF, {
+      startY: y,
+      head: [['Equipamento', 'Qtd', 'Unit (R$)', 'Total (R$)']],
+      body: equipment.map((i) => [
+        i.name,
+        String(i.quantity),
+        formatCurrency(i.unitValue),
+        formatCurrency(i.total),
+      ]),
+      theme: 'striped',
+      margin: { left: ML, right: MR },
+      headStyles: {
+        fillColor: C.navy as number[],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 7.5,
+      },
+      bodyStyles: { fontSize: 8.5, textColor: C.text as number[] },
+      alternateRowStyles: { fillColor: C.light as number[] },
+      columnStyles: {
+        0: { cellWidth: 90 },
+        1: { cellWidth: 15, halign: 'center' },
+        2: { cellWidth: (CW - 105) / 2, halign: 'right' },
+        3: { cellWidth: (CW - 105) / 2, halign: 'right' },
+      },
+    });
+    y = ((doc as PdfDoc).lastAutoTable?.finalY ?? y) + 6;
+  }
+
   return y;
 }
 
@@ -575,6 +723,7 @@ export async function generateQuotePdf({
     y = drawDetailedSection(doc, quote, y);
     if (quote.pricing_breakdown?.components) {
       y = drawPricingBreakdown(doc, quote.pricing_breakdown, y);
+      y = drawPricingBreakdown(doc, quote.pricing_breakdown, y, quote.freight_modality);
     }
   }
 
