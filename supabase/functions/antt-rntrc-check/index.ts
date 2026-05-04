@@ -284,9 +284,7 @@ function extractPanelHtml(responseText: string, ct: string): string {
   const isDelta = ct.includes('text/plain') || /^\d+\|/.test(responseText);
   if (!isDelta) return responseText;
   const panels = parseDelta(responseText);
-  const keys = Object.keys(panels);
-  console.log('[antt] panelKeys=', keys.join(','));
-  return keys.length > 0 ? Object.values(panels).join('') : responseText;
+  return Object.keys(panels).length > 0 ? Object.values(panels).join('') : responseText;
 }
 
 // ─── RNTRC RESULT PARSER ─────────────────────────────────────────────────────
@@ -523,12 +521,10 @@ async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise
     });
     const text = await res.text();
     const { hiddenFields } = parseDeltaFull(text);
-    console.log('[antt] autopostback hiddenFields keys=', Object.keys(hiddenFields).join(','));
     const vs = hiddenFields['__VIEWSTATE'];
     const vsg = hiddenFields['__VIEWSTATEGENERATOR'];
     const ev = hiddenFields['__EVENTVALIDATION'];
     if (vs && ev) {
-      console.log('[antt] autopostback: fresh tokens obtained');
       return {
         ...tokens,
         viewState: vs,
@@ -582,8 +578,6 @@ async function consultaRntrc(
     ...(altchaPayload ? { altcha: altchaPayload } : {}),
     ctl00$Corpo$btnConsulta: 'Consultar',
   });
-  console.log('[antt] altcha token present=', !!altchaPayload);
-
   const postRes = await fetch(RNTRC_URL, {
     method: 'POST',
     headers: {
