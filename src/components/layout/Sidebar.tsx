@@ -16,6 +16,7 @@ import {
   BarChart3,
   ShieldCheck,
   Activity,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,12 @@ const navItems = [
     path: '/usuarios',
     icon: UserCog,
     label: 'Usuários',
+    roles: ['admin'] as UserProfile[],
+  },
+  {
+    path: '/configuracoes-empresa',
+    icon: Building2,
+    label: 'Empresa',
     roles: ['admin'] as UserProfile[],
   },
 ];

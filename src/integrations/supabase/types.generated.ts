@@ -6,33 +6,43 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: '14.1';
   };
-  graphql_public: {
-    Tables: {
-      [_ in never]: never;
-    };
-    Views: {
-      [_ in never]: never;
-    };
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json;
-          operationName?: string;
-          query?: string;
-          variables?: Json;
-        };
-        Returns: Json;
-      };
-    };
-    Enums: {
-      [_ in never]: never;
-    };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
   public: {
     Tables: {
+      agent_jobs: {
+        Row: {
+          collected_data_id: string | null;
+          created_at: string | null;
+          id: string;
+          picked_at: string | null;
+          result: Json | null;
+          status: string | null;
+        };
+        Insert: {
+          collected_data_id?: string | null;
+          created_at?: string | null;
+          id?: string;
+          picked_at?: string | null;
+          result?: Json | null;
+          status?: string | null;
+        };
+        Update: {
+          collected_data_id?: string | null;
+          created_at?: string | null;
+          id?: string;
+          picked_at?: string | null;
+          result?: Json | null;
+          status?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'agent_jobs_collected_data_id_fkey';
+            columns: ['collected_data_id'];
+            isOneToOne: false;
+            referencedRelation: 'collected_data';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       ai_budget_config: {
         Row: {
           description: string | null;
@@ -200,6 +210,74 @@ export type Database = {
         };
         Relationships: [];
       };
+      antt_violation_alerts: {
+        Row: {
+          current_value: number;
+          detected_at: string;
+          gap: number | null;
+          id: string;
+          piso: number;
+          quote_id: string;
+          resolution_note: string | null;
+          resolved_at: string | null;
+          resolved_by: string | null;
+          stage: string;
+        };
+        Insert: {
+          current_value: number;
+          detected_at?: string;
+          gap?: number | null;
+          id?: string;
+          piso: number;
+          quote_id: string;
+          resolution_note?: string | null;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          stage: string;
+        };
+        Update: {
+          current_value?: number;
+          detected_at?: string;
+          gap?: number | null;
+          id?: string;
+          piso?: number;
+          quote_id?: string;
+          resolution_note?: string | null;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          stage?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'antt_violation_alerts_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'antt_violation_alerts_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'antt_violation_alerts_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_payment_reconciliation';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'antt_violation_alerts_resolved_by_fkey';
+            columns: ['resolved_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
+      };
       approval_requests: {
         Row: {
           ai_analysis: Json | null;
@@ -346,6 +424,9 @@ export type Database = {
       clients: {
         Row: {
           address: string | null;
+          address_complement: string | null;
+          address_neighborhood: string | null;
+          address_number: string | null;
           city: string | null;
           cnpj: string | null;
           cnpj_mask: string | null;
@@ -355,10 +436,14 @@ export type Database = {
           created_by: string | null;
           email: string | null;
           id: string;
+          legal_representative_cpf: string | null;
+          legal_representative_name: string | null;
+          legal_representative_role: string | null;
           name: string;
           notes: string | null;
           phone: string | null;
           state: string | null;
+          state_registration: string | null;
           updated_at: string;
           user_id: string;
           zip_code: string | null;
@@ -366,6 +451,9 @@ export type Database = {
         };
         Insert: {
           address?: string | null;
+          address_complement?: string | null;
+          address_neighborhood?: string | null;
+          address_number?: string | null;
           city?: string | null;
           cnpj?: string | null;
           cnpj_mask?: string | null;
@@ -375,10 +463,14 @@ export type Database = {
           created_by?: string | null;
           email?: string | null;
           id?: string;
+          legal_representative_cpf?: string | null;
+          legal_representative_name?: string | null;
+          legal_representative_role?: string | null;
           name: string;
           notes?: string | null;
           phone?: string | null;
           state?: string | null;
+          state_registration?: string | null;
           updated_at?: string;
           user_id?: string;
           zip_code?: string | null;
@@ -386,6 +478,9 @@ export type Database = {
         };
         Update: {
           address?: string | null;
+          address_complement?: string | null;
+          address_neighborhood?: string | null;
+          address_number?: string | null;
           city?: string | null;
           cnpj?: string | null;
           cnpj_mask?: string | null;
@@ -395,10 +490,14 @@ export type Database = {
           created_by?: string | null;
           email?: string | null;
           id?: string;
+          legal_representative_cpf?: string | null;
+          legal_representative_name?: string | null;
+          legal_representative_role?: string | null;
           name?: string;
           notes?: string | null;
           phone?: string | null;
           state?: string | null;
+          state_registration?: string | null;
           updated_at?: string;
           user_id?: string;
           zip_code?: string | null;
@@ -420,6 +519,554 @@ export type Database = {
             referencedColumns: ['user_id'];
           },
         ];
+      };
+      cnh_categories: {
+        Row: {
+          active: boolean;
+          code: string;
+          description: string;
+          id: number;
+        };
+        Insert: {
+          active?: boolean;
+          code: string;
+          description: string;
+          id?: number;
+        };
+        Update: {
+          active?: boolean;
+          code?: string;
+          description?: string;
+          id?: number;
+        };
+        Relationships: [];
+      };
+      collected_data: {
+        Row: {
+          collected_at: string | null;
+          id: string;
+          markdown: string;
+          processed: boolean | null;
+          raw: Json | null;
+          source_ref: string;
+          source_type: string;
+          task_id: string | null;
+        };
+        Insert: {
+          collected_at?: string | null;
+          id?: string;
+          markdown: string;
+          processed?: boolean | null;
+          raw?: Json | null;
+          source_ref: string;
+          source_type: string;
+          task_id?: string | null;
+        };
+        Update: {
+          collected_at?: string | null;
+          id?: string;
+          markdown?: string;
+          processed?: boolean | null;
+          raw?: Json | null;
+          source_ref?: string;
+          source_type?: string;
+          task_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'collected_data_task_id_fkey';
+            columns: ['task_id'];
+            isOneToOne: false;
+            referencedRelation: 'tasks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      commercial_closeout_events: {
+        Row: {
+          closeout_type: string;
+          created_at: string;
+          id: string;
+          message_event_id: string | null;
+          payload: Json;
+          quote_id: string;
+        };
+        Insert: {
+          closeout_type: string;
+          created_at?: string;
+          id?: string;
+          message_event_id?: string | null;
+          payload?: Json;
+          quote_id: string;
+        };
+        Update: {
+          closeout_type?: string;
+          created_at?: string;
+          id?: string;
+          message_event_id?: string | null;
+          payload?: Json;
+          quote_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'commercial_closeout_events_message_event_id_fkey';
+            columns: ['message_event_id'];
+            isOneToOne: false;
+            referencedRelation: 'commercial_message_events';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'commercial_closeout_events_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'commercial_closeout_events_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'commercial_closeout_events_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_payment_reconciliation';
+            referencedColumns: ['quote_id'];
+          },
+        ];
+      };
+      commercial_followup_rules: {
+        Row: {
+          active: boolean;
+          channel: string;
+          created_at: string;
+          id: string;
+          max_attempts: number;
+          name: string;
+          offset_minutes: number;
+          priority: number;
+          quote_stage: string;
+          requires_estimated_loading_date: boolean;
+          stop_on_reply: boolean;
+          stop_on_stage_change: boolean;
+          strategy_key: string;
+          template_key: string;
+          trigger_after_minutes: number;
+          trigger_anchor: string;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          channel: string;
+          created_at?: string;
+          id?: string;
+          max_attempts?: number;
+          name: string;
+          offset_minutes?: number;
+          priority?: number;
+          quote_stage: string;
+          requires_estimated_loading_date?: boolean;
+          stop_on_reply?: boolean;
+          stop_on_stage_change?: boolean;
+          strategy_key?: string;
+          template_key: string;
+          trigger_after_minutes?: number;
+          trigger_anchor?: string;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          channel?: string;
+          created_at?: string;
+          id?: string;
+          max_attempts?: number;
+          name?: string;
+          offset_minutes?: number;
+          priority?: number;
+          quote_stage?: string;
+          requires_estimated_loading_date?: boolean;
+          stop_on_reply?: boolean;
+          stop_on_stage_change?: boolean;
+          strategy_key?: string;
+          template_key?: string;
+          trigger_after_minutes?: number;
+          trigger_anchor?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      commercial_followup_runs: {
+        Row: {
+          attempt_no: number;
+          channel: string;
+          created_at: string;
+          id: string;
+          notification_log_id: string | null;
+          quote_id: string;
+          recipient_email: string | null;
+          recipient_phone: string | null;
+          replied_at: string | null;
+          rule_id: string;
+          sent_at: string | null;
+          status: string;
+          stopped_reason: string | null;
+          target_type: string | null;
+          template_key: string;
+        };
+        Insert: {
+          attempt_no: number;
+          channel: string;
+          created_at?: string;
+          id?: string;
+          notification_log_id?: string | null;
+          quote_id: string;
+          recipient_email?: string | null;
+          recipient_phone?: string | null;
+          replied_at?: string | null;
+          rule_id: string;
+          sent_at?: string | null;
+          status?: string;
+          stopped_reason?: string | null;
+          target_type?: string | null;
+          template_key: string;
+        };
+        Update: {
+          attempt_no?: number;
+          channel?: string;
+          created_at?: string;
+          id?: string;
+          notification_log_id?: string | null;
+          quote_id?: string;
+          recipient_email?: string | null;
+          recipient_phone?: string | null;
+          replied_at?: string | null;
+          rule_id?: string;
+          sent_at?: string | null;
+          status?: string;
+          stopped_reason?: string | null;
+          target_type?: string | null;
+          template_key?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'commercial_followup_runs_notification_log_id_fkey';
+            columns: ['notification_log_id'];
+            isOneToOne: false;
+            referencedRelation: 'notification_logs';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'commercial_followup_runs_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'commercial_followup_runs_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'commercial_followup_runs_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_payment_reconciliation';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'commercial_followup_runs_rule_id_fkey';
+            columns: ['rule_id'];
+            isOneToOne: false;
+            referencedRelation: 'commercial_followup_rules';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      commercial_message_events: {
+        Row: {
+          channel: string;
+          classification: string | null;
+          client_id: string | null;
+          created_at: string;
+          direction: string;
+          external_message_id: string | null;
+          id: string;
+          message_text: string | null;
+          metadata: Json;
+          phone: string | null;
+          quote_id: string | null;
+          shipper_id: string | null;
+          target_email: string | null;
+          target_name: string | null;
+          target_type: string | null;
+          template_key: string | null;
+        };
+        Insert: {
+          channel: string;
+          classification?: string | null;
+          client_id?: string | null;
+          created_at?: string;
+          direction: string;
+          external_message_id?: string | null;
+          id?: string;
+          message_text?: string | null;
+          metadata?: Json;
+          phone?: string | null;
+          quote_id?: string | null;
+          shipper_id?: string | null;
+          target_email?: string | null;
+          target_name?: string | null;
+          target_type?: string | null;
+          template_key?: string | null;
+        };
+        Update: {
+          channel?: string;
+          classification?: string | null;
+          client_id?: string | null;
+          created_at?: string;
+          direction?: string;
+          external_message_id?: string | null;
+          id?: string;
+          message_text?: string | null;
+          metadata?: Json;
+          phone?: string | null;
+          quote_id?: string | null;
+          shipper_id?: string | null;
+          target_email?: string | null;
+          target_name?: string | null;
+          target_type?: string | null;
+          template_key?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'commercial_message_events_client_id_fkey';
+            columns: ['client_id'];
+            isOneToOne: false;
+            referencedRelation: 'clients';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'commercial_message_events_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'commercial_message_events_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'commercial_message_events_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_payment_reconciliation';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'commercial_message_events_shipper_id_fkey';
+            columns: ['shipper_id'];
+            isOneToOne: false;
+            referencedRelation: 'shippers';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      commercial_operational_handoffs: {
+        Row: {
+          blockers: Json;
+          created_at: string;
+          handoff_status: string;
+          handoff_summary: Json;
+          id: string;
+          missing_fields: Json;
+          operational_owner_name: string | null;
+          order_id: string | null;
+          quote_id: string;
+          source: string;
+          updated_at: string;
+        };
+        Insert: {
+          blockers?: Json;
+          created_at?: string;
+          handoff_status?: string;
+          handoff_summary?: Json;
+          id?: string;
+          missing_fields?: Json;
+          operational_owner_name?: string | null;
+          order_id?: string | null;
+          quote_id: string;
+          source?: string;
+          updated_at?: string;
+        };
+        Update: {
+          blockers?: Json;
+          created_at?: string;
+          handoff_status?: string;
+          handoff_summary?: Json;
+          id?: string;
+          missing_fields?: Json;
+          operational_owner_name?: string | null;
+          order_id?: string | null;
+          quote_id?: string;
+          source?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'commercial_operational_handoffs_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'commercial_operational_handoffs_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders_rs_per_km';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'commercial_operational_handoffs_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_order_payment_reconciliation';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'commercial_operational_handoffs_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'commercial_operational_handoffs_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_trip_financial_details';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'commercial_operational_handoffs_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'vw_order_risk_status';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'commercial_operational_handoffs_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'commercial_operational_handoffs_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'commercial_operational_handoffs_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_payment_reconciliation';
+            referencedColumns: ['quote_id'];
+          },
+        ];
+      };
+      company_settings: {
+        Row: {
+          address_city: string;
+          address_complement: string | null;
+          address_neighborhood: string;
+          address_number: string;
+          address_state: string;
+          address_street: string;
+          address_zip: string;
+          bank_account: string | null;
+          bank_agency: string | null;
+          bank_name: string | null;
+          bank_pix_key: string | null;
+          cnpj: string;
+          created_at: string;
+          default_jurisdiction: string;
+          id: string;
+          legal_name: string;
+          legal_representative_cpf: string | null;
+          legal_representative_name: string | null;
+          legal_representative_role: string | null;
+          municipal_registration: string | null;
+          signature_city: string;
+          state_registration: string;
+          trade_name: string;
+          updated_at: string;
+        };
+        Insert: {
+          address_city?: string;
+          address_complement?: string | null;
+          address_neighborhood?: string;
+          address_number?: string;
+          address_state?: string;
+          address_street?: string;
+          address_zip?: string;
+          bank_account?: string | null;
+          bank_agency?: string | null;
+          bank_name?: string | null;
+          bank_pix_key?: string | null;
+          cnpj?: string;
+          created_at?: string;
+          default_jurisdiction?: string;
+          id?: string;
+          legal_name?: string;
+          legal_representative_cpf?: string | null;
+          legal_representative_name?: string | null;
+          legal_representative_role?: string | null;
+          municipal_registration?: string | null;
+          signature_city?: string;
+          state_registration?: string;
+          trade_name?: string;
+          updated_at?: string;
+        };
+        Update: {
+          address_city?: string;
+          address_complement?: string | null;
+          address_neighborhood?: string;
+          address_number?: string;
+          address_state?: string;
+          address_street?: string;
+          address_zip?: string;
+          bank_account?: string | null;
+          bank_agency?: string | null;
+          bank_name?: string | null;
+          bank_pix_key?: string | null;
+          cnpj?: string;
+          created_at?: string;
+          default_jurisdiction?: string;
+          id?: string;
+          legal_name?: string;
+          legal_representative_cpf?: string | null;
+          legal_representative_name?: string | null;
+          legal_representative_role?: string | null;
+          municipal_registration?: string | null;
+          signature_city?: string;
+          state_registration?: string;
+          trade_name?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       compliance_checks: {
         Row: {
@@ -957,6 +1604,326 @@ export type Database = {
           },
         ];
       };
+      driver_offer_ranking_config: {
+        Row: {
+          buonny_cargo_value_threshold: number;
+          id: number;
+          max_offers_default: number;
+          max_timeouts_before_escalation: number;
+          min_quality_score: number;
+          timeout_hours_default: number;
+          updated_at: string;
+          weight_price: number;
+          weight_proximity: number;
+          weight_quality_score: number;
+          weight_route_history: number;
+        };
+        Insert: {
+          buonny_cargo_value_threshold?: number;
+          id?: number;
+          max_offers_default?: number;
+          max_timeouts_before_escalation?: number;
+          min_quality_score?: number;
+          timeout_hours_default?: number;
+          updated_at?: string;
+          weight_price?: number;
+          weight_proximity?: number;
+          weight_quality_score?: number;
+          weight_route_history?: number;
+        };
+        Update: {
+          buonny_cargo_value_threshold?: number;
+          id?: number;
+          max_offers_default?: number;
+          max_timeouts_before_escalation?: number;
+          min_quality_score?: number;
+          timeout_hours_default?: number;
+          updated_at?: string;
+          weight_price?: number;
+          weight_proximity?: number;
+          weight_quality_score?: number;
+          weight_route_history?: number;
+        };
+        Relationships: [];
+      };
+      driver_offer_sequences: {
+        Row: {
+          accepted_at: string | null;
+          accepted_driver_id: string | null;
+          cargo_type: string | null;
+          cargo_value: number | null;
+          created_at: string;
+          created_by: string | null;
+          current_position: number;
+          destination: string | null;
+          destination_city: string | null;
+          destination_state: string | null;
+          escalated_at: string | null;
+          escalation_reason: string | null;
+          estimated_loading_date: string | null;
+          id: string;
+          max_offers: number;
+          order_id: string | null;
+          origin: string | null;
+          origin_city: string | null;
+          origin_state: string | null;
+          quote_id: string;
+          status: Database['public']['Enums']['offer_sequence_status'];
+          timeout_hours: number;
+          trip_id: string | null;
+          updated_at: string;
+          vehicle_type_id: string | null;
+          weight: number | null;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          accepted_driver_id?: string | null;
+          cargo_type?: string | null;
+          cargo_value?: number | null;
+          created_at?: string;
+          created_by?: string | null;
+          current_position?: number;
+          destination?: string | null;
+          destination_city?: string | null;
+          destination_state?: string | null;
+          escalated_at?: string | null;
+          escalation_reason?: string | null;
+          estimated_loading_date?: string | null;
+          id?: string;
+          max_offers?: number;
+          order_id?: string | null;
+          origin?: string | null;
+          origin_city?: string | null;
+          origin_state?: string | null;
+          quote_id: string;
+          status?: Database['public']['Enums']['offer_sequence_status'];
+          timeout_hours?: number;
+          trip_id?: string | null;
+          updated_at?: string;
+          vehicle_type_id?: string | null;
+          weight?: number | null;
+        };
+        Update: {
+          accepted_at?: string | null;
+          accepted_driver_id?: string | null;
+          cargo_type?: string | null;
+          cargo_value?: number | null;
+          created_at?: string;
+          created_by?: string | null;
+          current_position?: number;
+          destination?: string | null;
+          destination_city?: string | null;
+          destination_state?: string | null;
+          escalated_at?: string | null;
+          escalation_reason?: string | null;
+          estimated_loading_date?: string | null;
+          id?: string;
+          max_offers?: number;
+          order_id?: string | null;
+          origin?: string | null;
+          origin_city?: string | null;
+          origin_state?: string | null;
+          quote_id?: string;
+          status?: Database['public']['Enums']['offer_sequence_status'];
+          timeout_hours?: number;
+          trip_id?: string | null;
+          updated_at?: string;
+          vehicle_type_id?: string | null;
+          weight?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'driver_offer_sequences_accepted_driver_id_fkey';
+            columns: ['accepted_driver_id'];
+            isOneToOne: false;
+            referencedRelation: 'drivers';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders_rs_per_km';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_order_payment_reconciliation';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_trip_financial_details';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'vw_order_risk_status';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: true;
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: true;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: true;
+            referencedRelation: 'v_quote_payment_reconciliation';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_trip_id_fkey';
+            columns: ['trip_id'];
+            isOneToOne: false;
+            referencedRelation: 'trip_financial_summary';
+            referencedColumns: ['trip_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_trip_id_fkey';
+            columns: ['trip_id'];
+            isOneToOne: false;
+            referencedRelation: 'trips';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_trip_id_fkey';
+            columns: ['trip_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_trip_payment_reconciliation';
+            referencedColumns: ['trip_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_trip_id_fkey';
+            columns: ['trip_id'];
+            isOneToOne: false;
+            referencedRelation: 'vw_trip_risk_summary';
+            referencedColumns: ['trip_id'];
+          },
+          {
+            foreignKeyName: 'driver_offer_sequences_vehicle_type_id_fkey';
+            columns: ['vehicle_type_id'];
+            isOneToOne: false;
+            referencedRelation: 'vehicle_types';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      driver_offers: {
+        Row: {
+          buonny_check_id: string | null;
+          buonny_status: string | null;
+          created_at: string;
+          driver_id: string;
+          freight_value_offered: number | null;
+          id: string;
+          offered_at: string | null;
+          position: number;
+          ranking_details: Json | null;
+          ranking_score: number | null;
+          responded_at: string | null;
+          response_channel: string | null;
+          response_text: string | null;
+          sequence_id: string;
+          skip_reason: string | null;
+          status: Database['public']['Enums']['driver_offer_status'];
+          timeout_at: string | null;
+          whatsapp_message_id: string | null;
+        };
+        Insert: {
+          buonny_check_id?: string | null;
+          buonny_status?: string | null;
+          created_at?: string;
+          driver_id: string;
+          freight_value_offered?: number | null;
+          id?: string;
+          offered_at?: string | null;
+          position: number;
+          ranking_details?: Json | null;
+          ranking_score?: number | null;
+          responded_at?: string | null;
+          response_channel?: string | null;
+          response_text?: string | null;
+          sequence_id: string;
+          skip_reason?: string | null;
+          status?: Database['public']['Enums']['driver_offer_status'];
+          timeout_at?: string | null;
+          whatsapp_message_id?: string | null;
+        };
+        Update: {
+          buonny_check_id?: string | null;
+          buonny_status?: string | null;
+          created_at?: string;
+          driver_id?: string;
+          freight_value_offered?: number | null;
+          id?: string;
+          offered_at?: string | null;
+          position?: number;
+          ranking_details?: Json | null;
+          ranking_score?: number | null;
+          responded_at?: string | null;
+          response_channel?: string | null;
+          response_text?: string | null;
+          sequence_id?: string;
+          skip_reason?: string | null;
+          status?: Database['public']['Enums']['driver_offer_status'];
+          timeout_at?: string | null;
+          whatsapp_message_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'driver_offers_driver_id_fkey';
+            columns: ['driver_id'];
+            isOneToOne: false;
+            referencedRelation: 'drivers';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'driver_offers_sequence_id_fkey';
+            columns: ['sequence_id'];
+            isOneToOne: false;
+            referencedRelation: 'driver_offer_sequences';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       driver_qualifications: {
         Row: {
           ai_analysis: Json | null;
@@ -975,6 +1942,8 @@ export type Database = {
           risk_score: number | null;
           status: Database['public']['Enums']['driver_qualification_status'];
           updated_at: string;
+          whatsapp_reminded_at: string | null;
+          whatsapp_sent_at: string | null;
         };
         Insert: {
           ai_analysis?: Json | null;
@@ -993,6 +1962,8 @@ export type Database = {
           risk_score?: number | null;
           status?: Database['public']['Enums']['driver_qualification_status'];
           updated_at?: string;
+          whatsapp_reminded_at?: string | null;
+          whatsapp_sent_at?: string | null;
         };
         Update: {
           ai_analysis?: Json | null;
@@ -1011,6 +1982,8 @@ export type Database = {
           risk_score?: number | null;
           status?: Database['public']['Enums']['driver_qualification_status'];
           updated_at?: string;
+          whatsapp_reminded_at?: string | null;
+          whatsapp_sent_at?: string | null;
         };
         Relationships: [
           {
@@ -1068,8 +2041,10 @@ export type Database = {
         Row: {
           active: boolean;
           antt: string | null;
+          antt_expiry: string | null;
           cnh: string | null;
           cnh_category: string | null;
+          cnh_expiry: string | null;
           cooldown_days: number | null;
           cpf: string | null;
           created_at: string;
@@ -1084,8 +2059,10 @@ export type Database = {
         Insert: {
           active?: boolean;
           antt?: string | null;
+          antt_expiry?: string | null;
           cnh?: string | null;
           cnh_category?: string | null;
+          cnh_expiry?: string | null;
           cooldown_days?: number | null;
           cpf?: string | null;
           created_at?: string;
@@ -1100,8 +2077,10 @@ export type Database = {
         Update: {
           active?: boolean;
           antt?: string | null;
+          antt_expiry?: string | null;
           cnh?: string | null;
           cnh_category?: string | null;
+          cnh_expiry?: string | null;
           cooldown_days?: number | null;
           cpf?: string | null;
           created_at?: string;
@@ -1113,7 +2092,15 @@ export type Database = {
           refusal_count?: number | null;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'drivers_cnh_category_fk';
+            columns: ['cnh_category'];
+            isOneToOne: false;
+            referencedRelation: 'cnh_categories';
+            referencedColumns: ['code'];
+          },
+        ];
       };
       edge_function_api_keys: {
         Row: {
@@ -1911,6 +2898,48 @@ export type Database = {
           },
         ];
       };
+      logistics_traffic_rules: {
+        Row: {
+          city: string;
+          created_at: string | null;
+          full_name: string | null;
+          id: string;
+          organ_name: string;
+          permit_info: string | null;
+          restriction_type: string | null;
+          rules_summary: string | null;
+          source: string | null;
+          state: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          city: string;
+          created_at?: string | null;
+          full_name?: string | null;
+          id?: string;
+          organ_name: string;
+          permit_info?: string | null;
+          restriction_type?: string | null;
+          rules_summary?: string | null;
+          source?: string | null;
+          state: string;
+          updated_at?: string | null;
+        };
+        Update: {
+          city?: string;
+          created_at?: string | null;
+          full_name?: string | null;
+          id?: string;
+          organ_name?: string;
+          permit_info?: string | null;
+          restriction_type?: string | null;
+          rules_summary?: string | null;
+          source?: string | null;
+          state?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       ltl_parameters: {
         Row: {
           correction_factor: number;
@@ -2045,6 +3074,235 @@ export type Database = {
           resumo_whatsapp?: string | null;
         };
         Relationships: [];
+      };
+      mirofish_monthly_revenue: {
+        Row: {
+          ano_mes: string;
+          created_at: string | null;
+          ctes: number;
+          id: number;
+          mes: string;
+          valor: number;
+        };
+        Insert: {
+          ano_mes: string;
+          created_at?: string | null;
+          ctes: number;
+          id?: number;
+          mes: string;
+          valor: number;
+        };
+        Update: {
+          ano_mes?: string;
+          created_at?: string | null;
+          ctes?: number;
+          id?: number;
+          mes?: string;
+          valor?: number;
+        };
+        Relationships: [];
+      };
+      mirofish_recommendations: {
+        Row: {
+          action: string;
+          created_at: string | null;
+          id: string;
+          priority: string | null;
+          report_id: string;
+          status: string | null;
+          target_routes: string[] | null;
+        };
+        Insert: {
+          action: string;
+          created_at?: string | null;
+          id?: string;
+          priority?: string | null;
+          report_id: string;
+          status?: string | null;
+          target_routes?: string[] | null;
+        };
+        Update: {
+          action?: string;
+          created_at?: string | null;
+          id?: string;
+          priority?: string | null;
+          report_id?: string;
+          status?: string | null;
+          target_routes?: string[] | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'mirofish_recommendations_report_id_fkey';
+            columns: ['report_id'];
+            isOneToOne: false;
+            referencedRelation: 'mirofish_reports';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      mirofish_reports: {
+        Row: {
+          agents_count: number | null;
+          completed_at: string | null;
+          created_at: string | null;
+          error: string | null;
+          generated_at: string | null;
+          id: string;
+          mirofish_report_id: string;
+          period_end: string | null;
+          period_start: string | null;
+          period_type: string | null;
+          raw_insights: Json | null;
+          sections: Json | null;
+          simulation_id: string;
+          simulation_requirement: string | null;
+          status: string | null;
+          summary: string | null;
+          synced_at: string | null;
+          title: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          agents_count?: number | null;
+          completed_at?: string | null;
+          created_at?: string | null;
+          error?: string | null;
+          generated_at?: string | null;
+          id?: string;
+          mirofish_report_id: string;
+          period_end?: string | null;
+          period_start?: string | null;
+          period_type?: string | null;
+          raw_insights?: Json | null;
+          sections?: Json | null;
+          simulation_id: string;
+          simulation_requirement?: string | null;
+          status?: string | null;
+          summary?: string | null;
+          synced_at?: string | null;
+          title?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          agents_count?: number | null;
+          completed_at?: string | null;
+          created_at?: string | null;
+          error?: string | null;
+          generated_at?: string | null;
+          id?: string;
+          mirofish_report_id?: string;
+          period_end?: string | null;
+          period_start?: string | null;
+          period_type?: string | null;
+          raw_insights?: Json | null;
+          sections?: Json | null;
+          simulation_id?: string;
+          simulation_requirement?: string | null;
+          status?: string | null;
+          summary?: string | null;
+          synced_at?: string | null;
+          title?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      mirofish_route_insights: {
+        Row: {
+          avg_ticket: number | null;
+          avg_weight_kg: number | null;
+          created_at: string | null;
+          id: string;
+          ntc_impact: number | null;
+          report_id: string;
+          revenue: number | null;
+          route: string;
+          volume_ctes: number | null;
+        };
+        Insert: {
+          avg_ticket?: number | null;
+          avg_weight_kg?: number | null;
+          created_at?: string | null;
+          id?: string;
+          ntc_impact?: number | null;
+          report_id: string;
+          revenue?: number | null;
+          route: string;
+          volume_ctes?: number | null;
+        };
+        Update: {
+          avg_ticket?: number | null;
+          avg_weight_kg?: number | null;
+          created_at?: string | null;
+          id?: string;
+          ntc_impact?: number | null;
+          report_id?: string;
+          revenue?: number | null;
+          route?: string;
+          volume_ctes?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'mirofish_route_insights_report_id_fkey';
+            columns: ['report_id'];
+            isOneToOne: false;
+            referencedRelation: 'mirofish_reports';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      mirofish_shipper_insights: {
+        Row: {
+          avg_ticket: number | null;
+          churn_risk: string | null;
+          created_at: string | null;
+          ctes: number | null;
+          id: string;
+          report_id: string;
+          revenue: number | null;
+          routes_count: number | null;
+          shipper_id: string | null;
+          shipper_name: string;
+        };
+        Insert: {
+          avg_ticket?: number | null;
+          churn_risk?: string | null;
+          created_at?: string | null;
+          ctes?: number | null;
+          id?: string;
+          report_id: string;
+          revenue?: number | null;
+          routes_count?: number | null;
+          shipper_id?: string | null;
+          shipper_name: string;
+        };
+        Update: {
+          avg_ticket?: number | null;
+          churn_risk?: string | null;
+          created_at?: string | null;
+          ctes?: number | null;
+          id?: string;
+          report_id?: string;
+          revenue?: number | null;
+          routes_count?: number | null;
+          shipper_id?: string | null;
+          shipper_name?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'mirofish_shipper_insights_report_id_fkey';
+            columns: ['report_id'];
+            isOneToOne: false;
+            referencedRelation: 'mirofish_reports';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'mirofish_shipper_insights_shipper_id_fkey';
+            columns: ['shipper_id'];
+            isOneToOne: false;
+            referencedRelation: 'shippers';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       news_items: {
         Row: {
@@ -3398,6 +4656,7 @@ export type Database = {
           parcela_petrobras: number | null;
           periodo_coleta: string | null;
           preco_medio: number;
+          source: string;
           uf: string;
         };
         Insert: {
@@ -3410,6 +4669,7 @@ export type Database = {
           parcela_petrobras?: number | null;
           periodo_coleta?: string | null;
           preco_medio: number;
+          source?: string;
           uf: string;
         };
         Update: {
@@ -3422,6 +4682,7 @@ export type Database = {
           parcela_petrobras?: number | null;
           periodo_coleta?: string | null;
           preco_medio?: number;
+          source?: string;
           uf?: string;
         };
         Relationships: [];
@@ -3711,6 +4972,39 @@ export type Database = {
           },
         ];
       };
+      processes: {
+        Row: {
+          atualizado_em: string | null;
+          criado_em: string | null;
+          descricao: string | null;
+          dominio: string | null;
+          id: string;
+          nome: string;
+          owner: string | null;
+          status: string | null;
+        };
+        Insert: {
+          atualizado_em?: string | null;
+          criado_em?: string | null;
+          descricao?: string | null;
+          dominio?: string | null;
+          id?: string;
+          nome: string;
+          owner?: string | null;
+          status?: string | null;
+        };
+        Update: {
+          atualizado_em?: string | null;
+          criado_em?: string | null;
+          descricao?: string | null;
+          dominio?: string | null;
+          id?: string;
+          nome?: string;
+          owner?: string | null;
+          status?: string | null;
+        };
+        Relationships: [];
+      };
       product_dimensions: {
         Row: {
           altura_m: number;
@@ -3797,6 +5091,89 @@ export type Database = {
             isOneToOne: true;
             referencedRelation: 'valid_users';
             referencedColumns: ['user_id'];
+          },
+        ];
+      };
+      quote_contracts: {
+        Row: {
+          created_at: string;
+          generated_at: string;
+          generated_by: string | null;
+          id: string;
+          pdf_file_name: string | null;
+          pdf_size_bytes: number | null;
+          pdf_storage_path: string;
+          quote_id: string;
+          signature_envelope_id: string | null;
+          signature_metadata: Json;
+          signature_provider: string | null;
+          signature_status: string;
+          signed_at: string | null;
+          updated_at: string;
+          version: number;
+        };
+        Insert: {
+          created_at?: string;
+          generated_at?: string;
+          generated_by?: string | null;
+          id?: string;
+          pdf_file_name?: string | null;
+          pdf_size_bytes?: number | null;
+          pdf_storage_path: string;
+          quote_id: string;
+          signature_envelope_id?: string | null;
+          signature_metadata?: Json;
+          signature_provider?: string | null;
+          signature_status?: string;
+          signed_at?: string | null;
+          updated_at?: string;
+          version?: number;
+        };
+        Update: {
+          created_at?: string;
+          generated_at?: string;
+          generated_by?: string | null;
+          id?: string;
+          pdf_file_name?: string | null;
+          pdf_size_bytes?: number | null;
+          pdf_storage_path?: string;
+          quote_id?: string;
+          signature_envelope_id?: string | null;
+          signature_metadata?: Json;
+          signature_provider?: string | null;
+          signature_status?: string;
+          signed_at?: string | null;
+          updated_at?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'quote_contracts_generated_by_fkey';
+            columns: ['generated_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
+            foreignKeyName: 'quote_contracts_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'quotes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'quote_contracts_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'quote_contracts_quote_id_fkey';
+            columns: ['quote_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_payment_reconciliation';
+            referencedColumns: ['quote_id'];
           },
         ];
       };
@@ -3962,10 +5339,12 @@ export type Database = {
           client_email: string | null;
           client_id: string | null;
           client_name: string;
+          commercial_owner_name: string | null;
           conditional_fees_breakdown: Json | null;
           created_at: string;
           created_by: string;
           cubage_weight: number | null;
+          delivered_at: string | null;
           delivery_conditions_selected: Json | null;
           delivery_notes: string | null;
           destination: string;
@@ -3975,19 +5354,27 @@ export type Database = {
           email_sent: boolean;
           email_sent_at: string | null;
           estimated_loading_date: string | null;
+          followup_target_locked_at: string | null;
+          followup_target_type: string | null;
           freight_modality: string | null;
           freight_type: string | null;
+          handoff_required: boolean;
           id: string;
           is_legacy: boolean;
           km_distance: number | null;
+          last_commercial_reply_at: string | null;
           notes: string | null;
+          opened_at: string | null;
           origin: string;
           origin_cep: string | null;
           payment_method: string | null;
           payment_term_id: string | null;
           price_table_id: string | null;
           pricing_breakdown: Json | null;
+          proposal_sent_at: string | null;
           quote_code: string | null;
+          resend_email_id: string | null;
+          sent_at: string | null;
           shipper_email: string | null;
           shipper_id: string | null;
           shipper_name: string | null;
@@ -4016,10 +5403,12 @@ export type Database = {
           client_email?: string | null;
           client_id?: string | null;
           client_name: string;
+          commercial_owner_name?: string | null;
           conditional_fees_breakdown?: Json | null;
           created_at?: string;
           created_by: string;
           cubage_weight?: number | null;
+          delivered_at?: string | null;
           delivery_conditions_selected?: Json | null;
           delivery_notes?: string | null;
           destination: string;
@@ -4029,19 +5418,27 @@ export type Database = {
           email_sent?: boolean;
           email_sent_at?: string | null;
           estimated_loading_date?: string | null;
+          followup_target_locked_at?: string | null;
+          followup_target_type?: string | null;
           freight_modality?: string | null;
           freight_type?: string | null;
+          handoff_required?: boolean;
           id?: string;
           is_legacy?: boolean;
           km_distance?: number | null;
+          last_commercial_reply_at?: string | null;
           notes?: string | null;
+          opened_at?: string | null;
           origin: string;
           origin_cep?: string | null;
           payment_method?: string | null;
           payment_term_id?: string | null;
           price_table_id?: string | null;
           pricing_breakdown?: Json | null;
+          proposal_sent_at?: string | null;
           quote_code?: string | null;
+          resend_email_id?: string | null;
+          sent_at?: string | null;
           shipper_email?: string | null;
           shipper_id?: string | null;
           shipper_name?: string | null;
@@ -4070,10 +5467,12 @@ export type Database = {
           client_email?: string | null;
           client_id?: string | null;
           client_name?: string;
+          commercial_owner_name?: string | null;
           conditional_fees_breakdown?: Json | null;
           created_at?: string;
           created_by?: string;
           cubage_weight?: number | null;
+          delivered_at?: string | null;
           delivery_conditions_selected?: Json | null;
           delivery_notes?: string | null;
           destination?: string;
@@ -4083,19 +5482,27 @@ export type Database = {
           email_sent?: boolean;
           email_sent_at?: string | null;
           estimated_loading_date?: string | null;
+          followup_target_locked_at?: string | null;
+          followup_target_type?: string | null;
           freight_modality?: string | null;
           freight_type?: string | null;
+          handoff_required?: boolean;
           id?: string;
           is_legacy?: boolean;
           km_distance?: number | null;
+          last_commercial_reply_at?: string | null;
           notes?: string | null;
+          opened_at?: string | null;
           origin?: string;
           origin_cep?: string | null;
           payment_method?: string | null;
           payment_term_id?: string | null;
           price_table_id?: string | null;
           pricing_breakdown?: Json | null;
+          proposal_sent_at?: string | null;
           quote_code?: string | null;
+          resend_email_id?: string | null;
+          sent_at?: string | null;
           shipper_email?: string | null;
           shipper_id?: string | null;
           shipper_name?: string | null;
@@ -4738,6 +6145,30 @@ export type Database = {
           },
         ];
       };
+      settings: {
+        Row: {
+          created_at: string | null;
+          description: string | null;
+          key: string;
+          updated_at: string | null;
+          value: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          description?: string | null;
+          key: string;
+          updated_at?: string | null;
+          value: string;
+        };
+        Update: {
+          created_at?: string | null;
+          description?: string | null;
+          key?: string;
+          updated_at?: string | null;
+          value?: string;
+        };
+        Relationships: [];
+      };
       shippers: {
         Row: {
           address: string | null;
@@ -4806,6 +6237,324 @@ export type Database = {
           },
         ];
       };
+      sipoc_customers: {
+        Row: {
+          descricao: string | null;
+          id: string;
+          nome: string;
+          ordem: number | null;
+          referencia: string | null;
+          sipoc_map_id: string;
+          tipo: string;
+        };
+        Insert: {
+          descricao?: string | null;
+          id?: string;
+          nome: string;
+          ordem?: number | null;
+          referencia?: string | null;
+          sipoc_map_id: string;
+          tipo: string;
+        };
+        Update: {
+          descricao?: string | null;
+          id?: string;
+          nome?: string;
+          ordem?: number | null;
+          referencia?: string | null;
+          sipoc_map_id?: string;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sipoc_customers_sipoc_map_id_fkey';
+            columns: ['sipoc_map_id'];
+            isOneToOne: false;
+            referencedRelation: 'sipoc_maps';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      sipoc_decisions: {
+        Row: {
+          acao: string;
+          condicao: string;
+          id: string;
+          prioridade: number | null;
+          proximo_step_id: string | null;
+          sipoc_map_id: string;
+        };
+        Insert: {
+          acao: string;
+          condicao: string;
+          id?: string;
+          prioridade?: number | null;
+          proximo_step_id?: string | null;
+          sipoc_map_id: string;
+        };
+        Update: {
+          acao?: string;
+          condicao?: string;
+          id?: string;
+          prioridade?: number | null;
+          proximo_step_id?: string | null;
+          sipoc_map_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sipoc_decisions_sipoc_map_id_fkey';
+            columns: ['sipoc_map_id'];
+            isOneToOne: false;
+            referencedRelation: 'sipoc_maps';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      sipoc_inputs: {
+        Row: {
+          formato: string | null;
+          id: string;
+          nome: string;
+          obrigatorio: boolean | null;
+          ordem: number | null;
+          sipoc_map_id: string;
+          supplier_id: string | null;
+          tipo: string;
+          validacao: string | null;
+        };
+        Insert: {
+          formato?: string | null;
+          id?: string;
+          nome: string;
+          obrigatorio?: boolean | null;
+          ordem?: number | null;
+          sipoc_map_id: string;
+          supplier_id?: string | null;
+          tipo: string;
+          validacao?: string | null;
+        };
+        Update: {
+          formato?: string | null;
+          id?: string;
+          nome?: string;
+          obrigatorio?: boolean | null;
+          ordem?: number | null;
+          sipoc_map_id?: string;
+          supplier_id?: string | null;
+          tipo?: string;
+          validacao?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sipoc_inputs_sipoc_map_id_fkey';
+            columns: ['sipoc_map_id'];
+            isOneToOne: false;
+            referencedRelation: 'sipoc_maps';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'sipoc_inputs_supplier_id_fkey';
+            columns: ['supplier_id'];
+            isOneToOne: false;
+            referencedRelation: 'sipoc_suppliers';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      sipoc_maps: {
+        Row: {
+          alertas: Json | null;
+          atualizado_em: string | null;
+          criado_em: string | null;
+          criado_por: string | null;
+          ferramentas: Json | null;
+          id: string;
+          process_id: string;
+          proximo_steps: Json | null;
+          responsavel: string;
+          sla_horas: number | null;
+          status: string | null;
+          step_descricao: string | null;
+          step_id: string;
+          step_nome: string;
+          version: number | null;
+        };
+        Insert: {
+          alertas?: Json | null;
+          atualizado_em?: string | null;
+          criado_em?: string | null;
+          criado_por?: string | null;
+          ferramentas?: Json | null;
+          id?: string;
+          process_id: string;
+          proximo_steps?: Json | null;
+          responsavel: string;
+          sla_horas?: number | null;
+          status?: string | null;
+          step_descricao?: string | null;
+          step_id: string;
+          step_nome: string;
+          version?: number | null;
+        };
+        Update: {
+          alertas?: Json | null;
+          atualizado_em?: string | null;
+          criado_em?: string | null;
+          criado_por?: string | null;
+          ferramentas?: Json | null;
+          id?: string;
+          process_id?: string;
+          proximo_steps?: Json | null;
+          responsavel?: string;
+          sla_horas?: number | null;
+          status?: string | null;
+          step_descricao?: string | null;
+          step_id?: string;
+          step_nome?: string;
+          version?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sipoc_maps_process_id_fkey';
+            columns: ['process_id'];
+            isOneToOne: false;
+            referencedRelation: 'processes';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      sipoc_outputs: {
+        Row: {
+          condicao: string | null;
+          destino: string | null;
+          formato: string | null;
+          id: string;
+          nome: string;
+          ordem: number | null;
+          sipoc_map_id: string;
+          tipo: string;
+        };
+        Insert: {
+          condicao?: string | null;
+          destino?: string | null;
+          formato?: string | null;
+          id?: string;
+          nome: string;
+          ordem?: number | null;
+          sipoc_map_id: string;
+          tipo: string;
+        };
+        Update: {
+          condicao?: string | null;
+          destino?: string | null;
+          formato?: string | null;
+          id?: string;
+          nome?: string;
+          ordem?: number | null;
+          sipoc_map_id?: string;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sipoc_outputs_sipoc_map_id_fkey';
+            columns: ['sipoc_map_id'];
+            isOneToOne: false;
+            referencedRelation: 'sipoc_maps';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      sipoc_suppliers: {
+        Row: {
+          descricao: string | null;
+          id: string;
+          nome: string;
+          ordem: number | null;
+          referencia: string | null;
+          sipoc_map_id: string;
+          tipo: string;
+        };
+        Insert: {
+          descricao?: string | null;
+          id?: string;
+          nome: string;
+          ordem?: number | null;
+          referencia?: string | null;
+          sipoc_map_id: string;
+          tipo: string;
+        };
+        Update: {
+          descricao?: string | null;
+          id?: string;
+          nome?: string;
+          ordem?: number | null;
+          referencia?: string | null;
+          sipoc_map_id?: string;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sipoc_suppliers_sipoc_map_id_fkey';
+            columns: ['sipoc_map_id'];
+            isOneToOne: false;
+            referencedRelation: 'sipoc_maps';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      skill_executions: {
+        Row: {
+          agent_id: string | null;
+          avisos: Json | null;
+          duracao_ms: number | null;
+          erros: Json | null;
+          executado_em: string | null;
+          id: string;
+          payload_entrada: Json | null;
+          resultado: Json | null;
+          sipoc_map_id: string | null;
+          skill_id: string;
+          skill_version: string | null;
+          sucesso: boolean | null;
+        };
+        Insert: {
+          agent_id?: string | null;
+          avisos?: Json | null;
+          duracao_ms?: number | null;
+          erros?: Json | null;
+          executado_em?: string | null;
+          id?: string;
+          payload_entrada?: Json | null;
+          resultado?: Json | null;
+          sipoc_map_id?: string | null;
+          skill_id?: string;
+          skill_version?: string | null;
+          sucesso?: boolean | null;
+        };
+        Update: {
+          agent_id?: string | null;
+          avisos?: Json | null;
+          duracao_ms?: number | null;
+          erros?: Json | null;
+          executado_em?: string | null;
+          id?: string;
+          payload_entrada?: Json | null;
+          resultado?: Json | null;
+          sipoc_map_id?: string | null;
+          skill_id?: string;
+          skill_version?: string | null;
+          sucesso?: boolean | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'skill_executions_sipoc_map_id_fkey';
+            columns: ['sipoc_map_id'];
+            isOneToOne: false;
+            referencedRelation: 'sipoc_maps';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       tac_rates: {
         Row: {
           adjustment_percent: number;
@@ -4845,6 +6594,36 @@ export type Database = {
           updated_at?: string;
           user_id?: string | null;
           variation_percent?: number | null;
+        };
+        Relationships: [];
+      };
+      tasks: {
+        Row: {
+          active: boolean | null;
+          created_at: string | null;
+          cron_expr: string | null;
+          id: string;
+          last_run_at: string | null;
+          meta: Json;
+          name: string;
+        };
+        Insert: {
+          active?: boolean | null;
+          created_at?: string | null;
+          cron_expr?: string | null;
+          id?: string;
+          last_run_at?: string | null;
+          meta: Json;
+          name: string;
+        };
+        Update: {
+          active?: boolean | null;
+          created_at?: string | null;
+          cron_expr?: string | null;
+          id?: string;
+          last_run_at?: string | null;
+          meta?: Json;
+          name?: string;
         };
         Relationships: [];
       };
@@ -5156,14 +6935,14 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           departure_at: string | null;
-          driver_id: string;
+          driver_id: string | null;
           financial_status: string;
           id: string;
           notes: string | null;
           status_operational: string;
           trip_number: string;
           updated_at: string;
-          vehicle_plate: string;
+          vehicle_plate: string | null;
           vehicle_type_id: string | null;
         };
         Insert: {
@@ -5172,14 +6951,14 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           departure_at?: string | null;
-          driver_id: string;
+          driver_id?: string | null;
           financial_status?: string;
           id?: string;
           notes?: string | null;
           status_operational?: string;
           trip_number: string;
           updated_at?: string;
-          vehicle_plate: string;
+          vehicle_plate?: string | null;
           vehicle_type_id?: string | null;
         };
         Update: {
@@ -5188,14 +6967,14 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           departure_at?: string | null;
-          driver_id?: string;
+          driver_id?: string | null;
           financial_status?: string;
           id?: string;
           notes?: string | null;
           status_operational?: string;
           trip_number?: string;
           updated_at?: string;
-          vehicle_plate?: string;
+          vehicle_plate?: string | null;
           vehicle_type_id?: string | null;
         };
         Relationships: [
@@ -5296,6 +7075,147 @@ export type Database = {
             referencedColumns: ['user_id'];
           },
         ];
+      };
+      vectra_manifestos: {
+        Row: {
+          ciot: string | null;
+          combustivel: number | null;
+          created_at: string | null;
+          destino: string | null;
+          emissao: string | null;
+          frete: number | null;
+          has_ciot: boolean | null;
+          id: number;
+          manifesto: string;
+          motorista: string | null;
+          origem: string | null;
+          pedagio: number | null;
+          peso: number | null;
+          proprietario: string | null;
+          rota: string | null;
+          status: string | null;
+          tipo: string | null;
+          veiculo: string | null;
+        };
+        Insert: {
+          ciot?: string | null;
+          combustivel?: number | null;
+          created_at?: string | null;
+          destino?: string | null;
+          emissao?: string | null;
+          frete?: number | null;
+          has_ciot?: boolean | null;
+          id?: number;
+          manifesto: string;
+          motorista?: string | null;
+          origem?: string | null;
+          pedagio?: number | null;
+          peso?: number | null;
+          proprietario?: string | null;
+          rota?: string | null;
+          status?: string | null;
+          tipo?: string | null;
+          veiculo?: string | null;
+        };
+        Update: {
+          ciot?: string | null;
+          combustivel?: number | null;
+          created_at?: string | null;
+          destino?: string | null;
+          emissao?: string | null;
+          frete?: number | null;
+          has_ciot?: boolean | null;
+          id?: number;
+          manifesto?: string;
+          motorista?: string | null;
+          origem?: string | null;
+          pedagio?: number | null;
+          peso?: number | null;
+          proprietario?: string | null;
+          rota?: string | null;
+          status?: string | null;
+          tipo?: string | null;
+          veiculo?: string | null;
+        };
+        Relationships: [];
+      };
+      vectra_motoristas_margem: {
+        Row: {
+          created_at: string | null;
+          custo_total: number | null;
+          id: number;
+          km_total: number | null;
+          margem_pct: number | null;
+          margem_rs: number | null;
+          motorista: string;
+          pedagio_total: number | null;
+          peso_total: number | null;
+          receita_total: number | null;
+          viagens: number | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          custo_total?: number | null;
+          id?: number;
+          km_total?: number | null;
+          margem_pct?: number | null;
+          margem_rs?: number | null;
+          motorista: string;
+          pedagio_total?: number | null;
+          peso_total?: number | null;
+          receita_total?: number | null;
+          viagens?: number | null;
+        };
+        Update: {
+          created_at?: string | null;
+          custo_total?: number | null;
+          id?: number;
+          km_total?: number | null;
+          margem_pct?: number | null;
+          margem_rs?: number | null;
+          motorista?: string;
+          pedagio_total?: number | null;
+          peso_total?: number | null;
+          receita_total?: number | null;
+          viagens?: number | null;
+        };
+        Relationships: [];
+      };
+      vectra_rentabilidade_rotas: {
+        Row: {
+          created_at: string | null;
+          ctes: number | null;
+          custo_total: number | null;
+          id: number;
+          margem_pct: number | null;
+          margem_rs: number | null;
+          receita_total: number | null;
+          rota: string;
+          viagens: number | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          ctes?: number | null;
+          custo_total?: number | null;
+          id?: number;
+          margem_pct?: number | null;
+          margem_rs?: number | null;
+          receita_total?: number | null;
+          rota: string;
+          viagens?: number | null;
+        };
+        Update: {
+          created_at?: string | null;
+          ctes?: number | null;
+          custo_total?: number | null;
+          id?: number;
+          margem_pct?: number | null;
+          margem_rs?: number | null;
+          receita_total?: number | null;
+          rota?: string;
+          viagens?: number | null;
+        };
+        Relationships: [];
       };
       vehicle_types: {
         Row: {
@@ -5866,6 +7786,64 @@ export type Database = {
           },
         ];
       };
+      gris_service_items: {
+        Row: {
+          amount: number | null;
+          order_id: string | null;
+        };
+        Insert: {
+          amount?: never;
+          order_id?: string | null;
+        };
+        Update: {
+          amount?: never;
+          order_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'order_gris_services_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'order_gris_services_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders_rs_per_km';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'order_gris_services_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_order_payment_reconciliation';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'order_gris_services_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'order_gris_services_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_trip_financial_details';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'order_gris_services_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'vw_order_risk_status';
+            referencedColumns: ['order_id'];
+          },
+        ];
+      };
       insurance_metrics_error_breakdown: {
         Row: {
           bucket_1h: string | null;
@@ -6239,24 +8217,6 @@ export type Database = {
           quote_code: string | null;
           quote_id: string | null;
         };
-        Insert: {
-          delta_amount?: never;
-          expected_amount?: never;
-          is_reconciled?: never;
-          paid_amount?: never;
-          proofs_count?: never;
-          quote_code?: string | null;
-          quote_id?: string | null;
-        };
-        Update: {
-          delta_amount?: never;
-          expected_amount?: never;
-          is_reconciled?: never;
-          paid_amount?: never;
-          proofs_count?: never;
-          quote_code?: string | null;
-          quote_id?: string | null;
-        };
         Relationships: [];
       };
       v_trip_financial_details: {
@@ -6434,6 +8394,48 @@ export type Database = {
         Args: { p_fat_id: string; p_quote_id: string };
         Returns: undefined;
       };
+      create_trip: {
+        Args: {
+          p_departure_at?: string;
+          p_driver_id: string;
+          p_notes?: string;
+          p_trip_number?: string;
+          p_vehicle_plate: string;
+          p_vehicle_type_id?: string;
+        };
+        Returns: {
+          closed_at: string | null;
+          closed_by: string | null;
+          created_at: string;
+          created_by: string | null;
+          departure_at: string | null;
+          driver_id: string | null;
+          financial_status: string;
+          id: string;
+          notes: string | null;
+          status_operational: string;
+          trip_number: string;
+          updated_at: string;
+          vehicle_plate: string | null;
+          vehicle_type_id: string | null;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'trips';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      create_trip_from_composition: {
+        Args: {
+          p_composition_id: string;
+          p_notes?: string;
+          p_total_cost_pag: number;
+          p_total_value_fat: number;
+          p_user_id: string;
+        };
+        Returns: string;
+      };
       current_user_profile: {
         Args: never;
         Returns: Database['public']['Enums']['user_profile'];
@@ -6470,6 +8472,24 @@ export type Database = {
         Args: { p_order_id?: string; p_quote_id?: string };
         Returns: Json;
       };
+      get_diesel_cost_by_route: {
+        Args: { p_from?: string; p_to?: string };
+        Returns: {
+          ctes: number;
+          custo_por_km: number;
+          dest_uf: string;
+          diesel_dest: number;
+          diesel_orig: number;
+          diesel_total_medio: number;
+          diesel_total_soma: number;
+          km_medio: number;
+          media_rota: number;
+          origin_uf: string;
+          pct_ticket: number;
+          receita_media: number;
+          rota: string;
+        }[];
+      };
       get_route_metrics: {
         Args: { p_from: string; p_to: string; p_vehicle_type_id?: string };
         Returns: {
@@ -6494,6 +8514,7 @@ export type Database = {
         Args: { p_entity_type: string; p_from_stage: string };
         Returns: Json;
       };
+      get_vault_secret: { Args: { p_name: string }; Returns: string };
       has_any_role: {
         Args: {
           _roles: Database['public']['Enums']['app_role'][];
@@ -6524,6 +8545,41 @@ export type Database = {
       mask_plate: { Args: { input: string }; Returns: string };
       norm_plate: { Args: { input: string }; Returns: string };
       only_digits: { Args: { input: string }; Returns: string };
+      rank_drivers_for_quote: {
+        Args: {
+          p_dest_city?: string;
+          p_dest_state?: string;
+          p_exclude_driver_ids?: string[];
+          p_max_results?: number;
+          p_min_quality_score?: number;
+          p_origin_city?: string;
+          p_origin_state?: string;
+          p_vehicle_type_id: string;
+          p_w_history?: number;
+          p_w_price?: number;
+          p_w_proximity?: number;
+          p_w_quality?: number;
+        };
+        Returns: {
+          driver_cpf: string;
+          driver_id: string;
+          driver_name: string;
+          driver_phone: string;
+          history_pts: number;
+          owner_city: string;
+          owner_id: string;
+          owner_state: string;
+          proximity_pts: number;
+          quality_pts: number;
+          quality_score: number;
+          route_count: number;
+          score_details: Json;
+          total_score: number;
+          vehicle_id: string;
+          vehicle_plate: string;
+          vehicle_type_id: string;
+        }[];
+      };
       set_user_profile: {
         Args: {
           new_profile: Database['public']['Enums']['user_profile'];
@@ -6539,6 +8595,7 @@ export type Database = {
         Args: { p_key: string; p_scope: string };
         Returns: boolean;
       };
+      validate_quote_antt_floor: { Args: { p_quote_id: string }; Returns: Json };
       validate_transition: {
         Args: {
           p_entity_id: string;
@@ -6577,6 +8634,7 @@ export type Database = {
         | 'a_vista_fat'
         | 'saldo_fat'
         | 'a_prazo_fat';
+      driver_offer_status: 'pending' | 'sent' | 'accepted' | 'declined' | 'timeout' | 'skipped';
       driver_qualification_status:
         | 'pendente'
         | 'em_analise'
@@ -6587,6 +8645,13 @@ export type Database = {
       financial_installment_status: 'pendente' | 'baixado';
       financial_source_type: 'quote' | 'order';
       occurrence_severity: 'baixa' | 'media' | 'alta' | 'critica';
+      offer_sequence_status:
+        | 'ranking'
+        | 'in_progress'
+        | 'completed'
+        | 'exhausted'
+        | 'escalated'
+        | 'cancelled';
       order_stage:
         | 'ordem_criada'
         | 'busca_motorista'
@@ -6607,7 +8672,8 @@ export type Database = {
         | 'risco'
         | 'taxas_adicionais'
         | 'conteiner'
-        | 'pedagio';
+        | 'pedagio'
+        | 'ntc';
       pricing_rule_value_type: 'fixed' | 'percentage' | 'per_km' | 'per_ton';
       quote_stage:
         | 'novo_pedido'
@@ -6744,9 +8810,6 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: ['admin', 'comercial', 'operacao', 'financeiro', 'leitura'],
@@ -6778,11 +8841,20 @@ export const Constants = {
         'saldo_fat',
         'a_prazo_fat',
       ],
+      driver_offer_status: ['pending', 'sent', 'accepted', 'declined', 'timeout', 'skipped'],
       driver_qualification_status: ['pendente', 'em_analise', 'aprovado', 'reprovado', 'bloqueado'],
       financial_doc_type: ['FAT', 'PAG'],
       financial_installment_status: ['pendente', 'baixado'],
       financial_source_type: ['quote', 'order'],
       occurrence_severity: ['baixa', 'media', 'alta', 'critica'],
+      offer_sequence_status: [
+        'ranking',
+        'in_progress',
+        'completed',
+        'exhausted',
+        'escalated',
+        'cancelled',
+      ],
       order_stage: [
         'ordem_criada',
         'busca_motorista',
@@ -6805,6 +8877,7 @@ export const Constants = {
         'taxas_adicionais',
         'conteiner',
         'pedagio',
+        'ntc',
       ],
       pricing_rule_value_type: ['fixed', 'percentage', 'per_km', 'per_ton'],
       quote_stage: [

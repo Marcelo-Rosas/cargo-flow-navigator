@@ -81,6 +81,7 @@ import {
 } from '@/components/modals/quote-detail';
 import { AnttFloorBanner } from '@/components/modals/quote-detail/AnttFloorBanner';
 import { AnttFloorAlertDialog } from '@/components/modals/quote-detail/AnttFloorAlertDialog';
+import { QuoteContractPanel } from '@/components/modals/quote-detail/QuoteContractPanel';
 import { formatCurrency } from '@/lib/formatters';
 import { usePdfDownload } from '@/hooks/usePdfDownload';
 
@@ -1261,6 +1262,13 @@ export function QuoteDetailModal({
               {showDocFatTab && (
                 <TabsContent value="doc_fat" className="space-y-6 mt-4 m-0">
                   <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-2 block">
+                        Contrato
+                      </label>
+                      <QuoteContractPanel quoteId={quote.id} stage={quote.stage} />
+                    </div>
+
                     <div>
                       <label className="text-sm font-medium text-foreground mb-2 block">
                         Condição de recebimento

@@ -26,6 +26,7 @@ const Financial = lazy(() => import('./pages/Financial'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Approvals = lazy(() => import('./pages/Approvals'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
+const CompanySettings = lazy(() => import('./pages/CompanySettings'));
 const Auth = lazy(() => import('./pages/Auth'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const InsuranceMonitoringDashboard = lazy(() =>
@@ -219,6 +220,19 @@ const App = () => (
                       description="Ocorreu um erro ao carregar usuários. Tente novamente."
                     >
                       <UserManagement />
+                    </RouteErrorBoundary>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/configuracoes-empresa"
+                element={
+                  <ProtectedRoute requiredRoles={['admin']}>
+                    <RouteErrorBoundary
+                      title="Erro nas Configurações da Empresa"
+                      description="Ocorreu um erro ao carregar as configurações. Tente novamente."
+                    >
+                      <CompanySettings />
                     </RouteErrorBoundary>
                   </ProtectedRoute>
                 }
