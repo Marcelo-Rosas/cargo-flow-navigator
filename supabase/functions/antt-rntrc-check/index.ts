@@ -142,6 +142,14 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
+// Batch capped at 100 to keep CPU bursts within Supabase's ~400 ms budget.
+// A wall-clock deadline (POW_DEADLINE_MS) prevents the worker from being killed
+// with WORKER_RESOURCE_LIMIT on high-n challenges — the caller proceeds without
+// the altcha token instead (portal either accepts it or we get indeterminado,
+// same outcome as the current crash).
+const POW_BATCH = 100;
+const POW_DEADLINE_MS = 6_000; // wall-clock, not CPU time
+
 async function solvePoW(
   salt: string,
   target: string,
@@ -152,11 +160,15 @@ async function solvePoW(
   const saltBytes = enc.encode(salt);
   const targetBytes = hexToBytes(target);
   const cap = Math.min(maxnumber, 1_000_000);
-  const BATCH = 1_000;
+  const deadline = Date.now() + POW_DEADLINE_MS;
 
-  for (let base = 0; base <= cap; base += BATCH) {
+  for (let base = 0; base <= cap; base += POW_BATCH) {
     if (signal?.aborted) return null;
-    const count = Math.min(BATCH, cap - base + 1);
+    if (Date.now() > deadline) {
+      console.warn('[antt] PoW deadline hit at n=', base, '— proceeding without altcha');
+      return null;
+    }
+    const count = Math.min(POW_BATCH, cap - base + 1);
     const promises: Promise<ArrayBuffer>[] = [];
     for (let i = 0; i < count; i++) {
       const numStr = String(base + i);
@@ -185,17 +197,27 @@ function buildAltchaPayload(ch: AltchaChallenge, number: number): string {
   );
 }
 
-async function fetchAltchaAndSolve(referer: string, signal: AbortSignal): Promise<string> {
-  const res = await fetch(ALTCHA_URL, {
-    headers: { 'User-Agent': UA, Referer: referer },
-    signal,
-  });
-  if (!res.ok) throw new Error(`ALTCHA challenge ${res.status}`);
-  const ch: AltchaChallenge = await res.json();
-  console.log('[antt] solving PoW maxnumber=', ch.maxnumber);
-  const n = await solvePoW(ch.salt, ch.challenge, ch.maxnumber, signal);
-  if (n === null) throw new Error('ALTCHA: solução PoW não encontrada');
-  return buildAltchaPayload(ch, n);
+// Returns null (instead of throwing) when the challenge can't be fetched or PoW
+// times out — the caller must handle a missing token gracefully.
+async function fetchAltchaAndSolve(referer: string, signal: AbortSignal): Promise<string | null> {
+  try {
+    const res = await fetch(ALTCHA_URL, {
+      headers: { 'User-Agent': UA, Referer: referer },
+      signal,
+    });
+    if (!res.ok) {
+      console.warn('[antt] ALTCHA challenge fetch failed:', res.status, '— skipping PoW');
+      return null;
+    }
+    const ch: AltchaChallenge = await res.json();
+    console.log('[antt] solving PoW maxnumber=', ch.maxnumber);
+    const n = await solvePoW(ch.salt, ch.challenge, ch.maxnumber, signal);
+    if (n === null) return null;
+    return buildAltchaPayload(ch, n);
+  } catch (e) {
+    console.warn('[antt] fetchAltchaAndSolve error:', String(e), '— skipping PoW');
+    return null;
+  }
 }
 
 // ─── UPDATE PANEL DELTA PARSER ───────────────────────────────────────────────
@@ -456,9 +478,10 @@ async function consultaRntrc(
     ctl00$Corpo$txtPlaca: tipoConsulta === '3' ? plate : '',
     ctl00$Corpo$txtRNTRC: rntrc ?? '',
     ctl00$Corpo$txtCpfCnpj: cpfCnpj,
-    altcha: altchaPayload,
+    ...(altchaPayload ? { altcha: altchaPayload } : {}),
     ctl00$Corpo$btnConsulta: 'Consultar',
   });
+  console.log('[antt] altcha token present=', !!altchaPayload);
 
   const postRes = await fetch(RNTRC_URL, {
     method: 'POST',
@@ -523,7 +546,7 @@ async function consultaCIOT(
     ctl00$Corpo$rbTipoConsultaCIOT: '1',
     ctl00$Corpo$txtRntrc: rntrc,
     ctl00$Corpo$txtRenavam: renavam,
-    altcha: altchaPayload,
+    ...(altchaPayload ? { altcha: altchaPayload } : {}),
     // Confirmed button name from portal DOM mapping (mai/2026)
     ctl00$Corpo$btnConsultar: 'Consultar',
   });
@@ -589,7 +612,7 @@ async function consultaVPO(
     ctl00$Corpo$hfAltchaUrl: altchaUrl,
     ctl00$Corpo$txtPlaca: plate,
     ctl00$Corpo$txtCpfCnpj: cpfCnpj,
-    altcha: altchaPayload,
+    ...(altchaPayload ? { altcha: altchaPayload } : {}),
     ctl00$Corpo$btnConsultar: 'Consultar',
   });
 
