@@ -432,6 +432,7 @@ export function RiskWorkflowWizard({
         const respV = await anttCheck.mutateAsync({
           order_id: orderId,
           vehicle_plate: resolvedVehiclePlate,
+          cpf_cnpj: anttCpfCnpj ?? undefined,
           operation: 'veiculo',
         });
         firstResp = respV;
