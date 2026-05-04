@@ -159,6 +159,7 @@ export function RiskWorkflowWizard({
   const isDriverSameAsOwner =
     !!driverOnlyDigits && !!ownerOnlyDigits && driverOnlyDigits === ownerOnlyDigits;
   const anttCpfCnpj = !isDriverSameAsOwner && ownerCpfCnpj ? ownerCpfCnpj : resolvedDriverCpf;
+  const ownerIsCnpj = ownerOnlyDigits.length === 14;
 
   const { data: driverExposure } = useDriverActiveExposure(resolvedDriverId, orderId);
 
@@ -416,13 +417,6 @@ export function RiskWorkflowWizard({
     }
 
     try {
-      // Terceiro = owner tem CNPJ (14 dígitos) — empresa subcontratada.
-      // Agregado = owner tem CPF (11 dígitos) — TAC individual vinculado.
-      // CIOT é sempre obrigatório para agregado CPF.
-      // Para terceiro CNPJ: depende da frota (≤3 veículos → obrigatório; >3 → dispensado).
-      // Como não temos o tamanho da frota, checamos CIOT de qualquer forma, mas
-      // ausência de CIOT para CNPJ não bloqueia — gera 'valid' com aviso.
-      const ownerIsCnpj = onlyDigits(ownerCpfCnpj ?? '').length === 14;
       type Modalidade = 'tac' | 'agregado' | 'terceiro' | 'indefinido';
       let modalidade: Modalidade = 'indefinido';
       let veiculoNaFrota: boolean | null = null;
