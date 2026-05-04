@@ -160,7 +160,7 @@ function validateRequest(req: CheckWorkerRequest): { valid: boolean; error?: str
 /**
  * Main handler
  */
-export default async (req: Request): Promise<Response> => {
+Deno.serve(async (req: Request): Promise<Response> => {
   const startTime = performance.now();
   const requestId = crypto.randomUUID();
   const environment = Deno.env.get('ENVIRONMENT') || 'prod';
@@ -330,4 +330,4 @@ export default async (req: Request): Promise<Response> => {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-};
+});
