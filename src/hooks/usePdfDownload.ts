@@ -30,11 +30,14 @@ export function usePdfDownload() {
   const downloadQuotePdf = useCallback(async (quoteId: string, mode: QuotePdfMode) => {
     setLoading(`quote:${mode}`);
     try {
+      const selectFields =
+        mode === 'detailed'
+          ? 'id, quote_code, client_name, origin, destination, value, cargo_type, weight, volume, km_distance, estimated_loading_date, validity_date, notes, created_at, updated_at, payment_term_id, pricing_breakdown, freight_modality'
+          : 'id, quote_code, client_name, origin, destination, value, cargo_type, weight, volume, km_distance, estimated_loading_date, validity_date, notes, created_at, updated_at, payment_term_id';
+
       const { data: rawQuote, error } = (await supabase
         .from('quotes')
-        .select(
-          'id, quote_code, client_name, origin, destination, value, cargo_type, weight, volume, km_distance, estimated_loading_date, validity_date, notes, created_at, updated_at, payment_term_id'
-        )
+        .select(selectFields)
         .eq('id', quoteId)
         .single()) as {
         data: (QuotePdfPayload & { payment_term_id?: string | null }) | null;
