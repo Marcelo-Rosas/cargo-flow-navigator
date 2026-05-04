@@ -416,7 +416,14 @@ export function RiskWorkflowWizard({
     }
 
     try {
-      type Modalidade = 'tac' | 'agregado' | 'indefinido';
+      // Terceiro = owner tem CNPJ (14 dígitos) — empresa subcontratada.
+      // Agregado = owner tem CPF (11 dígitos) — TAC individual vinculado.
+      // CIOT é sempre obrigatório para agregado CPF.
+      // Para terceiro CNPJ: depende da frota (≤3 veículos → obrigatório; >3 → dispensado).
+      // Como não temos o tamanho da frota, checamos CIOT de qualquer forma, mas
+      // ausência de CIOT para CNPJ não bloqueia — gera 'valid' com aviso.
+      const ownerIsCnpj = onlyDigits(ownerCpfCnpj ?? '').length === 14;
+      type Modalidade = 'tac' | 'agregado' | 'terceiro' | 'indefinido';
       let modalidade: Modalidade = 'indefinido';
       let veiculoNaFrota: boolean | null = null;
       let ciotFound: boolean | null = null;
@@ -426,8 +433,7 @@ export function RiskWorkflowWizard({
       let firstResp: any = null;
 
       if (!isDriverSameAsOwner) {
-        // ── Agregado path: consulta Por Veículo (placa) → RNTRC do proprietário ──
-        // Não depende do CPF do proprietário estar cadastrado no banco.
+        // ── Terceiro / Agregado path: consulta Por Veículo (placa) ────────────
         setAnttCheckStage('veiculo');
         const respV = await anttCheck.mutateAsync({
           order_id: orderId,
@@ -436,7 +442,7 @@ export function RiskWorkflowWizard({
           operation: 'veiculo',
         });
         firstResp = respV;
-        modalidade = 'agregado';
+        modalidade = ownerIsCnpj ? 'terceiro' : 'agregado';
 
         if (respV.situacao === 'regular') {
           // RNTRC do proprietário vem da resposta do portal, ou usa o ANTT do motorista como fallback
@@ -502,21 +508,28 @@ export function RiskWorkflowWizard({
         }
       }
 
+      // Terceiro (CNPJ): RNTRC regular é suficiente para liberar; CIOT é advisory.
+      // Agregado (CPF): RNTRC regular + CIOT vigente obrigatórios.
       const overallOk =
         firstResp?.situacao === 'regular' &&
         (modalidade === 'tac' ||
           (modalidade === 'agregado' && ciotFound === true) ||
+          modalidade === 'terceiro' ||
           modalidade === 'indefinido');
 
       const notes =
         modalidade === 'tac'
           ? 'ANTT: TAC — veículo na frota do motorista'
-          : modalidade === 'agregado' && ciotFound
-            ? 'ANTT: Agregado — CIOT vigente, operação autorizada'
-            : modalidade === 'agregado'
-              ? 'ANTT: Agregado — sem CIOT vigente'
-              : (firstResp?.message ??
-                (overallOk ? 'Consulta ANTT (RNTRC)' : 'Situação irregular na consulta ANTT'));
+          : modalidade === 'terceiro' && ciotFound
+            ? 'ANTT: Terceiro (empresa) — RNTRC regular, CIOT vigente'
+            : modalidade === 'terceiro'
+              ? 'ANTT: Terceiro (empresa) — RNTRC regular. CIOT não localizado — verificar se frota > 3 veículos'
+              : modalidade === 'agregado' && ciotFound
+                ? 'ANTT: Agregado — CIOT vigente, operação autorizada'
+                : modalidade === 'agregado'
+                  ? 'ANTT: Agregado — sem CIOT vigente'
+                  : (firstResp?.message ??
+                    (overallOk ? 'Consulta ANTT (RNTRC)' : 'Situação irregular na consulta ANTT'));
 
       const evalId = await ensureEvaluationId();
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -548,6 +561,12 @@ export function RiskWorkflowWizard({
 
       if (modalidade === 'tac') {
         toast.success('ANTT: TAC — veículo na frota do motorista');
+      } else if (modalidade === 'terceiro' && ciotFound) {
+        toast.success('ANTT: Terceiro (empresa) — RNTRC regular, CIOT vigente');
+      } else if (modalidade === 'terceiro') {
+        toast.success(
+          'ANTT: Terceiro (empresa) — RNTRC regular. Verificar CIOT se frota ≤ 3 veículos'
+        );
       } else if (modalidade === 'agregado' && ciotFound) {
         toast.success('ANTT: Agregado — CIOT vigente, operação autorizada');
       } else if (modalidade === 'agregado') {
@@ -725,6 +744,7 @@ export function RiskWorkflowWizard({
               driverName={resolvedDriverName}
               driverCpf={anttCpfCnpj}
               ownerName={(!isDriverSameAsOwner && vehicleData?.ownerName) || undefined}
+              ownerIsCnpj={!isDriverSameAsOwner && ownerIsCnpj}
               vehiclePlate={resolvedVehiclePlate}
               vehicleTypeName={resolvedVehicleTypeName}
               anttEvidence={anttEvidence}
@@ -840,6 +860,7 @@ function StepAntt({
   driverName,
   driverCpf,
   ownerName,
+  ownerIsCnpj,
   vehiclePlate,
   vehicleTypeName,
   anttEvidence,
@@ -855,6 +876,7 @@ function StepAntt({
   driverName?: string | null;
   driverCpf?: string | null;
   ownerName?: string | null;
+  ownerIsCnpj?: boolean;
   vehiclePlate?: string | null;
   vehicleTypeName?: string | null;
   anttEvidence: RiskEvidence | undefined;
@@ -897,13 +919,18 @@ function StepAntt({
         {ownerName ? (
           <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-xs space-y-0.5">
             <div className="font-medium text-amber-700 dark:text-amber-400">
+              {ownerIsCnpj
+                ? '⚠ Veículo terceiro — proprietário empresa (CNPJ)'
+                : '⚠ Veículo agregado — proprietário diferente do motorista'}
               ⚠ Veículo agregado — proprietário diferente do motorista
             </div>
             <div className="text-amber-700 dark:text-amber-400">
               Proprietário: <span className="font-semibold">{ownerName}</span>
             </div>
             <div className="text-amber-600 dark:text-amber-500">
-              Consulta ANTT por placa (RNTRC do proprietário via portal)
+              {ownerIsCnpj
+                ? 'CIOT: verificar se frota ≤ 3 veículos (obrigatório) ou > 3 (dispensado)'
+                : 'CIOT obrigatório — TAC agregado pessoa física'}
             </div>
           </div>
         ) : (
