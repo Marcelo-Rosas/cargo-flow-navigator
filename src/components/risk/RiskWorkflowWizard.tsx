@@ -380,8 +380,10 @@ export function RiskWorkflowWizard({
       },
     });
 
-    // Await evidence refetch so buonnyValid updates immediately
-    await qc.refetchQueries({ queryKey: ['risk-evidence', evalId] });
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ['risk-evidence', evalId] }),
+      qc.invalidateQueries({ queryKey: ['risk-evaluation', 'order', orderId] }),
+    ]);
   };
 
   const buonnyCheck = useBuonnyProfessionalCheck();
@@ -551,7 +553,10 @@ export function RiskWorkflowWizard({
           ciot_mensagem: ciotMensagem,
         },
       });
-      await qc.refetchQueries({ queryKey: ['risk-evidence', evalId] });
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ['risk-evidence', evalId] }),
+        qc.invalidateQueries({ queryKey: ['risk-evaluation', 'order', orderId] }),
+      ]);
 
       if (modalidade === 'tac') {
         toast.success('ANTT: TAC — veículo na frota do motorista');
