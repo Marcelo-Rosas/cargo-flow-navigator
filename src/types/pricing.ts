@@ -25,8 +25,6 @@ export interface VehicleType {
   ailog_category: string | null;
   rolling_type: string | null;
   vehicle_profile: string | null;
-  capacity_kg: number | null;
-  capacity_m3: number | null;
   active: boolean;
   created_at: string;
   updated_at: string;

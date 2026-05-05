@@ -22,7 +22,7 @@ export interface VehicleWithRelations extends VehicleRow {
 }
 
 const selectWithRelations =
-  'id, plate, brand, model, year, color, renavam, vehicle_type_id, driver_id, owner_id, active, created_at, updated_at, ' +
+  'id, plate, brand, model, year, color, renavam, vehicle_type_id, capacity_kg, capacity_m3, qtd_pallets, driver_id, owner_id, active, created_at, updated_at, ' +
   'owner:owners(id,name,phone), ' +
   'driver:drivers(id,name,phone,cnh,antt), ' +
   'vehicle_type:vehicle_types(id,code,name)';

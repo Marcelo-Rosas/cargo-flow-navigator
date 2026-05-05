@@ -37,6 +37,7 @@ import { useVehicleTypesFleetForm } from '@/hooks/useVehicleTypes';
 import { toast } from 'sonner';
 import type { VehicleWithRelations } from '@/hooks/useVehicles';
 import { zodPlate } from '@/lib/validators';
+import { calculatePalletsFromVolume } from '@/lib/pallets';
 
 const vehicleSchema = z.object({
   plate: zodPlate,
@@ -49,6 +50,9 @@ const vehicleSchema = z.object({
   color: z.string().optional(),
   renavam: z.string().optional(),
   vehicle_type_id: z.string().optional(),
+  capacity_kg: z.string().optional(),
+  capacity_m3: z.string().optional(),
+  qtd_pallets: z.string().optional(),
   driver_id: z.string().optional(),
   owner_id: z.string().optional(),
   active: z.boolean(),
@@ -80,6 +84,9 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
       color: '',
       renavam: '',
       vehicle_type_id: '',
+      capacity_kg: '',
+      capacity_m3: '',
+      qtd_pallets: '',
       driver_id: '',
       owner_id: '',
       active: true,
@@ -96,6 +103,15 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
         color: vehicle.color || '',
         renavam: vehicle.renavam || '',
         vehicle_type_id: vehicle.vehicle_type_id || '',
+        capacity_kg:
+          ((vehicle as unknown as { capacity_kg?: number | null }).capacity_kg ?? '').toString() ||
+          '',
+        capacity_m3:
+          ((vehicle as unknown as { capacity_m3?: number | null }).capacity_m3 ?? '').toString() ||
+          '',
+        qtd_pallets:
+          ((vehicle as unknown as { qtd_pallets?: number | null }).qtd_pallets ?? '').toString() ||
+          '',
         driver_id: vehicle.driver_id || '',
         owner_id: vehicle.owner_id || '',
         active: vehicle.active,
@@ -109,6 +125,9 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
         color: '',
         renavam: '',
         vehicle_type_id: '',
+        capacity_kg: '',
+        capacity_m3: '',
+        qtd_pallets: '',
         driver_id: '',
         owner_id: '',
         active: true,
@@ -130,6 +149,9 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
             color: data.color || null,
             renavam: data.renavam || null,
             vehicle_type_id: data.vehicle_type_id || null,
+            capacity_kg: data.capacity_kg ? parseFloat(data.capacity_kg) : null,
+            capacity_m3: data.capacity_m3 ? parseFloat(data.capacity_m3) : null,
+            qtd_pallets: data.qtd_pallets ? parseInt(data.qtd_pallets, 10) : null,
             driver_id: data.driver_id || null,
             owner_id: data.owner_id || null,
             active: data.active,
@@ -353,6 +375,65 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                   </FormItem>
                 )}
               />
+
+              {/* Capacidade real do veiculo individual */}
+              <div className="grid grid-cols-3 gap-3">
+                <FormField
+                  control={form.control}
+                  name="capacity_kg"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Capacidade (kg)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="100" placeholder="14000" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="capacity_m3"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Volume (m³)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="0.5" placeholder="45" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="qtd_pallets"
+                  render={({ field }) => {
+                    const m3Raw = form.watch('capacity_m3');
+                    const m3Num = m3Raw ? parseFloat(m3Raw) : null;
+                    const calc = calculatePalletsFromVolume(m3Num);
+                    return (
+                      <FormItem>
+                        <FormLabel>Pallets PBR</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder={calc != null ? `auto: ${calc}` : '—'}
+                            {...field}
+                          />
+                        </FormControl>
+                        <p className="text-[10px] text-muted-foreground">
+                          {calc != null && !field.value
+                            ? `Cálculo automático: ${calc} pallets (1m × 1,20m). Preencha para sobrescrever.`
+                            : 'Vazio = usa cálculo automático a partir do m³.'}
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+              </div>
             </div>
 
             <Separator />
