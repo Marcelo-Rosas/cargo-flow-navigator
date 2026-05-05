@@ -630,6 +630,7 @@ export type Database = {
       collection_orders: {
         Row: {
           additional_info: string | null;
+          antt_data: Json | null;
           cancellation_reason: string | null;
           cancelled_at: string | null;
           cancelled_by: string | null;
@@ -655,6 +656,7 @@ export type Database = {
         };
         Insert: {
           additional_info?: string | null;
+          antt_data?: Json | null;
           cancellation_reason?: string | null;
           cancelled_at?: string | null;
           cancelled_by?: string | null;
@@ -680,6 +682,7 @@ export type Database = {
         };
         Update: {
           additional_info?: string | null;
+          antt_data?: Json | null;
           cancellation_reason?: string | null;
           cancelled_at?: string | null;
           cancelled_by?: string | null;
@@ -7484,8 +7487,6 @@ export type Database = {
           active: boolean;
           ailog_category: string | null;
           axes_count: number;
-          capacity_kg: number | null;
-          capacity_m3: number | null;
           code: string;
           created_at: string;
           id: string;
@@ -7499,8 +7500,6 @@ export type Database = {
           active?: boolean;
           ailog_category?: string | null;
           axes_count: number;
-          capacity_kg?: number | null;
-          capacity_m3?: number | null;
           code: string;
           created_at?: string;
           id?: string;
@@ -7514,8 +7513,6 @@ export type Database = {
           active?: boolean;
           ailog_category?: string | null;
           axes_count?: number;
-          capacity_kg?: number | null;
-          capacity_m3?: number | null;
           code?: string;
           created_at?: string;
           id?: string;
@@ -7531,6 +7528,8 @@ export type Database = {
         Row: {
           active: boolean;
           brand: string | null;
+          capacity_kg: number | null;
+          capacity_m3: number | null;
           color: string | null;
           created_at: string;
           driver_id: string | null;
@@ -7541,6 +7540,7 @@ export type Database = {
           plate_2: string | null;
           plate_2_mask: string | null;
           plate_mask: string | null;
+          qtd_pallets: number | null;
           renavam: string | null;
           updated_at: string;
           vehicle_type_id: string | null;
@@ -7549,6 +7549,8 @@ export type Database = {
         Insert: {
           active?: boolean;
           brand?: string | null;
+          capacity_kg?: number | null;
+          capacity_m3?: number | null;
           color?: string | null;
           created_at?: string;
           driver_id?: string | null;
@@ -7559,6 +7561,7 @@ export type Database = {
           plate_2?: string | null;
           plate_2_mask?: string | null;
           plate_mask?: string | null;
+          qtd_pallets?: number | null;
           renavam?: string | null;
           updated_at?: string;
           vehicle_type_id?: string | null;
@@ -7567,6 +7570,8 @@ export type Database = {
         Update: {
           active?: boolean;
           brand?: string | null;
+          capacity_kg?: number | null;
+          capacity_m3?: number | null;
           color?: string | null;
           created_at?: string;
           driver_id?: string | null;
@@ -7577,6 +7582,7 @@ export type Database = {
           plate_2?: string | null;
           plate_2_mask?: string | null;
           plate_mask?: string | null;
+          qtd_pallets?: number | null;
           renavam?: string | null;
           updated_at?: string;
           vehicle_type_id?: string | null;

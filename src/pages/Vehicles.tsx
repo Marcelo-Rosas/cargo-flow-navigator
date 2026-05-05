@@ -15,6 +15,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { DriverContractBadge } from '@/components/drivers/DriverContractBadge';
+import { effectivePallets } from '@/lib/pallets';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -358,6 +359,9 @@ export default function Vehicles() {
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                           RENAVAM
                         </th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
+                          Capacidade
+                        </th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                           Motorista
                         </th>
@@ -398,6 +402,26 @@ export default function Vehicles() {
                           </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
                             {vehicle.renavam || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm text-muted-foreground tabular-nums">
+                            {(() => {
+                              const v = vehicle as unknown as {
+                                capacity_kg?: number | null;
+                                capacity_m3?: number | null;
+                                qtd_pallets?: number | null;
+                              };
+                              const kg = v.capacity_kg
+                                ? `${Number(v.capacity_kg).toLocaleString('pt-BR')} kg`
+                                : null;
+                              const m3 = v.capacity_m3 ? `${v.capacity_m3} m³` : null;
+                              const pal = effectivePallets(
+                                v.qtd_pallets ?? null,
+                                v.capacity_m3 ?? null
+                              );
+                              const palStr = pal != null ? `${pal} pl` : null;
+                              const parts = [kg, m3, palStr].filter(Boolean);
+                              return parts.length > 0 ? parts.join(' · ') : '—';
+                            })()}
                           </td>
                           <td className="px-4 py-3">
                             {vehicle.driver ? (

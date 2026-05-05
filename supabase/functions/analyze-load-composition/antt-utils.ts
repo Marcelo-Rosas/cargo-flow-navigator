@@ -59,41 +59,24 @@ const FALLBACK_VEHICLES: VehicleInference[] = [
 
 /**
  * Infer the smallest vehicle that fits the given weight.
- * Prefers the DB table; falls back to hardcoded list if empty.
+ *
+ * Capacity nao mora mais em vehicle_types (foi pra vehicles individuais).
+ * Para uma heuristica rapida o fallback hardcoded acima e suficiente — a
+ * inferencia so precisa estimar eixos para a precificacao ANTT, nao precisa
+ * ser exata ao kg.
  */
 export async function inferAxesFromWeight(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   weightKg: number
 ): Promise<VehicleInference> {
-  const { data, error } = await supabase
-    .from('vehicle_types')
-    .select('id, code, name, axes_count, capacity_kg')
-    .eq('active', true)
-    .gte('capacity_kg', weightKg)
-    .order('capacity_kg', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (!error && data && data.axes_count && data.capacity_kg) {
-    return {
-      id: String(data.id),
-      axes_count: Number(data.axes_count),
-      vehicle_code: String(data.code),
-      vehicle_name: String(data.name),
-      capacity_kg: Number(data.capacity_kg),
-    };
-  }
-
-  // Fallback to hardcoded list
   const match = FALLBACK_VEHICLES.find((v) => v.capacity_kg >= weightKg);
   if (match) return match;
-
-  // If weight exceeds all vehicles, use the largest
   return FALLBACK_VEHICLES[FALLBACK_VEHICLES.length - 1];
 }
 
 /**
  * Get axes_count directly from a vehicle_type_id (when quote already has one).
+ * Capacity vira 0 porque nao existe mais em vehicle_types.
  */
 export async function getAxesFromVehicleTypeId(
   supabase: SupabaseClient,
@@ -101,7 +84,7 @@ export async function getAxesFromVehicleTypeId(
 ): Promise<VehicleInference | null> {
   const { data, error } = await supabase
     .from('vehicle_types')
-    .select('code, axes_count, capacity_kg')
+    .select('code, axes_count')
     .eq('id', vehicleTypeId)
     .maybeSingle();
 
@@ -110,7 +93,7 @@ export async function getAxesFromVehicleTypeId(
   return {
     axes_count: Number(data.axes_count),
     vehicle_code: String(data.code),
-    capacity_kg: Number(data.capacity_kg),
+    capacity_kg: 0, // capacity now lives in vehicles table, not vehicle_types
   };
 }
 
