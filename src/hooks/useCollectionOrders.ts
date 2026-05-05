@@ -227,6 +227,9 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
       const client = (order as unknown as { client: Record<string, unknown> | null }).client;
       const driver = (order as unknown as { driver: Record<string, unknown> | null }).driver;
 
+      // Numero, complemento e bairro NAO vem do cadastro do shipper — sao
+      // dados da operacao de coleta especifica e vem do senderOverride
+      // preenchido pelo operador no Wizard da OC.
       const sender: CollectionOrderPartyData = {
         name: (shipper?.name as string) ?? '',
         cnpj: (shipper?.cnpj as string) ?? null,
@@ -234,9 +237,9 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
         phone: (shipper?.phone as string) ?? null,
         email: (shipper?.email as string) ?? null,
         address: (shipper?.address as string) ?? null,
-        address_number: (shipper?.address_number as string) ?? null,
-        address_complement: (shipper?.address_complement as string) ?? null,
-        address_neighborhood: (shipper?.address_neighborhood as string) ?? null,
+        address_number: null,
+        address_complement: null,
+        address_neighborhood: null,
         zip_code: (shipper?.zip_code as string) ?? order.origin_cep ?? null,
         city: (shipper?.city as string) ?? null,
         state: (shipper?.state as string) ?? null,
@@ -364,25 +367,9 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
         throw insertErr;
       }
 
-      // 10. Salvar overrides de endereço no shipper se preenchido manualmente
-      if (
-        senderOverride &&
-        order.shipper_id &&
-        (senderOverride.address_number ||
-          senderOverride.address_complement ||
-          senderOverride.address_neighborhood)
-      ) {
-        await supabase
-          .from('shippers')
-          .update({
-            address_number: senderOverride.address_number ?? sender.address_number ?? null,
-            address_complement:
-              senderOverride.address_complement ?? sender.address_complement ?? null,
-            address_neighborhood:
-              senderOverride.address_neighborhood ?? sender.address_neighborhood ?? null,
-          })
-          .eq('id', order.shipper_id);
-      }
+      // Nº/Bairro/Complemento sao da OPERACAO, nao do cadastro — nao
+      // persistir no shipper (mesmo embarcador pode coletar em enderecos
+      // diferentes). Ficam apenas no snapshot da OC.
 
       return { collectionOrder: inserted, blob };
     },

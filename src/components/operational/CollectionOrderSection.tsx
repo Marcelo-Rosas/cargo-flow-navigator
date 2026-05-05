@@ -79,14 +79,15 @@ export function CollectionOrderSection({ order, shipperPreview }: CollectionOrde
     !!order.has_comp_residencia &&
     !!order.has_antt_motorista;
 
-  const needsSenderAddressFill =
-    !shipperPreview?.address_number || !shipperPreview?.address_neighborhood;
-
   const openIssueDialog = () => {
     setAdditionalInfo(order.notes ?? '');
-    setSenderNumber(shipperPreview?.address_number ?? '');
-    setSenderComplement(shipperPreview?.address_complement ?? '');
-    setSenderNeighborhood(shipperPreview?.address_neighborhood ?? '');
+    // Numero, complemento e bairro sao dados da OPERACAO de coleta — nao do
+    // cadastro do shipper. Sempre comecam vazios e o operador preenche pra
+    // esse embarque especifico (mesmo shipper pode coletar em enderecos
+    // diferentes). NAO sao persistidos no cadastro.
+    setSenderNumber('');
+    setSenderComplement('');
+    setSenderNeighborhood('');
     setIssueOpen(true);
   };
 
@@ -257,51 +258,52 @@ export function CollectionOrderSection({ order, shipperPreview }: CollectionOrde
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {needsSenderAddressFill && (
-              <div className="space-y-3 p-3 rounded-md border border-amber-500/40 bg-amber-500/5">
-                <div className="flex items-start gap-2">
-                  <div className="text-xs font-medium text-amber-700">
-                    Endereço do remetente incompleto — complete os campos abaixo (também serão
-                    salvos no cadastro do embarcador):
-                  </div>
+            <div className="space-y-3 p-3 rounded-md border border-border bg-muted/40">
+              <div className="text-xs font-medium text-foreground">
+                Endereço de coleta — preencha o número, bairro e complemento desta operação.
+                <span className="block text-muted-foreground font-normal mt-0.5">
+                  Esses dados ficam apenas no snapshot da OC. Não alteram o cadastro do embarcador.
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label htmlFor="sender-number" className="text-xs">
+                    Número
+                  </Label>
+                  <Input
+                    id="sender-number"
+                    value={senderNumber}
+                    onChange={(e) => setSenderNumber(e.target.value)}
+                    placeholder="Ex.: 495"
+                    className="h-8"
+                  />
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <Label htmlFor="sender-number" className="text-xs">
-                      Número
-                    </Label>
-                    <Input
-                      id="sender-number"
-                      value={senderNumber}
-                      onChange={(e) => setSenderNumber(e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Label htmlFor="sender-neighborhood" className="text-xs">
-                      Bairro
-                    </Label>
-                    <Input
-                      id="sender-neighborhood"
-                      value={senderNeighborhood}
-                      onChange={(e) => setSenderNeighborhood(e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <Label htmlFor="sender-complement" className="text-xs">
-                      Complemento
-                    </Label>
-                    <Input
-                      id="sender-complement"
-                      value={senderComplement}
-                      onChange={(e) => setSenderComplement(e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
+                <div className="col-span-2">
+                  <Label htmlFor="sender-neighborhood" className="text-xs">
+                    Bairro
+                  </Label>
+                  <Input
+                    id="sender-neighborhood"
+                    value={senderNeighborhood}
+                    onChange={(e) => setSenderNeighborhood(e.target.value)}
+                    placeholder="Ex.: Centro"
+                    className="h-8"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <Label htmlFor="sender-complement" className="text-xs">
+                    Complemento
+                  </Label>
+                  <Input
+                    id="sender-complement"
+                    value={senderComplement}
+                    onChange={(e) => setSenderComplement(e.target.value)}
+                    placeholder="Ex.: Galpão 2, sala 3"
+                    className="h-8"
+                  />
                 </div>
               </div>
-            )}
+            </div>
 
             <div>
               <Label htmlFor="additional-info" className="text-sm">
