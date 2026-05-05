@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { zodCnpj, zodPhone, zodCep, validateCpf } from '@/lib/validators';
 import { MaskedInput } from '@/components/ui/masked-input';
+import { CnpjLookupError, lookupCnpj, pickLegalRepresentative } from '@/lib/cnpjLookup';
 
 type Client = Database['public']['Tables']['clients']['Row'];
 
@@ -134,58 +135,59 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
     }
   }, [client, form]);
 
-  // CNPJ auto-lookup functions
-  const sanitizeCnpj = (v: string) => v.replace(/\D/g, '');
+  // CNPJ auto-lookup — usa helper compartilhado em @/lib/cnpjLookup.
+  // Estado adicional armazena o resultado completo para persistir os 13 campos
+  // novos (nome fantasia, natureza juridica, CNAE, situacao, QSA, etc.) no submit.
+  const [cnpjResult, setCnpjResult] = useState<Awaited<ReturnType<typeof lookupCnpj>> | null>(null);
 
   const safeSet = (key: keyof ClientFormData, value?: unknown) => {
     const str = value != null ? String(value).trim() : '';
     if (!str) return;
     const current = form.getValues(key);
-    if (current && current.trim().length > 0) return; // não sobrescreve se usuário já preencheu
+    if (current && current.trim().length > 0) return; // nao sobrescreve se usuario ja preencheu
     form.setValue(key, str, { shouldValidate: true, shouldDirty: true });
   };
 
   const handleCnpjLookup = async (rawValue?: string) => {
     const raw = rawValue ?? form.getValues('cnpj') ?? '';
-    const cnpj = sanitizeCnpj(raw);
-    if (cnpj.length !== 14) return;
+    if (raw.replace(/\D/g, '').length !== 14) return;
 
     setIsLookingUp(true);
     try {
-      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
-      if (!res.ok) {
-        if (res.status === 404) {
-          toast.error('CNPJ não encontrado na base da Receita Federal');
-        } else {
-          toast.error(`Erro ao consultar CNPJ (status ${res.status})`);
-        }
-        setIsLookingUp(false);
-        return;
+      const result = await lookupCnpj(raw);
+      setCnpjResult(result);
+
+      // Identificacao + contato
+      safeSet('name', result.name ?? result.trade_name);
+      safeSet('email', result.email);
+      safeSet('phone', result.phone);
+
+      // Endereco — agora com bairro/numero/complemento separados
+      safeSet('address', result.address);
+      safeSet('city', result.city);
+      safeSet('state', result.state);
+      safeSet('zip_code', result.zip_code);
+
+      // Auto-sugestao de representante legal a partir do QSA
+      const rep = pickLegalRepresentative(result.partners);
+      if (rep) {
+        safeSet('legal_representative_name', rep.name);
+        safeSet('legal_representative_role', rep.role);
+        if (rep.document) safeSet('legal_representative_cpf', rep.document);
       }
-      const data = (await res.json()) as Record<string, unknown>;
 
-      // Mapeamento "tolerante" a variações de chave
-      safeSet('name', data.razao_social || data.nome_fantasia || data.name);
-      safeSet('email', data.email || data.email_contato);
-      safeSet('phone', data.ddd_telefone_1 || data.telefone || data.phone);
-
-      const street = data.logradouro || data.endereco || data.street;
-      const number = data.numero || data.number;
-      const district = data.bairro || data.distrito || data.neighborhood;
-      const composedAddress = [street, number, district].filter(Boolean).join(', ');
-      safeSet('address', composedAddress);
-
-      safeSet('city', data.municipio || data.cidade || data.city);
-
-      const uf = (data.uf || data.estado || data.state || '').toString().toUpperCase();
-      safeSet('state', uf?.slice(0, 2));
-
-      const cep = (data.cep || data.codigo_postal || data.zip_code || '').toString();
-      safeSet('zip_code', cep);
-
-      toast.success('Dados preenchidos automaticamente pelo CNPJ');
-    } catch {
-      toast.error('Falha ao consultar CNPJ — verifique sua conexão');
+      const partnerCount = result.partners.length;
+      toast.success(
+        partnerCount > 0
+          ? `Dados preenchidos pelo CNPJ (${partnerCount} sócio${partnerCount !== 1 ? 's' : ''} no QSA)`
+          : 'Dados preenchidos pelo CNPJ'
+      );
+    } catch (e) {
+      if (e instanceof CnpjLookupError) {
+        toast.error(e.message);
+      } else {
+        toast.error('Falha ao consultar CNPJ — verifique sua conexão');
+      }
     } finally {
       setIsLookingUp(false);
     }
@@ -198,47 +200,60 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
     }
 
     try {
+      const cpfNum = data.cpf ? Number(digits(data.cpf)) : null;
+
+      // Campos derivados do lookup CNPJ (so populados se houve consulta nesta sessao)
+      const cnpjFields = cnpjResult
+        ? {
+            trade_name: cnpjResult.trade_name,
+            legal_nature: cnpjResult.legal_nature,
+            legal_nature_code: cnpjResult.legal_nature_code,
+            company_size: cnpjResult.company_size,
+            cnae_main_code: cnpjResult.cnae_main_code,
+            cnae_main_description: cnpjResult.cnae_main_description,
+            cnaes_secondary: cnpjResult.cnaes_secondary,
+            opening_date: cnpjResult.opening_date,
+            registration_status: cnpjResult.registration_status,
+            registration_status_date: cnpjResult.registration_status_date,
+            registration_status_reason: cnpjResult.registration_status_reason,
+            efr: cnpjResult.efr,
+            share_capital: cnpjResult.share_capital,
+            partners: cnpjResult.partners,
+            address_number: cnpjResult.address_number,
+            address_complement: cnpjResult.address_complement,
+            address_neighborhood: cnpjResult.address_neighborhood,
+            cnpj_lookup_at: new Date().toISOString(),
+          }
+        : {};
+
+      const baseFields = {
+        name: data.name,
+        contact_name: data.contact_name || null,
+        cpf: cpfNum,
+        cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
+        city: data.city || null,
+        state: data.state || null,
+        zip_code: data.zip_code || null,
+        notes: data.notes || null,
+        state_registration: data.state_registration || null,
+        legal_representative_name: data.legal_representative_name || null,
+        legal_representative_cpf: data.legal_representative_cpf || null,
+        legal_representative_role: data.legal_representative_role || null,
+        ...cnpjFields,
+      };
+
       if (isEditing && client) {
-        const cpfNum = data.cpf ? Number(digits(data.cpf)) : null;
         await updateClientMutation.mutateAsync({
           id: client.id,
-          updates: {
-            name: data.name,
-            contact_name: data.contact_name || null,
-            cpf: cpfNum,
-            cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
-            email: data.email || null,
-            phone: data.phone || null,
-            address: data.address || null,
-            city: data.city || null,
-            state: data.state || null,
-            zip_code: data.zip_code || null,
-            notes: data.notes || null,
-            state_registration: data.state_registration || null,
-            legal_representative_name: data.legal_representative_name || null,
-            legal_representative_cpf: data.legal_representative_cpf || null,
-            legal_representative_role: data.legal_representative_role || null,
-          },
+          updates: baseFields,
         });
         toast.success('Cliente atualizado com sucesso');
       } else {
-        const cpfNum = data.cpf ? Number(digits(data.cpf)) : null;
         await createClientMutation.mutateAsync({
-          name: data.name,
-          contact_name: data.contact_name || null,
-          cpf: cpfNum,
-          cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
-          email: data.email || null,
-          phone: data.phone || null,
-          address: data.address || null,
-          city: data.city || null,
-          state: data.state || null,
-          zip_code: data.zip_code || null,
-          notes: data.notes || null,
-          state_registration: data.state_registration || null,
-          legal_representative_name: data.legal_representative_name || null,
-          legal_representative_cpf: data.legal_representative_cpf || null,
-          legal_representative_role: data.legal_representative_role || null,
+          ...baseFields,
           created_by: user.id,
         });
         toast.success('Cliente criado com sucesso');
