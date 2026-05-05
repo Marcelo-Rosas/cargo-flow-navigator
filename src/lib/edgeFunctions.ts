@@ -6,6 +6,8 @@ type InvokeOptions = {
   requireAuth?: boolean;
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function getPublishableKey(): string | undefined {
   const key =
     import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -61,6 +63,15 @@ export async function invokeEdgeFunction<T>(
     });
 
   let { data, error } = await execute(initialHeaders);
+
+  // Supabase can return 546/WORKER_RESOURCE_LIMIT before function-level fallback.
+  // Retry once with small backoff for transient runtime pressure.
+  if (error && /546|WORKER_RESOURCE_LIMIT/i.test(error.message || '')) {
+    await sleep(350);
+    const retryResourceLimit = await execute(initialHeaders);
+    data = retryResourceLimit.data;
+    error = retryResourceLimit.error;
+  }
 
   if (error && /401|jwt|token/i.test(error.message || '')) {
     const {

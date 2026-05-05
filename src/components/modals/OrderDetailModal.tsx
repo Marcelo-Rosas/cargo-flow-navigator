@@ -52,6 +52,7 @@ import { OrderForm } from '@/components/forms/OrderForm';
 import { CarreteiroTab } from '@/components/modals/CarreteiroTab';
 import { DriverQualificationPanel } from '@/components/operational/DriverQualificationPanel';
 import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
+import { CollectionOrderSection } from '@/components/operational/CollectionOrderSection';
 import { RiskWorkflowWizard } from '@/components/risk/RiskWorkflowWizard';
 import {
   useOrderRiskStatus,
@@ -1514,6 +1515,13 @@ export function OrderDetailModal({
                     </>
                   )}
                   <DocumentList orderId={order.id} docMotFilter />
+
+                  {canManage && order.stage === 'busca_motorista' && (
+                    <>
+                      <Separator />
+                      <CollectionOrderSection order={order} />
+                    </>
+                  )}
                 </TabsContent>
               )}
 

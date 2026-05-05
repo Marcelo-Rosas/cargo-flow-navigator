@@ -12,6 +12,7 @@ import { DriverForm } from '@/components/forms/DriverForm';
 import type { Driver } from '@/hooks/useDrivers';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Badge } from '@/components/ui/badge';
+import { DriverContractBadge } from '@/components/drivers/DriverContractBadge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -171,6 +172,9 @@ export default function Drivers() {
                     Motorista
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                    Vínculo
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                     Telefone
                   </th>
                   <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
@@ -194,6 +198,25 @@ export default function Drivers() {
                             </Badge>
                           )}
                         </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="outline" className="text-xs w-fit">
+                          {driver.contract_type === 'agregado'
+                            ? 'Agregado'
+                            : driver.contract_type === 'terceiro'
+                              ? 'Terceiro'
+                              : 'Frota'}
+                        </Badge>
+                        <DriverContractBadge
+                          contractType={
+                            driver.contract_type as 'proprio' | 'agregado' | 'terceiro' | null
+                          }
+                          rntrcRegistryType={
+                            (driver.rntrc_registry_type as 'TAC' | 'ETC' | null | undefined) ?? null
+                          }
+                        />
                       </div>
                     </td>
                     <td className="px-4 py-3">

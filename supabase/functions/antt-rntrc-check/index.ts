@@ -23,12 +23,18 @@ const ALTCHA_URL = 'https://captcha.srvs.antt.gov.br/altcha';
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const FETCH_TIMEOUT_MS = 25_000;
+const ALTCHA_POW_ENABLED = true;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info, x-api-key',
 };
+
+// SHA-256 sincrono — necessario para resolver o PoW do ALTCHA dentro do CPU
+// budget de ~400ms do Supabase Edge Runtime. crypto.subtle.digest tem overhead
+// async (~10us/call) que estoura o budget para maxnumber=100000.
+import { sha256 } from 'https://esm.sh/js-sha256@0.11.0';
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +62,8 @@ interface AnttRntrcCheckResponse {
   situacao: 'regular' | 'irregular' | 'indeterminado';
   /** ATIVO / VENCIDO / CANCELADO / SUSPENSO conforme a tabela ANTT */
   situacao_raw?: string;
+  /** Tipo registral RNTRC quando encontrado no retorno (TAC/ETC) */
+  rntrc_registry_type?: 'TAC' | 'ETC' | null;
   rntrc?: string | null;
   transportador?: string;
   /** CPF/CNPJ mascarado retornado pelo portal (ex: XXX.465.204-XX) */
@@ -143,27 +151,12 @@ function mergeCookies(existing: string, fresh: string): string {
 }
 
 // ─── ALTCHA PROOF-OF-WORK ────────────────────────────────────────────────────
-// Batched Promise.all eliminates per-iteration async overhead (~1µs/iter vs ~6µs).
-// Salt concatenated directly: SHA256(salt + number) — no dot separator (confirmed working).
+// SHA-256 SINCRONO via js-sha256 (JS puro, sem WASM, sem promises).
+// crypto.subtle.digest async tinha overhead de microtasks que estourava o CPU
+// budget do Supabase Edge Runtime (~400ms) com maxnumber=100000. js-sha256
+// roda em ~1us/hash → 50_000 hashes = ~50ms, cabe folgado.
 
-function hexToBytes(hex: string): Uint8Array {
-  const out = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  return out;
-}
-
-function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
-  for (let i = 0; i < 32; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-// Batch capped at 100 to keep CPU bursts within Supabase's ~400 ms budget.
-// A wall-clock deadline (POW_DEADLINE_MS) prevents the worker from being killed
-// with WORKER_RESOURCE_LIMIT on high-n challenges — the caller proceeds without
-// the altcha token instead (portal either accepts it or we get indeterminado,
-// same outcome as the current crash).
-const POW_BATCH = 100;
-const POW_DEADLINE_MS = 6_000; // wall-clock, not CPU time
+const POW_DEADLINE_MS = 8_000;
 
 async function solvePoW(
   salt: string,
@@ -171,30 +164,22 @@ async function solvePoW(
   maxnumber = 1_000_000,
   signal?: AbortSignal
 ): Promise<number | null> {
-  const enc = new TextEncoder();
-  const saltBytes = enc.encode(salt);
-  const targetBytes = hexToBytes(target);
   const cap = Math.min(maxnumber, 1_000_000);
   const deadline = Date.now() + POW_DEADLINE_MS;
+  const targetLower = target.toLowerCase();
 
-  for (let base = 0; base <= cap; base += POW_BATCH) {
-    if (signal?.aborted) return null;
-    if (Date.now() > deadline) {
-      console.warn('[antt] PoW deadline hit at n=', base, '— proceeding without altcha');
-      return null;
+  // Loop sincrono — sha256() retorna hex, comparacao de string. Check de
+  // abort/deadline a cada 2048 iteracoes (bitmask) reduz overhead.
+  for (let n = 0; n <= cap; n++) {
+    if ((n & 0x7ff) === 0) {
+      if (signal?.aborted) return null;
+      if (Date.now() > deadline) {
+        console.warn('[antt] PoW deadline at n=', n);
+        return null;
+      }
     }
-    const count = Math.min(POW_BATCH, cap - base + 1);
-    const promises: Promise<ArrayBuffer>[] = [];
-    for (let i = 0; i < count; i++) {
-      const numStr = String(base + i);
-      const msg = new Uint8Array(saltBytes.length + numStr.length);
-      msg.set(saltBytes);
-      for (let j = 0; j < numStr.length; j++) msg[saltBytes.length + j] = numStr.charCodeAt(j);
-      promises.push(crypto.subtle.digest('SHA-256', msg));
-    }
-    const hashes = await Promise.all(promises);
-    for (let i = 0; i < count; i++) {
-      if (bytesEqual(new Uint8Array(hashes[i]), targetBytes)) return base + i;
+    if (sha256(salt + n) === targetLower) {
+      return n;
     }
   }
   return null;
@@ -215,27 +200,41 @@ function buildAltchaPayload(ch: AltchaChallenge, number: number): string {
 // Returns null (instead of throwing) when the challenge can't be fetched or PoW
 // times out — the caller must handle a missing token gracefully.
 async function fetchAltchaAndSolve(referer: string, signal: AbortSignal): Promise<string | null> {
+  if (!ALTCHA_POW_ENABLED) {
+    return null;
+  }
   try {
+    console.log('[antt] altcha: fetching challenge');
     const res = await fetch(ALTCHA_URL, {
       headers: { 'User-Agent': UA, Referer: referer },
       signal,
     });
     if (!res.ok) {
-      console.warn('[antt] ALTCHA challenge fetch failed:', res.status, '— skipping PoW');
+      console.warn('[antt] altcha fetch failed:', res.status);
       return null;
     }
     const ch: AltchaChallenge = await res.json();
-    console.log('[antt] solving PoW maxnumber=', ch.maxnumber);
+    console.log('[antt] altcha challenge maxnumber=', ch.maxnumber);
+    const t1 = Date.now();
     const n = await solvePoW(ch.salt, ch.challenge, ch.maxnumber, signal);
-    if (n === null) return null;
+    if (n === null) {
+      console.warn('[antt] altcha PoW failed after', Date.now() - t1, 'ms');
+      return null;
+    }
+    console.log('[antt] altcha PoW solved n=', n, 'in', Date.now() - t1, 'ms');
     return buildAltchaPayload(ch, n);
   } catch (e) {
-    console.warn('[antt] fetchAltchaAndSolve error:', String(e), '— skipping PoW');
+    console.error('[antt] altcha error:', String(e));
     return null;
   }
 }
 
-// ─── UPDATE PANEL DELTA PARSER ───────────────────────────────────────────────
+// ─── UPDATE PANEL DELTA PARSER (REGEX-BASED) ─────────────────────────────────
+// Reescrito porque o parser por length quebra com chars Unicode (length em
+// UTF-16 code units, JS string lê em code points → off-by-N em respostas com
+// acentos como "Pública", "Veículo", "Não"). Regex ignora o length e busca
+// os campos diretamente — VIEWSTATE/EVENTVALIDATION são base64 (sem |), então
+// a delimitação por pipe é segura.
 
 interface DeltaResult {
   panels: Record<string, string>;
@@ -245,53 +244,25 @@ interface DeltaResult {
 function parseDeltaFull(delta: string): DeltaResult {
   const panels: Record<string, string> = {};
   const hiddenFields: Record<string, string> = {};
-  let i = 0;
-  while (i < delta.length) {
-    const p1 = delta.indexOf('|', i);
-    if (p1 < 0) break;
-    const len = parseInt(delta.slice(i, p1), 10);
-    if (isNaN(len)) break;
-    i = p1 + 1;
-    const p2 = delta.indexOf('|', i);
-    if (p2 < 0) break;
-    const type = delta.slice(i, p2);
-    i = p2 + 1;
-    const p3 = delta.indexOf('|', i);
-    if (p3 < 0) break;
-    const id = delta.slice(i, p3);
-    i = p3 + 1;
-    const content = delta.slice(i, i + len);
-    i += len;
-    if (i < delta.length && delta[i] === '|') i++;
-    if (type === 'updatePanel') panels[id] = content;
-    if (type === 'hiddenField') hiddenFields[id] = content;
+
+  for (const m of delta.matchAll(/\|hiddenField\|(__[A-Z]+)\|([^|]*)/g)) {
+    hiddenFields[m[1]] = m[2];
   }
+
+  // Captura updatePanel até o próximo registro reconhecido (lookahead).
+  // Tipos cobertos: updatePanel, hiddenField, scriptBlock, pageRedirect, e
+  // demais tipos comuns do PageRequestManager do ASP.NET AJAX.
+  const PANEL_RE =
+    /\|updatePanel\|([^|]+)\|([\s\S]*?)(?=\|\d+\|(?:updatePanel|hiddenField|scriptBlock|pageRedirect|asyncPostBackControlIDs|postBackControlIDs|updatePanelIDs|childUpdatePanelIDs|panelsToRefreshIDs|asyncPostBackTimeout|formAction|dataItem|dataItemJson|arrayDeclaration|expandoAttribute|onSubmit|focus|scriptStartupBlock|scriptDispose)\|)/g;
+  for (const m of delta.matchAll(PANEL_RE)) {
+    panels[m[1]] = m[2];
+  }
+
   return { panels, hiddenFields };
 }
 
 function parseDelta(delta: string): Record<string, string> {
-  const panels: Record<string, string> = {};
-  let i = 0;
-  while (i < delta.length) {
-    const p1 = delta.indexOf('|', i);
-    if (p1 < 0) break;
-    const len = parseInt(delta.slice(i, p1), 10);
-    if (isNaN(len)) break;
-    i = p1 + 1;
-    const p2 = delta.indexOf('|', i);
-    if (p2 < 0) break;
-    const type = delta.slice(i, p2);
-    i = p2 + 1;
-    const p3 = delta.indexOf('|', i);
-    if (p3 < 0) break;
-    const id = delta.slice(i, p3);
-    i = p3 + 1;
-    const content = delta.slice(i, i + len);
-    i += len;
-    if (i < delta.length && delta[i] === '|') i++;
-    if (type === 'updatePanel') panels[id] = content;
-  }
-  return panels;
+  return parseDeltaFull(delta).panels;
 }
 
 /** Extracts UpdatePanel HTML or falls back to raw response. */
@@ -366,6 +337,11 @@ function extractRntrcResult(
 
       // Map raw situacao → canonical
       const situRaw = (situacaoRaw ?? '').trim().toUpperCase();
+      const registryTypeCell = cells
+        .find((c) => /^(TAC|ETC)$/i.test(c.trim()))
+        ?.trim()
+        .toUpperCase();
+      const rntrcRegistryType = (registryTypeCell || null) as 'TAC' | 'ETC' | null;
       let situacao: 'regular' | 'irregular';
       if (/^ATIVO$/.test(situRaw)) {
         situacao = 'regular';
@@ -395,6 +371,7 @@ function extractRntrcResult(
       return {
         situacao,
         situacao_raw: situRaw || undefined,
+        rntrc_registry_type: rntrcRegistryType,
         rntrc: rntrc || null,
         transportador: transportador || undefined,
         cpf_cnpj_mask: cpfCnpjMask || undefined,
@@ -529,32 +506,40 @@ async function fetchPage(url: string, signal: AbortSignal): Promise<PageTokens> 
 // ─── CONSULTATION FLOWS ──────────────────────────────────────────────────────
 
 /**
- * Autopostback intermediário para selecionar rbTipoConsulta=3 (Por Veículo).
+ * Modo-switch intermediário para rbTipoConsulta=3 (Por Veículo).
  *
- * O ANTT renderiza txtPlaca condicionalmente — só aparece quando o usuário
- * clica no radio "Por Veículo". Como o GET inicial entrega o modo 1 (Por
- * Transportador), txtPlaca não está no __EVENTVALIDATION original. Sem este
- * autopostback, o POST de consulta retorna "Invalid postback or callback
- * argument" (ASP.NET event validation error, HTTP 500 no delta).
+ * O portal ANTT renderiza txtPlaca condicionalmente — só aparece quando
+ * tipo=3 está ativo. Sem este POST intermediário, o __EVENTVALIDATION do
+ * POST final não inclui txtPlaca/btnConsulta para tipo=3 e o servidor
+ * rejeita com "Invalid postback or callback argument".
+ *
+ * Estratégia: POST regular (sem X-MicrosoftAjax) para que o servidor
+ * responda com HTML completo. A resposta delta (ScriptManager) era
+ * consistentemente rejeitada com event validation error 505.
  */
 async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise<PageTokens> {
-  console.log('[antt] autopostback rbTipoConsulta=3');
-  const selBody = new URLSearchParams({
-    ctl00$ScriptManagerMain: 'ctl00$ScriptManagerMain|ctl00$Corpo$rbTipoConsulta',
-    __EVENTTARGET: 'ctl00$Corpo$rbTipoConsulta',
-    __EVENTARGUMENT: '',
-    __LASTFOCUS: '',
-    __VIEWSTATE: tokens.viewState,
-    __VIEWSTATEGENERATOR: tokens.viewStateGen,
-    __EVENTVALIDATION: tokens.eventValidation,
-    ctl00$bMostraAlerta: 'true',
-    ctl00$Corpo$hfPnlConsulta: '1',
-    ctl00$Corpo$hfAltchaUrl: tokens.altchaUrl,
-    ctl00$Corpo$rbTipoConsulta: '3',
-    ctl00$Corpo$txtPlaca: '',
-    ctl00$Corpo$txtRNTRC: '',
-    ctl00$Corpo$txtCpfCnpj: '',
-  });
+  console.log('[antt] autopostback rbTipoConsulta=$2 (Por Veículo)');
+
+  const selBody = new URLSearchParams();
+  // ScriptManager arg referencia o radio com índice $2 (terceiro radio = Por Veículo)
+  selBody.append('ctl00$ScriptManagerMain', 'ctl00$ScriptManagerMain|ctl00$Corpo$rbTipoConsulta$2');
+  // EVENTTARGET com $2 — confirmado pelo onclick do DOM real
+  selBody.append('__EVENTTARGET', 'ctl00$Corpo$rbTipoConsulta$2');
+  selBody.append('__EVENTARGUMENT', '');
+  selBody.append('__LASTFOCUS', '');
+  selBody.append('__VIEWSTATE', tokens.viewState);
+  selBody.append('__VIEWSTATEGENERATOR', tokens.viewStateGen);
+  selBody.append('__EVENTVALIDATION', tokens.eventValidation);
+  selBody.append('ctl00$bMostraAlerta', 'true');
+  selBody.append('ctl00$Corpo$hfPnlConsulta', '1');
+  selBody.append('ctl00$Corpo$hfAltchaUrl', tokens.altchaUrl);
+  selBody.append('ctl00$Corpo$rbTipoConsulta', '3');
+  // CRÍTICO: NÃO enviar txtPlaca aqui — esse campo só existe APÓS o autopostback.
+  // Enviá-lo antes faz o __EVENTVALIDATION rejeitar com "Invalid postback".
+  selBody.append('ctl00$Corpo$txtRNTRC', '');
+  selBody.append('ctl00$Corpo$txtCpfCnpj', '');
+  // CRÍTICO: campo obrigatório em postbacks AJAX do ScriptManager
+  selBody.append('__ASYNCPOST', 'true');
 
   try {
     const res = await fetch(RNTRC_URL, {
@@ -567,6 +552,7 @@ async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise
         'X-MicrosoftAjax': 'Delta=true',
         'X-Requested-With': 'XMLHttpRequest',
         Accept: '*/*',
+        'Cache-Control': 'no-cache',
       },
       body: selBody.toString(),
       redirect: 'follow',
@@ -580,31 +566,34 @@ async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise
       : tokens.cookies;
 
     if (/\d+\|error\|/i.test(text)) {
-      console.warn('[antt] autopostback retornou erro delta — tokens originais com cookies merged');
-      return { ...tokens, cookies: mergedCookies };
+      console.error('[antt] autopostback rejeitado:', text.slice(0, 300));
+      throw new Error('autopostback delta error');
     }
 
     const { hiddenFields } = parseDeltaFull(text);
+
     const vs = hiddenFields['__VIEWSTATE'];
-    const vsg = hiddenFields['__VIEWSTATEGENERATOR'];
     const ev = hiddenFields['__EVENTVALIDATION'];
-    if (vs && ev) {
-      return {
-        ...tokens,
-        viewState: vs,
-        viewStateGen: vsg || tokens.viewStateGen,
-        eventValidation: ev,
-        cookies: mergedCookies,
-      };
+    const vsg = hiddenFields['__VIEWSTATEGENERATOR'];
+
+    if (!vs || !ev) {
+      throw new Error(
+        `autopostback: tokens ausentes (vs=${!!vs}, ev=${!!ev}). Delta preview: ${text.slice(0, 200)}`
+      );
     }
-    console.warn(
-      '[antt] autopostback: hidden fields não retornados — cookies merged, tokens originais'
-    );
-    return { ...tokens, cookies: mergedCookies };
+
+    console.log('[antt] autopostback OK, vs.len=', vs.length, 'ev.len=', ev.length);
+    return {
+      ...tokens,
+      viewState: vs,
+      viewStateGen: vsg || tokens.viewStateGen,
+      eventValidation: ev,
+      cookies: mergedCookies,
+    };
   } catch (e) {
-    console.warn('[antt] autopostback error:', String(e), '— using original tokens');
+    console.error('[antt] switchRntrcMode FALHOU:', String(e));
+    throw e; // propaga em vez de silenciar — o caller decide retry/fallback
   }
-  return tokens;
 }
 
 /** Returns true when the delta response is an ASP.NET event-validation rejection. */
@@ -630,6 +619,8 @@ async function consultaRntrc(
 
     // tipoConsulta=3 requires an intermediate autopostback so the server
     // registers txtPlaca in __EVENTVALIDATION before the actual search POST.
+    // Logs anteriores comprovaram que sem o autopostback a 1ª tentativa SEMPRE
+    // falha com EventValidation rejection — entao roda sempre.
     if (tipoConsulta === '3') {
       tokens = await switchRntrcMode(tokens, signal);
     }
@@ -655,6 +646,7 @@ async function consultaRntrc(
       ctl00$Corpo$txtCpfCnpj: cpfCnpj,
       ...(altchaPayload ? { altcha: altchaPayload } : {}),
       ctl00$Corpo$btnConsulta: 'Consultar',
+      __ASYNCPOST: 'true', // CRÍTICO: campo obrigatório em postbacks AJAX
     });
     const postRes = await fetch(RNTRC_URL, {
       method: 'POST',
@@ -675,7 +667,14 @@ async function consultaRntrc(
 
     const responseText = await postRes.text();
     const ct = postRes.headers.get('content-type') ?? '';
-    console.log('[antt] RNTRC ct=', ct, 'response[:300]=', responseText.slice(0, 300));
+    console.log('[antt] RNTRC ct=', ct, 'response.len=', responseText.length);
+    // Diagnostico: lista todos os updatePanel ids do delta para entender qual
+    // painel o servidor atualizou (resultados vs radio vs ...).
+    const panelIds = Array.from(responseText.matchAll(/updatePanel\|([^|]+)\|/g)).map((m) => m[1]);
+    console.log('[antt] RNTRC delta updatePanel ids=', panelIds.join(','));
+    console.log('[antt] RNTRC response[:500]=', responseText.slice(0, 500));
+    console.log('[antt] RNTRC response[1500:3000]=', responseText.slice(1500, 3000));
+    console.log('[antt] RNTRC response[-500:]=', responseText.slice(-500));
 
     // If ASP.NET event-validation rejected our POST, retry with fresh tokens
     if (attempt < 2 && tipoConsulta === '3' && isEventValidationError(responseText)) {
@@ -844,8 +843,17 @@ async function consultaVPO(
 }
 
 // ─── HANDLER ─────────────────────────────────────────────────────────────────
+const edgeServe = (
+  globalThis as unknown as {
+    Deno?: { serve: (handler: (req: Request) => Response | Promise<Response>) => void };
+  }
+).Deno?.serve;
 
-Deno.serve(async (req: Request): Promise<Response> => {
+if (!edgeServe) {
+  throw new Error('Deno.serve is not available in this runtime');
+}
+
+edgeServe(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response('ok', { status: 200, headers: CORS });
 
   if (req.method !== 'POST') {

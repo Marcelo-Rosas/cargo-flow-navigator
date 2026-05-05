@@ -50,6 +50,11 @@ const driverSchema = z.object({
     ),
   cnh_category: z.string().optional(),
   antt: z.string().optional(),
+  contract_type: z.enum(['proprio', 'agregado', 'terceiro']),
+  rntrc_registry_type: z.enum(['TAC', 'ETC'], {
+    required_error: 'RNTRC é obrigatório',
+    invalid_type_error: 'Selecione TAC ou ETC',
+  }),
   is_owner: z.boolean(),
   active: z.boolean(),
 });
@@ -94,6 +99,8 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
       cnh: '',
       cnh_category: '',
       antt: '',
+      contract_type: 'proprio',
+      rntrc_registry_type: undefined as unknown as 'TAC' | 'ETC',
       is_owner: false,
       active: true,
     },
@@ -108,6 +115,8 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
         cnh: driver.cnh || '',
         cnh_category: (driver.cnh_category as DriverFormData['cnh_category']) || '',
         antt: driver.antt || '',
+        contract_type: driver.contract_type ?? 'proprio',
+        rntrc_registry_type: (driver.rntrc_registry_type ?? undefined) as 'TAC' | 'ETC',
         is_owner: initialIsOwner,
         active: driver.active,
       });
@@ -119,6 +128,8 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
         cnh: '',
         cnh_category: '',
         antt: '',
+        contract_type: 'proprio',
+        rntrc_registry_type: undefined as unknown as 'TAC' | 'ETC',
         is_owner: false,
         active: true,
       });
@@ -137,6 +148,8 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
             cnh: data.cnh || null,
             cnh_category: data.cnh_category || null,
             antt: data.antt || null,
+            contract_type: data.contract_type,
+            rntrc_registry_type: data.rntrc_registry_type,
             active: data.active,
           },
         });
@@ -171,6 +184,8 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
           cnh: data.cnh || null,
           cnh_category: data.cnh_category || null,
           antt: data.antt || null,
+          contract_type: data.contract_type,
+          rntrc_registry_type: data.rntrc_registry_type,
           active: data.active,
         });
         toast.success('Motorista criado com sucesso');
@@ -326,6 +341,56 @@ export function DriverForm({ open, onClose, driver }: DriverFormProps) {
                     <FormControl>
                       <Input placeholder="Número do RNTRC" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="contract_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de vínculo operacional *</FormLabel>
+                    <FormControl>
+                      <select
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        {...field}
+                      >
+                        <option value="proprio">Frota</option>
+                        <option value="agregado">Agregado</option>
+                        <option value="terceiro">Terceiro</option>
+                      </select>
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Esta definição será usada na consulta ANTT do Step 1 do risco.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="rntrc_registry_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Registro RNTRC (TAC/ETC) *</FormLabel>
+                    <FormControl>
+                      <select
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value || undefined)}
+                      >
+                        <option value="">Selecione…</option>
+                        <option value="TAC">TAC</option>
+                        <option value="ETC">ETC</option>
+                      </select>
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Obrigatório. Define se o motorista é Transportador Autônomo (TAC) ou vinculado
+                      a Empresa de Transporte (ETC) — usado para regra de CIOT.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

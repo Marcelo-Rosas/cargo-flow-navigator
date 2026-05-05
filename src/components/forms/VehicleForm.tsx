@@ -174,8 +174,26 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
         toast.success('Veículo criado com sucesso');
       }
       onClose();
-    } catch {
-      toast.error(isEditing ? 'Erro ao atualizar veículo' : 'Erro ao criar veículo');
+    } catch (error) {
+      // PostgrestError 23505 = unique_violation (placa/renavam duplicado)
+      const e = error as { code?: string; status?: number; message?: string } | undefined;
+      if (e?.code === '23505' || e?.status === 409 || /duplicate|unique/i.test(e?.message ?? '')) {
+        const isPlate = /plate|placa/i.test(e?.message ?? '');
+        const isRenavam = /renavam/i.test(e?.message ?? '');
+        if (isRenavam) {
+          toast.error('Já existe um veículo com este RENAVAM. Edite o cadastro existente.');
+        } else if (isPlate) {
+          toast.error('Já existe um veículo com esta placa. Edite o cadastro existente.');
+        } else {
+          toast.error('Veículo já cadastrado (placa ou RENAVAM em duplicidade).');
+        }
+        return;
+      }
+      toast.error(
+        isEditing
+          ? `Erro ao atualizar veículo: ${e?.message ?? 'desconhecido'}`
+          : `Erro ao criar veículo: ${e?.message ?? 'desconhecido'}`
+      );
     }
   };
 

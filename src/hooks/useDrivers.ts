@@ -10,6 +10,8 @@ export interface Driver {
   cnh: string | null;
   cnh_category: string | null;
   antt: string | null;
+  contract_type: 'proprio' | 'agregado' | 'terceiro' | null;
+  rntrc_registry_type: 'TAC' | 'ETC' | null;
   active: boolean;
 }
 
@@ -23,7 +25,9 @@ export function useDrivers(activeOnly = true, options: UseDriversOptions = {}) {
     queryFn: async () => {
       let query = supabase
         .from('drivers')
-        .select('id, name, cpf, phone, cnh, cnh_category, antt, active')
+        .select(
+          'id, name, cpf, phone, cnh, cnh_category, antt, contract_type, rntrc_registry_type, active'
+        )
         .order('name', { ascending: true });
       if (activeOnly) {
         query = query.eq('active', asDb(true));
@@ -50,6 +54,8 @@ export function useDrivers(activeOnly = true, options: UseDriversOptions = {}) {
             cnh: null,
             cnh_category: null,
             antt: null,
+            contract_type: null,
+            rntrc_registry_type: null,
             active: true, // assume ativo enquanto banco não tem a coluna
           }));
         }
@@ -71,6 +77,8 @@ export function useCreateDriver() {
       cnh?: string | null;
       cnh_category?: string | null;
       antt?: string | null;
+      contract_type?: 'proprio' | 'agregado' | 'terceiro' | null;
+      rntrc_registry_type?: 'TAC' | 'ETC' | null;
       active?: boolean;
     }) => {
       const { data, error } = await supabase
@@ -78,7 +86,28 @@ export function useCreateDriver() {
         .insert(asInsert(driver))
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        const msg = error.message || '';
+        if (
+          msg.includes('contract_type') ||
+          msg.includes('rntrc_registry_type') ||
+          msg.includes('column')
+        ) {
+          const {
+            contract_type: _contractType,
+            rntrc_registry_type: _rntrcRegistryType,
+            ...fallbackInsert
+          } = driver;
+          const retry = await supabase
+            .from('drivers')
+            .insert(asInsert(fallbackInsert))
+            .select()
+            .single();
+          if (retry.error) throw retry.error;
+          return retry.data;
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['drivers'] }),
@@ -100,6 +129,8 @@ export function useUpdateDriver() {
         cnh?: string | null;
         cnh_category?: string | null;
         antt?: string | null;
+        contract_type?: 'proprio' | 'agregado' | 'terceiro' | null;
+        rntrc_registry_type?: 'TAC' | 'ETC' | null;
         active?: boolean;
       };
     }) => {
@@ -109,7 +140,29 @@ export function useUpdateDriver() {
         .eq('id', asDb(id))
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        const msg = error.message || '';
+        if (
+          msg.includes('contract_type') ||
+          msg.includes('rntrc_registry_type') ||
+          msg.includes('column')
+        ) {
+          const {
+            contract_type: _contractType,
+            rntrc_registry_type: _rntrcRegistryType,
+            ...fallbackUpdates
+          } = updates;
+          const retry = await supabase
+            .from('drivers')
+            .update(asInsert(fallbackUpdates))
+            .eq('id', asDb(id))
+            .select()
+            .single();
+          if (retry.error) throw retry.error;
+          return retry.data;
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['drivers'] }),
@@ -135,11 +188,31 @@ export function useDriver(id: string | null | undefined) {
 
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, name, cpf, phone, cnh, cnh_category, antt, active')
+        .select(
+          'id, name, cpf, phone, cnh, cnh_category, antt, contract_type, rntrc_registry_type, active'
+        )
         .eq('id', asDb(id))
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        const msg = error.message || '';
+        if (
+          msg.includes('contract_type') ||
+          msg.includes('rntrc_registry_type') ||
+          msg.includes('column')
+        ) {
+          const fallback = await supabase
+            .from('drivers')
+            .select('id, name, cpf, phone, cnh, cnh_category, antt, active')
+            .eq('id', asDb(id))
+            .maybeSingle();
+          if (fallback.error) throw fallback.error;
+          const row = filterSupabaseSingle<Driver>(fallback.data);
+          if (!row) return row;
+          return { ...row, contract_type: null, rntrc_registry_type: null };
+        }
+        throw error;
+      }
       return filterSupabaseSingle<Driver>(data);
     },
     enabled: !!id,

@@ -32,6 +32,7 @@ import {
   getNextStageRequirements,
   groupDocumentsByCategory,
 } from '@/lib/order-documents';
+import { DriverContractBadge } from '@/components/drivers/DriverContractBadge';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -284,6 +285,23 @@ export function OrderCard({
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">{order.driver_name}</p>
             <p className="text-xs text-muted-foreground">{order.vehicle_plate}</p>
+            <DriverContractBadge
+              contractType={
+                (
+                  order as unknown as {
+                    driver?: { contract_type?: 'proprio' | 'agregado' | 'terceiro' | null } | null;
+                  }
+                ).driver?.contract_type ?? null
+              }
+              rntrcRegistryType={
+                (
+                  order as unknown as {
+                    driver?: { rntrc_registry_type?: 'TAC' | 'ETC' | null } | null;
+                  }
+                ).driver?.rntrc_registry_type ?? null
+              }
+              className="mt-1"
+            />
           </div>
         </div>
       )}
