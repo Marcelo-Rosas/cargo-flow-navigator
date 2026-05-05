@@ -70,6 +70,10 @@ async function run({ ocNumber, issuedAt, issuedBy }: SmokePayloadOverrides): Pro
   const { generateCollectionOrderPdf } = mod;
 
   // Snapshot fiel da OS-2026-05-0001 (capturado via SQL real em 2026-05-05)
+  // Conceito (commit a565d9a): No/bairro/complemento sao dados da OPERACAO,
+  // nao do cadastro. No fluxo real da OS-2026-05-0001 o operador preencheu
+  // esses 3 campos no destinatario (TM ACADEMIA / Hortolandia), nao no
+  // remetente (KONNEN FITNESS / Itajai).
   const sender = {
     name: 'KONNEN FITNESS',
     cnpj: '09.447.411/0001-02',
@@ -77,9 +81,9 @@ async function run({ ocNumber, issuedAt, issuedBy }: SmokePayloadOverrides): Pro
     phone: '1145436636',
     email: null,
     address: 'JORGE LACERDA, 725, ESPINHEIROS',
-    address_number: '42',
-    address_complement: 'ACADEMIA MALIBU',
-    address_neighborhood: 'JARDIM NOSSA SENHORA AUXILIADORA',
+    address_number: null,
+    address_complement: null,
+    address_neighborhood: null,
     zip_code: '88317100',
     city: 'ITAJAI',
     state: 'SC',
@@ -92,9 +96,9 @@ async function run({ ocNumber, issuedAt, issuedBy }: SmokePayloadOverrides): Pro
     phone: '19 98246-1726',
     email: 'MALIBUHORTOLANDIA2@GMAIL.COM',
     address: 'MARIA CARVALHO SILVA, 42, JARDIM NOSSA SENHORA AUXILIADORA',
-    address_number: null,
-    address_complement: null,
-    address_neighborhood: null,
+    address_number: '42',
+    address_complement: 'ACADEMIA MALIBU',
+    address_neighborhood: 'JARDIM NOSSA SENHORA AUXILIADORA',
     zip_code: '13183512',
     city: 'HORTOLANDIA',
     state: 'SP',
