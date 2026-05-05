@@ -571,7 +571,6 @@ async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise
     }
 
     const { hiddenFields } = parseDeltaFull(text);
-    console.log('[antt] autopostback hiddenFields:', Object.keys(hiddenFields).join(','));
 
     const vs = hiddenFields['__VIEWSTATE'];
     const ev = hiddenFields['__EVENTVALIDATION'];
