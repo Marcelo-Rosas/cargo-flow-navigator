@@ -129,6 +129,19 @@ function extractCookies(res: Response): string {
   return getCookies.map((c: string) => c.split(';')[0]).join('; ');
 }
 
+/** Merges fresh Set-Cookie values into an existing cookie string (fresh overrides existing). */
+function mergeCookies(existing: string, fresh: string): string {
+  const map = new Map<string, string>();
+  for (const raw of (existing + '; ' + fresh).split(';')) {
+    const pair = raw.trim();
+    if (!pair) continue;
+    const eq = pair.indexOf('=');
+    const name = eq >= 0 ? pair.slice(0, eq).trim() : pair.trim();
+    if (name) map.set(name, pair);
+  }
+  return [...map.values()].join('; ');
+}
+
 // ─── ALTCHA PROOF-OF-WORK ────────────────────────────────────────────────────
 // Batched Promise.all eliminates per-iteration async overhead (~1µs/iter vs ~6µs).
 // Salt concatenated directly: SHA256(salt + number) — no dot separator (confirmed working).
@@ -560,6 +573,17 @@ async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise
       signal,
     });
     const text = await res.text();
+    // Merge any new session cookies set by the autopostback response
+    const freshCookies = extractCookies(res);
+    const mergedCookies = freshCookies
+      ? mergeCookies(tokens.cookies, freshCookies)
+      : tokens.cookies;
+
+    if (/\d+\|error\|/i.test(text)) {
+      console.warn('[antt] autopostback retornou erro delta — tokens originais com cookies merged');
+      return { ...tokens, cookies: mergedCookies };
+    }
+
     const { hiddenFields } = parseDeltaFull(text);
     const vs = hiddenFields['__VIEWSTATE'];
     const vsg = hiddenFields['__VIEWSTATEGENERATOR'];
@@ -570,12 +594,22 @@ async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise
         viewState: vs,
         viewStateGen: vsg || tokens.viewStateGen,
         eventValidation: ev,
+        cookies: mergedCookies,
       };
     }
+    console.warn(
+      '[antt] autopostback: hidden fields não retornados — cookies merged, tokens originais'
+    );
+    return { ...tokens, cookies: mergedCookies };
   } catch (e) {
     console.warn('[antt] autopostback error:', String(e), '— using original tokens');
   }
   return tokens;
+}
+
+/** Returns true when the delta response is an ASP.NET event-validation rejection. */
+function isEventValidationError(text: string): boolean {
+  return /\d+\|error\|500\|Invalid postback/i.test(text);
 }
 
 async function consultaRntrc(
@@ -585,71 +619,90 @@ async function consultaRntrc(
   tipoConsulta: '1' | '3',
   signal: AbortSignal
 ): Promise<AnttRntrcCheckResponse> {
-  console.log('[antt] GET RNTRC page tipo=', tipoConsulta);
-  let tokens = await fetchPage(RNTRC_URL, signal);
+  // Retry loop: EventValidation errors on tipo=3 happen when the autopostback
+  // fails to update tokens. A fresh GET+autopostback on the second attempt
+  // resolves the mismatch.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    if (attempt > 1) console.warn('[antt] retry', attempt, 'após EventValidation rejection');
 
-  if (!tokens.viewState) throw new Error('RNTRC ViewState não encontrado');
+    let tokens = await fetchPage(RNTRC_URL, signal);
+    if (!tokens.viewState) throw new Error('RNTRC ViewState não encontrado');
 
-  // tipoConsulta=3 requires an intermediate autopostback so the server
-  // registers txtPlaca in __EVENTVALIDATION before the actual search POST.
-  if (tipoConsulta === '3') {
-    tokens = await switchRntrcMode(tokens, signal);
+    // tipoConsulta=3 requires an intermediate autopostback so the server
+    // registers txtPlaca in __EVENTVALIDATION before the actual search POST.
+    if (tipoConsulta === '3') {
+      tokens = await switchRntrcMode(tokens, signal);
+    }
+
+    const altchaPayload = await fetchAltchaAndSolve(RNTRC_URL, signal);
+
+    console.log('[antt] POST RNTRC tipo=', tipoConsulta, 'attempt=', attempt);
+    const { viewState, viewStateGen, eventValidation, altchaUrl, cookies } = tokens;
+    const formBody = new URLSearchParams({
+      ctl00$ScriptManagerMain: 'ctl00$ScriptManagerMain|ctl00$Corpo$btnConsulta',
+      __EVENTTARGET: '',
+      __EVENTARGUMENT: '',
+      __LASTFOCUS: '',
+      __VIEWSTATE: viewState,
+      __VIEWSTATEGENERATOR: viewStateGen,
+      __EVENTVALIDATION: eventValidation,
+      ctl00$bMostraAlerta: 'true',
+      ctl00$Corpo$hfPnlConsulta: '1',
+      ctl00$Corpo$hfAltchaUrl: altchaUrl,
+      ctl00$Corpo$rbTipoConsulta: tipoConsulta,
+      ctl00$Corpo$txtPlaca: tipoConsulta === '3' ? plate : '',
+      ctl00$Corpo$txtRNTRC: rntrc ?? '',
+      ctl00$Corpo$txtCpfCnpj: cpfCnpj,
+      ...(altchaPayload ? { altcha: altchaPayload } : {}),
+      ctl00$Corpo$btnConsulta: 'Consultar',
+    });
+    const postRes = await fetch(RNTRC_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'User-Agent': UA,
+        Referer: RNTRC_URL,
+        Cookie: cookies,
+        'X-MicrosoftAjax': 'Delta=true',
+        'X-Requested-With': 'XMLHttpRequest',
+        Accept: '*/*',
+      },
+      body: formBody.toString(),
+      redirect: 'follow',
+      signal,
+    });
+    if (!postRes.ok) throw new Error(`RNTRC POST ${postRes.status}`);
+
+    const responseText = await postRes.text();
+    const ct = postRes.headers.get('content-type') ?? '';
+    console.log('[antt] RNTRC ct=', ct, 'response[:300]=', responseText.slice(0, 300));
+
+    // If ASP.NET event-validation rejected our POST, retry with fresh tokens
+    if (attempt < 2 && tipoConsulta === '3' && isEventValidationError(responseText)) {
+      console.warn('[antt] EventValidation rejection detectada — retrying');
+      continue;
+    }
+
+    const resultHtml = extractPanelHtml(responseText, ct);
+    console.log('[antt] RNTRC resultHtml[:500]=', resultHtml.slice(0, 500));
+
+    const parsed = extractRntrcResult(resultHtml, tipoConsulta === '3');
+    console.log('[antt] RNTRC parsed=', JSON.stringify(parsed));
+
+    if (parsed.situacao === 'indeterminado') {
+      parsed.message = `ct=${ct}; preview=${responseText.slice(0, 300)}`;
+    }
+
+    return { ...parsed, is_stub: false };
   }
 
-  const altchaPayload = await fetchAltchaAndSolve(RNTRC_URL, signal);
-
-  console.log('[antt] POST RNTRC tipo=', tipoConsulta);
-  const { viewState, viewStateGen, eventValidation, altchaUrl, cookies } = tokens;
-  const formBody = new URLSearchParams({
-    ctl00$ScriptManagerMain: 'ctl00$ScriptManagerMain|ctl00$Corpo$btnConsulta',
-    __EVENTTARGET: '',
-    __EVENTARGUMENT: '',
-    __LASTFOCUS: '',
-    __VIEWSTATE: viewState,
-    __VIEWSTATEGENERATOR: viewStateGen,
-    __EVENTVALIDATION: eventValidation,
-    ctl00$bMostraAlerta: 'true',
-    ctl00$Corpo$hfPnlConsulta: '1',
-    ctl00$Corpo$hfAltchaUrl: altchaUrl,
-    ctl00$Corpo$rbTipoConsulta: tipoConsulta,
-    ctl00$Corpo$txtPlaca: tipoConsulta === '3' ? plate : '',
-    ctl00$Corpo$txtRNTRC: rntrc ?? '',
-    ctl00$Corpo$txtCpfCnpj: cpfCnpj,
-    ...(altchaPayload ? { altcha: altchaPayload } : {}),
-    ctl00$Corpo$btnConsulta: 'Consultar',
-  });
-  const postRes = await fetch(RNTRC_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'User-Agent': UA,
-      Referer: RNTRC_URL,
-      Cookie: cookies,
-      'X-MicrosoftAjax': 'Delta=true',
-      'X-Requested-With': 'XMLHttpRequest',
-      Accept: '*/*',
-    },
-    body: formBody.toString(),
-    redirect: 'follow',
-    signal,
-  });
-  if (!postRes.ok) throw new Error(`RNTRC POST ${postRes.status}`);
-
-  const responseText = await postRes.text();
-  const ct = postRes.headers.get('content-type') ?? '';
-  console.log('[antt] RNTRC ct=', ct, 'response[:300]=', responseText.slice(0, 300));
-
-  const resultHtml = extractPanelHtml(responseText, ct);
-  console.log('[antt] RNTRC resultHtml[:500]=', resultHtml.slice(0, 500));
-
-  const parsed = extractRntrcResult(resultHtml, tipoConsulta === '3');
-  console.log('[antt] RNTRC parsed=', JSON.stringify(parsed));
-
-  if (parsed.situacao === 'indeterminado') {
-    parsed.message = `ct=${ct}; preview=${responseText.slice(0, 300)}`;
-  }
-
-  return { ...parsed, is_stub: false };
+  // Should never reach here (loop always returns or throws)
+  return {
+    situacao: 'indeterminado',
+    rntrc: null,
+    is_stub: false,
+    message: 'max retries exceeded',
+  };
 }
 
 async function consultaCIOT(
