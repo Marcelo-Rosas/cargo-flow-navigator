@@ -72,7 +72,7 @@ export function useOrders() {
           vehicle_type:vehicle_types!orders_vehicle_type_id_fkey (name, code, axes_count),
           payment_term:payment_terms!orders_payment_term_id_fkey (name, code, adjustment_percent, advance_percent, days),
           carrier_payment_term:payment_terms!orders_carrier_payment_term_id_fkey (id, name, code, adjustment_percent, advance_percent, days),
-          driver:drivers!orders_driver_id_fkey (id, name, cpf, cnh),
+          driver:drivers!orders_driver_id_fkey (id, name, cpf, cnh, contract_type, rntrc_registry_type),
           quote:quotes (
             id,
             shipper_name,
@@ -118,7 +118,7 @@ export function useOrder(id: string) {
           vehicle_type:vehicle_types!orders_vehicle_type_id_fkey (name, code, axes_count),
           payment_term:payment_terms!orders_payment_term_id_fkey (name, code, adjustment_percent, advance_percent, days),
           carrier_payment_term:payment_terms!orders_carrier_payment_term_id_fkey (id, name, code, adjustment_percent, advance_percent, days),
-          driver:drivers!orders_driver_id_fkey (id, name, cpf, cnh),
+          driver:drivers!orders_driver_id_fkey (id, name, cpf, cnh, contract_type, rntrc_registry_type),
           quote:quotes (
             id,
             shipper_name,

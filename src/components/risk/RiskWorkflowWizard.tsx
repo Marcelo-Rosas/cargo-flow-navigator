@@ -100,20 +100,40 @@ export function RiskWorkflowWizard({
   // (janela de propagação após "Aplicar à OS" antes do refetch do componente pai)
   const { data: driverRecord } = useQuery({
     queryKey: ['wizard-driver-cpf', orderId],
-    enabled: !driverCpf || !vehiclePlate || !driverName,
+    enabled: !!orderId,
     queryFn: async () => {
-      const { data } = await supabase
+      const primary = await supabase
         .from('orders')
         .select(
-          'driver_id, driver_name, vehicle_plate, vehicle_type_name, drivers!orders_driver_id_fkey(cpf, antt)'
+          'driver_id, driver_name, vehicle_plate, vehicle_type_name, drivers!orders_driver_id_fkey(cpf, antt, contract_type, rntrc_registry_type)'
         )
         .eq('id', orderId)
         .single();
+      let data = primary.data;
+      if (primary.error) {
+        const msg = primary.error.message || '';
+        if (msg.includes('contract_type') || msg.includes('column')) {
+          const fallback = await supabase
+            .from('orders')
+            .select(
+              'driver_id, driver_name, vehicle_plate, vehicle_type_name, drivers!orders_driver_id_fkey(cpf, antt)'
+            )
+            .eq('id', orderId)
+            .single();
+          if (fallback.error) throw fallback.error;
+          data = fallback.data;
+        } else {
+          throw primary.error;
+        }
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const d = data as any;
       return {
         cpf: (d?.drivers?.cpf as string | null) ?? null,
         antt: (d?.drivers?.antt as string | null) ?? null,
+        contract_type:
+          (d?.drivers?.contract_type as 'proprio' | 'agregado' | 'terceiro' | null) ?? null,
+        rntrc_registry_type: (d?.drivers?.rntrc_registry_type as 'TAC' | 'ETC' | null) ?? null,
         driver_id: (d?.driver_id as string | null) ?? null,
         driver_name: (d?.driver_name as string | null) ?? null,
         vehicle_plate: (d?.vehicle_plate as string | null) ?? null,
@@ -124,6 +144,8 @@ export function RiskWorkflowWizard({
 
   const resolvedDriverCpf = driverCpf || driverRecord?.cpf || undefined;
   const resolvedDriverAntt = driverRecord?.antt || undefined;
+  const resolvedDriverContractType = driverRecord?.contract_type ?? null;
+  const resolvedDriverRntrcRegistryType = driverRecord?.rntrc_registry_type ?? null;
   const resolvedDriverId = driverRecord?.driver_id ?? null;
   const resolvedDriverName = driverName || driverRecord?.driver_name || undefined;
   const resolvedVehiclePlate = vehiclePlate || driverRecord?.vehicle_plate || undefined;
@@ -156,10 +178,16 @@ export function RiskWorkflowWizard({
   // (RNTRC is registered under the vehicle owner, not the driver)
   const driverOnlyDigits = onlyDigits(resolvedDriverCpf ?? '');
   const ownerOnlyDigits = onlyDigits(ownerCpfCnpj ?? '');
-  const isDriverSameAsOwner =
+  const isDriverSameAsOwnerByDocument =
     !!driverOnlyDigits && !!ownerOnlyDigits && driverOnlyDigits === ownerOnlyDigits;
-  const anttCpfCnpj = !isDriverSameAsOwner && ownerCpfCnpj ? ownerCpfCnpj : resolvedDriverCpf;
   const ownerIsCnpj = ownerOnlyDigits.length === 14;
+  const inferredContractType: 'proprio' | 'agregado' | 'terceiro' = isDriverSameAsOwnerByDocument
+    ? 'proprio'
+    : ownerIsCnpj
+      ? 'terceiro'
+      : 'agregado';
+  const contractType = resolvedDriverContractType ?? inferredContractType;
+  const anttCpfCnpj = contractType === 'proprio' ? resolvedDriverCpf : ownerCpfCnpj;
 
   const { data: driverExposure } = useDriverActiveExposure(resolvedDriverId, orderId);
 
@@ -207,7 +235,9 @@ export function RiskWorkflowWizard({
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(10);
-      const rows = (data ?? []) as import('@/types/risk').RiskEvidence[];
+      const rows: import('@/types/risk').RiskEvidence[] = (data ?? []).map(
+        (row) => row as unknown as import('@/types/risk').RiskEvidence
+      );
       return (
         rows.find((e) => {
           const p = e.payload as Record<string, unknown> | null;
@@ -230,7 +260,7 @@ export function RiskWorkflowWizard({
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(10);
-      const rows = (data ?? []) as RiskEvidence[];
+      const rows: RiskEvidence[] = (data ?? []).map((row) => row as unknown as RiskEvidence);
       const cpfNorm = onlyDigits(resolvedDriverCpf ?? '');
       const plateNorm = normalizePlate(resolvedVehiclePlate ?? '');
       return (
@@ -406,7 +436,7 @@ export function RiskWorkflowWizard({
 
     // TAC path needs driver CPF; Agregado path only needs the plate
     let digits = '';
-    if (isDriverSameAsOwner) {
+    if (contractType === 'proprio') {
       if (!anttCpfCnpj) {
         toast.error('CPF/CNPJ do transportador não cadastrado');
         return;
@@ -428,7 +458,7 @@ export function RiskWorkflowWizard({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let firstResp: any = null;
 
-      if (!isDriverSameAsOwner) {
+      if (contractType !== 'proprio') {
         // ── Terceiro / Agregado path: consulta Por Veículo (placa) ────────────
         setAnttCheckStage('veiculo');
         const respV = await anttCheck.mutateAsync({
@@ -438,7 +468,7 @@ export function RiskWorkflowWizard({
           operation: 'veiculo',
         });
         firstResp = respV;
-        modalidade = ownerIsCnpj ? 'terceiro' : 'agregado';
+        modalidade = contractType === 'terceiro' ? 'terceiro' : 'agregado';
 
         if (respV.situacao === 'regular') {
           // RNTRC do proprietário vem da resposta do portal, ou usa o ANTT do motorista como fallback
@@ -519,7 +549,7 @@ export function RiskWorkflowWizard({
           : modalidade === 'terceiro' && ciotFound
             ? 'ANTT: Terceiro (empresa) — RNTRC regular, CIOT vigente'
             : modalidade === 'terceiro'
-              ? 'ANTT: Terceiro (empresa) — RNTRC regular. CIOT não localizado — verificar se frota > 3 veículos'
+              ? 'ANTT: Terceiro (empresa) — RNTRC regular. CIOT não localizado — validar obrigatoriedade conforme regra fiscal vigente'
               : modalidade === 'agregado' && ciotFound
                 ? 'ANTT: Agregado — CIOT vigente, operação autorizada'
                 : modalidade === 'agregado'
@@ -533,11 +563,12 @@ export function RiskWorkflowWizard({
         evaluation_id: evalId,
         evidence_type: 'antt_rntrc_check',
         status: overallOk ? 'valid' : 'rejected',
-        expires_at: overallOk ? expiresAt : null,
+        expires_at: overallOk ? expiresAt : undefined,
         notes,
         payload: {
           situacao: firstResp?.situacao ?? 'indeterminado',
           situacao_raw: firstResp?.situacao_raw ?? null,
+          rntrc_registry_type: firstResp?.rntrc_registry_type ?? null,
           rntrc: firstResp?.rntrc ?? null,
           transportador: firstResp?.transportador ?? null,
           apto: firstResp?.apto ?? null,
@@ -558,6 +589,13 @@ export function RiskWorkflowWizard({
         qc.refetchQueries({ queryKey: ['risk-evidence', evalId] }),
         qc.invalidateQueries({ queryKey: ['risk-evaluation', 'order', orderId] }),
       ]);
+
+      if (resolvedDriverId && firstResp?.rntrc_registry_type) {
+        const rntrcRegistryUpdate = {
+          rntrc_registry_type: firstResp.rntrc_registry_type,
+        } as unknown as Record<string, unknown>;
+        await supabase.from('drivers').update(rntrcRegistryUpdate).eq('id', resolvedDriverId);
+      }
 
       if (modalidade === 'tac') {
         toast.success('ANTT: TAC — veículo na frota do motorista');
@@ -743,8 +781,9 @@ export function RiskWorkflowWizard({
             <StepAntt
               driverName={resolvedDriverName}
               driverCpf={anttCpfCnpj}
-              ownerName={(!isDriverSameAsOwner && vehicleData?.ownerName) || undefined}
-              ownerIsCnpj={!isDriverSameAsOwner && ownerIsCnpj}
+              ownerName={(contractType !== 'proprio' && vehicleData?.ownerName) || undefined}
+              ownerIsCnpj={contractType === 'terceiro'}
+              driverRntrcRegistryType={resolvedDriverRntrcRegistryType}
               vehiclePlate={resolvedVehiclePlate}
               vehicleTypeName={resolvedVehicleTypeName}
               anttEvidence={anttEvidence}
@@ -859,6 +898,7 @@ export function RiskCriticalityBadge({ criticality }: { criticality: RiskCritica
 function StepAntt({
   driverName,
   driverCpf,
+  driverRntrcRegistryType,
   ownerName,
   ownerIsCnpj,
   vehiclePlate,
@@ -875,6 +915,7 @@ function StepAntt({
 }: {
   driverName?: string | null;
   driverCpf?: string | null;
+  driverRntrcRegistryType?: 'TAC' | 'ETC' | null;
   ownerName?: string | null;
   ownerIsCnpj?: boolean;
   vehiclePlate?: string | null;
@@ -892,7 +933,14 @@ function StepAntt({
   const payload = anttEvidence?.payload as Record<string, unknown> | undefined;
   const situacao = payload?.situacao ? String(payload.situacao) : null;
   const situacaoRaw = payload?.situacao_raw ? String(payload.situacao_raw) : null;
+  const rntrcRegistryType = payload?.rntrc_registry_type
+    ? String(payload.rntrc_registry_type).toUpperCase()
+    : null;
   const modalidade = payload?.modalidade ? String(payload.modalidade) : null;
+  const transportador =
+    payload?.transportador != null ? String(payload.transportador).trim() : null;
+  const comprovanteUrl =
+    payload?.comprovante_url != null ? String(payload.comprovante_url).trim() : null;
 
   const stageLabelMap: Record<string, string> = {
     rntrc: 'Verificando RNTRC...',
@@ -928,7 +976,7 @@ function StepAntt({
             </div>
             <div className="text-amber-600 dark:text-amber-500">
               {ownerIsCnpj
-                ? 'CIOT: verificar se frota ≤ 3 veículos (obrigatório) ou > 3 (dispensado)'
+                ? 'CIOT: validar obrigatoriedade conforme enquadramento da operação e legislação vigente'
                 : 'CIOT obrigatório — TAC agregado pessoa física'}
             </div>
           </div>
@@ -946,6 +994,12 @@ function StepAntt({
           <div>
             <span className="text-muted-foreground">Tipo:</span>{' '}
             <span className="font-medium">{vehicleTypeName}</span>
+          </div>
+        )}
+        {driverRntrcRegistryType && (
+          <div>
+            <span className="text-muted-foreground">Registro RNTRC:</span>{' '}
+            <span className="font-medium">{driverRntrcRegistryType}</span>
           </div>
         )}
       </div>
@@ -967,13 +1021,14 @@ function StepAntt({
             )}
             ANTT: {anttValid ? 'Consulta válida' : 'Reprovada / expirada'}
           </div>
-          {payload?.transportador && (
-            <div className="text-muted-foreground">{String(payload.transportador)}</div>
-          )}
+          {transportador ? <div className="text-muted-foreground">{transportador}</div> : null}
           {payload?.rntrc != null && String(payload.rntrc).length > 0 && (
             <div className="text-muted-foreground">RNTRC: {String(payload.rntrc)}</div>
           )}
           {situacao && <div className="text-muted-foreground capitalize">Situação: {situacao}</div>}
+          {rntrcRegistryType && (
+            <div className="text-muted-foreground">Registro RNTRC: {rntrcRegistryType}</div>
+          )}
           {situacaoRaw && situacaoRaw !== 'ATIVO' && (
             <div className="text-xs text-amber-700 dark:text-amber-400 font-medium">
               Situação RNTRC: {situacaoRaw}
@@ -991,6 +1046,14 @@ function StepAntt({
               >
                 {modalidade === 'tac' ? 'TAC' : modalidade === 'terceiro' ? 'Terceiro' : 'Agregado'}
               </span>
+              {modalidade === 'terceiro' && (
+                <span className="text-muted-foreground text-xs">
+                  CIOT:{' '}
+                  {payload?.ciot_found === true
+                    ? 'vigente'
+                    : 'não localizado (validar regra aplicável)'}
+                </span>
+              )}
               {modalidade === 'agregado' && (
                 <span className="text-muted-foreground text-xs">
                   CIOT:{' '}
@@ -1001,18 +1064,12 @@ function StepAntt({
                       : '—'}
                 </span>
               )}
-              {modalidade === 'terceiro' && (
-                <span className="text-muted-foreground text-xs">
-                  CIOT:{' '}
-                  {payload?.ciot_found === true ? 'vigente' : 'dispensado se frota > 3 veículos'}
-                </span>
-              )}
             </div>
           )}
-          {payload?.comprovante_url && (
+          {comprovanteUrl && (
             <div className="text-sm">
               <a
-                href={String(payload.comprovante_url)}
+                href={comprovanteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 dark:text-blue-400 underline underline-offset-2"

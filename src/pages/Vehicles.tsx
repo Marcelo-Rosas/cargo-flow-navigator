@@ -13,8 +13,8 @@ import {
   Phone,
   Mail,
   MapPin,
-  ShieldAlert,
 } from 'lucide-react';
+import { DriverContractBadge } from '@/components/drivers/DriverContractBadge';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -406,13 +406,16 @@ export default function Vehicles() {
                                   <User className="w-3.5 h-3.5 text-muted-foreground" />
                                   {vehicle.driver.name}
                                 </div>
-                                {vehicle.driver_id && vehicle.owner_id && (
+                                <DriverContractBadge
+                                  contractType={vehicle.driver.contract_type ?? null}
+                                  rntrcRegistryType={vehicle.driver.rntrc_registry_type ?? null}
+                                />
+                                {!vehicle.driver.contract_type && vehicle.owner_id && (
                                   <Badge
                                     variant="outline"
-                                    className="text-xs w-fit gap-1 text-amber-700 border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400"
+                                    className="text-xs w-fit gap-1 text-muted-foreground"
                                   >
-                                    <ShieldAlert className="w-3 h-3" />
-                                    Agregado — CIOT obrigatório
+                                    Vinculo nao classificado
                                   </Badge>
                                 )}
                               </div>
