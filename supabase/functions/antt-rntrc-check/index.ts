@@ -66,6 +66,8 @@ interface AnttRntrcCheckResponse {
   apto?: boolean;
   /** Apenas para operation='veiculo': veículo está na frota do transportador */
   veiculo_na_frota?: boolean;
+  /** URL do comprovante/certidão de regularidade emitido pelo portal ANTT */
+  comprovante_url?: string | null;
   ciot?: CiotResult;
   message?: string;
   is_stub: boolean;
@@ -287,6 +289,40 @@ function extractPanelHtml(responseText: string, ct: string): string {
   return Object.keys(panels).length > 0 ? Object.values(panels).join('') : responseText;
 }
 
+// ─── COMPROVANTE URL EXTRACTOR ────────────────────────────────────────────────
+/**
+ * Procura um link de certidão/comprovante na página de resultado.
+ * O portal ANTT pode gerar links do tipo:
+ *   <a href="CertidaoRNTRC.aspx?...">Emitir Certidão</a>
+ *   window.open('...CertidaoRNTRC...')
+ * Retorna a URL absoluta ou null se não encontrar.
+ */
+function extractComprovanteUrl(html: string): string | null {
+  const BASE = 'https://consultapublica.antt.gov.br/Site/';
+
+  // Padrão 1: <a href="..."> com texto ou href contendo palavras-chave
+  const anchorMatches = [...html.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
+  for (const m of anchorMatches) {
+    const href = m[1];
+    const text = stripTags(m[2]);
+    const isCert =
+      /certidao|comprovante|emitir|regularidade/i.test(text) ||
+      /certidao|comprovante|regularidade/i.test(href);
+    if (isCert && !/javascript:/i.test(href)) {
+      return href.startsWith('http') ? href : BASE + href.replace(/^\/+/, '');
+    }
+  }
+
+  // Padrão 2: window.open('URL') com palavra-chave
+  const winOpen = html.match(/window\.open\(['"]([^'"]*(?:certidao|comprovante)[^'"]*)['"]/i);
+  if (winOpen) {
+    const url = winOpen[1];
+    return url.startsWith('http') ? url : BASE + url.replace(/^\/+/, '');
+  }
+
+  return null;
+}
+
 // ─── RNTRC RESULT PARSER ─────────────────────────────────────────────────────
 /**
  * Parses Corpo_gvResultadoPesquisa (6 cols) + Corpo_lblMsg.
@@ -340,6 +376,9 @@ function extractRntrcResult(
         veiculoNaFrota = !negativo;
       }
 
+      // Extrai URL de certidão/comprovante se o portal gerar link na página de resultado
+      const comprovanteUrl = extractComprovanteUrl(html);
+
       return {
         situacao,
         situacao_raw: situRaw || undefined,
@@ -350,6 +389,7 @@ function extractRntrcResult(
         municipio_uf: municipioUf || undefined,
         apto,
         veiculo_na_frota: veiculoNaFrota,
+        comprovante_url: comprovanteUrl,
       };
     }
   }

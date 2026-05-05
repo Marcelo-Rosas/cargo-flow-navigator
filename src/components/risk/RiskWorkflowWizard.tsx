@@ -551,6 +551,7 @@ export function RiskWorkflowWizard({
           ciot_found: ciotFound,
           ciot_status: ciotStatus,
           ciot_mensagem: ciotMensagem,
+          comprovante_url: firstResp?.comprovante_url ?? null,
         },
       });
       await Promise.all([
@@ -921,7 +922,6 @@ function StepAntt({
               {ownerIsCnpj
                 ? '⚠ Veículo terceiro — proprietário empresa (CNPJ)'
                 : '⚠ Veículo agregado — proprietário diferente do motorista'}
-              ⚠ Veículo agregado — proprietário diferente do motorista
             </div>
             <div className="text-amber-700 dark:text-amber-400">
               Proprietário: <span className="font-semibold">{ownerName}</span>
@@ -989,7 +989,7 @@ function StepAntt({
                     : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
                 )}
               >
-                {modalidade === 'tac' ? 'TAC' : 'Agregado'}
+                {modalidade === 'tac' ? 'TAC' : modalidade === 'terceiro' ? 'Terceiro' : 'Agregado'}
               </span>
               {modalidade === 'agregado' && (
                 <span className="text-muted-foreground text-xs">
@@ -1001,6 +1001,24 @@ function StepAntt({
                       : '—'}
                 </span>
               )}
+              {modalidade === 'terceiro' && (
+                <span className="text-muted-foreground text-xs">
+                  CIOT:{' '}
+                  {payload?.ciot_found === true ? 'vigente' : 'dispensado se frota > 3 veículos'}
+                </span>
+              )}
+            </div>
+          )}
+          {payload?.comprovante_url && (
+            <div className="text-sm">
+              <a
+                href={String(payload.comprovante_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 underline underline-offset-2"
+              >
+                Ver Comprovante ANTT
+              </a>
             </div>
           )}
           {payload?.is_stub === true && (
