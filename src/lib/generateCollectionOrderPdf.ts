@@ -1,6 +1,5 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import logoUrl from '@/assets/logo_vectra_cargo.png?url';
 import { formatDate } from '@/lib/formatters';
 import type {
   CollectionOrderAnttData,
@@ -25,6 +24,9 @@ export interface CollectionOrderPdfPayload {
   observation: string | null;
   additional_info: string | null;
   cancelled?: boolean;
+  /** Logo ja codificado em base64 (data URL). Quando ausente, faz fetch
+   *  do asset Vite — usado em smoke tests Node onde nao ha bundler. */
+  logoBase64Override?: string | null;
 }
 
 type PdfDoc = jsPDF & { lastAutoTable?: { finalY?: number } };
@@ -92,6 +94,11 @@ const fmtDate = (d: string | null | undefined): string => {
 
 async function loadLogoBase64(): Promise<string | null> {
   try {
+    // Dynamic import com `?url` — Vite resolve em build, Node ignora (cai no
+    // catch). Ambiente Node deve usar logoBase64Override no payload.
+    const mod = (await import('@/assets/logo_vectra_cargo.png?url')) as { default?: string };
+    const logoUrl = mod.default;
+    if (!logoUrl) return null;
     const res = await fetch(logoUrl);
     if (!res.ok) return null;
     const blob = await res.blob();
@@ -610,7 +617,7 @@ export async function generateCollectionOrderPdf(
   payload: CollectionOrderPdfPayload
 ): Promise<{ blob: Blob; fileName: string }> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as PdfDoc;
-  const logo = await loadLogoBase64();
+  const logo = payload.logoBase64Override ?? (await loadLogoBase64());
 
   let y = drawHeader(doc, payload, logo);
   y += 2;
