@@ -115,16 +115,31 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
       if (orderErr) throw orderErr;
       if (!order) throw new Error('OS nao encontrada');
 
-      // 2. Buscar carreta via vehicles (plate_2) usando driver_id
+      // 2. Buscar carreta + dados do proprietario via vehicles → owners
       let trailerPlate: string | null = null;
+      let ownerInfo: {
+        cpf_cnpj: string | null;
+        city: string | null;
+        state: string | null;
+        registered_at: string | null;
+      } | null = null;
       if (order.driver_id) {
         const { data: veh } = await supabase
           .from('vehicles')
-          .select('plate, plate_2')
+          .select('plate, plate_2, owner_id, owner:owners(cpf_cnpj, city, state, created_at)')
           .eq('driver_id', order.driver_id)
           .limit(1)
           .maybeSingle();
         trailerPlate = veh?.plate_2 ?? null;
+        const ow = (veh as unknown as { owner?: Record<string, unknown> | null })?.owner ?? null;
+        if (ow) {
+          ownerInfo = {
+            cpf_cnpj: (ow.cpf_cnpj as string) ?? null,
+            city: (ow.city as string) ?? null,
+            state: (ow.state as string) ?? null,
+            registered_at: (ow.created_at as string) ?? null,
+          };
+        }
       }
 
       // 2b. Buscar ultimo resultado ANTT/RNTRC da OS via risk_evidence
@@ -149,15 +164,36 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
             .maybeSingle();
           if (evidence?.payload) {
             const p = evidence.payload as Record<string, unknown>;
+            // Portal ANTT devolve transportador como "TAC - Nome" ou "ETC - Nome".
+            // Extrai o tipo do prefixo (preenche rntrc_registry_type quando portal nao
+            // retorna esse campo direto) e limpa o nome para o PDF.
+            const rawTransportador = (p.transportador as string) ?? null;
+            let parsedType: 'TAC' | 'ETC' | null = null;
+            let cleanTransportador = rawTransportador;
+            if (rawTransportador) {
+              const m = rawTransportador.match(/^\s*(TAC|ETC)\s*[-–—]\s*(.+)$/i);
+              if (m) {
+                parsedType = m[1].toUpperCase() as 'TAC' | 'ETC';
+                cleanTransportador = m[2].trim();
+              }
+            }
+            // Fallback de municipio/uf e cadastrado_desde: portal raramente devolve.
+            // Usa dados do proprietario do veiculo (owners) para preencher no PDF.
+            const ownerMunicipioUf =
+              ownerInfo?.city || ownerInfo?.state
+                ? [ownerInfo?.city, ownerInfo?.state].filter(Boolean).join('/')
+                : null;
             anttSnapshot = {
               situacao: (p.situacao as string) ?? null,
               situacao_raw: (p.situacao_raw as string) ?? null,
-              rntrc_registry_type: (p.rntrc_registry_type as 'TAC' | 'ETC' | null) ?? null,
+              rntrc_registry_type:
+                ((p.rntrc_registry_type as 'TAC' | 'ETC' | null) ?? null) || parsedType,
               rntrc: (p.rntrc as string) ?? null,
-              transportador: (p.transportador as string) ?? null,
-              cpf_cnpj_mask: (p.cpf_cnpj_mask as string) ?? null,
-              cadastrado_desde: (p.cadastrado_desde as string) ?? null,
-              municipio_uf: (p.municipio_uf as string) ?? null,
+              transportador: cleanTransportador,
+              cpf_cnpj_mask: ((p.cpf_cnpj_mask as string) ?? null) || ownerInfo?.cpf_cnpj || null,
+              cadastrado_desde:
+                ((p.cadastrado_desde as string) ?? null) || ownerInfo?.registered_at || null,
+              municipio_uf: ((p.municipio_uf as string) ?? null) || ownerMunicipioUf,
               apto: (p.apto as boolean | null) ?? null,
               veiculo_na_frota: (p.veiculo_na_frota as boolean | null) ?? null,
               comprovante_url: (p.comprovante_url as string) ?? null,

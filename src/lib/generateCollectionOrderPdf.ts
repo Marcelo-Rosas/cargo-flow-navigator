@@ -521,7 +521,15 @@ function drawAnttBlock(doc: PdfDoc, antt: CollectionOrderAnttData, y: number): n
     { label: 'TRANSPORTADOR', value: safe(antt.transportador) || '—' },
     { label: 'CPF / CNPJ', value: safe(antt.cpf_cnpj_mask) || '—' },
     { label: 'MUNICIPIO/UF', value: safe(antt.municipio_uf) || '—' },
-    { label: 'CADASTRADO DESDE', value: safe(antt.cadastrado_desde) || '—' },
+    {
+      label: 'CADASTRADO DESDE',
+      value: antt.cadastrado_desde
+        ? // ISO date (owner.created_at) ou string já formatada
+          /^\d{4}-\d{2}-\d{2}/.test(antt.cadastrado_desde)
+          ? fmtDate(antt.cadastrado_desde) || '—'
+          : antt.cadastrado_desde
+        : '—',
+    },
   ];
   row2.forEach((c, i) => {
     const x = ML + 2 + i * colW;
