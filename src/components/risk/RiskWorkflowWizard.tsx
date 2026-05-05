@@ -583,6 +583,7 @@ export function RiskWorkflowWizard({
           ciot_status: ciotStatus,
           ciot_mensagem: ciotMensagem,
           comprovante_url: firstResp?.comprovante_url ?? null,
+          comprovante_storage_path: firstResp?.comprovante_storage_path ?? null,
         },
       });
       await Promise.all([

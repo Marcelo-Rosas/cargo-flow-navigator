@@ -200,6 +200,7 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
               apto: (p.apto as boolean | null) ?? null,
               veiculo_na_frota: (p.veiculo_na_frota as boolean | null) ?? null,
               comprovante_url: (p.comprovante_url as string) ?? null,
+              comprovante_storage_path: (p.comprovante_storage_path as string) ?? null,
               checked_at: evidence.created_at ?? null,
             };
           }

@@ -63,6 +63,8 @@ export interface CollectionOrderAnttData {
   veiculo_na_frota: boolean | null;
   /** URL do comprovante/certidao gerado pelo portal */
   comprovante_url: string | null;
+  /** Path no bucket antt-comprovantes (signed URL gerado on-demand para auditoria) */
+  comprovante_storage_path: string | null;
   /** timestamp da consulta */
   checked_at: string | null;
 }
