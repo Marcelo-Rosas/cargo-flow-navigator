@@ -470,7 +470,9 @@ function drawSchedule(
 }
 
 function drawAnttBlock(doc: PdfDoc, antt: CollectionOrderAnttData, y: number): number {
-  const H = 22;
+  // Linha extra para o link do comprovante quando o portal devolver URL
+  const hasComprovante = !!antt.comprovante_url;
+  const H = hasComprovante ? 30 : 22;
   doc.setDrawColor(...C.border);
   doc.setLineWidth(0.25);
   doc.rect(ML, y, CW, H);
@@ -547,6 +549,29 @@ function drawAnttBlock(doc: PdfDoc, antt: CollectionOrderAnttData, y: number): n
     const lines = doc.splitTextToSize(c.value, colW - 4) as string[];
     doc.text(lines[0] ?? '', x + 2, y + 20);
   });
+
+  // Linha 3 (opcional): COMPROVANTE ANTT (link clicavel)
+  if (hasComprovante && antt.comprovante_url) {
+    doc.setDrawColor(...C.border);
+    doc.line(ML + 2, y + 22, ML + CW, y + 22);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...C.muted);
+    doc.text('COMPROVANTE ANTT', ML + 4, y + 25.5);
+
+    // Link clicavel (jsPDF: textWithLink)
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(0, 90, 200);
+    const url = antt.comprovante_url;
+    const display = url.length > 110 ? `${url.slice(0, 107)}...` : url;
+    (
+      doc as PdfDoc & {
+        textWithLink: (text: string, x: number, y: number, options: { url: string }) => void;
+      }
+    ).textWithLink(display, ML + 36, y + 25.5, { url });
+  }
 
   return y + H + 1;
 }

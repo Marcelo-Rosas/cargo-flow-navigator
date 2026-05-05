@@ -190,10 +190,13 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
                 ((p.rntrc_registry_type as 'TAC' | 'ETC' | null) ?? null) || parsedType,
               rntrc: (p.rntrc as string) ?? null,
               transportador: cleanTransportador,
+              // CPF/CNPJ e MUNICIPIO/UF: fallback para o cadastro do proprietario quando
+              // o portal nao devolve (caminho "Por Veiculo" raramente preenche).
               cpf_cnpj_mask: ((p.cpf_cnpj_mask as string) ?? null) || ownerInfo?.cpf_cnpj || null,
-              cadastrado_desde:
-                ((p.cadastrado_desde as string) ?? null) || ownerInfo?.registered_at || null,
               municipio_uf: ((p.municipio_uf as string) ?? null) || ownerMunicipioUf,
+              // CADASTRADO DESDE: vem APENAS do registro ANTT (data de inscricao no
+              // RNTRC). NAO usar owner.created_at (data cadastro no nosso sistema).
+              cadastrado_desde: (p.cadastrado_desde as string) ?? null,
               apto: (p.apto as boolean | null) ?? null,
               veiculo_na_frota: (p.veiculo_na_frota as boolean | null) ?? null,
               comprovante_url: (p.comprovante_url as string) ?? null,
