@@ -37,6 +37,8 @@ export interface AnttRntrcCheckResponse {
   situacao: AnttRntrcSituacao;
   /** ATIVO / VENCIDO / CANCELADO conforme tabela ANTT */
   situacao_raw?: string;
+  /** Tipo registral RNTRC quando disponível (ex.: TAC / ETC) */
+  rntrc_registry_type?: 'TAC' | 'ETC' | null;
   rntrc?: string | null;
   /** Nome do transportador conforme cadastro ANTT */
   transportador?: string;

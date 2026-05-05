@@ -45,7 +45,15 @@ export function VehicleTypesSection() {
       toast.success('Tipo de veículo criado');
       setIsCreateOpen(false);
     } catch (error) {
-      toast.error('Erro ao criar tipo de veículo');
+      // PostgrestError 23505 = unique_violation (code duplicado)
+      const e = error as { code?: string; status?: number; message?: string } | undefined;
+      if (e?.code === '23505' || e?.status === 409 || /duplicate|unique/i.test(e?.message ?? '')) {
+        toast.error(
+          'Já existe um tipo com este código. Edite o tipo existente em vez de criar novo.'
+        );
+        return;
+      }
+      toast.error(`Erro ao criar tipo: ${e?.message ?? 'erro desconhecido'}`);
     }
   };
 
@@ -95,8 +103,6 @@ export function VehicleTypesSection() {
             <TableHead>Código</TableHead>
             <TableHead>Nome</TableHead>
             <TableHead>Eixos</TableHead>
-            <TableHead>Capacidade (kg)</TableHead>
-            <TableHead>Capacidade (m³)</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Ações</TableHead>
           </TableRow>
@@ -107,8 +113,6 @@ export function VehicleTypesSection() {
               <TableCell className="font-mono text-sm">{vehicle.code}</TableCell>
               <TableCell className="font-medium">{vehicle.name}</TableCell>
               <TableCell>{vehicle.axes_count || '-'}</TableCell>
-              <TableCell>{vehicle.capacity_kg?.toLocaleString('pt-BR') || '-'}</TableCell>
-              <TableCell>{vehicle.capacity_m3 || '-'}</TableCell>
               <TableCell>
                 <Badge variant={vehicle.active ? 'default' : 'outline'}>
                   {vehicle.active ? 'Ativo' : 'Inativo'}
@@ -177,8 +181,6 @@ function VehicleTypeForm({
   const [code, setCode] = useState(vehicle?.code || '');
   const [name, setName] = useState(vehicle?.name || '');
   const [axesCount, setAxesCount] = useState(vehicle?.axes_count?.toString() || '');
-  const [capacityKg, setCapacityKg] = useState(vehicle?.capacity_kg?.toString() || '');
-  const [capacityM3, setCapacityM3] = useState(vehicle?.capacity_m3?.toString() || '');
   const [active, setActive] = useState(vehicle?.active ?? true);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -191,8 +193,6 @@ function VehicleTypeForm({
       code,
       name,
       axes_count: axesCount ? parseInt(axesCount) : null,
-      capacity_kg: capacityKg ? parseFloat(capacityKg) : null,
-      capacity_m3: capacityM3 ? parseFloat(capacityM3) : null,
       active,
     });
   };
@@ -223,33 +223,18 @@ function VehicleTypeForm({
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Truck" />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label>Nº Eixos</Label>
-            <Input
-              type="number"
-              min="2"
-              max="12"
-              value={axesCount}
-              onChange={(e) => setAxesCount(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Capacidade (kg)</Label>
-            <Input
-              type="number"
-              value={capacityKg}
-              onChange={(e) => setCapacityKg(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Capacidade (m³)</Label>
-            <Input
-              type="number"
-              value={capacityM3}
-              onChange={(e) => setCapacityM3(e.target.value)}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label>Nº Eixos</Label>
+          <Input
+            type="number"
+            min="2"
+            max="12"
+            value={axesCount}
+            onChange={(e) => setAxesCount(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Capacidade (kg/m³/pallets) é cadastrada por veículo individual em /veiculos.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Switch checked={active} onCheckedChange={setActive} />

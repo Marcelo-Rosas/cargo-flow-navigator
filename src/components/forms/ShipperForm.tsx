@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { zodCpf, zodCnpj, zodPhone, zodCep } from '@/lib/validators';
 import { MaskedInput } from '@/components/ui/masked-input';
+import { CnpjLookupError, lookupCnpj, pickLegalRepresentative } from '@/lib/cnpjLookup';
 
 type Shipper = Database['public']['Tables']['shippers']['Row'];
 
@@ -108,8 +109,9 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
     }
   }, [shipper, form]);
 
-  // CNPJ auto-lookup functions
+  // CNPJ auto-lookup compartilhado em @/lib/cnpjLookup.
   const sanitizeCnpj = (v: string) => v.replace(/\D/g, '');
+  const [cnpjResult, setCnpjResult] = useState<Awaited<ReturnType<typeof lookupCnpj>> | null>(null);
 
   const safeSet = (key: keyof ShipperFormData, value?: unknown) => {
     const str = value != null ? String(value).trim() : '';
@@ -121,44 +123,33 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
 
   const handleCnpjLookup = async (rawValue?: string) => {
     const raw = rawValue ?? form.getValues('cnpj') ?? '';
-    const cnpj = sanitizeCnpj(raw);
-    if (cnpj.length !== 14) return;
+    if (sanitizeCnpj(raw).length !== 14) return;
 
     setIsLookingUp(true);
     try {
-      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
-      if (!res.ok) {
-        if (res.status === 404) {
-          toast.error('CNPJ não encontrado na base da Receita Federal');
-        } else {
-          toast.error(`Erro ao consultar CNPJ (status ${res.status})`);
-        }
-        setIsLookingUp(false);
-        return;
+      const result = await lookupCnpj(raw);
+      setCnpjResult(result);
+
+      safeSet('name', result.name ?? result.trade_name);
+      safeSet('email', result.email);
+      safeSet('phone', result.phone);
+      safeSet('address', result.address);
+      safeSet('city', result.city);
+      safeSet('state', result.state);
+      safeSet('zip_code', result.zip_code);
+
+      const partnerCount = result.partners.length;
+      toast.success(
+        partnerCount > 0
+          ? `Dados preenchidos pelo CNPJ (${partnerCount} sócio${partnerCount !== 1 ? 's' : ''} no QSA)`
+          : 'Dados preenchidos pelo CNPJ'
+      );
+    } catch (e) {
+      if (e instanceof CnpjLookupError) {
+        toast.error(e.message);
+      } else {
+        toast.error('Falha ao consultar CNPJ — verifique sua conexão');
       }
-      const data = (await res.json()) as Record<string, unknown>;
-
-      safeSet('name', data.razao_social || data.nome_fantasia || data.name);
-      safeSet('email', data.email || data.email_contato);
-      safeSet('phone', data.ddd_telefone_1 || data.telefone || data.phone);
-
-      const street = data.logradouro || data.endereco || data.street;
-      const number = data.numero || data.number;
-      const district = data.bairro || data.distrito || data.neighborhood;
-      const composedAddress = [street, number, district].filter(Boolean).join(', ');
-      safeSet('address', composedAddress);
-
-      safeSet('city', data.municipio || data.cidade || data.city);
-
-      const uf = (data.uf || data.estado || data.state || '').toString().toUpperCase();
-      safeSet('state', uf?.slice(0, 2));
-
-      const cep = (data.cep || data.codigo_postal || data.zip_code || '').toString();
-      safeSet('zip_code', cep);
-
-      toast.success('Dados preenchidos automaticamente pelo CNPJ');
-    } catch {
-      toast.error('Falha ao consultar CNPJ — verifique sua conexão');
     } finally {
       setIsLookingUp(false);
     }
@@ -171,35 +162,59 @@ export function ShipperForm({ open, onClose, shipper }: ShipperFormProps) {
     }
 
     try {
+      // Reaproveita resultado do lookup CNPJ feito nesta sessao para popular
+      // todos os campos novos da Receita (cartao + QSA) sem precisar de mais
+      // chamadas. Tambem nutre representante legal sugerido pelo QSA.
+      const rep = cnpjResult ? pickLegalRepresentative(cnpjResult.partners) : null;
+      const cnpjFields = cnpjResult
+        ? {
+            trade_name: cnpjResult.trade_name,
+            legal_nature: cnpjResult.legal_nature,
+            legal_nature_code: cnpjResult.legal_nature_code,
+            company_size: cnpjResult.company_size,
+            cnae_main_code: cnpjResult.cnae_main_code,
+            cnae_main_description: cnpjResult.cnae_main_description,
+            cnaes_secondary: cnpjResult.cnaes_secondary,
+            opening_date: cnpjResult.opening_date,
+            registration_status: cnpjResult.registration_status,
+            registration_status_date: cnpjResult.registration_status_date,
+            registration_status_reason: cnpjResult.registration_status_reason,
+            efr: cnpjResult.efr,
+            share_capital: cnpjResult.share_capital,
+            partners: cnpjResult.partners,
+            address_number: cnpjResult.address_number,
+            address_complement: cnpjResult.address_complement,
+            address_neighborhood: cnpjResult.address_neighborhood,
+            cnpj_lookup_at: new Date().toISOString(),
+            legal_representative_name: rep?.name ?? null,
+            legal_representative_role: rep?.role ?? null,
+            legal_representative_cpf: rep?.document ?? null,
+          }
+        : {};
+
+      const baseFields = {
+        name: data.name,
+        cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null,
+        cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
+        city: data.city || null,
+        state: data.state || null,
+        zip_code: data.zip_code || null,
+        notes: data.notes || null,
+        ...cnpjFields,
+      };
+
       if (isEditing && shipper) {
         await updateShipperMutation.mutateAsync({
           id: shipper.id,
-          updates: {
-            name: data.name,
-            cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null,
-            cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
-            email: data.email || null,
-            phone: data.phone || null,
-            address: data.address || null,
-            city: data.city || null,
-            state: data.state || null,
-            zip_code: data.zip_code || null,
-            notes: data.notes || null,
-          },
+          updates: baseFields,
         });
         toast.success('Embarcador atualizado com sucesso');
       } else {
         await createShipperMutation.mutateAsync({
-          name: data.name,
-          cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null,
-          cnpj: data.cnpj ? data.cnpj.replace(/\D/g, '') : null,
-          email: data.email || null,
-          phone: data.phone || null,
-          address: data.address || null,
-          city: data.city || null,
-          state: data.state || null,
-          zip_code: data.zip_code || null,
-          notes: data.notes || null,
+          ...baseFields,
           created_by: user.id,
         });
         toast.success('Embarcador criado com sucesso');

@@ -4,19 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import type { VehicleType } from '@/types/pricing';
 
 /** Campos usados em selects operacionais + QuoteForm (WebRouter `categoria_veiculo` / eixos). */
-const OPERATIONAL_SELECT =
-  'id, code, name, axes_count, ailog_category, capacity_kg, capacity_m3, active' as const;
+const OPERATIONAL_SELECT = 'id, code, name, axes_count, ailog_category, active' as const;
 
 export type VehicleTypeOperational = Pick<
   VehicleType,
-  | 'id'
-  | 'code'
-  | 'name'
-  | 'axes_count'
-  | 'ailog_category'
-  | 'capacity_kg'
-  | 'capacity_m3'
-  | 'active'
+  'id' | 'code' | 'name' | 'axes_count' | 'ailog_category' | 'active'
 >;
 
 export type VehicleTypeFleetFormRow = Pick<VehicleType, 'id' | 'code' | 'name'>;
