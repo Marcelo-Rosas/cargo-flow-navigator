@@ -1064,6 +1064,24 @@ function StepAntt({
                       : '—'}
                 </span>
               )}
+              {modalidade === 'terceiro' && (
+                <span className="text-muted-foreground text-xs">
+                  CIOT:{' '}
+                  {payload?.ciot_found === true ? 'vigente' : 'dispensado se frota > 3 veículos'}
+                </span>
+              )}
+            </div>
+          )}
+          {payload?.comprovante_url && (
+            <div className="text-sm">
+              <a
+                href={String(payload.comprovante_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 underline underline-offset-2"
+              >
+                Ver Comprovante ANTT
+              </a>
             </div>
           )}
           {comprovanteUrl && (

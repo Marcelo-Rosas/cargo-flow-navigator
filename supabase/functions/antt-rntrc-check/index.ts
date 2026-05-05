@@ -24,7 +24,6 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const FETCH_TIMEOUT_MS = 25_000;
 const ALTCHA_POW_ENABLED = true;
-const RNTRC_SWITCH_MODE_ENABLED = false;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -560,6 +559,7 @@ async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise
       signal,
     });
     const text = await res.text();
+    // Merge any new session cookies set by the autopostback response
     const freshCookies = extractCookies(res);
     const mergedCookies = freshCookies
       ? mergeCookies(tokens.cookies, freshCookies)
@@ -618,10 +618,11 @@ async function consultaRntrc(
     let tokens = await fetchPage(RNTRC_URL, signal);
     if (!tokens.viewState) throw new Error('RNTRC ViewState não encontrado');
 
-    // Fast path avoids extra request/CPU. If event validation rejects, we
-    // retry and enable switch mode only on the second attempt.
-    const shouldUseSwitchMode = tipoConsulta === '3' && (RNTRC_SWITCH_MODE_ENABLED || attempt > 1);
-    if (shouldUseSwitchMode) {
+    // tipoConsulta=3 requires an intermediate autopostback so the server
+    // registers txtPlaca in __EVENTVALIDATION before the actual search POST.
+    // Logs anteriores comprovaram que sem o autopostback a 1ª tentativa SEMPRE
+    // falha com EventValidation rejection — entao roda sempre.
+    if (tipoConsulta === '3') {
       tokens = await switchRntrcMode(tokens, signal);
     }
 
@@ -648,7 +649,6 @@ async function consultaRntrc(
       ctl00$Corpo$btnConsulta: 'Consultar',
       __ASYNCPOST: 'true', // CRÍTICO: campo obrigatório em postbacks AJAX
     });
-    const isVeiculoConsulta = tipoConsulta === '3';
     const postRes = await fetch(RNTRC_URL, {
       method: 'POST',
       headers: {
@@ -656,13 +656,9 @@ async function consultaRntrc(
         'User-Agent': UA,
         Referer: RNTRC_URL,
         Cookie: cookies,
-        ...(isVeiculoConsulta
-          ? { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' }
-          : {
-              'X-MicrosoftAjax': 'Delta=true',
-              'X-Requested-With': 'XMLHttpRequest',
-              Accept: '*/*',
-            }),
+        'X-MicrosoftAjax': 'Delta=true',
+        'X-Requested-With': 'XMLHttpRequest',
+        Accept: '*/*',
       },
       body: formBody.toString(),
       redirect: 'follow',
