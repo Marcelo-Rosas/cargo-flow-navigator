@@ -115,16 +115,31 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
       if (orderErr) throw orderErr;
       if (!order) throw new Error('OS nao encontrada');
 
-      // 2. Buscar carreta via vehicles (plate_2) usando driver_id
+      // 2. Buscar carreta + dados do proprietario via vehicles → owners
       let trailerPlate: string | null = null;
+      let ownerInfo: {
+        cpf_cnpj: string | null;
+        city: string | null;
+        state: string | null;
+        registered_at: string | null;
+      } | null = null;
       if (order.driver_id) {
         const { data: veh } = await supabase
           .from('vehicles')
-          .select('plate, plate_2')
+          .select('plate, plate_2, owner_id, owner:owners(cpf_cnpj, city, state, created_at)')
           .eq('driver_id', order.driver_id)
           .limit(1)
           .maybeSingle();
         trailerPlate = veh?.plate_2 ?? null;
+        const ow = (veh as unknown as { owner?: Record<string, unknown> | null })?.owner ?? null;
+        if (ow) {
+          ownerInfo = {
+            cpf_cnpj: (ow.cpf_cnpj as string) ?? null,
+            city: (ow.city as string) ?? null,
+            state: (ow.state as string) ?? null,
+            registered_at: (ow.created_at as string) ?? null,
+          };
+        }
       }
 
       // 2b. Buscar ultimo resultado ANTT/RNTRC da OS via risk_evidence
@@ -149,18 +164,43 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
             .maybeSingle();
           if (evidence?.payload) {
             const p = evidence.payload as Record<string, unknown>;
+            // Portal ANTT devolve transportador como "TAC - Nome" ou "ETC - Nome".
+            // Extrai o tipo do prefixo (preenche rntrc_registry_type quando portal nao
+            // retorna esse campo direto) e limpa o nome para o PDF.
+            const rawTransportador = (p.transportador as string) ?? null;
+            let parsedType: 'TAC' | 'ETC' | null = null;
+            let cleanTransportador = rawTransportador;
+            if (rawTransportador) {
+              const m = rawTransportador.match(/^\s*(TAC|ETC)\s*[-–—]\s*(.+)$/i);
+              if (m) {
+                parsedType = m[1].toUpperCase() as 'TAC' | 'ETC';
+                cleanTransportador = m[2].trim();
+              }
+            }
+            // Fallback de municipio/uf e cadastrado_desde: portal raramente devolve.
+            // Usa dados do proprietario do veiculo (owners) para preencher no PDF.
+            const ownerMunicipioUf =
+              ownerInfo?.city || ownerInfo?.state
+                ? [ownerInfo?.city, ownerInfo?.state].filter(Boolean).join('/')
+                : null;
             anttSnapshot = {
               situacao: (p.situacao as string) ?? null,
               situacao_raw: (p.situacao_raw as string) ?? null,
-              rntrc_registry_type: (p.rntrc_registry_type as 'TAC' | 'ETC' | null) ?? null,
+              rntrc_registry_type:
+                ((p.rntrc_registry_type as 'TAC' | 'ETC' | null) ?? null) || parsedType,
               rntrc: (p.rntrc as string) ?? null,
-              transportador: (p.transportador as string) ?? null,
-              cpf_cnpj_mask: (p.cpf_cnpj_mask as string) ?? null,
+              transportador: cleanTransportador,
+              // CPF/CNPJ e MUNICIPIO/UF: fallback para o cadastro do proprietario quando
+              // o portal nao devolve (caminho "Por Veiculo" raramente preenche).
+              cpf_cnpj_mask: ((p.cpf_cnpj_mask as string) ?? null) || ownerInfo?.cpf_cnpj || null,
+              municipio_uf: ((p.municipio_uf as string) ?? null) || ownerMunicipioUf,
+              // CADASTRADO DESDE: vem APENAS do registro ANTT (data de inscricao no
+              // RNTRC). NAO usar owner.created_at (data cadastro no nosso sistema).
               cadastrado_desde: (p.cadastrado_desde as string) ?? null,
-              municipio_uf: (p.municipio_uf as string) ?? null,
               apto: (p.apto as boolean | null) ?? null,
               veiculo_na_frota: (p.veiculo_na_frota as boolean | null) ?? null,
               comprovante_url: (p.comprovante_url as string) ?? null,
+              comprovante_storage_path: (p.comprovante_storage_path as string) ?? null,
               checked_at: evidence.created_at ?? null,
             };
           }
@@ -187,6 +227,9 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
       const client = (order as unknown as { client: Record<string, unknown> | null }).client;
       const driver = (order as unknown as { driver: Record<string, unknown> | null }).driver;
 
+      // Numero, complemento e bairro NAO vem do cadastro do shipper — sao
+      // dados da operacao de coleta especifica e vem do senderOverride
+      // preenchido pelo operador no Wizard da OC.
       const sender: CollectionOrderPartyData = {
         name: (shipper?.name as string) ?? '',
         cnpj: (shipper?.cnpj as string) ?? null,
@@ -194,9 +237,9 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
         phone: (shipper?.phone as string) ?? null,
         email: (shipper?.email as string) ?? null,
         address: (shipper?.address as string) ?? null,
-        address_number: (shipper?.address_number as string) ?? null,
-        address_complement: (shipper?.address_complement as string) ?? null,
-        address_neighborhood: (shipper?.address_neighborhood as string) ?? null,
+        address_number: null,
+        address_complement: null,
+        address_neighborhood: null,
         zip_code: (shipper?.zip_code as string) ?? order.origin_cep ?? null,
         city: (shipper?.city as string) ?? null,
         state: (shipper?.state as string) ?? null,
@@ -324,25 +367,9 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
         throw insertErr;
       }
 
-      // 10. Salvar overrides de endereço no shipper se preenchido manualmente
-      if (
-        senderOverride &&
-        order.shipper_id &&
-        (senderOverride.address_number ||
-          senderOverride.address_complement ||
-          senderOverride.address_neighborhood)
-      ) {
-        await supabase
-          .from('shippers')
-          .update({
-            address_number: senderOverride.address_number ?? sender.address_number ?? null,
-            address_complement:
-              senderOverride.address_complement ?? sender.address_complement ?? null,
-            address_neighborhood:
-              senderOverride.address_neighborhood ?? sender.address_neighborhood ?? null,
-          })
-          .eq('id', order.shipper_id);
-      }
+      // Nº/Bairro/Complemento sao da OPERACAO, nao do cadastro — nao
+      // persistir no shipper (mesmo embarcador pode coletar em enderecos
+      // diferentes). Ficam apenas no snapshot da OC.
 
       return { collectionOrder: inserted, blob };
     },

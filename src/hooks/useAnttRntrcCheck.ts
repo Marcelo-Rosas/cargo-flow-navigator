@@ -52,6 +52,8 @@ export interface AnttRntrcCheckResponse {
   veiculo_na_frota?: boolean;
   /** URL do comprovante/certidão de regularidade emitido pelo portal ANTT */
   comprovante_url?: string | null;
+  /** Path no bucket antt-comprovantes apos download (auditoria) */
+  comprovante_storage_path?: string | null;
   /** Resultado da consulta CIOT (só presente quando operation='ciot') */
   ciot?: CiotResult;
   message?: string;

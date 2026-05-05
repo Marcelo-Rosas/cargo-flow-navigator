@@ -14,6 +14,7 @@ import {
   Mail,
   MapPin,
 } from 'lucide-react';
+import { DriverContractBadge } from '@/components/drivers/DriverContractBadge';
 import { effectivePallets } from '@/lib/pallets';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';

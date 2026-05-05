@@ -76,6 +76,8 @@ interface AnttRntrcCheckResponse {
   veiculo_na_frota?: boolean;
   /** URL do comprovante/certidão de regularidade emitido pelo portal ANTT */
   comprovante_url?: string | null;
+  /** Path no bucket antt-comprovantes apos download (auditoria) */
+  comprovante_storage_path?: string | null;
   ciot?: CiotResult;
   message?: string;
   is_stub: boolean;
@@ -843,6 +845,65 @@ async function consultaVPO(
 }
 
 // ─── HANDLER ─────────────────────────────────────────────────────────────────
+// ─── COMPROVANTE STORAGE (Plano B) ───────────────────────────────────────────
+/**
+ * Baixa o comprovante (PDF/HTML) do portal ANTT e persiste no bucket privado
+ * antt-comprovantes via Supabase Storage REST API. Retorna o storage_path ou
+ * null em caso de falha. NUNCA throw — falha de download nao deve quebrar a
+ * resposta principal da consulta.
+ */
+async function downloadAndStoreComprovante(
+  url: string,
+  orderId: string,
+  rntrc: string
+): Promise<string | null> {
+  const supaUrl = (
+    globalThis as unknown as { Deno?: { env?: { get?: (k: string) => string | undefined } } }
+  ).Deno?.env?.get?.('SUPABASE_URL');
+  const serviceKey = (
+    globalThis as unknown as { Deno?: { env?: { get?: (k: string) => string | undefined } } }
+  ).Deno?.env?.get?.('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supaUrl || !serviceKey) {
+    console.warn('[antt] storage skip — env SUPABASE_URL/SERVICE_ROLE_KEY ausentes');
+    return null;
+  }
+
+  // 1. Download do comprovante. O portal pode redirecionar; segue.
+  const downloadRes = await fetch(url, {
+    headers: { 'User-Agent': UA, Accept: 'application/pdf, text/html, */*' },
+    redirect: 'follow',
+  });
+  if (!downloadRes.ok) {
+    console.warn('[antt] download comprovante falhou:', downloadRes.status);
+    return null;
+  }
+  const ct = downloadRes.headers.get('content-type') ?? 'application/pdf';
+  const buf = new Uint8Array(await downloadRes.arrayBuffer());
+
+  // 2. Define extensao baseada no content-type
+  const ext = /pdf/i.test(ct) ? 'pdf' : /html/i.test(ct) ? 'html' : /png/i.test(ct) ? 'png' : 'bin';
+  const storagePath = `${orderId}/${rntrc}-${Date.now()}.${ext}`;
+
+  // 3. Upload via Storage REST (service_role bypassa RLS)
+  const uploadUrl = `${supaUrl}/storage/v1/object/antt-comprovantes/${storagePath}`;
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+      'Content-Type': ct,
+      'x-upsert': 'true',
+    },
+    body: buf,
+  });
+  if (!uploadRes.ok) {
+    const body = await uploadRes.text().catch(() => '');
+    console.warn('[antt] upload comprovante falhou:', uploadRes.status, body.slice(0, 200));
+    return null;
+  }
+  return storagePath;
+}
+
 const edgeServe = (
   globalThis as unknown as {
     Deno?: { serve: (handler: (req: Request) => Response | Promise<Response>) => void };
@@ -921,6 +982,31 @@ edgeServe(async (req: Request): Promise<Response> => {
     switch (operation) {
       case 'veiculo':
         result = await consultaRntrc(cpfCnpj, plate, rntrcNorm, '3', signal);
+        // Plano A — enriquece com 2a consulta tipo=1 quando regular + temos
+        // CNPJ do proprietario. "Por Veiculo" devolve so o essencial; "Por
+        // Transportador" traz cpf_cnpj_mask, cadastrado_desde, municipio_uf,
+        // comprovante_url completos.
+        if (result.situacao === 'regular' && cpfCnpj && cpfCnpj.length >= 11) {
+          try {
+            console.log('[antt] enriching tipo=3 with tipo=1 cpfCnpj.len=', cpfCnpj.length);
+            const enriched = await consultaRntrc(cpfCnpj, plate, rntrcNorm, '1', signal);
+            if (enriched.situacao === 'regular') {
+              result = {
+                ...result,
+                cpf_cnpj_mask: result.cpf_cnpj_mask || enriched.cpf_cnpj_mask,
+                cadastrado_desde: result.cadastrado_desde || enriched.cadastrado_desde,
+                municipio_uf: result.municipio_uf || enriched.municipio_uf,
+                comprovante_url: result.comprovante_url || enriched.comprovante_url,
+                rntrc_registry_type: result.rntrc_registry_type || enriched.rntrc_registry_type,
+              };
+              console.log('[antt] enrich OK — fields filled');
+            } else {
+              console.warn('[antt] enrich tipo=1 nao retornou regular:', enriched.situacao);
+            }
+          } catch (e) {
+            console.warn('[antt] enrich tipo=1 falhou:', String(e));
+          }
+        }
         break;
       case 'ciot':
         result = await consultaCIOT(rntrcNorm!, onlyDigits(String(body.renavam)), signal);
@@ -931,6 +1017,24 @@ edgeServe(async (req: Request): Promise<Response> => {
       default:
         result = await consultaRntrc(cpfCnpj, plate, rntrcNorm, '1', signal);
         break;
+    }
+
+    // Plano B — baixa o PDF do comprovante e persiste no bucket privado
+    // antt-comprovantes (prova auditavel mesmo se URL do portal expirar).
+    if (result.comprovante_url && body.order_id) {
+      try {
+        const storagePath = await downloadAndStoreComprovante(
+          result.comprovante_url,
+          body.order_id,
+          result.rntrc ?? 'unknown'
+        );
+        if (storagePath) {
+          result = { ...result, comprovante_storage_path: storagePath };
+          console.log('[antt] comprovante salvo:', storagePath);
+        }
+      } catch (e) {
+        console.warn('[antt] download/store comprovante falhou:', String(e));
+      }
     }
 
     return new Response(JSON.stringify(result), {

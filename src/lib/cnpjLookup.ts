@@ -219,7 +219,12 @@ export async function lookupCnpj(rawCnpj: string): Promise<CnpjLookupResult> {
 
   let res: Response;
   try {
-    res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+    // BrasilAPI bloqueia o User-Agent default do undici (Node fetch) com 403.
+    // Mandar um UA identificavel resolve. No browser este header nao tem efeito
+    // (forbidden header), entao convive com o uso original em formularios.
+    res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, {
+      headers: { 'User-Agent': 'vectra-cargo (cnpj-lookup; +https://vectracargo.com.br)' },
+    });
   } catch (e) {
     throw new CnpjLookupError(
       e instanceof Error ? e.message : 'Falha de rede ao consultar CNPJ',
