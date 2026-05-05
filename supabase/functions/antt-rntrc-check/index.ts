@@ -529,18 +529,21 @@ async function fetchPage(url: string, signal: AbortSignal): Promise<PageTokens> 
 // ─── CONSULTATION FLOWS ──────────────────────────────────────────────────────
 
 /**
- * Autopostback intermediário para selecionar rbTipoConsulta=3 (Por Veículo).
+ * Modo-switch intermediário para rbTipoConsulta=3 (Por Veículo).
  *
- * O ANTT renderiza txtPlaca condicionalmente — só aparece quando o usuário
- * clica no radio "Por Veículo". Como o GET inicial entrega o modo 1 (Por
- * Transportador), txtPlaca não está no __EVENTVALIDATION original. Sem este
- * autopostback, o POST de consulta retorna "Invalid postback or callback
- * argument" (ASP.NET event validation error, HTTP 500 no delta).
+ * O portal ANTT renderiza txtPlaca condicionalmente — só aparece quando
+ * tipo=3 está ativo. Sem este POST intermediário, o __EVENTVALIDATION do
+ * POST final não inclui txtPlaca/btnConsulta para tipo=3 e o servidor
+ * rejeita com "Invalid postback or callback argument".
+ *
+ * Estratégia: POST regular (sem X-MicrosoftAjax) para que o servidor
+ * responda com HTML completo. A resposta delta (ScriptManager) era
+ * consistentemente rejeitada com event validation error 505.
  */
 async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise<PageTokens> {
-  console.log('[antt] autopostback rbTipoConsulta=3');
+  // Regular (non-AJAX) form POST — ScriptManager AJAX mode triggered the
+  // same EventValidation error we're trying to avoid.
   const selBody = new URLSearchParams({
-    ctl00$ScriptManagerMain: 'ctl00$ScriptManagerMain|ctl00$Corpo$rbTipoConsulta',
     __EVENTTARGET: 'ctl00$Corpo$rbTipoConsulta',
     __EVENTARGUMENT: '',
     __LASTFOCUS: '',
@@ -551,7 +554,6 @@ async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise
     ctl00$Corpo$hfPnlConsulta: '1',
     ctl00$Corpo$hfAltchaUrl: tokens.altchaUrl,
     ctl00$Corpo$rbTipoConsulta: '3',
-    ctl00$Corpo$txtPlaca: '',
     ctl00$Corpo$txtRNTRC: '',
     ctl00$Corpo$txtCpfCnpj: '',
   });
@@ -560,49 +562,45 @@ async function switchRntrcMode(tokens: PageTokens, signal: AbortSignal): Promise
     const res = await fetch(RNTRC_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': UA,
         Referer: RNTRC_URL,
         Cookie: tokens.cookies,
-        'X-MicrosoftAjax': 'Delta=true',
-        'X-Requested-With': 'XMLHttpRequest',
-        Accept: '*/*',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
       body: selBody.toString(),
       redirect: 'follow',
       signal,
     });
-    const text = await res.text();
-    // Merge any new session cookies set by the autopostback response
+    const html = await res.text();
+    // Merge any new session cookies from the response
     const freshCookies = extractCookies(res);
     const mergedCookies = freshCookies
       ? mergeCookies(tokens.cookies, freshCookies)
       : tokens.cookies;
 
-    if (/\d+\|error\|/i.test(text)) {
-      console.warn('[antt] autopostback retornou erro delta — tokens originais com cookies merged');
-      return { ...tokens, cookies: mergedCookies };
-    }
+    const vs = extractHidden(html, '__VIEWSTATE');
+    const vsg = extractHidden(html, '__VIEWSTATEGENERATOR');
+    const ev = extractHidden(html, '__EVENTVALIDATION');
+    const altchaUrl =
+      extractHidden(html, 'ctl00$Corpo$hfAltchaUrl') ||
+      extractHidden(html, 'Corpo_hfAltchaUrl') ||
+      tokens.altchaUrl;
 
-    const { hiddenFields } = parseDeltaFull(text);
-    const vs = hiddenFields['__VIEWSTATE'];
-    const vsg = hiddenFields['__VIEWSTATEGENERATOR'];
-    const ev = hiddenFields['__EVENTVALIDATION'];
     if (vs && ev) {
+      console.log('[antt] switchRntrcMode OK — tokens atualizados via HTML completo');
       return {
-        ...tokens,
         viewState: vs,
         viewStateGen: vsg || tokens.viewStateGen,
         eventValidation: ev,
+        altchaUrl,
         cookies: mergedCookies,
       };
     }
-    console.warn(
-      '[antt] autopostback: hidden fields não retornados — cookies merged, tokens originais'
-    );
+    console.warn('[antt] switchRntrcMode: tokens não encontrados no HTML — usando originais');
     return { ...tokens, cookies: mergedCookies };
   } catch (e) {
-    console.warn('[antt] autopostback error:', String(e), '— using original tokens');
+    console.warn('[antt] switchRntrcMode error:', String(e), '— usando tokens originais');
   }
   return tokens;
 }
