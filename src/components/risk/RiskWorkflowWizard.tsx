@@ -922,7 +922,6 @@ function StepAntt({
               {ownerIsCnpj
                 ? '⚠ Veículo terceiro — proprietário empresa (CNPJ)'
                 : '⚠ Veículo agregado — proprietário diferente do motorista'}
-              ⚠ Veículo agregado — proprietário diferente do motorista
             </div>
             <div className="text-amber-700 dark:text-amber-400">
               Proprietário: <span className="font-semibold">{ownerName}</span>
