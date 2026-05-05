@@ -61,6 +61,7 @@ const orderSchema = z.object({
   owner_name: z.string().optional(),
   owner_phone: z.string().optional(),
   eta: z.string().optional(),
+  pickup_date: z.string().optional(),
   payment_method: z.string().optional(),
   carrier_payment_method: z.string().optional(),
   notes: z.string().max(500, 'Observações muito longas').optional(),
@@ -113,6 +114,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
       owner_name: '',
       owner_phone: '',
       eta: '',
+      pickup_date: '',
       payment_method: '',
       carrier_payment_method: '',
       notes: '',
@@ -142,6 +144,8 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         owner_name: order.owner_name || '',
         owner_phone: order.owner_phone || '',
         eta: order.eta ? new Date(order.eta).toISOString().slice(0, 16) : '',
+        pickup_date:
+          ((order as unknown as Record<string, unknown>).pickup_date as string | null) ?? '',
         payment_method:
           ((order as unknown as Record<string, unknown>).payment_method as string) || '',
         carrier_payment_method:
@@ -170,6 +174,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         owner_name: '',
         owner_phone: '',
         eta: '',
+        pickup_date: '',
         payment_method: '',
         carrier_payment_method: '',
         notes: '',
@@ -255,6 +260,7 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
         owner_name: data.owner_name || null,
         owner_phone: data.owner_phone || null,
         eta: data.eta ? new Date(data.eta).toISOString() : null,
+        pickup_date: data.pickup_date || null,
         payment_method: data.payment_method || null,
         carrier_payment_method: data.carrier_payment_method || null,
         notes: data.notes || null,
@@ -407,6 +413,22 @@ export function OrderForm({ open, onClose, order }: OrderFormProps) {
                       <FormLabel>Previsão de Entrega</FormLabel>
                       <FormControl>
                         <Input type="datetime-local" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="pickup_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Previsão de Coleta</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
