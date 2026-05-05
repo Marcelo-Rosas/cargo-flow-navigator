@@ -428,22 +428,37 @@ export type Database = {
           address_neighborhood: string | null;
           address_number: string | null;
           city: string | null;
+          cnae_main_code: string | null;
+          cnae_main_description: string | null;
+          cnaes_secondary: Json | null;
           cnpj: string | null;
+          cnpj_lookup_at: string | null;
           cnpj_mask: string | null;
+          company_size: string | null;
           contact_name: string | null;
           cpf: number | null;
           created_at: string;
           created_by: string | null;
+          efr: string | null;
           email: string | null;
           id: string;
+          legal_nature: string | null;
+          legal_nature_code: string | null;
           legal_representative_cpf: string | null;
           legal_representative_name: string | null;
           legal_representative_role: string | null;
           name: string;
           notes: string | null;
+          opening_date: string | null;
+          partners: Json | null;
           phone: string | null;
+          registration_status: string | null;
+          registration_status_date: string | null;
+          registration_status_reason: string | null;
+          share_capital: number | null;
           state: string | null;
           state_registration: string | null;
+          trade_name: string | null;
           updated_at: string;
           user_id: string;
           zip_code: string | null;
@@ -455,22 +470,37 @@ export type Database = {
           address_neighborhood?: string | null;
           address_number?: string | null;
           city?: string | null;
+          cnae_main_code?: string | null;
+          cnae_main_description?: string | null;
+          cnaes_secondary?: Json | null;
           cnpj?: string | null;
+          cnpj_lookup_at?: string | null;
           cnpj_mask?: string | null;
+          company_size?: string | null;
           contact_name?: string | null;
           cpf?: number | null;
           created_at?: string;
           created_by?: string | null;
+          efr?: string | null;
           email?: string | null;
           id?: string;
+          legal_nature?: string | null;
+          legal_nature_code?: string | null;
           legal_representative_cpf?: string | null;
           legal_representative_name?: string | null;
           legal_representative_role?: string | null;
           name: string;
           notes?: string | null;
+          opening_date?: string | null;
+          partners?: Json | null;
           phone?: string | null;
+          registration_status?: string | null;
+          registration_status_date?: string | null;
+          registration_status_reason?: string | null;
+          share_capital?: number | null;
           state?: string | null;
           state_registration?: string | null;
+          trade_name?: string | null;
           updated_at?: string;
           user_id?: string;
           zip_code?: string | null;
@@ -482,22 +512,37 @@ export type Database = {
           address_neighborhood?: string | null;
           address_number?: string | null;
           city?: string | null;
+          cnae_main_code?: string | null;
+          cnae_main_description?: string | null;
+          cnaes_secondary?: Json | null;
           cnpj?: string | null;
+          cnpj_lookup_at?: string | null;
           cnpj_mask?: string | null;
+          company_size?: string | null;
           contact_name?: string | null;
           cpf?: number | null;
           created_at?: string;
           created_by?: string | null;
+          efr?: string | null;
           email?: string | null;
           id?: string;
+          legal_nature?: string | null;
+          legal_nature_code?: string | null;
           legal_representative_cpf?: string | null;
           legal_representative_name?: string | null;
           legal_representative_role?: string | null;
           name?: string;
           notes?: string | null;
+          opening_date?: string | null;
+          partners?: Json | null;
           phone?: string | null;
+          registration_status?: string | null;
+          registration_status_date?: string | null;
+          registration_status_reason?: string | null;
+          share_capital?: number | null;
           state?: string | null;
           state_registration?: string | null;
+          trade_name?: string | null;
           updated_at?: string;
           user_id?: string;
           zip_code?: string | null;
@@ -579,6 +624,141 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: 'tasks';
             referencedColumns: ['id'];
+          },
+        ];
+      };
+      collection_orders: {
+        Row: {
+          additional_info: string | null;
+          cancellation_reason: string | null;
+          cancelled_at: string | null;
+          cancelled_by: string | null;
+          cargo_data: Json;
+          created_at: string;
+          delivery_date: string | null;
+          driver_data: Json;
+          id: string;
+          issued_at: string;
+          issued_by: string | null;
+          oc_month: number;
+          oc_number: string;
+          oc_seq: number;
+          oc_year: number;
+          order_id: string;
+          pdf_storage_path: string | null;
+          pickup_date: string | null;
+          recipient_data: Json;
+          sender_data: Json;
+          status: Database['public']['Enums']['collection_order_status'];
+          updated_at: string;
+          vehicle_data: Json;
+        };
+        Insert: {
+          additional_info?: string | null;
+          cancellation_reason?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          cargo_data: Json;
+          created_at?: string;
+          delivery_date?: string | null;
+          driver_data: Json;
+          id?: string;
+          issued_at?: string;
+          issued_by?: string | null;
+          oc_month: number;
+          oc_number: string;
+          oc_seq: number;
+          oc_year: number;
+          order_id: string;
+          pdf_storage_path?: string | null;
+          pickup_date?: string | null;
+          recipient_data: Json;
+          sender_data: Json;
+          status?: Database['public']['Enums']['collection_order_status'];
+          updated_at?: string;
+          vehicle_data: Json;
+        };
+        Update: {
+          additional_info?: string | null;
+          cancellation_reason?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          cargo_data?: Json;
+          created_at?: string;
+          delivery_date?: string | null;
+          driver_data?: Json;
+          id?: string;
+          issued_at?: string;
+          issued_by?: string | null;
+          oc_month?: number;
+          oc_number?: string;
+          oc_seq?: number;
+          oc_year?: number;
+          order_id?: string;
+          pdf_storage_path?: string | null;
+          pickup_date?: string | null;
+          recipient_data?: Json;
+          sender_data?: Json;
+          status?: Database['public']['Enums']['collection_order_status'];
+          updated_at?: string;
+          vehicle_data?: Json;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'collection_orders_cancelled_by_fkey';
+            columns: ['cancelled_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
+            foreignKeyName: 'collection_orders_issued_by_fkey';
+            columns: ['issued_by'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
+            foreignKeyName: 'collection_orders_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'collection_orders_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders_rs_per_km';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'collection_orders_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_order_payment_reconciliation';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'collection_orders_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_quote_order_divergence';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'collection_orders_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_trip_financial_details';
+            referencedColumns: ['order_id'];
+          },
+          {
+            foreignKeyName: 'collection_orders_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'vw_order_risk_status';
+            referencedColumns: ['order_id'];
           },
         ];
       };
@@ -2045,6 +2225,7 @@ export type Database = {
           cnh: string | null;
           cnh_category: string | null;
           cnh_expiry: string | null;
+          contract_type: Database['public']['Enums']['driver_contract_type'];
           cooldown_days: number | null;
           cpf: string | null;
           created_at: string;
@@ -2054,6 +2235,7 @@ export type Database = {
           phone: string | null;
           phone_normalized: string | null;
           refusal_count: number | null;
+          rntrc_registry_type: Database['public']['Enums']['rntrc_registry_type'] | null;
           updated_at: string;
         };
         Insert: {
@@ -2063,6 +2245,7 @@ export type Database = {
           cnh?: string | null;
           cnh_category?: string | null;
           cnh_expiry?: string | null;
+          contract_type?: Database['public']['Enums']['driver_contract_type'];
           cooldown_days?: number | null;
           cpf?: string | null;
           created_at?: string;
@@ -2072,6 +2255,7 @@ export type Database = {
           phone?: string | null;
           phone_normalized?: string | null;
           refusal_count?: number | null;
+          rntrc_registry_type?: Database['public']['Enums']['rntrc_registry_type'] | null;
           updated_at?: string;
         };
         Update: {
@@ -2081,6 +2265,7 @@ export type Database = {
           cnh?: string | null;
           cnh_category?: string | null;
           cnh_expiry?: string | null;
+          contract_type?: Database['public']['Enums']['driver_contract_type'];
           cooldown_days?: number | null;
           cpf?: string | null;
           created_at?: string;
@@ -2090,6 +2275,7 @@ export type Database = {
           phone?: string | null;
           phone_normalized?: string | null;
           refusal_count?: number | null;
+          rntrc_registry_type?: Database['public']['Enums']['rntrc_registry_type'] | null;
           updated_at?: string;
         };
         Relationships: [
@@ -3909,6 +4095,7 @@ export type Database = {
           pedagio_charge_type: Database['public']['Enums']['pedagio_charge_type'] | null;
           pedagio_debitado_no_cte: boolean | null;
           pedagio_real: number | null;
+          pickup_date: string | null;
           price_table_id: string | null;
           pricing_breakdown: Json | null;
           quote_id: string | null;
@@ -3983,6 +4170,7 @@ export type Database = {
           pedagio_charge_type?: Database['public']['Enums']['pedagio_charge_type'] | null;
           pedagio_debitado_no_cte?: boolean | null;
           pedagio_real?: number | null;
+          pickup_date?: string | null;
           price_table_id?: string | null;
           pricing_breakdown?: Json | null;
           quote_id?: string | null;
@@ -4057,6 +4245,7 @@ export type Database = {
           pedagio_charge_type?: Database['public']['Enums']['pedagio_charge_type'] | null;
           pedagio_debitado_no_cte?: boolean | null;
           pedagio_real?: number | null;
+          pickup_date?: string | null;
           price_table_id?: string | null;
           pricing_breakdown?: Json | null;
           quote_id?: string | null;
@@ -4148,6 +4337,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: 'v_quote_payment_reconciliation';
             referencedColumns: ['quote_id'];
+          },
+          {
+            foreignKeyName: 'orders_shipper_id_fkey';
+            columns: ['shipper_id'];
+            isOneToOne: false;
+            referencedRelation: 'shippers';
+            referencedColumns: ['id'];
           },
           {
             foreignKeyName: 'orders_trip_id_fkey';
@@ -6172,58 +6368,124 @@ export type Database = {
       shippers: {
         Row: {
           address: string | null;
+          address_complement: string | null;
+          address_neighborhood: string | null;
+          address_number: string | null;
           cep_origem_override: string | null;
           city: string | null;
+          cnae_main_code: string | null;
+          cnae_main_description: string | null;
+          cnaes_secondary: Json | null;
           cnpj: string | null;
+          cnpj_lookup_at: string | null;
+          company_size: string | null;
           contact_context: string | null;
           contact_name: string | null;
           cpf: string | null;
           created_at: string;
           created_by: string | null;
+          efr: string | null;
           email: string | null;
           id: string;
+          legal_nature: string | null;
+          legal_nature_code: string | null;
+          legal_representative_cpf: string | null;
+          legal_representative_name: string | null;
+          legal_representative_role: string | null;
           name: string;
           notes: string | null;
+          opening_date: string | null;
+          partners: Json | null;
           phone: string | null;
+          registration_status: string | null;
+          registration_status_date: string | null;
+          registration_status_reason: string | null;
+          share_capital: number | null;
           state: string | null;
+          state_registration: string | null;
+          trade_name: string | null;
           updated_at: string;
           zip_code: string | null;
         };
         Insert: {
           address?: string | null;
+          address_complement?: string | null;
+          address_neighborhood?: string | null;
+          address_number?: string | null;
           cep_origem_override?: string | null;
           city?: string | null;
+          cnae_main_code?: string | null;
+          cnae_main_description?: string | null;
+          cnaes_secondary?: Json | null;
           cnpj?: string | null;
+          cnpj_lookup_at?: string | null;
+          company_size?: string | null;
           contact_context?: string | null;
           contact_name?: string | null;
           cpf?: string | null;
           created_at?: string;
           created_by?: string | null;
+          efr?: string | null;
           email?: string | null;
           id?: string;
+          legal_nature?: string | null;
+          legal_nature_code?: string | null;
+          legal_representative_cpf?: string | null;
+          legal_representative_name?: string | null;
+          legal_representative_role?: string | null;
           name: string;
           notes?: string | null;
+          opening_date?: string | null;
+          partners?: Json | null;
           phone?: string | null;
+          registration_status?: string | null;
+          registration_status_date?: string | null;
+          registration_status_reason?: string | null;
+          share_capital?: number | null;
           state?: string | null;
+          state_registration?: string | null;
+          trade_name?: string | null;
           updated_at?: string;
           zip_code?: string | null;
         };
         Update: {
           address?: string | null;
+          address_complement?: string | null;
+          address_neighborhood?: string | null;
+          address_number?: string | null;
           cep_origem_override?: string | null;
           city?: string | null;
+          cnae_main_code?: string | null;
+          cnae_main_description?: string | null;
+          cnaes_secondary?: Json | null;
           cnpj?: string | null;
+          cnpj_lookup_at?: string | null;
+          company_size?: string | null;
           contact_context?: string | null;
           contact_name?: string | null;
           cpf?: string | null;
           created_at?: string;
           created_by?: string | null;
+          efr?: string | null;
           email?: string | null;
           id?: string;
+          legal_nature?: string | null;
+          legal_nature_code?: string | null;
+          legal_representative_cpf?: string | null;
+          legal_representative_name?: string | null;
+          legal_representative_role?: string | null;
           name?: string;
           notes?: string | null;
+          opening_date?: string | null;
+          partners?: Json | null;
           phone?: string | null;
+          registration_status?: string | null;
+          registration_status_date?: string | null;
+          registration_status_reason?: string | null;
+          share_capital?: number | null;
           state?: string | null;
+          state_registration?: string | null;
+          trade_name?: string | null;
           updated_at?: string;
           zip_code?: string | null;
         };
@@ -8543,6 +8805,10 @@ export type Database = {
       mask_cnpj: { Args: { input: string }; Returns: string };
       mask_cpf: { Args: { input: string }; Returns: string };
       mask_plate: { Args: { input: string }; Returns: string };
+      next_collection_order_seq: {
+        Args: { p_month: number; p_year: number };
+        Returns: number;
+      };
       norm_plate: { Args: { input: string }; Returns: string };
       only_digits: { Args: { input: string }; Returns: string };
       rank_drivers_for_quote: {
@@ -8608,6 +8874,7 @@ export type Database = {
     };
     Enums: {
       app_role: 'admin' | 'comercial' | 'operacao' | 'financeiro' | 'leitura';
+      collection_order_status: 'emitida' | 'cancelada';
       compliance_check_status: 'ok' | 'warning' | 'violation';
       compliance_check_type:
         | 'pre_contratacao'
@@ -8634,6 +8901,7 @@ export type Database = {
         | 'a_vista_fat'
         | 'saldo_fat'
         | 'a_prazo_fat';
+      driver_contract_type: 'proprio' | 'agregado' | 'terceiro';
       driver_offer_status: 'pending' | 'sent' | 'accepted' | 'declined' | 'timeout' | 'skipped';
       driver_qualification_status:
         | 'pendente'
@@ -8685,6 +8953,7 @@ export type Database = {
         | 'perdido';
       risk_criticality: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
       risk_evaluation_status: 'pending' | 'evaluated' | 'approved' | 'rejected' | 'expired';
+      rntrc_registry_type: 'TAC' | 'ETC';
       route_stop_type: 'origin' | 'stop' | 'destination';
       user_profile: 'admin' | 'operacional' | 'financeiro' | 'comercial';
     };
@@ -8813,6 +9082,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ['admin', 'comercial', 'operacao', 'financeiro', 'leitura'],
+      collection_order_status: ['emitida', 'cancelada'],
       compliance_check_status: ['ok', 'warning', 'violation'],
       compliance_check_type: [
         'pre_contratacao',
@@ -8841,6 +9111,7 @@ export const Constants = {
         'saldo_fat',
         'a_prazo_fat',
       ],
+      driver_contract_type: ['proprio', 'agregado', 'terceiro'],
       driver_offer_status: ['pending', 'sent', 'accepted', 'declined', 'timeout', 'skipped'],
       driver_qualification_status: ['pendente', 'em_analise', 'aprovado', 'reprovado', 'bloqueado'],
       financial_doc_type: ['FAT', 'PAG'],
@@ -8891,6 +9162,7 @@ export const Constants = {
       ],
       risk_criticality: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
       risk_evaluation_status: ['pending', 'evaluated', 'approved', 'rejected', 'expired'],
+      rntrc_registry_type: ['TAC', 'ETC'],
       route_stop_type: ['origin', 'stop', 'destination'],
       user_profile: ['admin', 'operacional', 'financeiro', 'comercial'],
     },
