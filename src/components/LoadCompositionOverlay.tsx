@@ -29,7 +29,6 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { RefreshCw, Sparkles, Loader2 } from 'lucide-react';
 import type { CompositionFilterStatus } from '@/hooks/useLoadCompositionController';
@@ -138,28 +137,24 @@ export function LoadCompositionOverlay({
         </div>
       )}
 
-      {/* Body */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <ScrollArea className="h-full pr-3">
-          <div className="pb-4">
-            <LoadCompositionSuggestionList
-              suggestions={ctrl.suggestions}
-              quoteInfoMap={ctrl.quoteInfoMap}
-              isLoading={ctrl.isLoading}
-              error={ctrl.error}
-              filterStatus={ctrl.filterStatus}
-              expandedIds={ctrl.expandedIds}
-              onToggleExpand={ctrl.toggleExpand}
-              onApprove={ctrl.handleApprove}
-              onView={ctrl.handleViewDetails}
-              onCalculateDiscounts={ctrl.handleCalculateDiscounts}
-              isApproving={ctrl.isApproving}
-              isCalculatingDiscounts={ctrl.isCalculatingDiscounts}
-              onRetry={() => ctrl.refetch()}
-              layout="compact"
-            />
-          </div>
-        </ScrollArea>
+      {/* Body — rola junto com header/footer via overflow-y-auto do DialogContent/DrawerContent */}
+      <div className="pb-4">
+        <LoadCompositionSuggestionList
+          suggestions={ctrl.suggestions}
+          quoteInfoMap={ctrl.quoteInfoMap}
+          isLoading={ctrl.isLoading}
+          error={ctrl.error}
+          filterStatus={ctrl.filterStatus}
+          expandedIds={ctrl.expandedIds}
+          onToggleExpand={ctrl.toggleExpand}
+          onApprove={ctrl.handleApprove}
+          onView={ctrl.handleViewDetails}
+          onCalculateDiscounts={ctrl.handleCalculateDiscounts}
+          isApproving={ctrl.isApproving}
+          isCalculatingDiscounts={ctrl.isCalculatingDiscounts}
+          onRetry={() => ctrl.refetch()}
+          layout="compact"
+        />
       </div>
 
       <LoadCompositionFooter layout="overlay" />
@@ -184,12 +179,12 @@ export function LoadCompositionOverlay({
           }}
         >
           <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col gap-4 overflow-y-auto sm:max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle className="sr-only">Oportunidades de Consolidação</DialogTitle>
               <DialogDescription className="sr-only">Análise por embarcador</DialogDescription>
             </DialogHeader>
-            {content}
+            <div className="space-y-4">{content}</div>
           </DialogContent>
         </Dialog>
 
@@ -208,12 +203,12 @@ export function LoadCompositionOverlay({
     <>
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>{trigger ?? defaultTrigger}</DrawerTrigger>
-        <DrawerContent className="max-h-[90vh] flex flex-col overflow-y-auto">
+        <DrawerContent className="max-h-[90vh] overflow-y-auto">
           <DrawerHeader className="sr-only">
             <DrawerTitle>Oportunidades de Consolidação</DrawerTitle>
             <DrawerDescription>Análise por embarcador</DrawerDescription>
           </DrawerHeader>
-          <div className="flex flex-col flex-1 min-h-0 px-4 pb-6 overflow-hidden">{content}</div>
+          <div className="space-y-4 px-4 pb-6">{content}</div>
         </DrawerContent>
       </Drawer>
 
