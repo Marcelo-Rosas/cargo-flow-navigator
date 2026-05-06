@@ -737,6 +737,19 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     return null;
   }, [anttRate, watchedKmDistance, savedAnttMeta]);
 
+  // Piso ANTT em R$ — input para freightCalculator aplicar MP 1.343/2026 em lotação.
+  // Sem isso, custoMotorista cai para baseCost (= frete_peso) mesmo quando o piso é maior.
+  const pisoAnttCarreteiroForCalc = useMemo<number | undefined>(() => {
+    if (!anttRate || !axesCountForAntt) return undefined;
+    const km = Number(debouncedKmBand || 0);
+    if (km <= 0) return undefined;
+    return calculateAnttMinimum({
+      kmDistance: km,
+      ccd: Number(anttRate.ccd),
+      cc: Number(anttRate.cc),
+    }).total;
+  }, [anttRate, axesCountForAntt, debouncedKmBand]);
+
   // Passo 1: calcular frete sem taxas condicionais (usa valores debounced)
   const baseCalculationResult = useMemo(() => {
     return calculateFreight({
@@ -756,6 +769,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       icmsRatePercent: icmsRate,
       kmByUf: kmByUf ?? undefined,
       icmsByUf: icmsByUfMap,
+      pisoAnttCarreteiro: pisoAnttCarreteiroForCalc,
       // TDE/TEAR NTC desativados no cálculo: representados via conditional_fees (TEAR/TPD)
       tdeEnabled: false,
       tearEnabled: false,
@@ -778,6 +792,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     icmsRate,
     kmByUf,
     icmsByUfMap,
+    pisoAnttCarreteiroForCalc,
     resolvedPricingParams,
   ]);
 
@@ -841,6 +856,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       icmsRatePercent: icmsRate,
       kmByUf: kmByUf ?? undefined,
       icmsByUf: icmsByUfMap,
+      pisoAnttCarreteiro: pisoAnttCarreteiroForCalc,
       // TDE/TEAR NTC desativados no cálculo: representados via conditional_fees (TEAR/TPD)
       tdeEnabled: false,
       tearEnabled: false,
@@ -869,6 +885,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     icmsRate,
     kmByUf,
     icmsByUfMap,
+    pisoAnttCarreteiroForCalc,
     resolvedPricingParams,
     computedConditionalFees,
     additionalFeesSelection.waitingTimeCost,

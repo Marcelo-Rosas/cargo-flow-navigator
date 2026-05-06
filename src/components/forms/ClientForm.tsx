@@ -1,8 +1,8 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,7 +21,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useCreateClient, useUpdateClient } from '@/hooks/useClients';
+import { useClients, useCreateClient, useUpdateClient } from '@/hooks/useClients';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
@@ -65,14 +66,29 @@ interface ClientFormProps {
   open: boolean;
   onClose: () => void;
   client?: Client | null;
+  /** When the user picks an existing client from the name autocomplete during
+   * "Novo Cliente", this callback is invoked. The parent should typically
+   * close this dialog and reopen it in edit mode for the chosen client. */
+  onSelectExisting?: (existing: Client) => void;
 }
 
-export function ClientForm({ open, onClose, client }: ClientFormProps) {
+export function ClientForm({ open, onClose, client, onSelectExisting }: ClientFormProps) {
   const { user } = useAuth();
   const createClientMutation = useCreateClient();
   const updateClientMutation = useUpdateClient();
   const isEditing = !!client;
   const [isLookingUp, setIsLookingUp] = useState(false);
+
+  // Name autocomplete (only in "Novo Cliente"). Helps prevent re-cadastro of an
+  // existing client by suggesting matches as the user types.
+  const [nameQuery, setNameQuery] = useState('');
+  const debouncedNameQuery = useDebounce(nameQuery, 300);
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
+  const nameSuggestionContainerRef = useRef<HTMLDivElement>(null);
+  const { data: nameMatches } = useClients(debouncedNameQuery, {
+    enabled: !isEditing && open && debouncedNameQuery.trim().length >= 3,
+  });
+  const visibleNameMatches = (nameMatches ?? []).slice(0, 5);
 
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
@@ -268,7 +284,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -285,7 +301,71 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                 <FormItem>
                   <FormLabel>Nome / Razão Social *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Empresa LTDA" {...field} />
+                    <div ref={nameSuggestionContainerRef} className="relative">
+                      <Input
+                        placeholder="Empresa LTDA"
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          if (!isEditing) {
+                            setNameQuery(e.target.value);
+                            setShowNameSuggestions(true);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (!isEditing && nameQuery.trim().length >= 3) {
+                            setShowNameSuggestions(true);
+                          }
+                        }}
+                        onBlur={(e) => {
+                          field.onBlur();
+                          // Delay so a click on a suggestion fires before we hide
+                          window.setTimeout(() => setShowNameSuggestions(false), 150);
+                        }}
+                        autoComplete="off"
+                      />
+                      {!isEditing && showNameSuggestions && visibleNameMatches.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md border border-border bg-popover shadow-md">
+                          <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground border-b">
+                            <AlertTriangle className="size-3.5 text-warning" />
+                            <span>
+                              Já existem clientes com nome parecido — clique para editar em vez de
+                              criar duplicata
+                            </span>
+                          </div>
+                          <ul className="max-h-60 overflow-y-auto py-1">
+                            {visibleNameMatches.map((match) => (
+                              <li key={match.id}>
+                                <button
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    // mousedown so it fires before the input's blur
+                                    e.preventDefault();
+                                    setShowNameSuggestions(false);
+                                    onSelectExisting?.(match);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors"
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="font-medium text-foreground truncate">
+                                      {match.name}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground shrink-0">
+                                      {[match.city, match.state].filter(Boolean).join(' - ') || '—'}
+                                    </span>
+                                  </div>
+                                  {match.cnpj && (
+                                    <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                                      {match.cnpj}
+                                    </div>
+                                  )}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -351,7 +431,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                           </div>
                         )}
-                        {!isLookingUp && field.value && sanitizeCnpj(field.value).length === 14 && (
+                        {!isLookingUp && field.value && digits(field.value).length === 14 && (
                           <button
                             type="button"
                             className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-primary transition-colors"
