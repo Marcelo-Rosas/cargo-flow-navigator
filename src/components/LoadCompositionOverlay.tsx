@@ -208,7 +208,7 @@ export function LoadCompositionOverlay({
     <>
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>{trigger ?? defaultTrigger}</DrawerTrigger>
-        <DrawerContent className="max-h-[90vh] flex flex-col">
+        <DrawerContent className="max-h-[90vh] flex flex-col overflow-y-auto">
           <DrawerHeader className="sr-only">
             <DrawerTitle>Oportunidades de Consolidação</DrawerTitle>
             <DrawerDescription>Análise por embarcador</DrawerDescription>
