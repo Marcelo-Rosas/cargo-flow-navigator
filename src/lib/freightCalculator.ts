@@ -1142,8 +1142,16 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       totalCliente,
     },
     profitability: {
+      // Legados (compat com leitores antigos da UI/PDF/DRE)
       custoMotorista,
       custosCarreteiro: custoMotorista,
+      // VEC-121: campos semânticos novos
+      // - Antt: piso legal mínimo (= piso ANTT quando aplicado, senão = baseCost/frete_peso)
+      // - Contratado: NTC base (frete_peso) — o que o motorista recebe em condição padrão
+      // - Real: valor negociado na OS (alimentado externamente após fechamento)
+      custoMotoristaAntt: custoMotorista,
+      custoMotoristaContratado: baseCost,
+      custoMotoristaReal: null,
       custosDescarga: descargaValue,
       custoServicos,
       custosDiretos,

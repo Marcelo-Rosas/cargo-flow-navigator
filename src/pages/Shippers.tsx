@@ -1,15 +1,47 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Pencil, Trash2, Loader2, Ship, Phone, Mail, MapPin } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Ship,
+  Phone,
+  Mail,
+  MapPin,
+  User,
+  Crown,
+  Briefcase,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useShippers, useDeleteShipper } from '@/hooks/useShippers';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 import { ShipperForm } from '@/components/forms/ShipperForm';
-import { formatCpfDisplay } from '@/lib/formatters';
+import { formatCnpjDisplay, formatCpfDisplay, formatPhoneDisplay } from '@/lib/formatters';
 import { Database } from '@/integrations/supabase/types';
 import { useDebounce } from '@/hooks/useDebounce';
 import {
@@ -24,6 +56,53 @@ import {
 } from '@/components/ui/alert-dialog';
 
 type Shipper = Database['public']['Tables']['shippers']['Row'];
+
+type QsaPartner = { name?: string | null; role?: string | null };
+
+function getQsaOwner(partners: Shipper['partners']): QsaPartner | null {
+  if (!partners || !Array.isArray(partners) || partners.length === 0) return null;
+  const list = partners as QsaPartner[];
+  const admin = list.find((p) => p?.role === 'Sócio-Administrador' && p?.name);
+  if (admin) return admin;
+  const first = list.find((p) => p?.name);
+  return first ?? null;
+}
+
+function formatCnae(code: string | null | undefined): string | null {
+  if (!code) return null;
+  const d = code.replace(/\D/g, '');
+  if (d.length !== 7) return code;
+  return `${d.slice(0, 2)}.${d.slice(2, 4)}-${d.slice(4, 5)}-${d.slice(5)}`;
+}
+
+const COLUMN_COUNT = 7;
+
+function ShippersTableSkeleton() {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {Array.from({ length: COLUMN_COUNT }).map((_, i) => (
+            <TableHead key={i}>
+              <Skeleton className="h-4 w-24" />
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {Array.from({ length: 8 }).map((_, rowIdx) => (
+          <TableRow key={rowIdx}>
+            {Array.from({ length: COLUMN_COUNT }).map((_, colIdx) => (
+              <TableCell key={colIdx}>
+                <Skeleton className="h-4 w-full" />
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
 
 export default function Shippers() {
   const { user } = useAuth();
@@ -103,169 +182,233 @@ export default function Shippers() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
-            <span className="font-semibold text-primary">{shippers?.length || 0}</span> embarcadores
-            cadastrados
+            <span className="font-semibold text-primary">{shippers?.length || 0}</span>
+            {debouncedSearchTerm ? ' resultados' : ' embarcadores cadastrados'}
           </motion.p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
+          <InputGroup className="w-80">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
               placeholder="Buscar por nome, CPF, CNPJ, e-mail..."
-              className="pl-10 w-80"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-          </div>
+          </InputGroup>
           {canManageShippers && (
-            <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
-              <Plus className="w-4 h-4" />
+            <Button onClick={() => setIsFormOpen(true)}>
+              <Plus />
               Novo Embarcador
             </Button>
           )}
         </div>
       </div>
 
-      {/* Loading State */}
+      {/* Loading / Error / Empty / Table */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
+          <ShippersTableSkeleton />
         </div>
       ) : isError ? (
-        <div className="bg-card rounded-xl border border-border shadow-card p-8">
-          <p className="text-foreground font-medium">Não foi possível carregar os embarcadores</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {(error instanceof Error && error.message) || 'Erro inesperado ao buscar embarcadores.'}
-          </p>
-          <div className="mt-4">
-            <Button onClick={() => refetch()}>Tentar novamente</Button>
-          </div>
-        </div>
-      ) : shippers?.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-card rounded-xl border border-border shadow-card p-12 text-center"
-        >
-          <Ship className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            Nenhum embarcador cadastrado
-          </h3>
-          <p className="text-muted-foreground mb-4">Comece adicionando seu primeiro embarcador</p>
-          {canManageShippers && (
-            <Button onClick={() => setIsFormOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Adicionar Embarcador
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertTitle>Não foi possível carregar os embarcadores</AlertTitle>
+          <AlertDescription className="flex flex-col gap-3">
+            <span>
+              {(error instanceof Error && error.message) ||
+                'Erro inesperado ao buscar embarcadores.'}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => refetch()} className="w-fit">
+              Tentar novamente
             </Button>
-          )}
-        </motion.div>
+          </AlertDescription>
+        </Alert>
+      ) : !shippers || shippers.length === 0 ? (
+        <Empty className="bg-card rounded-xl border border-border shadow-card">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Ship />
+            </EmptyMedia>
+            <EmptyTitle>
+              {debouncedSearchTerm
+                ? 'Nenhum embarcador para essa busca'
+                : 'Nenhum embarcador cadastrado'}
+            </EmptyTitle>
+            <EmptyDescription>
+              {debouncedSearchTerm
+                ? 'Ajuste a busca para ver mais resultados'
+                : 'Comece adicionando seu primeiro embarcador'}
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            {canManageShippers && !debouncedSearchTerm && (
+              <Button onClick={() => setIsFormOpen(true)}>
+                <Plus />
+                Adicionar Embarcador
+              </Button>
+            )}
+          </EmptyContent>
+        </Empty>
       ) : (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="bg-card rounded-xl border border-border shadow-card overflow-hidden"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                    Embarcador
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                    CPF / CNPJ
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                    Contato
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                    Localização
-                  </th>
-                  <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {shippers?.map((shipper) => (
-                  <tr key={shipper.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3">
+          <Table className="table-fixed">
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead className="w-[260px]">Embarcador</TableHead>
+                <TableHead className="w-[150px]">CPF / CNPJ</TableHead>
+                <TableHead className="w-[220px]">Sócio-Administrador</TableHead>
+                <TableHead className="w-[300px]">Atividade</TableHead>
+                <TableHead className="w-[160px]">Contato</TableHead>
+                <TableHead className="w-[170px]">Localização</TableHead>
+                <TableHead className="w-[100px] text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {shippers.map((shipper) => {
+                const owner = getQsaOwner(shipper.partners);
+                const cnaeCode = formatCnae(shipper.cnae_main_code);
+                const cnaeDesc = shipper.cnae_main_description;
+
+                return (
+                  <TableRow key={shipper.id}>
+                    <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Ship className="w-5 h-5 text-primary" />
+                        <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Ship className="size-5 text-primary" />
                         </div>
-                        <div>
-                          <p className="font-medium text-foreground">{shipper.name}</p>
-                          {shipper.notes && (
-                            <p className="text-sm text-muted-foreground truncate max-w-[200px]">
-                              {shipper.notes}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-foreground truncate" title={shipper.name}>
+                            {shipper.name}
+                          </p>
+                          {shipper.contact_name && (
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <User className="size-3 shrink-0" />
+                              <span className="truncate">{shipper.contact_name}</span>
                             </p>
                           )}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-foreground font-mono text-sm">
-                      {(shipper.cpf ? formatCpfDisplay(shipper.cpf) : null) || shipper.cnpj || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="space-y-1">
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {shipper.cpf
+                        ? formatCpfDisplay(String(shipper.cpf)) || String(shipper.cpf)
+                        : shipper.cnpj
+                          ? formatCnpjDisplay(shipper.cnpj)
+                          : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {owner?.name ? (
+                        <div className="flex items-start gap-2">
+                          <Crown className="size-3.5 text-warning mt-0.5 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className="text-sm font-medium text-foreground truncate"
+                              title={owner.name}
+                            >
+                              {owner.name}
+                            </p>
+                            {owner.role && owner.role !== 'Sócio-Administrador' && (
+                              <p className="text-xs text-muted-foreground truncate">{owner.role}</p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {cnaeCode || cnaeDesc ? (
+                        <div className="flex items-start gap-2">
+                          <Briefcase className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            {cnaeCode && (
+                              <p className="text-xs font-mono text-muted-foreground">{cnaeCode}</p>
+                            )}
+                            {cnaeDesc && (
+                              <p className="text-sm text-foreground line-clamp-2" title={cnaeDesc}>
+                                {cnaeDesc}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="overflow-hidden">
+                      <div className="flex flex-col gap-1 min-w-0">
                         {shipper.phone && (
-                          <div className="flex items-center gap-2 text-sm text-foreground">
-                            <Phone className="w-3.5 h-3.5 text-muted-foreground" />
-                            {shipper.phone}
+                          <div className="flex items-center gap-2 min-w-0 text-foreground">
+                            <Phone className="size-3.5 text-muted-foreground shrink-0" />
+                            <span className="truncate">{formatPhoneDisplay(shipper.phone)}</span>
                           </div>
                         )}
                         {shipper.email && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Mail className="w-3.5 h-3.5" />
-                            {shipper.email}
+                          <div className="flex items-center gap-2 min-w-0 text-muted-foreground">
+                            <Mail className="size-3.5 shrink-0" />
+                            <span className="truncate" title={shipper.email}>
+                              {shipper.email}
+                            </span>
                           </div>
                         )}
-                        {!shipper.phone && !shipper.email && '-'}
+                        {!shipper.phone && !shipper.email && (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell>
                       {shipper.city || shipper.state ? (
-                        <div className="flex items-center gap-2 text-sm text-foreground">
-                          <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-                          {[shipper.city, shipper.state].filter(Boolean).join(' - ')}
+                        <div className="flex items-center gap-2 text-foreground">
+                          <MapPin className="size-3.5 text-muted-foreground shrink-0" />
+                          <span
+                            className="truncate"
+                            title={[shipper.city, shipper.state].filter(Boolean).join(' - ')}
+                          >
+                            {[shipper.city, shipper.state].filter(Boolean).join(' - ')}
+                          </span>
                         </div>
                       ) : (
-                        '-'
+                        <span className="text-muted-foreground">-</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center justify-end gap-2">
                         {canManageShippers && (
                           <>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className="size-8"
                               onClick={() => handleEdit(shipper)}
                               aria-label="Editar embarcador"
                             >
-                              <Pencil className="w-4 h-4" />
+                              <Pencil />
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              className="size-8 text-destructive hover:text-destructive"
                               onClick={() => setDeletingShipper(shipper)}
                               aria-label="Excluir embarcador"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 />
                             </Button>
                           </>
                         )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </motion.div>
       )}
 
@@ -274,6 +417,15 @@ export default function Shippers() {
         open={isFormOpen && canManageShippers}
         onClose={handleFormClose}
         shipper={editingShipper}
+        onSelectExisting={(existing) => {
+          setIsFormOpen(false);
+          // small delay so the dialog unmounts before remounting in edit mode
+          window.setTimeout(() => {
+            setEditingShipper(existing);
+            setIsFormOpen(true);
+          }, 50);
+          toast.info(`Editando embarcador existente: ${existing.name}`);
+        }}
       />
 
       {/* Delete Confirmation Dialog */}

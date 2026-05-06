@@ -46,7 +46,7 @@ export function useGlobalSearch() {
           type: 'quote',
           title: `Cotação - ${q.client_name}`,
           subtitle: `${q.origin} → ${q.destination}`,
-          url: '/comercial',
+          url: `/comercial?q=${encodeURIComponent(q.client_name)}`,
         });
       });
 
@@ -72,7 +72,7 @@ export function useGlobalSearch() {
           type: 'order',
           title: `${o.os_number} - ${o.client_name}`,
           subtitle: `${o.origin} → ${o.destination}`,
-          url: '/operacional',
+          url: `/operacional?q=${encodeURIComponent(o.os_number)}`,
         });
       });
 
@@ -98,7 +98,7 @@ export function useGlobalSearch() {
           subtitle: c.cnpj
             ? `${c.cnpj} - ${c.city || ''}/${c.state || ''}`
             : `${c.city || ''}/${c.state || ''}`,
-          url: '/clientes',
+          url: `/clientes?q=${encodeURIComponent(c.name)}`,
         });
       });
 

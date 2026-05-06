@@ -184,7 +184,7 @@ export function LoadCompositionOverlay({
           }}
         >
           <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col gap-4 sm:max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col gap-4 overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle className="sr-only">Oportunidades de Consolidação</DialogTitle>
               <DialogDescription className="sr-only">Análise por embarcador</DialogDescription>
