@@ -1011,16 +1011,38 @@ Deno.serve(async (req: Request) => {
     refinedResults.sort((a, b) => b.consolidation_score - a.consolidation_score);
 
     // -----------------------------------------------------------------------
+    // Greedy dedupe por cotação: cada quote_id aparece em no máximo 1 sugestão
+    // (a de maior score). Resolve o sintoma de "mesma cotação aparecendo em
+    // múltiplos cards" quando o algoritmo gera todas as combinações 2-a-2 ou
+    // pares + triplas. Estratégia: itera por score desc, reivindica as quotes
+    // de cada candidato, descarta candidatos cuja quote já foi reivindicada.
+    // No modo on_save (anchor sempre incluído) e manual (1 combo), o
+    // comportamento é equivalente — não impacta esses paths.
+    // -----------------------------------------------------------------------
+    const claimedQuotes = new Set<string>();
+    const dedupedResults: SuggestionRow[] = [];
+    for (const candidate of refinedResults) {
+      if (candidate.quote_ids.some((qid) => claimedQuotes.has(qid))) {
+        continue;
+      }
+      candidate.quote_ids.forEach((qid) => claimedQuotes.add(qid));
+      dedupedResults.push(candidate);
+    }
+    console.log(
+      `[analyze] Greedy dedupe: ${refinedResults.length} candidates → ${dedupedResults.length} non-overlapping (cada cotação em no máx. 1 sugestão)`
+    );
+
+    // -----------------------------------------------------------------------
     // Deduplication: skip suggestions that already exist
     // -----------------------------------------------------------------------
     const existingKeys = await findExistingQuoteIdSets(supabase, shipperId);
-    const newSuggestions = refinedResults.filter((s) => {
+    const newSuggestions = dedupedResults.filter((s) => {
       const key = s.quote_ids.join(',');
       return !existingKeys.has(key);
     });
 
     console.log(
-      `[analyze] ${refinedResults.length} passed thresholds, ${refinedResults.length - newSuggestions.length} duplicates skipped, ${newSuggestions.length} new`
+      `[analyze] ${dedupedResults.length} passed thresholds, ${dedupedResults.length - newSuggestions.length} duplicates skipped, ${newSuggestions.length} new`
     );
 
     // -----------------------------------------------------------------------
