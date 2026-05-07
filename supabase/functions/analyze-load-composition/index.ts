@@ -1008,16 +1008,26 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    refinedResults.sort((a, b) => b.consolidation_score - a.consolidation_score);
+    // Ordenacao por score × cobertura: score * log2(1 + N quotes).
+    // Sem o bias por cobertura, greedy puro escolhe pair com score 75 sobre
+    // triple com score 70 — mesmo a triple cobrindo 3 cotacoes (1 viagem
+    // a mais que 2 pairs separados). Multiplicar pelo log da contagem
+    // privilegia coberturas maiores quando o score eh comparavel.
+    //   pair (2)     → log2(3) = 1.585
+    //   triple (3)   → log2(4) = 2.000
+    //   quadruple (4)→ log2(5) = 2.322
+    // Para uma triple vencer uma pair de score 75, basta score ≥ 75 * 1.585/2.0 ≈ 59.4.
+    refinedResults.sort((a, b) => {
+      const weightA = a.consolidation_score * Math.log2(1 + a.quote_ids.length);
+      const weightB = b.consolidation_score * Math.log2(1 + b.quote_ids.length);
+      return weightB - weightA;
+    });
 
     // -----------------------------------------------------------------------
-    // Greedy dedupe por cotação: cada quote_id aparece em no máximo 1 sugestão
-    // (a de maior score). Resolve o sintoma de "mesma cotação aparecendo em
-    // múltiplos cards" quando o algoritmo gera todas as combinações 2-a-2 ou
-    // pares + triplas. Estratégia: itera por score desc, reivindica as quotes
-    // de cada candidato, descarta candidatos cuja quote já foi reivindicada.
-    // No modo on_save (anchor sempre incluído) e manual (1 combo), o
-    // comportamento é equivalente — não impacta esses paths.
+    // Greedy dedupe por cotação: cada quote_id aparece em no máximo 1 sugestão.
+    // Itera pela ordem ponderada acima — privilegia coberturas maiores.
+    // Modo on_save (anchor sempre incluído) e manual (1 combo) não são
+    // afetados — comportamento equivalente nesses paths.
     // -----------------------------------------------------------------------
     const claimedQuotes = new Set<string>();
     const dedupedResults: SuggestionRow[] = [];
@@ -1029,7 +1039,7 @@ Deno.serve(async (req: Request) => {
       dedupedResults.push(candidate);
     }
     console.log(
-      `[analyze] Greedy dedupe: ${refinedResults.length} candidates → ${dedupedResults.length} non-overlapping (cada cotação em no máx. 1 sugestão)`
+      `[analyze] Coverage-weighted dedupe: ${refinedResults.length} candidates → ${dedupedResults.length} non-overlapping (preferring larger coverage)`
     );
 
     // -----------------------------------------------------------------------
