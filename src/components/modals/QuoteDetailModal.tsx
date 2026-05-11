@@ -435,8 +435,8 @@ export function QuoteDetailModal({
         });
         queryClient.invalidateQueries({ queryKey: ['quotes'] });
         setAnttDialog({ open: true, suggestedValue: newCalcValue, piso: pisoFromResponse });
-      } else if (newCalcValue > currentValue && currentValue > 0) {
-        // Valor sugerido maior que o negociado — apresentar escolha ao usuário
+      } else if (currentValue > 0 && Math.abs(newCalcValue - currentValue) > 0.01) {
+        // Recálculo divergiu do valor negociado (maior ou menor) — apresentar escolha
         setSuggestedValueDialog({ open: true, newBreakdown, newCalcValue });
       } else {
         // Sem divergência — atualiza apenas a memória de cálculo
@@ -1341,11 +1341,11 @@ export function QuoteDetailModal({
         onCancel={() => setAnttDialog({ open: false, suggestedValue: 0, piso: 0 })}
       />
 
-      {/* Dialog de valor sugerido — aparece quando recálculo resulta em valor maior que o negociado */}
+      {/* Dialog de valor sugerido — aparece quando recálculo diverge do valor negociado (maior ou menor) */}
       <AlertDialog open={suggestedValueDialog.open}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Valor sugerido maior que o atual</AlertDialogTitle>
+            <AlertDialogTitle>Recálculo divergiu do valor atual</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm">
                 <p>
@@ -1353,7 +1353,9 @@ export function QuoteDetailModal({
                   <span className="font-semibold text-foreground">
                     {formatCurrency(suggestedValueDialog.newCalcValue)}
                   </span>
-                  , superior ao valor negociado atual de{' '}
+                  ,{' '}
+                  {suggestedValueDialog.newCalcValue > currentQuoteValue ? 'superior' : 'inferior'}{' '}
+                  ao valor negociado atual de{' '}
                   <span className="font-semibold text-foreground">
                     {formatCurrency(currentQuoteValue)}
                   </span>
