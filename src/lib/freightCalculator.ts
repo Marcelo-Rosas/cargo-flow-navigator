@@ -918,10 +918,17 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
 
   let grisPercent: number;
   let tsoPercent: number;
-  // Lotação: tabela tem precedência sobre rule; fracionado mantém rule > tabela
+  // Lotação: Central > tabela quando Central > 0; 0 trata como "não configurado"
+  // (cai na tabela) para evitar zeragem acidental — incidente abr/2026, item B
+  // de docs/NTC_DIVERGENCIAS_LOTACAO.md.
+  // Fracionado: mantém Central > tabela (precedência tradicional NTC).
+  const effectiveCentralCostValuePercent =
+    centralCostValuePercent != null && centralCostValuePercent > 0
+      ? centralCostValuePercent
+      : undefined;
   const costValuePercent = isLtl
     ? (centralCostValuePercent ?? rowCostValuePercent ?? 0.3)
-    : (rowCostValuePercent ?? centralCostValuePercent ?? 0.3);
+    : (effectiveCentralCostValuePercent ?? rowCostValuePercent ?? 0.3);
 
   // Ad Valorem para Lotação: substitui GRIS/TSO como componente único de custo de risco
   let adValorem = 0;

@@ -1,5 +1,5 @@
 /// <reference path="deno.d.ts" />
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { calculateFreightInputSchema } from '../_shared/freight-schema.ts';
 import {
@@ -442,8 +442,12 @@ Deno.serve(async (req) => {
 
             const ruleCostVal = resolveRulePercent('cost_value_percent');
             const ptCostVal = toFiniteNumber(priceRow.cost_value_percent);
-            // Lotação: tabela tem precedência sobre rule (rule=0 não deve zerar RCTR-C da tabela)
-            costValuePercent = ptCostVal ?? ruleCostVal ?? 0.3;
+            // Lotação: Central > tabela quando Central > 0. Valor 0 na Central é tratado
+            // como "não configurado" (cai na tabela) — evita zeragem acidental igual ao
+            // incidente abr/2026, item B de docs/NTC_DIVERGENCIAS_LOTACAO.md.
+            const effectiveRuleCostVal =
+              ruleCostVal != null && ruleCostVal > 0 ? ruleCostVal : undefined;
+            costValuePercent = effectiveRuleCostVal ?? ptCostVal ?? 0.3;
 
             console.log(
               `[calculate-freight] Lotação Ad Valorem | Faixa: ${kmBandLabel}, cost_per_ton: ${costPerTon}, frete_peso: ${baseCost}, adValoremPercent: ${adValoremLotacaoPercent}%, costValuePercent: ${costValuePercent}%`
