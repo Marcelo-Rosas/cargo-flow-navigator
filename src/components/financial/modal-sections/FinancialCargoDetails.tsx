@@ -1,19 +1,34 @@
-import { Package, Scale, Box } from 'lucide-react';
+import { Package, Scale, Box, FileText } from 'lucide-react';
 
 interface FinancialCargoDetailsProps {
   cargoType?: string | null;
   weight?: number | null;
   volume?: number | null;
+  documentType?: string | null;
 }
 
-export function FinancialCargoDetails({ cargoType, weight, volume }: FinancialCargoDetailsProps) {
-  const hasCargo = cargoType || weight != null || volume != null;
+export function FinancialCargoDetails({
+  cargoType,
+  weight,
+  volume,
+  documentType,
+}: FinancialCargoDetailsProps) {
+  const hasCargo = cargoType || weight != null || volume != null || documentType;
   if (!hasCargo) return null;
 
   return (
     <div>
       <h4 className="font-semibold text-foreground text-sm mb-2">Dados da Carga</h4>
       <div className="grid grid-cols-3 gap-2">
+        {documentType && (
+          <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+            <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+              <FileText className="w-3.5 h-3.5" />
+              <span className="text-[10px]">Tipo de documento</span>
+            </div>
+            <p className="font-medium text-xs">{documentType}</p>
+          </div>
+        )}
         {cargoType && (
           <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
             <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
