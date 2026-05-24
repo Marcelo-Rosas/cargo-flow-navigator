@@ -127,6 +127,7 @@ const DOCUMENT_TYPES_BY_STAGE: Record<OrderStage, { value: DocumentType; label: 
 
 // Tipos de documento para pagamento/custos do carreteiro (aba Carreteiro)
 const CARRIER_PAYMENT_BASE_DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
+  { value: 'a_vista_pag' as DocumentType, label: 'À vista' },
   { value: 'adiantamento_carreteiro', label: 'Adiantamento (Carreteiro)' },
   { value: 'saldo_carreteiro', label: 'Saldo (Carreteiro)' },
   { value: 'outros', label: 'Outros' },
@@ -161,7 +162,11 @@ const DOCUMENT_TYPE_TO_ORDER_FIELD: Record<string, keyof Order | null> = {
   outros: null,
 };
 
-const CARRIER_PAYMENT_TYPES: DocumentType[] = ['adiantamento_carreteiro', 'saldo_carreteiro'];
+const CARRIER_PAYMENT_TYPES: DocumentType[] = [
+  'a_vista_pag' as DocumentType,
+  'adiantamento_carreteiro',
+  'saldo_carreteiro',
+];
 const QUOTE_RECEIVABLE_TYPES: DocumentType[] = [
   'a_vista_fat' as DocumentType,
   'adiantamento',

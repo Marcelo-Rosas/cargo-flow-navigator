@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { openDocument, downloadDocument } from '@/lib/storage';
 
 const PROOF_TYPE_LABELS: Record<string, { label: string; color: string }> = {
+  a_vista: { label: 'À vista', color: 'bg-emerald-500/10 text-emerald-600' },
   adiantamento: { label: 'Adiantamento', color: 'bg-orange-500/10 text-orange-600' },
   saldo: { label: 'Saldo', color: 'bg-orange-500/10 text-orange-600' },
   outros: { label: 'Outros', color: 'bg-muted text-muted-foreground' },

@@ -26,9 +26,10 @@ function isUuid(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
 
-const PAYMENT_PROOF_TYPES = ['adiantamento_carreteiro', 'saldo_carreteiro'] as const;
+const PAYMENT_PROOF_TYPES = ['a_vista_pag', 'adiantamento_carreteiro', 'saldo_carreteiro'] as const;
 
-function mapProofType(docType: string): 'adiantamento' | 'saldo' {
+function mapProofType(docType: string): 'a_vista' | 'adiantamento' | 'saldo' {
+  if (docType === 'a_vista_pag') return 'a_vista';
   if (docType === 'adiantamento_carreteiro') return 'adiantamento';
   if (docType === 'saldo_carreteiro') return 'saldo';
   return 'adiantamento';
@@ -135,6 +136,8 @@ Deno.serve(async (req) => {
         expectedAmount = (carreteiroReal * (100 - advancePercent)) / 100;
       }
     } else if (carreteiroReal != null && carreteiroReal > 0 && proofType === 'saldo') {
+      expectedAmount = carreteiroReal;
+    } else if (carreteiroReal != null && carreteiroReal > 0 && proofType === 'a_vista') {
       expectedAmount = carreteiroReal;
     }
 

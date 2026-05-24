@@ -466,7 +466,7 @@ async function handleDocumentUploaded(
     actions.push(`flag_set:${flag}`);
   }
 
-  if (['adiantamento_carreteiro', 'saldo_carreteiro'].includes(type as string)) {
+  if (['a_vista_pag', 'adiantamento_carreteiro', 'saldo_carreteiro'].includes(type as string)) {
     try {
       await callEdgeFunction('process-payment-proof', { documentId: event.entity_id });
       actions.push('payment_proof_processing_triggered');
