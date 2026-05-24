@@ -231,6 +231,14 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
                     cargoType={doc.cargo_type as string | null}
                     weight={doc.weight as number | null}
                     volume={doc.volume as number | null}
+                    documentType={
+                      (doc.payment_term_name as string | null) ??
+                      (doc.installments_total == null || doc.installments_total === 1
+                        ? 'Á vista'
+                        : doc.installments_total > 1
+                          ? 'A prazo'
+                          : null)
+                    }
                   />
                 )}
                 <FinancialPricingDetails
