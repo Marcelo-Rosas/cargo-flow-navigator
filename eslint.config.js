@@ -10,6 +10,8 @@ export default tseslint.config(
     ignores: [
       'dist',
       'supabase/functions',
+      'scripts/render-contract-from-payload.ts',
+      'scripts/smoke-contract-pdf.ts',
       'docs/referencia/melhoria_agentes_orquestradores_workers',
       'melhoria_agentes_orquestradores_workers',
     ],
