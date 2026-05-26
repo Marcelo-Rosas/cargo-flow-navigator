@@ -1,13 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Building2, Save } from 'lucide-react';
+import { Loader2, Building2, Save, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -18,11 +19,26 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useCompanySettings, useUpdateCompanySettings } from '@/hooks/useCompanySettings';
 import { MainLayout } from '@/components/layout/MainLayout';
+import { MaskedInput } from '@/components/ui/masked-input';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { validateCnpj, validateCpf } from '@/lib/validators';
+import { fixMojibake } from '@/lib/fix-mojibake';
+import {
+  CnpjLookupError,
+  lookupCnpj,
+  pickLegalRepresentative,
+  suggestTaxRegistrations,
+} from '@/lib/cnpjLookup';
+
+const digits = (v: string) => v.replace(/\D/g, '');
 
 const schema = z.object({
   legal_name: z.string().min(2, 'Razão social obrigatória'),
   trade_name: z.string().optional().default(''),
-  cnpj: z.string().min(14, 'CNPJ inválido'),
+  cnpj: z
+    .string()
+    .min(1, 'CNPJ obrigatório')
+    .refine((v) => digits(v).length === 14 && validateCnpj(v), 'CNPJ inválido'),
   state_registration: z.string().optional().default(''),
   municipal_registration: z.string().optional().default(''),
   address_street: z.string().min(2, 'Logradouro obrigatório'),
@@ -30,10 +46,22 @@ const schema = z.object({
   address_complement: z.string().optional().default(''),
   address_neighborhood: z.string().optional().default(''),
   address_city: z.string().min(2, 'Cidade obrigatória'),
-  address_state: z.string().length(2, 'Use a sigla do estado (ex: SC)'),
-  address_zip: z.string().min(8, 'CEP inválido'),
+  address_state: z
+    .string()
+    .length(2, 'Use a sigla do estado (ex: SC)')
+    .transform((v) => v.toUpperCase()),
+  address_zip: z.string().refine((v) => digits(v).length === 8, 'CEP inválido'),
   legal_representative_name: z.string().optional().default(''),
-  legal_representative_cpf: z.string().optional().default(''),
+  legal_representative_cpf: z
+    .string()
+    .optional()
+    .default('')
+    .refine((v) => {
+      const d = digits(v ?? '');
+      if (d.length === 0) return true;
+      if (d.length !== 11) return true;
+      return validateCpf(v);
+    }, 'CPF inválido'),
   legal_representative_role: z.string().optional().default(''),
   bank_name: z.string().optional().default(''),
   bank_agency: z.string().optional().default(''),
@@ -48,6 +76,8 @@ type FormData = z.infer<typeof schema>;
 export default function CompanySettings() {
   const { data: settings, isLoading } = useCompanySettings();
   const updateMutation = useUpdateCompanySettings();
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const cnpjTouchedForLookup = useRef(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -78,23 +108,27 @@ export default function CompanySettings() {
 
   useEffect(() => {
     if (settings) {
+      cnpjTouchedForLookup.current = false;
+      const repCpf = settings.legal_representative_cpf
+        ? digits(settings.legal_representative_cpf)
+        : '';
       form.reset({
-        legal_name: settings.legal_name ?? '',
-        trade_name: settings.trade_name ?? '',
-        cnpj: settings.cnpj ?? '',
-        state_registration: settings.state_registration ?? '',
-        municipal_registration: settings.municipal_registration ?? '',
-        address_street: settings.address_street ?? '',
-        address_number: settings.address_number ?? '',
-        address_complement: settings.address_complement ?? '',
-        address_neighborhood: settings.address_neighborhood ?? '',
-        address_city: settings.address_city ?? '',
+        legal_name: fixMojibake(settings.legal_name),
+        trade_name: fixMojibake(settings.trade_name),
+        cnpj: settings.cnpj ? digits(settings.cnpj) : '',
+        state_registration: fixMojibake(settings.state_registration),
+        municipal_registration: fixMojibake(settings.municipal_registration ?? ''),
+        address_street: fixMojibake(settings.address_street),
+        address_number: fixMojibake(settings.address_number),
+        address_complement: fixMojibake(settings.address_complement ?? ''),
+        address_neighborhood: fixMojibake(settings.address_neighborhood),
+        address_city: fixMojibake(settings.address_city),
         address_state: settings.address_state ?? '',
-        address_zip: settings.address_zip ?? '',
-        legal_representative_name: settings.legal_representative_name ?? '',
-        legal_representative_cpf: settings.legal_representative_cpf ?? '',
-        legal_representative_role: settings.legal_representative_role ?? '',
-        bank_name: settings.bank_name ?? '',
+        address_zip: settings.address_zip ? digits(settings.address_zip) : '',
+        legal_representative_name: fixMojibake(settings.legal_representative_name ?? ''),
+        legal_representative_cpf: repCpf.length === 11 ? repCpf : '',
+        legal_representative_role: fixMojibake(settings.legal_representative_role ?? ''),
+        bank_name: fixMojibake(settings.bank_name ?? ''),
         bank_agency: settings.bank_agency ?? '',
         bank_account: settings.bank_account ?? '',
         bank_pix_key: settings.bank_pix_key ?? '',
@@ -104,6 +138,57 @@ export default function CompanySettings() {
     }
   }, [settings, form]);
 
+  const safeSet = (key: keyof FormData, value?: unknown) => {
+    const str = value != null ? String(value).trim() : '';
+    if (!str) return;
+    const current = form.getValues(key);
+    if (current && String(current).trim().length > 0) return;
+    form.setValue(key, str, { shouldValidate: true, shouldDirty: true });
+  };
+
+  const handleCnpjLookup = async (rawValue?: string) => {
+    const raw = rawValue ?? form.getValues('cnpj') ?? '';
+    if (digits(raw).length !== 14) return;
+
+    setIsLookingUp(true);
+    try {
+      const result = await lookupCnpj(raw);
+      safeSet('legal_name', result.name ?? result.trade_name);
+      safeSet('trade_name', result.trade_name);
+      safeSet('address_street', result.address);
+      safeSet('address_number', result.address_number);
+      safeSet('address_complement', result.address_complement);
+      safeSet('address_neighborhood', result.address_neighborhood);
+      safeSet('address_city', result.city);
+      safeSet('address_state', result.state);
+      safeSet('address_zip', result.zip_code);
+
+      const rep = pickLegalRepresentative(result.partners);
+      if (rep) {
+        safeSet('legal_representative_name', rep.name);
+        safeSet('legal_representative_role', rep.role);
+        if (rep.document) safeSet('legal_representative_cpf', digits(rep.document));
+      }
+
+      const tax = suggestTaxRegistrations(result);
+      if (tax.state_registration) safeSet('state_registration', tax.state_registration);
+      if (tax.municipal_registration) safeSet('municipal_registration', tax.municipal_registration);
+
+      toast.success('Dados preenchidos pela consulta CNPJ', {
+        description: tax.note,
+        duration: 8000,
+      });
+    } catch (e) {
+      if (e instanceof CnpjLookupError) {
+        toast.error(e.message);
+      } else {
+        toast.error('Falha ao consultar CNPJ — verifique sua conexão');
+      }
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
+
   const onSubmit = async (data: FormData) => {
     if (!settings?.id) {
       toast.error('Configurações não encontradas');
@@ -112,16 +197,36 @@ export default function CompanySettings() {
     try {
       await updateMutation.mutateAsync({ id: settings.id, ...data });
       toast.success('Configurações salvas');
-    } catch {
-      toast.error('Erro ao salvar configurações');
+      cnpjTouchedForLookup.current = false;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Erro ao salvar configurações';
+      toast.error(msg);
     }
   };
+
+  const canSave = Boolean(settings?.id) && !updateMutation.isPending && !isLookingUp;
 
   if (isLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!settings) {
+    return (
+      <MainLayout>
+        <div className="max-w-3xl mx-auto py-8 px-4">
+          <Alert variant="destructive">
+            <AlertTitle>Configurações não encontradas</AlertTitle>
+            <AlertDescription>
+              Não há registro em company_settings. Peça ao suporte para criar a linha inicial da
+              empresa antes de editar este formulário.
+            </AlertDescription>
+          </Alert>
         </div>
       </MainLayout>
     );
@@ -183,8 +288,51 @@ export default function CompanySettings() {
                       <FormItem>
                         <FormLabel>CNPJ *</FormLabel>
                         <FormControl>
-                          <Input placeholder="00.000.000/0000-00" {...field} />
+                          <div className="relative">
+                            <MaskedInput
+                              mask="cnpj"
+                              placeholder="00.000.000/0000-00"
+                              value={field.value || ''}
+                              onValueChange={(raw) => {
+                                cnpjTouchedForLookup.current = true;
+                                field.onChange(raw ?? '');
+                              }}
+                              onBlur={async () => {
+                                field.onBlur();
+                                if (
+                                  cnpjTouchedForLookup.current &&
+                                  digits(field.value ?? '').length === 14
+                                ) {
+                                  await handleCnpjLookup();
+                                }
+                              }}
+                              className="pr-10"
+                              aria-label="CNPJ da empresa"
+                            />
+                            {isLookingUp && (
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                              </div>
+                            )}
+                            {!isLookingUp && field.value && digits(field.value).length === 14 && (
+                              <button
+                                type="button"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-primary transition-colors"
+                                onClick={() => {
+                                  cnpjTouchedForLookup.current = true;
+                                  void handleCnpjLookup();
+                                }}
+                                title="Consultar CNPJ na Receita Federal"
+                                aria-label="Consultar CNPJ"
+                              >
+                                <Search className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                              </button>
+                            )}
+                          </div>
                         </FormControl>
+                        <FormDescription className="text-xs">
+                          Saia do campo ou use a lupa para buscar razão social, endereço e QSA.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -196,8 +344,11 @@ export default function CompanySettings() {
                       <FormItem>
                         <FormLabel>Inscrição Estadual</FormLabel>
                         <FormControl>
-                          <Input placeholder="Isento" {...field} />
+                          <Input placeholder="Isento ou número da IE" {...field} />
                         </FormControl>
+                        <FormDescription className="text-xs">
+                          Não vem na consulta CNPJ; para MEI sugerimos &quot;ISENTO&quot;.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -209,8 +360,11 @@ export default function CompanySettings() {
                       <FormItem>
                         <FormLabel>Inscrição Municipal</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <Input placeholder="Número na prefeitura" {...field} />
                         </FormControl>
+                        <FormDescription className="text-xs">
+                          Preencha manualmente conforme o município.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -323,7 +477,14 @@ export default function CompanySettings() {
                       <FormItem>
                         <FormLabel>CEP *</FormLabel>
                         <FormControl>
-                          <Input placeholder="88.370-053" {...field} />
+                          <MaskedInput
+                            mask="cep"
+                            placeholder="88370-053"
+                            value={field.value || ''}
+                            onValueChange={(raw) => field.onChange(raw ?? '')}
+                            onBlur={field.onBlur}
+                            aria-label="CEP"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -361,7 +522,14 @@ export default function CompanySettings() {
                       <FormItem>
                         <FormLabel>CPF</FormLabel>
                         <FormControl>
-                          <Input placeholder="000.000.000-00" {...field} />
+                          <MaskedInput
+                            mask="cpf"
+                            placeholder="000.000.000-00"
+                            value={field.value || ''}
+                            onValueChange={(raw) => field.onChange(raw ?? '')}
+                            onBlur={field.onBlur}
+                            aria-label="CPF do representante legal"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -489,7 +657,7 @@ export default function CompanySettings() {
             <Separator />
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={updateMutation.isPending}>
+              <Button type="submit" disabled={!canSave}>
                 {updateMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
