@@ -12,6 +12,8 @@ export default tseslint.config(
       'supabase/functions',
       'scripts/render-contract-from-payload.ts',
       'scripts/smoke-contract-pdf.ts',
+      'scripts/render-montagem-orcamento-pdf.ts',
+      'scripts/render-montagem-orcamento-email-pdf.ts',
       'docs/referencia/melhoria_agentes_orquestradores_workers',
       'melhoria_agentes_orquestradores_workers',
     ],

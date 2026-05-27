@@ -1651,7 +1651,7 @@ export type Database = {
           updated_at: string;
           uploaded_by: string;
           validation_errors: string[] | null;
-          validation_metadata: Record<string, any> | null;
+          validation_metadata: Json | null;
           validation_status: string | null;
         };
         Insert: {
@@ -1670,7 +1670,7 @@ export type Database = {
           updated_at?: string;
           uploaded_by: string;
           validation_errors?: string[] | null;
-          validation_metadata?: Record<string, any> | null;
+          validation_metadata?: Json | null;
           validation_status?: string | null;
         };
         Update: {
@@ -1689,7 +1689,7 @@ export type Database = {
           updated_at?: string;
           uploaded_by?: string;
           validation_errors?: string[] | null;
-          validation_metadata?: Record<string, any> | null;
+          validation_metadata?: Json | null;
           validation_status?: string | null;
         };
         Relationships: [
