@@ -3,24 +3,36 @@
  *
  *   npx tsx scripts/generate-contract-by-code.ts COT-2026-05-0006
  *   npx tsx scripts/generate-contract-by-code.ts COT-2026-05-0006 --force
+ *   npx tsx scripts/generate-contract-by-code.ts --id 43888a1f-078b-4c30-b11c-064fc106ddaf --force
  *   npx tsx scripts/generate-contract-by-code.ts COT-2026-05-0006 --local
  *
  * Env (.env):
- *   VITE_SUPABASE_URL ou SUPABASE_URL
- *   SUPABASE_SR_KEY (recomendado) OU VITE_SUPABASE_PUBLISHABLE_KEY + sessão não usada aqui
+ *   SUPABASE_URL ou VITE_SUPABASE_URL → epgedaiukjippepujuzc.supabase.co (produção)
+ *   SUPABASE_SR_KEY (obrigatório para --force; anon key pode retornar “não encontrada” por RLS)
  */
 import 'dotenv/config';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
-const quoteCode = process.argv[2];
+const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const idFlagIdx = process.argv.indexOf('--id');
+const quoteIdFromFlag = idFlagIdx >= 0 ? process.argv[idFlagIdx + 1] : undefined;
+const positional = args[0];
+const quoteId =
+  quoteIdFromFlag ?? (positional && UUID_RX.test(positional) ? positional : undefined);
+const quoteCode =
+  quoteIdFromFlag || (positional && UUID_RX.test(positional)) ? undefined : positional;
+
 const forceRegenerate = process.argv.includes('--force');
 const localOnly = process.argv.includes('--local');
 
-if (!quoteCode) {
+if (!quoteCode && !quoteId) {
   console.error(
-    'Uso: npx tsx scripts/generate-contract-by-code.ts <QUOTE_CODE> [--force] [--local]'
+    'Uso: npx tsx scripts/generate-contract-by-code.ts <QUOTE_CODE> [--force] [--local]\n' +
+      '     npx tsx scripts/generate-contract-by-code.ts --id <QUOTE_UUID> [--force] [--local]'
   );
   process.exit(1);
 }
@@ -31,24 +43,48 @@ const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SU
 const key = srKey ?? anonKey;
 
 if (!url || !key) {
-  console.error('Defina SUPABASE_URL e SUPABASE_SR_KEY (ou VITE_SUPABASE_PUBLISHABLE_KEY) no .env');
+  console.error('Defina SUPABASE_URL e SUPABASE_SR_KEY no .env');
+  process.exit(1);
+}
+
+const host = (() => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+})();
+console.log(`[contract] Supabase: ${host} | chave: ${srKey ? 'service_role' : 'anon (RLS)'}`);
+if (!srKey) {
+  console.error(
+    '[contract] SUPABASE_SR_KEY ausente no .env.\n' +
+      '  Dashboard → Settings → API → service_role (secret).\n' +
+      '  Com anon key o RLS oculta quotes e o script falha com “não encontrada”.'
+  );
   process.exit(1);
 }
 
 const sb = createClient(url, key);
 
-const { data: quote, error: quoteErr } = await sb
-  .from('quotes')
-  .select('id, quote_code, stage, client_name, value')
-  .eq('quote_code', quoteCode)
-  .maybeSingle();
+let quoteQuery = sb.from('quotes').select('id, quote_code, stage, client_name, value');
+if (quoteId) {
+  quoteQuery = quoteQuery.eq('id', quoteId);
+} else {
+  quoteQuery = quoteQuery.eq('quote_code', quoteCode!);
+}
+
+const { data: quote, error: quoteErr } = await quoteQuery.maybeSingle();
 
 if (quoteErr) {
   console.error('[contract]', quoteErr.message);
   process.exit(1);
 }
 if (!quote) {
-  console.error(`[contract] Cotação não encontrada: ${quoteCode}`);
+  const label = quoteId ?? quoteCode;
+  console.error(`[contract] Cotação não encontrada: ${label}`);
+  console.error(
+    '[contract] Confira: (1) .env aponta para epgedaiukjippepujuzc, (2) SUPABASE_SR_KEY no .env, (3) código exato na UI.'
+  );
   process.exit(1);
 }
 
@@ -98,7 +134,10 @@ if (localOnly) {
 
   console.log('[contract] Render local via Deno (rode o comando abaixo):');
   const payload = { quote: fullQuote, company, version: 1 };
-  const payloadPath = resolve('tests/fixtures', `contract-payload-${quoteCode}.json`);
+  const payloadPath = resolve(
+    'tests/fixtures',
+    `contract-payload-${quote.quote_code ?? quote.id}.json`
+  );
   mkdirSync(resolve('tests/fixtures'), { recursive: true });
   writeFileSync(payloadPath, JSON.stringify(payload, null, 2), 'utf8');
   console.log(`  Payload: ${payloadPath}`);
@@ -150,9 +189,11 @@ if (json.signed_url) {
   const pdfRes = await fetch(String(json.signed_url));
   if (pdfRes.ok) {
     const buf = Buffer.from(await pdfRes.arrayBuffer());
-    const safeName = quoteCode.replace(/[^\w-]/g, '_');
+    const safeName = String(quote.quote_code ?? quote.id).replace(/[^\w-]/g, '_');
     const outPath = resolve(outDir, `${safeName}-contrato-v${json.version ?? 1}.pdf`);
     writeFileSync(outPath, buf);
     console.log(`[contract] PDF salvo: ${outPath} (${buf.byteLength} bytes)`);
   }
 }
+
+process.exit(0);

@@ -130,22 +130,37 @@ export function RecentOrdersList({ orders, onViewOrder, onViewAll }: RecentOrder
                   </p>
                 </div>
 
-                <div className="flex gap-1">
+                <div className="flex shrink-0 gap-1">
                   <Badge
-                    variant={order.has_nfe ? 'default' : 'outline'}
-                    className={cn('text-xs', order.has_nfe && 'bg-success text-success-foreground')}
+                    variant="outline"
+                    className={cn(
+                      'shrink-0 whitespace-nowrap text-xs',
+                      order.has_nfe
+                        ? 'border-success/50 text-success bg-success/10'
+                        : 'border-muted-foreground/20 text-muted-foreground/60'
+                    )}
                   >
                     NF-e
                   </Badge>
                   <Badge
-                    variant={order.has_cte ? 'default' : 'outline'}
-                    className={cn('text-xs', order.has_cte && 'bg-success text-success-foreground')}
+                    variant="outline"
+                    className={cn(
+                      'shrink-0 whitespace-nowrap text-xs',
+                      order.has_cte
+                        ? 'border-success/50 text-success bg-success/10'
+                        : 'border-muted-foreground/20 text-muted-foreground/60'
+                    )}
                   >
                     CT-e
                   </Badge>
                   <Badge
-                    variant={order.has_pod ? 'default' : 'outline'}
-                    className={cn('text-xs', order.has_pod && 'bg-success text-success-foreground')}
+                    variant="outline"
+                    className={cn(
+                      'shrink-0 whitespace-nowrap text-xs',
+                      order.has_pod
+                        ? 'border-success/50 text-success bg-success/10'
+                        : 'border-muted-foreground/20 text-muted-foreground/60'
+                    )}
                   >
                     POD
                   </Badge>

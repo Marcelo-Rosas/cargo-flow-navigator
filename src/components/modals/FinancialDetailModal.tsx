@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FileCheck, FileText, ExternalLink } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -66,7 +67,14 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
       ? (doc.carreteiro_real ?? doc.total_amount ?? doc.order_value ?? 0)
       : (doc.total_amount ?? doc.quote_value ?? doc.order_value ?? 0);
   const amount = Number(rawAmount);
-  const name = (doc.client_name ?? doc.supplier_name ?? '—') as string;
+
+  // PAG = supplier (carrier); FAT = consumer (client/shipper)
+  const name =
+    doc.type === 'PAG'
+      ? (doc.carrier_name ?? doc.client_name ?? doc.supplier_name ?? '—')
+      : (doc.client_name ?? doc.shipper_name ?? doc.supplier_name ?? '—');
+  const secondaryName = doc.type === 'PAG' ? (doc.client_name ?? null) : (doc.shipper_name ?? null);
+
   const dueDate = (doc.next_due_date ?? doc.due_date) as string | null | undefined;
   const tollValue = doc.toll_value != null ? Number(doc.toll_value) : 0;
 
@@ -132,6 +140,9 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
               </div>
               <p className="text-sm text-muted-foreground truncate">
                 {name}
+                {secondaryName && (
+                  <span className="text-muted-foreground/60"> ({secondaryName})</span>
+                )}
                 {doc.origin && doc.destination && (
                   <span className="text-muted-foreground/60">
                     {' '}
@@ -209,6 +220,43 @@ export function FinancialDetailModal({ open, onClose, doc }: FinancialDetailModa
               </div>
             )}
           </div>
+
+          {/* CONTRATO — FAT only */}
+          {doc.type === 'FAT' && (
+            <div className="p-4 rounded-xl bg-muted/30 border border-border/60">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  {doc.has_contract ? (
+                    <FileCheck className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <FileText className="w-5 h-5 text-muted-foreground" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">
+                      {doc.has_contract ? 'Contrato gerado' : 'Sem contrato'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {doc.has_contract
+                        ? `Versão ${doc.contract_version} · Status: ${doc.contract_signature_status ?? 'pendente'}`
+                        : 'Nenhum contrato foi gerado para esta cotação.'}
+                    </p>
+                  </div>
+                </div>
+                {doc.has_contract && doc.contract_pdf_path && (
+                  <a
+                    href={doc.contract_pdf_path}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Abrir PDF
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ROTA */}
           {hasRoute && (

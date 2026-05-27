@@ -27,9 +27,10 @@ export const VECTRA_RECOMMENDED_DATASETS: LogExplorerDatasetSpec[] = [
   {
     dataset: 'workers_trace_events',
     scope: 'account',
-    priority: 'high',
+    priority: 'optional',
     service: 'Workers / Pages workers',
-    justification: '17 Workers + scripts Pages em produção',
+    justification:
+      'Requer plano/entitlement compatível (Free retorna 400 unsupported). Alternativa: observability.logs no wrangler.toml + wrangler tail',
   },
   {
     dataset: 'http_requests',

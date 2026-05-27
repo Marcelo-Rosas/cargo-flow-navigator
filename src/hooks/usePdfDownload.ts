@@ -1,12 +1,17 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import { generateLoadCompositionProposalPdf } from '@/lib/generateLoadCompositionProposalPdf';
-import type { QuotePdfPayload } from '@/lib/generateQuotePdf';
-import { generateQuotePdf } from '@/lib/generateQuotePdf';
 import type { LoadCompositionSuggestionWithDetails } from '@/types/load-composition';
 
 type QuotePdfMode = 'simplified' | 'detailed';
+
+type GenerateQuoteEmailPdfResponse = {
+  pdf_base64: string;
+  file_name: string;
+  quote_code?: string;
+};
 
 const triggerBlobDownload = (blob: Blob, fileName: string): void => {
   const objectUrl = URL.createObjectURL(blob);
@@ -15,14 +20,18 @@ const triggerBlobDownload = (blob: Blob, fileName: string): void => {
   anchor.download = fileName;
   anchor.rel = 'noopener';
   anchor.style.display = 'none';
-  // Append to <html> instead of <body> — Radix Dialog applies aria-hidden to
-  // <body>/<div#root> while a modal is open, which causes window.open and
-  // body-appended anchors to lose user-activation context in Chromium.
   document.documentElement.appendChild(anchor);
   anchor.click();
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 };
+
+function base64ToBlob(base64: string, mimeType: string): Blob {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mimeType });
+}
 
 export function usePdfDownload() {
   const [loading, setLoading] = useState<string | false>(false);
@@ -30,25 +39,6 @@ export function usePdfDownload() {
   const downloadQuotePdf = useCallback(async (quoteId: string, mode: QuotePdfMode) => {
     setLoading(`quote:${mode}`);
     try {
-      const selectFields =
-        mode === 'detailed'
-          ? 'id, quote_code, client_name, origin, destination, value, cargo_type, weight, volume, km_distance, estimated_loading_date, validity_date, notes, created_at, updated_at, payment_term_id, pricing_breakdown, freight_modality'
-          : 'id, quote_code, client_name, origin, destination, value, cargo_type, weight, volume, km_distance, estimated_loading_date, validity_date, notes, created_at, updated_at, payment_term_id';
-
-      const { data: rawQuote, error } = (await supabase
-        .from('quotes')
-        .select(selectFields)
-        .eq('id', quoteId)
-        .single()) as {
-        data: (QuotePdfPayload & { payment_term_id?: string | null }) | null;
-        error: { message: string } | null;
-      };
-
-      if (error || !rawQuote) {
-        throw new Error(error?.message || 'Cotação não encontrada para gerar PDF.');
-      }
-
-      // Gate ANTT: validar piso antes de gerar qualquer PDF
       const { data: anttCheck } = await supabase.rpc('validate_quote_antt_floor', {
         p_quote_id: quoteId,
       });
@@ -56,48 +46,35 @@ export function usePdfDownload() {
         is_below_antt_floor?: boolean;
         piso?: number;
         current_value?: number;
-        modality?: string;
       } | null;
 
-      if (anttResult?.is_below_antt_floor) {
-        if (mode === 'simplified') {
-          const pisoFmt = (anttResult.piso ?? 0).toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-          });
-          const valueFmt = (anttResult.current_value ?? 0).toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-          });
-          throw new Error(
-            `PDF do cliente bloqueado: valor ${valueFmt} está abaixo do Piso ANTT (${pisoFmt}). Abra a cotação e clique em "Aplicar Piso ANTT".`
-          );
+      if (anttResult?.is_below_antt_floor && mode === 'simplified') {
+        const pisoFmt = (anttResult.piso ?? 0).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        });
+        const valueFmt = (anttResult.current_value ?? 0).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        });
+        throw new Error(
+          `PDF do cliente bloqueado: valor ${valueFmt} está abaixo do Piso ANTT (${pisoFmt}). Abra a cotação e clique em "Aplicar Piso ANTT".`
+        );
+      }
+
+      const data = await invokeEdgeFunction<GenerateQuoteEmailPdfResponse>(
+        'generate-quote-email-pdf',
+        {
+          body: { quoteId, emailMode: mode },
         }
-        // Modo detailed: permitir com flag para watermark
-        (rawQuote as QuotePdfPayload & { antt_compliance?: unknown }).antt_compliance = {
-          piso: anttResult.piso ?? 0,
-          below: true,
-          modality: anttResult.modality ?? 'lotacao',
-        };
+      );
+
+      if (!data?.pdf_base64 || !data.file_name) {
+        throw new Error('Resposta inválida ao gerar PDF da cotação.');
       }
 
-      let payment_term_name: string | null = null;
-      if (rawQuote.payment_term_id) {
-        const { data: termData } = await supabase
-          .from('payment_terms')
-          .select('name')
-          .eq('id', rawQuote.payment_term_id)
-          .maybeSingle();
-        payment_term_name = (termData as { name?: string | null } | null)?.name ?? null;
-      }
-
-      const data: QuotePdfPayload = { ...rawQuote, payment_term_name };
-
-      const { blob, fileName } = await generateQuotePdf({
-        quote: data,
-        mode,
-      });
-      triggerBlobDownload(blob, fileName);
+      const blob = base64ToBlob(data.pdf_base64, 'application/pdf');
+      triggerBlobDownload(blob, data.file_name);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Não foi possível gerar o PDF da cotação.';

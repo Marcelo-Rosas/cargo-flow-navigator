@@ -9,13 +9,16 @@
  *   CLOUDFLARE_API_TOKEN=xxx npx tsx scripts/cloudflare-log-explorer/provision-log-explorer.ts --apply
  *   npm run cf:log-explorer -- --list
  *
- * Env:
- *   CLOUDFLARE_API_TOKEN   — obrigatório para --apply e --list
+ * Env (qualquer um):
+ *   CLOUDFLARE_API_TOKEN   — variável de ambiente
+ *   .env.local             — CLOUDFLARE_API_TOKEN=cfut_... (gitignored)
+ *   .cloudflare-api-token.local — uma linha com o token (gitignored)
  *   CLOUDFLARE_ACCOUNT_ID  — default: conta Vectra (auditoria 2026-05)
  *   CLOUDFLARE_ZONE_ID     — default: vectracargo.com.br
  */
 
-import { CloudflareLogExplorerClient, isAlreadyExistsError } from './client.ts';
+import { CloudflareLogExplorerClient, classifyFailure, isAlreadyExistsError } from './client.ts';
+import { printTokenHelp, resolveCloudflareLogExplorerToken } from './load-token.mjs';
 import {
   DEFAULT_ACCOUNT_ID,
   DEFAULT_ZONE_ID,
@@ -31,6 +34,10 @@ const APPLY = args.includes('--apply');
 const LIST = args.includes('--list');
 const INCLUDE_OPTIONAL = args.includes('--include-optional');
 const JSON_OUT = args.includes('--json');
+const ONLY = argValue('--only')
+  ?.split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 const accountId =
   process.env.CLOUDFLARE_ACCOUNT_ID ?? argValue('--account-id') ?? DEFAULT_ACCOUNT_ID;
@@ -53,7 +60,8 @@ Flags:
   --dry-run            Mostra o plano sem chamar a API de escrita
   --apply              Cria datasets que ainda não existem
   --list               Lista datasets habilitados e disponíveis
-  --include-optional   Inclui nel_reports
+  --include-optional   Inclui nel_reports e workers_trace_events
+  --only <a,b>         Provisiona só estes datasets (ex.: access_requests)
   --json               Saída JSON (com --apply ou --list)
   --account-id <id>    Sobrescreve CLOUDFLARE_ACCOUNT_ID
   --zone-id <id>       Sobrescreve CLOUDFLARE_ZONE_ID
@@ -74,7 +82,14 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const plan = resolveDatasetPlan(INCLUDE_OPTIONAL);
+  const plan = resolveDatasetPlan(INCLUDE_OPTIONAL).filter(
+    (d) => !ONLY?.length || ONLY.includes(d.dataset)
+  );
+
+  if (ONLY?.length && plan.length === 0) {
+    console.error(`Nenhum dataset do plano corresponde a --only=${ONLY.join(',')}`);
+    process.exit(1);
+  }
 
   if (DRY_RUN) {
     const output = {
@@ -103,9 +118,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  const token = process.env.CLOUDFLARE_API_TOKEN;
+  const token =
+    process.env.CLOUDFLARE_API_TOKEN?.trim() || (await resolveCloudflareLogExplorerToken());
   if (!token) {
-    console.error('CLOUDFLARE_API_TOKEN é obrigatório para --apply e --list');
+    printTokenHelp();
     process.exit(1);
   }
 
@@ -213,20 +229,59 @@ async function main(): Promise<void> {
   }
 
   const failed = results.filter((r) => r.status === 'failed');
+  const created = results.filter((r) => r.status === 'created');
+  const skipped = results.filter((r) => r.status === 'skipped');
+
+  const failureHints = failed.map((f) => ({
+    dataset: f.dataset,
+    kind: classifyFailure(f.message),
+    message: f.message,
+  }));
 
   if (JSON_OUT) {
-    console.log(JSON.stringify({ account_id: accountId, zone_id: zoneId, results }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          account_id: accountId,
+          zone_id: zoneId,
+          summary: { created: created.length, skipped: skipped.length, failed: failed.length },
+          results,
+          failure_hints: failureHints,
+        },
+        null,
+        2
+      )
+    );
   } else {
     console.log('Resultado do provisionamento:\n');
     console.table(results);
+    console.log(
+      `\nResumo: ${created.length} criado(s), ${skipped.length} já existente(s), ${failed.length} falha(s).`
+    );
     if (failed.length > 0) {
-      console.error(
-        `\n${failed.length} falha(s). Token precisa de permissão Log Explorer (Account Logs Edit).`
-      );
+      for (const f of failureHints) {
+        if (f.kind === 'unsupported') {
+          console.warn(
+            `• ${f.dataset}: dataset não disponível neste plano/conta — ignore ou use alternativa (ex.: wrangler observability).`
+          );
+        } else if (f.kind === 'internal') {
+          console.warn(
+            `• ${f.dataset}: erro interno da Cloudflare — tente novamente em alguns minutos ou habilite no dashboard.`
+          );
+        } else if (f.kind === 'auth') {
+          const hint = /9106/.test(f.message)
+            ? ' (verifique espaços no início/fim do token ao colar no PowerShell)'
+            : '';
+          console.error(`• ${f.dataset}: token inválido ou sem permissão${hint}.`);
+        } else {
+          console.warn(`• ${f.dataset}: ${f.message}`);
+        }
+      }
     }
   }
 
-  process.exit(failed.length > 0 ? 1 : 0);
+  const authFailures = failureHints.filter((f) => f.kind === 'auth');
+  process.exit(authFailures.length > 0 ? 1 : failed.length > 0 ? 2 : 0);
 }
 
 main().catch((err) => {

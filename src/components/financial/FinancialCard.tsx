@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, FileText, FileCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { KanbanReconciliationBadge } from '@/components/financial/kanban/KanbanReconciliationBadge';
 import { KanbanTripChip } from '@/components/financial/kanban/KanbanTripChip';
@@ -31,7 +31,14 @@ export function FinancialCard({ row, onEdit, canManageActions = true }: Financia
       ? (row.carreteiro_real ?? row.total_amount ?? row.order_value ?? 0)
       : (row.total_amount ?? row.quote_value ?? row.order_value ?? 0);
   const amount = Number(rawAmount);
-  const name = (row.client_name ?? row.supplier_name ?? '—') as string;
+
+  // PAG = supplier (carrier); FAT = consumer (client/shipper)
+  const name =
+    row.type === 'PAG'
+      ? (row.carrier_name ?? row.client_name ?? row.supplier_name ?? '—')
+      : (row.client_name ?? row.shipper_name ?? row.supplier_name ?? '—');
+  const secondaryName = row.type === 'PAG' ? (row.client_name ?? null) : (row.shipper_name ?? null);
+
   const dueDate = (row.next_due_date ?? row.due_date) as string | null | undefined;
   const code = (row.code ?? row.id?.slice(0, 8)) as string;
 
@@ -73,8 +80,23 @@ export function FinancialCard({ row, onEdit, canManageActions = true }: Financia
                   Atrasado
                 </Badge>
               )}
+              {row.type === 'FAT' && row.has_contract && (
+                <Badge variant="outline" className="text-xs shrink-0 gap-1">
+                  <FileCheck className="w-3 h-3 text-green-500" />
+                  Contrato v{row.contract_version}
+                </Badge>
+              )}
+              {row.type === 'FAT' && !row.has_contract && (
+                <Badge variant="secondary" className="text-xs shrink-0 gap-1">
+                  <FileText className="w-3 h-3" />
+                  Sem contrato
+                </Badge>
+              )}
             </div>
             <p className="font-medium text-sm truncate">{name}</p>
+            {secondaryName && (
+              <p className="text-xs text-muted-foreground truncate">{secondaryName}</p>
+            )}
             {row.origin && row.destination && (
               <p className="text-xs text-muted-foreground truncate">
                 {row.origin} → {row.destination}

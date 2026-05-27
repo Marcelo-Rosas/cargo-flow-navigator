@@ -21,7 +21,8 @@ import { useCompanySettings, useUpdateCompanySettings } from '@/hooks/useCompany
 import { MainLayout } from '@/components/layout/MainLayout';
 import { MaskedInput } from '@/components/ui/masked-input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { validateCnpj, validateCpf } from '@/lib/validators';
+import { validateCnpj, zodPartialCpf } from '@/lib/validators';
+import { formatRepresentativeCpfForForm } from '@/lib/company-settings-normalize';
 import { fixMojibake } from '@/lib/fix-mojibake';
 import {
   CnpjLookupError,
@@ -52,16 +53,7 @@ const schema = z.object({
     .transform((v) => v.toUpperCase()),
   address_zip: z.string().refine((v) => digits(v).length === 8, 'CEP inválido'),
   legal_representative_name: z.string().optional().default(''),
-  legal_representative_cpf: z
-    .string()
-    .optional()
-    .default('')
-    .refine((v) => {
-      const d = digits(v ?? '');
-      if (d.length === 0) return true;
-      if (d.length !== 11) return true;
-      return validateCpf(v);
-    }, 'CPF inválido'),
+  legal_representative_cpf: zodPartialCpf,
   legal_representative_role: z.string().optional().default(''),
   bank_name: z.string().optional().default(''),
   bank_agency: z.string().optional().default(''),
@@ -109,9 +101,6 @@ export default function CompanySettings() {
   useEffect(() => {
     if (settings) {
       cnpjTouchedForLookup.current = false;
-      const repCpf = settings.legal_representative_cpf
-        ? digits(settings.legal_representative_cpf)
-        : '';
       form.reset({
         legal_name: fixMojibake(settings.legal_name),
         trade_name: fixMojibake(settings.trade_name),
@@ -126,7 +115,7 @@ export default function CompanySettings() {
         address_state: settings.address_state ?? '',
         address_zip: settings.address_zip ? digits(settings.address_zip) : '',
         legal_representative_name: fixMojibake(settings.legal_representative_name ?? ''),
-        legal_representative_cpf: repCpf.length === 11 ? repCpf : '',
+        legal_representative_cpf: formatRepresentativeCpfForForm(settings.legal_representative_cpf),
         legal_representative_role: fixMojibake(settings.legal_representative_role ?? ''),
         bank_name: fixMojibake(settings.bank_name ?? ''),
         bank_agency: settings.bank_agency ?? '',
@@ -189,19 +178,20 @@ export default function CompanySettings() {
     }
   };
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = (data: FormData) => {
     if (!settings?.id) {
       toast.error('Configurações não encontradas');
       return;
     }
-    try {
-      await updateMutation.mutateAsync({ id: settings.id, ...data });
-      toast.success('Configurações salvas');
-      cnpjTouchedForLookup.current = false;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Erro ao salvar configurações';
-      toast.error(msg);
-    }
+    updateMutation.mutate(
+      { id: settings.id, ...data },
+      {
+        onSuccess: () => {
+          toast.success('Configurações salvas');
+          cnpjTouchedForLookup.current = false;
+        },
+      }
+    );
   };
 
   const canSave = Boolean(settings?.id) && !updateMutation.isPending && !isLookingUp;

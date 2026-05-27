@@ -22,6 +22,17 @@ export interface FinancialKanbanRow {
   // Enriched from quote/order
   client_name?: string | null;
   supplier_name?: string | null;
+
+  // Carrier (supplier) - PAG documents
+  carrier_name?: string | null;
+  carrier_phone?: string | null;
+
+  // Contract info - FAT documents
+  has_contract?: boolean | null;
+  contract_pdf_path?: string | null;
+  contract_version?: number | null;
+  contract_signature_status?: string | null;
+
   origin?: string | null;
   destination?: string | null;
   origin_cep?: string | null;

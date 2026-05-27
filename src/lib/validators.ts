@@ -29,6 +29,18 @@ export function validateCpf(cpf: string): boolean {
   return d2 === parseInt(n[10]);
 }
 
+/**
+ * CPF opcional com suporte a mascaramento da Receita (1–10 dígitos visíveis).
+ * Vazio OK; parcial OK; 11 dígitos exige dígito verificador; >11 rejeita.
+ */
+export function validateOptionalPartialCpf(value: string | null | undefined): boolean {
+  const d = digits(String(value ?? ''));
+  if (d.length === 0) return true;
+  if (d.length < 11) return true;
+  if (d.length > 11) return false;
+  return validateCpf(value!);
+}
+
 // ─── CNPJ ─────────────────────────────────────────────────────────────────────
 
 export function validateCnpj(cnpj: string): boolean {
@@ -92,6 +104,15 @@ export const zodCpf = z
   .string()
   .optional()
   .refine((v) => !v || digits(v).length === 0 || validateCpf(v), 'CPF inválido');
+
+/**
+ * CPF opcional com parcial da Receita (1–10 dígitos) ou completo (11 + verificador).
+ */
+export const zodPartialCpf = z
+  .string()
+  .optional()
+  .default('')
+  .refine((v) => validateOptionalPartialCpf(v), 'CPF inválido');
 
 /**
  * Campo CNPJ opcional com validação de formato e dígito verificador.

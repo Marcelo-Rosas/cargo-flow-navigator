@@ -13,6 +13,8 @@ import {
   Clock,
   AlertCircle,
   Loader2,
+  FileCheck,
+  RotateCcw,
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -39,6 +41,7 @@ import {
 import { cn } from '@/lib/utils';
 import { openDocument, downloadDocument } from '@/lib/storage';
 import { useDocuments, useDeleteDocument } from '@/hooks/useDocuments';
+import { useValidateDocument } from '@/hooks/useValidateDocument';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Database } from '@/integrations/supabase/types';
@@ -60,12 +63,12 @@ const typeLabels: Record<DocumentType, string> = {
   doc_rota: 'Doc. Rota',
   comprovante_vpo: 'VPO',
   outros: 'Outros',
-  comprovante_descarga: '',
-  adiantamento_carreteiro: '',
-  saldo_carreteiro: '',
-  a_vista_fat: '',
-  saldo_fat: '',
-  a_prazo_fat: '',
+  comprovante_descarga: 'Comp. Descarga',
+  adiantamento_carreteiro: 'Adiant. Carreteiro',
+  saldo_carreteiro: 'Saldo Carreteiro',
+  a_vista_fat: 'À Vista FAT',
+  saldo_fat: 'Saldo FAT',
+  a_prazo_fat: 'À Prazo FAT',
 };
 
 const typeColors: Record<DocumentType, string> = {
@@ -82,18 +85,19 @@ const typeColors: Record<DocumentType, string> = {
   doc_rota: 'bg-violet-500/10 text-violet-600',
   comprovante_vpo: 'bg-teal-500/10 text-teal-600',
   outros: 'bg-muted text-muted-foreground',
-  comprovante_descarga: '',
-  adiantamento_carreteiro: '',
-  saldo_carreteiro: '',
-  a_vista_fat: '',
-  saldo_fat: '',
-  a_prazo_fat: '',
+  comprovante_descarga: 'bg-orange-500/10 text-orange-600',
+  adiantamento_carreteiro: 'bg-cyan-500/10 text-cyan-600',
+  saldo_carreteiro: 'bg-cyan-500/10 text-cyan-600',
+  a_vista_fat: 'bg-emerald-500/10 text-emerald-600',
+  saldo_fat: 'bg-emerald-500/10 text-emerald-600',
+  a_prazo_fat: 'bg-emerald-500/10 text-emerald-600',
 };
 
 const statusConfig = {
   valid: { icon: CheckCircle, color: 'text-success', label: 'Válido' },
   pending: { icon: Clock, color: 'text-warning', label: 'Pendente' },
   invalid: { icon: AlertCircle, color: 'text-destructive', label: 'Inválido' },
+  xml_parsed: { icon: FileCheck, color: 'text-primary', label: 'Validado' },
 };
 
 const getFileIcon = (fileName: string) => {
@@ -115,6 +119,7 @@ export default function Documents() {
   const { canWrite } = useUserRole();
   const { data: documents, isLoading, isError, error, refetch } = useDocuments();
   const deleteDocumentMutation = useDeleteDocument();
+  const validateDocumentMutation = useValidateDocument();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [isDragging, setIsDragging] = useState(false);
@@ -195,7 +200,13 @@ export default function Documents() {
               <SelectItem value="analise_gr">Análise GR</SelectItem>
               <SelectItem value="doc_rota">Doc. Rota</SelectItem>
               <SelectItem value="comprovante_vpo">VPO</SelectItem>
+              <SelectItem value="comprovante_descarga">Comp. Descarga</SelectItem>
               <SelectItem value="adiantamento">Adiantamento</SelectItem>
+              <SelectItem value="adiantamento_carreteiro">Adiant. Carreteiro</SelectItem>
+              <SelectItem value="saldo_carreteiro">Saldo Carreteiro</SelectItem>
+              <SelectItem value="a_vista_fat">À Vista FAT</SelectItem>
+              <SelectItem value="saldo_fat">Saldo FAT</SelectItem>
+              <SelectItem value="a_prazo_fat">À Prazo FAT</SelectItem>
               <SelectItem value="cnh">CNH</SelectItem>
               <SelectItem value="crlv">CRLV</SelectItem>
               <SelectItem value="antt_motorista">ANTT</SelectItem>
@@ -283,7 +294,7 @@ export default function Documents() {
                     Tipo
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                    Status
+                    Validação
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
                     Data
@@ -346,9 +357,37 @@ export default function Documents() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <div className={cn('flex items-center gap-1.5', status.color)}>
-                          <StatusIcon className="w-4 h-4" />
-                          <span className="text-sm">{status.label}</span>
+                        <div className="flex flex-col gap-1">
+                          <div className={cn('flex items-center gap-1.5', status.color)}>
+                            <StatusIcon className="w-4 h-4" />
+                            <span className="text-sm">{status.label}</span>
+                          </div>
+                          {doc.nfe_key && (
+                            <span
+                              className="text-[10px] text-muted-foreground font-mono truncate max-w-[140px]"
+                              title={doc.nfe_key}
+                            >
+                              {doc.nfe_key}
+                            </span>
+                          )}
+                          {doc.validation_metadata?.uf_name && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {doc.validation_metadata.modelo_descricao || doc.type?.toUpperCase()}{' '}
+                              • {doc.validation_metadata.uf_name}
+                              {doc.validation_metadata.serie &&
+                                ` • Série ${doc.validation_metadata.serie}`}
+                              {doc.validation_metadata.numero &&
+                                ` • Nº ${doc.validation_metadata.numero}`}
+                            </span>
+                          )}
+                          {doc.validation_errors && doc.validation_errors.length > 0 && (
+                            <span
+                              className="text-[10px] text-destructive truncate max-w-[180px]"
+                              title={doc.validation_errors.join(', ')}
+                            >
+                              {doc.validation_errors[0]}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-sm">
@@ -361,6 +400,29 @@ export default function Documents() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          {(doc.type === 'nfe' ||
+                            doc.type === 'cte' ||
+                            doc.type === 'mdfe' ||
+                            doc.nfe_key) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              aria-label="Revalidar documento"
+                              disabled={
+                                validateDocumentMutation.isPending &&
+                                validateDocumentMutation.variables === doc.id
+                              }
+                              onClick={() => validateDocumentMutation.mutate(doc.id)}
+                            >
+                              {validateDocumentMutation.isPending &&
+                              validateDocumentMutation.variables === doc.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RotateCcw className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"

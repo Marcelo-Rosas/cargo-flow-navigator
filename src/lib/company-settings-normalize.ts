@@ -11,8 +11,14 @@ const text = (v: string | null | undefined) => fixMojibake(v ?? '').trim();
 export function normalizeRepresentativeCpf(value: string | null | undefined): string | null {
   const d = digits(String(value ?? ''));
   if (d.length === 0) return null;
-  if (d.length !== 11) return d;
+  if (d.length > 11) return null;
+  if (d.length < 11) return d;
   return d;
+}
+
+/** CPF para o formulário: só dígitos; partial da Receita (ex. `982984`) é preservado. */
+export function formatRepresentativeCpfForForm(value: string | null | undefined): string {
+  return digits(String(value ?? ''));
 }
 
 /** Normaliza payload do formulário (CNPJ/CEP/CPF só dígitos, textos trim, mojibake). */

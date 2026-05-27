@@ -15,7 +15,14 @@ export class CloudflareLogExplorerClient {
       },
     });
 
-    const body = (await res.json()) as CloudflareApiResponse<T>;
+    const raw = await res.text();
+    let body: CloudflareApiResponse<T>;
+    try {
+      body = JSON.parse(raw) as CloudflareApiResponse<T>;
+    } catch {
+      const snippet = raw.trim().slice(0, 200) || `HTTP ${res.status}`;
+      throw new Error(`${res.status}: ${snippet}`);
+    }
 
     if (!res.ok && body.success !== true) {
       const msg =
@@ -96,4 +103,13 @@ export class CloudflareLogExplorerClient {
 /** 409 = dataset já existe para account/zone */
 export function isAlreadyExistsError(message: string): boolean {
   return /409|already exists|duplicate/i.test(message);
+}
+
+export type FailureKind = 'unsupported' | 'internal' | 'auth' | 'unknown';
+
+export function classifyFailure(message: string): FailureKind {
+  if (/unsupported dataset|400.*unsupported/i.test(message)) return 'unsupported';
+  if (/internal error|500|502|503|504/i.test(message)) return 'internal';
+  if (/403|401|9106|authentication|permission|unauthorized/i.test(message)) return 'auth';
+  return 'unknown';
 }

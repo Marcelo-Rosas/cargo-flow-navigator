@@ -1,42 +1,55 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink } from 'lucide-react';
-import newsData from '@/data/ntc_news_latest.json';
+import { ExternalLink, Loader2 } from 'lucide-react';
+import { useNewsItems } from '@/hooks/useNewsItems';
 
-interface Noticia {
-  id: string;
-  titulo: string;
-  data: string;
-  categoria: string;
-  resumo: string;
-  url: string;
-  relevancia: 'alta' | 'media' | 'baixa';
-  emoji: string;
-  cor: string;
-}
-
-function getRelevanciaColor(relevancia: string) {
-  switch (relevancia) {
-    case 'alta':
-      return { bg: 'bg-red-100', text: 'text-red-800', badge: 'bg-red-600' };
-    case 'media':
-      return { bg: 'bg-yellow-100', text: 'text-yellow-800', badge: 'bg-yellow-600' };
-    case 'baixa':
-      return { bg: 'bg-green-100', text: 'text-green-800', badge: 'bg-green-600' };
-    default:
-      return { bg: 'bg-gray-100', text: 'text-gray-800', badge: 'bg-gray-600' };
-  }
+function getRelevanciaColor(relevanceScore: number | null) {
+  const score = relevanceScore ?? 5;
+  if (score >= 8) return { bg: 'bg-red-100', text: 'text-red-800', badge: 'bg-red-600' };
+  if (score >= 5) return { bg: 'bg-yellow-100', text: 'text-yellow-800', badge: 'bg-yellow-600' };
+  return { bg: 'bg-green-100', text: 'text-green-800', badge: 'bg-green-600' };
 }
 
 function formatarData(data: string) {
-  const [ano, mes, dia] = data.split('-');
-  return `${dia}/${mes}/${ano}`;
+  const d = new Date(data);
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export function NTCNewsWidget() {
-  const noticias: Noticia[] = newsData.noticias;
+  const { data: items, isLoading, isError } = useNewsItems(10);
 
-  if (!noticias || noticias.length === 0) {
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Notícias NTC</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando notícias...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Notícias NTC</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Erro ao carregar notícias.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const noticias = items ?? [];
+
+  if (noticias.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -49,62 +62,70 @@ export function NTCNewsWidget() {
     );
   }
 
+  const ultimaAtualizacao = noticias[0]?.created_at;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">📰 Notícias do Portal NTC</h2>
         <span className="text-xs text-muted-foreground">
-          Atualizado: {formatarData(newsData.atualizado_em.split('T')[0])}
+          Atualizado: {ultimaAtualizacao ? formatarData(ultimaAtualizacao) : '—'}
         </span>
       </div>
 
       <div className="space-y-3">
         {noticias.map((noticia) => {
-          const relevanciaColor = getRelevanciaColor(noticia.relevancia);
+          const relevanciaColor = getRelevanciaColor(noticia.relevance_score);
+          const relevanciaLabel =
+            (noticia.relevance_score ?? 0) >= 8
+              ? 'Alta'
+              : (noticia.relevance_score ?? 0) >= 5
+                ? 'Média'
+                : 'Baixa';
 
           return (
-            <Card key={noticia.id} className={`border-l-4 ${noticia.cor === 'red' ? 'border-l-red-500' : 'border-l-blue-500'}`}>
+            <Card
+              key={noticia.id}
+              className={`border-l-4 ${(noticia.relevance_score ?? 0) >= 8 ? 'border-l-red-500' : 'border-l-blue-500'}`}
+            >
               <CardContent className="pt-6">
                 <div className="flex gap-4">
-                  {/* Emoji */}
-                  <div className="text-3xl">{noticia.emoji}</div>
+                  <div className="text-3xl">📰</div>
 
-                  {/* Conteúdo */}
                   <div className="flex-1 space-y-2">
-                    {/* Título e Categoria */}
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="font-semibold text-sm leading-snug hover:text-primary transition-colors">
-                        {noticia.titulo}
+                        {noticia.title}
                       </h3>
-                      <Badge className={`${relevanciaColor.badge} text-white whitespace-nowrap text-xs`}>
-                        {noticia.relevancia === 'alta'
-                          ? '🔴 Alta'
-                          : noticia.relevancia === 'media'
-                            ? '🟡 Média'
-                            : '🟢 Baixa'}
+                      <Badge
+                        className={`${relevanciaColor.badge} text-white whitespace-nowrap text-xs`}
+                      >
+                        {relevanciaLabel}
                       </Badge>
                     </div>
 
-                    {/* Resumo */}
-                    <p className="text-xs text-muted-foreground line-clamp-2">{noticia.resumo}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{noticia.summary}</p>
 
-                    {/* Footer: Categoria, Data e Link */}
                     <div className="flex items-center justify-between pt-2">
                       <div className="flex items-center gap-2">
                         <span className="inline-block px-2 py-1 bg-muted text-xs rounded text-muted-foreground">
-                          {noticia.categoria}
+                          {noticia.source_name ?? noticia.source_type}
                         </span>
-                        <span className="text-xs text-muted-foreground">{formatarData(noticia.data)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatarData(noticia.created_at)}
+                        </span>
                       </div>
 
-                      <a
-                        href={noticia.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                      >
-                        Ler mais <ExternalLink className="w-3 h-3" />
-                      </a>
+                      {noticia.source_url && (
+                        <a
+                          href={noticia.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          Ler mais <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -114,9 +135,8 @@ export function NTCNewsWidget() {
         })}
       </div>
 
-      {/* Footer */}
       <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-        <span>Próxima atualização: {formatarData(newsData.proxima_atualizacao.split('T')[0])} às 08:00</span>
+        <span>Fonte: agente de notícias (2x ao dia)</span>
         <a
           href="https://www.portalntc.org.br/"
           target="_blank"

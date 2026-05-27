@@ -19,7 +19,7 @@ import { KanbanColumn } from '@/components/boards/KanbanColumn';
 import { QuoteCard } from '@/components/boards/QuoteCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useQuotes, useUpdateQuoteStage } from '@/hooks/useQuotes';
+import { useQuotes, useUpdateQuoteStage, useCloneQuote, useDeleteQuote } from '@/hooks/useQuotes';
 import { useShippers } from '@/hooks/useShippers';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -68,6 +68,8 @@ export default function Commercial() {
   const { canWrite } = useUserRole();
   const { data: quotes, isLoading, isError, error, refetch } = useQuotes();
   const updateStageMutation = useUpdateQuoteStage();
+  const cloneQuoteMutation = useCloneQuote();
+  const deleteQuoteMutation = useDeleteQuote();
   const [activeTab, setActiveTab] = useState<CommercialTab>('kanban');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -298,6 +300,41 @@ export default function Commercial() {
     }).format(value);
   };
 
+  const handleCloneQuote = useCallback(
+    async (quote: Quote) => {
+      try {
+        const cloned = await cloneQuoteMutation.mutateAsync(quote.id);
+        toast.success(
+          cloned.quote_code
+            ? `Cotação clonada: ${cloned.quote_code}`
+            : 'Cotação clonada com sucesso'
+        );
+      } catch {
+        // toast tratado em useCloneQuote.onError
+      }
+    },
+    [cloneQuoteMutation]
+  );
+
+  const handleDeleteQuote = useCallback(
+    async (quote: Quote) => {
+      const label = quote.quote_code ?? quote.client_name;
+      if (!window.confirm(`Excluir a cotação ${label}? Esta ação não pode ser desfeita.`)) {
+        return;
+      }
+      try {
+        await deleteQuoteMutation.mutateAsync(quote.id);
+        toast.success('Cotação excluída');
+        if (selectedQuote?.id === quote.id) setSelectedQuote(null);
+        if (emailingQuote?.id === quote.id) setEmailingQuote(null);
+        if (convertingQuote?.id === quote.id) setConvertingQuote(null);
+      } catch {
+        // toast tratado em useDeleteQuote.onError
+      }
+    },
+    [deleteQuoteMutation, selectedQuote, emailingQuote, convertingQuote]
+  );
+
   if (!user) {
     return (
       <MainLayout>
@@ -475,6 +512,9 @@ export default function Commercial() {
                           key={quote.id}
                           quote={quote}
                           onEdit={() => setSelectedQuote(quote)}
+                          onClone={() => void handleCloneQuote(quote)}
+                          onDelete={() => void handleDeleteQuote(quote)}
+                          onConvert={() => setConvertingQuote(quote)}
                           onSendEmail={() => setEmailingQuote(quote)}
                           canManageActions={canManageCommercial}
                         />

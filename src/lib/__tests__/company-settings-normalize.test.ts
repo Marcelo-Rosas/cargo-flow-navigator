@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fixMojibake } from '@/lib/fix-mojibake';
 import {
+  formatRepresentativeCpfForForm,
   normalizeCompanySettingsPayload,
   normalizeRepresentativeCpf,
 } from '@/lib/company-settings-normalize';
@@ -39,5 +40,24 @@ describe('normalizeRepresentativeCpf', () => {
 
   it('aceita CPF mascarado da Receita', () => {
     expect(normalizeRepresentativeCpf('***982984**')).toBe('982984');
+  });
+
+  it('descarta CPF com mais de 11 dígitos', () => {
+    expect(normalizeRepresentativeCpf('123456789012')).toBeNull();
+  });
+});
+
+describe('formatRepresentativeCpfForForm', () => {
+  it('retorna vazio para null', () => {
+    expect(formatRepresentativeCpfForForm(null)).toBe('');
+  });
+
+  it('preserva CPF parcial mascarado da Receita', () => {
+    expect(formatRepresentativeCpfForForm('***982984**')).toBe('982984');
+    expect(formatRepresentativeCpfForForm('982984')).toBe('982984');
+  });
+
+  it('preserva CPF completo', () => {
+    expect(formatRepresentativeCpfForForm('123.456.789-09')).toBe('12345678909');
   });
 });

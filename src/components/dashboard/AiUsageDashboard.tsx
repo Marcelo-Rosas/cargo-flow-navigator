@@ -73,6 +73,11 @@ function BudgetSettingsDialog() {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 pt-2">
+          {configs.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Nenhuma configuração disponível.
+            </p>
+          )}
           {configs.map((config) => (
             <div key={config.key} className="space-y-1.5">
               <Label className="text-xs font-medium">
@@ -209,9 +214,9 @@ function ModelDistribution({
 // ─────────────────────────────────────────────────────
 
 export function AiUsageDashboard() {
-  const { data: stats, isLoading } = useAiUsageStats();
+  const { data: stats, isLoading, isError, error } = useAiUsageStats();
 
-  if (isLoading || !stats) {
+  if (isLoading) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -228,6 +233,33 @@ export function AiUsageDashboard() {
         <div className="flex items-center justify-center py-6 text-muted-foreground">
           <Clock className="w-4 h-4 animate-spin mr-2" />
           <span className="text-sm">Carregando...</span>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (isError || !stats) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.5 }}
+        className="p-5 rounded-xl border bg-card shadow-card"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+            <Activity className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <h3 className="text-sm font-semibold">Uso da AI</h3>
+        </div>
+        <div className="text-center py-6">
+          <AlertTriangle className="w-6 h-6 mx-auto mb-2 text-amber-500" />
+          <p className="text-sm text-muted-foreground">
+            Não foi possível carregar estatísticas de uso.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {error instanceof Error ? error.message : ''}
+          </p>
         </div>
       </motion.div>
     );
@@ -302,7 +334,10 @@ export function AiUsageDashboard() {
           </div>
           <div className="space-y-1 max-h-[80px] overflow-y-auto">
             {stats.recent_errors.slice(0, 3).map((err, i) => (
-              <p key={i} className="text-[10px] text-muted-foreground truncate">
+              <p
+                key={`${err.status}-${err.analysis_type}-${i}`}
+                className="text-[10px] text-muted-foreground truncate"
+              >
                 {err.status}: {err.analysis_type} — {err.error_message || 'sem detalhes'}
               </p>
             ))}

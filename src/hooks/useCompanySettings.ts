@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import {
@@ -45,6 +46,9 @@ export function useUpdateCompanySettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
     },
   });
 }

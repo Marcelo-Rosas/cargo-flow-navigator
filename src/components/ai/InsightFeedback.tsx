@@ -27,18 +27,24 @@ export function InsightFeedback({
   };
 
   const handleSave = () => {
-    if (!rating) return;
-    rateInsight.mutate({ insightId, rating, feedback: feedbackText });
+    // Allow saving feedback text even without a rating; default to neutral (3) if no rating
+    const effectiveRating = rating ?? 3;
+    rateInsight.mutate({ insightId, rating: effectiveRating, feedback: feedbackText });
   };
 
   const isSaving = rateInsight.isPending;
-  const isSaveDisabled = !rating || isSaving;
+  const isSaveDisabled = isSaving;
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
-          <span className="text-[10px] text-muted-foreground mr-1">Útil?</span>
+          <span className="text-[10px] text-muted-foreground mr-1">
+            Útil?{' '}
+            {rating === null && (
+              <span className="text-[9px] text-muted-foreground/60">(opcional)</span>
+            )}
+          </span>
           <button
             type="button"
             onClick={() => handleToggleRating(5)}
