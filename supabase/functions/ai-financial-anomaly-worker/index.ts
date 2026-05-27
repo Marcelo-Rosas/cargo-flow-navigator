@@ -19,7 +19,7 @@ Deno.serve(async (req: Request) => {
   try {
     const {
       entityId,
-      model = 'gemini-2.0-flash',
+      model = 'gemini-2.5-flash',
       previousInsights,
     }: { entityId: string; model: GeminiModel; previousInsights?: string } = await req.json();
 

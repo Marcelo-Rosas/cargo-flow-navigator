@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Mail, Loader2, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mail, Loader2, MapPin, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { usePdfDownload } from '@/hooks/usePdfDownload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +32,7 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [emailMode, setEmailMode] = useState<'simplified' | 'detailed'>('simplified');
   const sendMutation = useSendQuoteEmail();
+  const { downloadQuotePdf, loading: pdfLoading } = usePdfDownload();
   const { data: paymentTerms } = usePaymentTerms(true);
 
   useEffect(() => {
@@ -224,6 +226,24 @@ export function SendQuoteEmailModal({ open, onClose, quote }: SendQuoteEmailModa
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-2">
+          <Button
+            variant="outline"
+            onClick={() => quote && void downloadQuotePdf(quote.id, emailMode)}
+            disabled={Boolean(pdfLoading) || sendMutation.isPending}
+            aria-label="Baixar PDF no layout do e-mail"
+          >
+            {pdfLoading === `quote:${emailMode}` ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Gerando PDF…
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 mr-2" />
+                Baixar PDF
+              </>
+            )}
+          </Button>
           <Button variant="outline" onClick={onClose} disabled={sendMutation.isPending}>
             Cancelar
           </Button>

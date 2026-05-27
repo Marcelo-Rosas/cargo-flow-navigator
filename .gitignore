@@ -42,6 +42,12 @@ audit-report.json
 .claude/settings.local.json
 
 # Sensitive / local-only
+docs/certificados/
+*.pfx
+.serena/
+.tmp/
+openai-cookbook/
+
 APIs/
 *.env
 *.env.*
@@ -60,6 +66,7 @@ CON
 !.dev.vars.example
 .env*
 !.env.example
+!.env.e2e.example
 
 dist/wrangler.json
 

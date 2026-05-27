@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FileSignature, Download, Eye, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,10 +12,16 @@ interface QuoteContractPanelProps {
 }
 
 export function QuoteContractPanel({ quoteId, stage }: QuoteContractPanelProps) {
-  const { data: contract, isLoading } = useQuoteContract(quoteId);
+  const { data: contract, isLoading, isFetching, refetch } = useQuoteContract(quoteId);
   const generateContract = useGenerateContract(quoteId);
   const [isOpening, setIsOpening] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  useEffect(() => {
+    const onFocus = () => void refetch();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [refetch]);
 
   if (stage !== 'ganho') {
     return (
@@ -119,6 +125,12 @@ export function QuoteContractPanel({ quoteId, stage }: QuoteContractPanelProps) 
                 : (contract.signature_status ?? 'pending')}
         </Badge>
         <span className="text-xs text-muted-foreground">{generatedAt}</span>
+        {isFetching && !isLoading && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Atualizando…
+          </span>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -141,13 +153,28 @@ export function QuoteContractPanel({ quoteId, stage }: QuoteContractPanelProps) 
         <Button
           size="sm"
           variant="outline"
+          onClick={() => void refetch()}
+          disabled={isFetching}
+          aria-label="Atualizar versão do contrato"
+          title="Busca a versão mais recente (ex.: após gerar pelo script CLI)"
+        >
+          {isFetching ? (
+            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          )}
+          Atualizar
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
           onClick={() => handleGenerate(true)}
           disabled={generateContract.isPending}
         >
           {generateContract.isPending ? (
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
           ) : (
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <FileSignature className="w-4 h-4 mr-2" />
           )}
           Re-emitir
         </Button>

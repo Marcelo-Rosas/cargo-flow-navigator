@@ -1,0 +1,45 @@
+name: Provision Cloudflare Log Explorer
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_optional:
+        description: Incluir nel_reports (opcional)
+        type: boolean
+        default: false
+      dry_run:
+        description: Apenas simular (dry-run)
+        type: boolean
+        default: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Provision Log Explorer datasets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          FLAGS="--apply --json"
+          if [ "${{ inputs.include_optional }}" = "true" ]; then
+            FLAGS="$FLAGS --include-optional"
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            npx tsx scripts/cloudflare-log-explorer/provision-log-explorer.ts --dry-run --json
+          else
+            npx tsx scripts/cloudflare-log-explorer/provision-log-explorer.ts $FLAGS
+          fi

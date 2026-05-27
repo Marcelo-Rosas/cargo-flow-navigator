@@ -32,8 +32,8 @@ const CustomTooltip = ({
 }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-zinc-200 rounded-lg p-3 text-xs shadow-sm">
-      <p className="font-medium text-zinc-700 mb-1">{label}</p>
+    <div className="bg-card border border-border rounded-lg p-3 text-xs shadow-sm">
+      <p className="font-medium text-foreground mb-1">{label}</p>
       {payload.map((p) => (
         <p key={p.dataKey} style={{ color: p.color }}>
           {p.dataKey === 'inctl'
@@ -46,7 +46,7 @@ const CustomTooltip = ({
 };
 
 export function NtcIndicesCard() {
-  const { data, isLoading, isError } = useNtcIndices();
+  const { data, isLoading, isError, refetch } = useNtcIndices();
   const { data: latestMarket } = useLatestMarketIndex();
 
   const periodoLabel =
@@ -60,15 +60,22 @@ export function NtcIndicesCard() {
 
   if (isLoading)
     return (
-      <div className="bg-white border border-zinc-200 rounded-xl p-5 flex items-center justify-center h-48">
-        <Loader2 className="animate-spin text-zinc-400" size={20} />
+      <div className="bg-card border border-border rounded-xl p-5 flex items-center justify-center h-48">
+        <Loader2 className="animate-spin text-muted-foreground" size={20} />
       </div>
     );
 
   if (isError || !data)
     return (
-      <div className="bg-white border border-zinc-200 rounded-xl p-5 text-sm text-zinc-400">
-        Não foi possível carregar os índices NTC.
+      <div className="bg-card border border-border rounded-xl p-5 text-sm text-muted-foreground">
+        <p>Não foi possível carregar os índices NTC.</p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="mt-2 text-xs font-medium underline underline-offset-2 hover:text-foreground transition-colors"
+        >
+          Tentar novamente
+        </button>
       </div>
     );
 
@@ -132,16 +139,16 @@ export function NtcIndicesCard() {
   const lastMes = data.evolution[data.evolution.length - 1]?.mes ?? '';
 
   return (
-    <div className="bg-white border border-zinc-200 rounded-xl p-5">
+    <div className="bg-card border border-border rounded-xl p-5">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
-          <p className="text-[10px] font-medium tracking-widest text-zinc-400 uppercase">
+          <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
             Índices NTC &amp; Logística
           </p>
-          <p className="text-xl font-medium text-zinc-900 mt-0.5 capitalize">{periodoLabel}</p>
+          <p className="text-xl font-medium text-foreground mt-0.5 capitalize">{periodoLabel}</p>
         </div>
-        <span className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+        <span className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800">
           <AlertTriangle size={12} />
           Atenção
         </span>
@@ -152,30 +159,30 @@ export function NtcIndicesCard() {
         {cards.map(({ label, mainValue, sub, valueColor, borderColor }) => (
           <div
             key={label}
-            className={`rounded-r-xl border-y border-r border-l-[2.5px] border-zinc-200 pl-3.5 pr-3 py-3 ${borderColor}`}
+            className={`rounded-r-xl border-y border-r border-l-[2.5px] border-border pl-3.5 pr-3 py-3 ${borderColor}`}
           >
-            <p className="text-[10px] font-medium tracking-widest text-zinc-400 uppercase mb-1.5">
+            <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase mb-1.5">
               {label}
             </p>
             <p className={`text-2xl font-bold leading-none mb-1 tabular-nums ${valueColor}`}>
               {mainValue}
             </p>
-            <p className="text-[12px] text-zinc-500">{sub}</p>
+            <p className="text-[12px] text-muted-foreground">{sub}</p>
           </div>
         ))}
       </div>
 
       {/* Insumos Lotação — usa market_indices quando houver; senão fallback estático */}
-      <div className="rounded-xl border border-zinc-200 px-4 py-3 mb-2.5">
-        <p className="text-[10px] font-medium tracking-widest text-zinc-400 uppercase mb-2">
+      <div className="rounded-xl border border-border px-4 py-3 mb-2.5">
+        <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase mb-2">
           Insumos Lotação 12M
         </p>
         {insumos.map(({ label, value }, i) => (
           <div
             key={label}
-            className={`flex items-center justify-between py-2 text-sm ${i > 0 ? 'border-t border-zinc-100' : ''}`}
+            className={`flex items-center justify-between py-2 text-sm ${i > 0 ? 'border-t border-border/50' : ''}`}
           >
-            <span className="text-zinc-500">{label}</span>
+            <span className="text-muted-foreground">{label}</span>
             <span className="font-medium text-emerald-700">{value}</span>
           </div>
         ))}
@@ -183,12 +190,12 @@ export function NtcIndicesCard() {
 
       {/* Chart */}
       {data.evolution.length > 0 && (
-        <div className="rounded-xl border border-zinc-200 px-4 pt-3 pb-2">
+        <div className="rounded-xl border border-border px-4 pt-3 pb-2">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] font-medium tracking-widest text-zinc-400 uppercase">
+            <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
               Evolução INCTL 12M
             </p>
-            <div className="flex gap-3 text-[11px] text-zinc-500">
+            <div className="flex gap-3 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-600" />
                 INCTL
@@ -201,10 +208,10 @@ export function NtcIndicesCard() {
           </div>
           <ResponsiveContainer width="100%" height={140}>
             <LineChart data={data.evolution} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0efe8" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis
                 dataKey="mes"
-                tick={{ fontSize: 11, fill: '#a1a09a' }}
+                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -246,7 +253,7 @@ export function NtcIndicesCard() {
               />
             </LineChart>
           </ResponsiveContainer>
-          <div className="flex justify-between text-[11px] text-zinc-400 mt-1">
+          <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
             <span>{firstMes}</span>
             <span>{lastMes}</span>
           </div>
@@ -254,7 +261,7 @@ export function NtcIndicesCard() {
       )}
 
       {/* Footer */}
-      <div className="flex items-center gap-1.5 mt-3 text-[11px] text-zinc-400">
+      <div className="flex items-center gap-1.5 mt-3 text-[11px] text-muted-foreground">
         <Info size={12} />
         Fonte: Portal NTC &amp; Logística — Monitor automático seg/sex 08h10
       </div>

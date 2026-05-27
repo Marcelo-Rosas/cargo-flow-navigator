@@ -1650,6 +1650,8 @@ export type Database = {
           type: Database['public']['Enums']['document_type'];
           updated_at: string;
           uploaded_by: string;
+          validation_errors: string[] | null;
+          validation_metadata: Json | null;
           validation_status: string | null;
         };
         Insert: {
@@ -1667,6 +1669,8 @@ export type Database = {
           type: Database['public']['Enums']['document_type'];
           updated_at?: string;
           uploaded_by: string;
+          validation_errors?: string[] | null;
+          validation_metadata?: Json | null;
           validation_status?: string | null;
         };
         Update: {
@@ -1684,6 +1688,8 @@ export type Database = {
           type?: Database['public']['Enums']['document_type'];
           updated_at?: string;
           uploaded_by?: string;
+          validation_errors?: string[] | null;
+          validation_metadata?: Json | null;
           validation_status?: string | null;
         };
         Relationships: [

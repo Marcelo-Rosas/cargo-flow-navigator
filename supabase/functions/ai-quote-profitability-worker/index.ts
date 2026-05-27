@@ -188,7 +188,7 @@ function extractFinancialsFromBreakdown(
 // Prevents silent Gemini API errors from bad caller inputs.
 // ---------------------------------------------------------------------------
 const VALID_GEMINI_MODELS: ReadonlySet<GeminiModel> = new Set([
-  'gemini-2.0-flash',
+  'gemini-2.5-flash',
   'gemini-2.5-pro',
 ]);
 
@@ -196,7 +196,7 @@ function parseGeminiModel(raw: unknown): GeminiModel {
   if (typeof raw === 'string' && VALID_GEMINI_MODELS.has(raw as GeminiModel)) {
     return raw as GeminiModel;
   }
-  return 'gemini-2.0-flash';
+  return 'gemini-2.5-flash';
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,41 @@
+export interface RouteStop {
+  sequence: number;
+  name: string | null;
+  city_uf: string | null;
+  cep: string | null;
+}
+
+export interface PaymentTerm {
+  name: string;
+  advance_percent: number | null;
+  days: number;
+}
+
+export interface EmailRow {
+  label: string;
+  value: string;
+}
+
+export interface QuoteEmailPaymentInfo {
+  termName?: string;
+  methodLabel?: string;
+  advancePercent: number;
+  balancePercent: number;
+  advanceAmount: string;
+  balanceAmount: string;
+  days?: number;
+}
+
+export interface QuoteEmailContent {
+  quoteCode: string;
+  value: number;
+  valueFormatted: string;
+  clientRows: EmailRow[];
+  routeRows: EmailRow[];
+  pricingRows: EmailRow[];
+  taxRow?: EmailRow;
+  payment?: QuoteEmailPaymentInfo;
+  notes?: string;
+}
+
+export type QuoteEmailMode = 'simplified' | 'detailed';

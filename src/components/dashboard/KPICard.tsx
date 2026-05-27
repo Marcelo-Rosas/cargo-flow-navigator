@@ -55,7 +55,9 @@ export function KPICard({
               <span
                 className={cn(
                   'text-sm font-medium tabular-nums whitespace-nowrap',
-                  trend.isPositive ? 'text-[#16a34a]' : 'text-[#dc2626]'
+                  trend.isPositive
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-red-600 dark:text-red-400'
                 )}
               >
                 {formatTrendPct(trend.value, trend.isPositive)}

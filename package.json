@@ -33,7 +33,17 @@
     "test:e2e:mocks": "npx playwright test tests/e2e/quote-*.spec.ts --project=chromium-mocks",
     "test:e2e:seeded": "npx playwright test tests/e2e/flows/*.seeded.spec.ts --project=chromium-auth",
     "audit:trips": "npx tsx scripts/audit-trips.ts",
-    "audit:trips:json": "npx tsx scripts/audit-trips.ts --json"
+    "audit:trips:json": "npx tsx scripts/audit-trips.ts --json",
+    "montagem:pdf": "deno run -A --config supabase/functions/generate-contract-pdf/deno.json scripts/render-montagem-orcamento-pdf.ts",
+    "montagem:email-pdf": "npx tsx scripts/render-montagem-orcamento-email-pdf.ts",
+    "montagem:all": "npm run montagem:pdf && npm run montagem:email-pdf",
+    "cf:log-explorer": "npx tsx scripts/cloudflare-log-explorer/provision-log-explorer.ts",
+    "cf:log-explorer:dry-run": "npm run cf:log-explorer -- --dry-run",
+    "cf:log-explorer:apply": "npm run cf:log-explorer -- --apply",
+    "cf:log-explorer:retry-access": "npm run cf:log-explorer -- --apply --only access_requests",
+    "cf:log-explorer:queries": "npx tsx scripts/cloudflare-log-explorer/run-query.ts --list",
+    "cf:log-explorer:query": "npx tsx scripts/cloudflare-log-explorer/run-query.ts",
+    "cf:log-explorer:test-all": "node scripts/cloudflare-log-explorer/run-all-tests.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

@@ -64,6 +64,7 @@ Deno.serve(async (req: Request) => {
         origin, destination, cargo_type, weight, volume,
         value, payment_term_id, estimated_loading_date, validity_date,
         advance_due_date, balance_due_date, stage,
+        pricing_breakdown, conditional_fees_breakdown,
         payment_terms:payment_term_id (name, days, advance_percent),
         clients:client_id (
           name, cnpj, address, city, state, zip_code, zip_code_mask,
