@@ -255,7 +255,21 @@ export class CnpjLookupError extends Error {
 }
 
 /**
- * Consulta CNPJ na BrasilAPI e retorna o shape normalizado.
+ * Fallback para minhareceita.org quando a BrasilAPI nao encontra o CNPJ.
+ * O formato de resposta eh compativel com o shape BrasilApiCnpj.
+ */
+async function fetchMinhaReceita(cnpj: string): Promise<BrasilApiCnpj> {
+  const res = await fetch(`https://minhareceita.org/${cnpj}`, {
+    headers: { 'User-Agent': 'vectra-cargo (cnpj-lookup; +https://vectracargo.com.br)' },
+  });
+  if (!res.ok) {
+    throw new CnpjLookupError(`Erro ao consultar CNPJ (status ${res.status})`, 'STATUS');
+  }
+  return (await res.json()) as BrasilApiCnpj;
+}
+
+/**
+ * Consulta CNPJ na BrasilAPI (com fallback para minhareceita.org) e retorna o shape normalizado.
  * @throws CnpjLookupError quando CNPJ invalido, nao encontrado, ou erro de rede.
  */
 export async function lookupCnpj(rawCnpj: string): Promise<CnpjLookupResult> {
@@ -273,14 +287,26 @@ export async function lookupCnpj(rawCnpj: string): Promise<CnpjLookupResult> {
       headers: { 'User-Agent': 'vectra-cargo (cnpj-lookup; +https://vectracargo.com.br)' },
     });
   } catch (e) {
-    throw new CnpjLookupError(
-      e instanceof Error ? e.message : 'Falha de rede ao consultar CNPJ',
-      'NETWORK'
-    );
+    // Erro de rede na BrasilAPI -> tenta fallback
+    try {
+      const data = await fetchMinhaReceita(cnpj);
+      return normalize(data);
+    } catch {
+      throw new CnpjLookupError(
+        e instanceof Error ? e.message : 'Falha de rede ao consultar CNPJ',
+        'NETWORK'
+      );
+    }
   }
 
   if (res.status === 404) {
-    throw new CnpjLookupError('CNPJ nao encontrado na base da Receita Federal', 'NOT_FOUND');
+    // CNPJ nao encontrado na BrasilAPI -> tenta fallback
+    try {
+      const data = await fetchMinhaReceita(cnpj);
+      return normalize(data);
+    } catch {
+      throw new CnpjLookupError('CNPJ nao encontrado na base da Receita Federal', 'NOT_FOUND');
+    }
   }
   if (!res.ok) {
     throw new CnpjLookupError(`Erro ao consultar CNPJ (status ${res.status})`, 'STATUS');
