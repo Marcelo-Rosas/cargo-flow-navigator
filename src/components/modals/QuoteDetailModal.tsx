@@ -52,6 +52,7 @@ import {
   FREIGHT_CONSTANTS,
   isMarginBelowTarget,
   resolveMargemBrutaDisplay,
+  round2,
 } from '@/lib/freightCalculator';
 import {
   Table,
@@ -273,16 +274,36 @@ export function QuoteDetailModal({
   // Visão contábil (DRE Asset-Light):
   // Total Cliente = Faturamento Bruto - Desconto | Receita Líquida = Total - Impostos
   // Resultado Líquido e Margem % vêm do breakdown quando disponível
-  const discountView = breakdown?.totals?.discount ?? 0;
   const totalClienteBruto = breakdown?.totals?.totalCliente ?? 0;
-  const totalClienteView = Math.max(0, totalClienteBruto - discountView);
+  const currentQuoteValue = Number(quote?.value ?? 0);
+  const discountFromBreakdown = breakdown?.totals?.discount ?? 0;
+  const discountImplicit =
+    totalClienteBruto > 0 && currentQuoteValue > 0
+      ? Math.max(0, round2(totalClienteBruto - currentQuoteValue))
+      : 0;
+  const discountView =
+    discountImplicit > discountFromBreakdown + PRICE_EPS_REAIS
+      ? discountImplicit
+      : discountFromBreakdown;
+  /** Faturamento exibido: valor negociado (quote.value) quando existir */
+  const totalClienteView =
+    currentQuoteValue > 0 ? currentQuoteValue : Math.max(0, totalClienteBruto - discountView);
+  const hasNegotiatedFaturamento =
+    totalClienteBruto > 0 &&
+    totalClienteView > 0 &&
+    Math.abs(totalClienteView - totalClienteBruto) > PRICE_EPS_REAIS;
+  const faturamentoRatio =
+    hasNegotiatedFaturamento && totalClienteBruto > 0 ? totalClienteView / totalClienteBruto : 1;
+
+  const receitaLiquidaSnapshot =
+    (breakdown?.profitability as { receitaLiquida?: number } | undefined)?.receitaLiquida ??
+    (totalClienteBruto > 0 ? totalClienteBruto - (breakdown?.totals?.totalImpostos ?? 0) : null);
   const receitaLiquidaView =
-    (breakdown?.profitability as { receitaLiquida?: number } | undefined)?.receitaLiquida ?? null;
+    receitaLiquidaSnapshot != null ? round2(receitaLiquidaSnapshot * faturamentoRatio) : null;
 
   const pisoAnttView = Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0);
   // Piso de compliance: usa anttCalc (taxa atual) ou breakdown meta como fallback
   const pisoAnttCompliance = anttCalc?.total ?? breakdown?.meta?.anttPisoCarreteiro ?? 0;
-  const currentQuoteValue = Number(quote?.value ?? 0);
   const priceTableModality = (priceTable as { modality?: string } | null)?.modality;
   const isQuoteBelowAnttFloor =
     priceTableModality === 'lotacao' &&
@@ -327,37 +348,36 @@ export function QuoteDetailModal({
     pisoAnttView;
   const receitaLiquidaFromBreakdown =
     receitaLiquidaView ??
-    (totalClienteView > 0 ? totalClienteView - (breakdown?.totals?.totalImpostos ?? 0) : null);
+    (totalClienteView > 0
+      ? totalClienteView - (breakdown?.totals?.totalImpostos ?? 0) * faturamentoRatio
+      : null);
 
   const margemBrutaView =
     receitaLiquidaFromBreakdown != null
       ? resolveMargemBrutaDisplay(
           breakdown?.profitability?.margemBruta,
           receitaLiquidaFromBreakdown,
-          overheadView,
+          round2(overheadView * faturamentoRatio),
           custoMotoristaAnttView,
           custoServicosView
         )
       : (breakdown?.profitability?.margemBruta ?? 0);
 
+  const resultadoSnapshot = breakdown?.profitability?.resultadoLiquido ?? 0;
   const resultadoLiquidoView = (
     breakdown?.profitability?.resultadoLiquido != null
-      ? breakdown.profitability.resultadoLiquido
-      : margemBrutaView - overheadView
+      ? round2(resultadoSnapshot * faturamentoRatio)
+      : margemBrutaView - round2(overheadView * faturamentoRatio)
   ) as number;
+  /** Margem operacional sempre sobre o faturamento exibido (evita 21,9% da tabela com R$ 29,3k negociado) */
   const margemPercentView = (
-    breakdown?.profitability?.margemPercent != null
-      ? breakdown.profitability.margemPercent
-      : totalClienteView > 0
-        ? (resultadoLiquidoView / totalClienteView) * 100
-        : 0
+    totalClienteView > 0 ? round2((resultadoLiquidoView / totalClienteView) * 100) : 0
   ) as number;
   const targetMargin =
-    (breakdown?.profitability as { profitMarginTarget?: number; profit_margin_target?: number })
-      ?.profitMarginTarget ??
-    (breakdown?.profitability as { profit_margin_target?: number })?.profit_margin_target ??
+    breakdown?.profitability?.profitMarginTarget ??
+    breakdown?.rates?.targetMarginPercent ??
+    breakdown?.rates?.profitMarginPercent ??
     TARGET_MARGIN_PERCENT;
-  // Alerta: margem atual vs meta da cotação (não usar marginStatus do snapshot — era vs 15% fixo)
   const isBelowTarget = isMarginBelowTarget(margemPercentView, targetMargin);
 
   const handleAdvancePercentChange = async (value: string) => {
