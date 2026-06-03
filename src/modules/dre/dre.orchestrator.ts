@@ -25,6 +25,8 @@ export interface OrderForDre {
   pedagio_real: number | null;
   descarga_real: number | null;
   waiting_time_cost: number | null;
+  aluguel_maquinas_real?: number | null;
+  mao_de_obra_real?: number | null;
   quote_code?: string | null;
   quote_created_at?: string | null;
   quote_value?: number | null;
@@ -89,6 +91,8 @@ export function buildDreTables(input: DreOrchestratorInput): DreTable[] {
       pedagio_real: order.pedagio_real,
       descarga_real: order.descarga_real,
       waiting_time_cost: order.waiting_time_cost,
+      aluguel_maquinas_real: order.aluguel_maquinas_real ?? null,
+      mao_de_obra_real: order.mao_de_obra_real ?? null,
     };
 
     const tripItems = tripCostItemsByOrderId.get(order.id) ?? [];

@@ -320,12 +320,14 @@ export function roundCurrency(value: number): number {
 }
 
 /**
- * Determina status da margem vs target
+ * Determina status da margem vs meta (pricing_rules / profit_margin_percent da cotação).
+ * @param targetMarginPercent — meta da tabela/regra; default 15% só quando não informada.
  */
 export function getMarginStatus(
-  marginPercent: number
+  marginPercent: number,
+  targetMarginPercent: number = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT
 ): 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET' {
-  const target = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
+  const target = targetMarginPercent;
 
   if (marginPercent > target + 0.5) return 'ABOVE_TARGET';
   if (marginPercent < target - 0.5) return 'BELOW_TARGET';

@@ -3,6 +3,7 @@ export interface RouteStop {
   name: string | null;
   city_uf: string | null;
   cep: string | null;
+  stop_type?: 'origin' | 'stop' | 'destination';
 }
 
 export interface PaymentTerm {
@@ -35,6 +36,7 @@ export interface QuoteEmailContent {
   pricingRows: EmailRow[];
   taxRow?: EmailRow;
   payment?: QuoteEmailPaymentInfo;
+  bankRows?: EmailRow[];
   notes?: string;
 }
 

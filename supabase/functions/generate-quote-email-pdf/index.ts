@@ -63,10 +63,13 @@ Deno.serve(async (req) => {
 
     const emailMode = body.emailMode ?? 'simplified';
 
-    const { quote, routeStops, paymentTerm } = await fetchQuoteEmailContext(supabase, body.quoteId);
+    const { quote, routeStops, paymentTerm, company } = await fetchQuoteEmailContext(
+      supabase,
+      body.quoteId
+    );
 
     const quoteCode = (quote.quote_code as string) || body.quoteId.slice(0, 8);
-    const content = buildQuoteEmailContent(quote, paymentTerm, routeStops, emailMode);
+    const content = buildQuoteEmailContent(quote, paymentTerm, routeStops, emailMode, company);
     const pdfBytes = await renderQuoteEmailPdf(content);
 
     return new Response(
@@ -82,7 +85,7 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    const status = /not found/i.test(message) ? 404 : 500;
+    const status = /^Quote not found/i.test(message) ? 404 : 500;
     return new Response(JSON.stringify({ error: message }), {
       status,
       headers: { ...corsHeaders, 'content-type': 'application/json' },

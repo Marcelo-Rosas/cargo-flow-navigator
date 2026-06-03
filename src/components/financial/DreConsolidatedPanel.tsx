@@ -17,31 +17,29 @@ import { cn } from '@/lib/utils';
 import type { DreTable, DreCanonicalRow, DreLineCode } from '@/modules/dre';
 import { DRE_LINE_MAPPINGS } from '@/modules/dre';
 import { Link } from 'react-router-dom';
+import { DrePeriodFilter, type DrePeriodFilterValue } from '@/components/filters/DrePeriodFilter';
+import { getRangeFromMonth, getCurrentMonthYear } from '@/lib/dateFilterUtils';
 
-const CURRENT_YEAR = new Date().getFullYear();
-
-function getToday(): string {
-  const d = new Date();
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}/${d.getFullYear()}`;
-}
+const { month: CUR_MONTH, year: CUR_YEAR } = getCurrentMonthYear();
+const DEFAULT_RANGE = getRangeFromMonth(CUR_MONTH, CUR_YEAR);
 
 function extractTotals(tables: DreTable[]) {
-  let faturamentoBruto = 0;
+  let faturamentoBrutoPresumido = 0;
+  let faturamentoBrutoReal = 0;
   let resultadoPresumido = 0;
   let resultadoReal = 0;
   for (const table of tables) {
     for (const row of table.rows) {
       if (row.line_code === 'faturamento_bruto') {
-        faturamentoBruto += row.presumed_value;
+        faturamentoBrutoPresumido += row.presumed_value;
+        faturamentoBrutoReal += row.real_value;
       } else if (row.line_code === 'resultado_liquido') {
         resultadoPresumido += row.presumed_value;
         resultadoReal += row.real_value;
       }
     }
   }
-  return { faturamentoBruto, resultadoPresumido, resultadoReal };
+  return { faturamentoBrutoPresumido, faturamentoBrutoReal, resultadoPresumido, resultadoReal };
 }
 
 /** Consolida todas as DreTables em uma única tabela (soma linha a linha). */
@@ -134,58 +132,49 @@ function consolidateAllRows(tables: DreTable[]): DreTable {
 }
 
 export function DreConsolidatedPanel() {
-  const [dateFrom, setDateFrom] = useState<string>(`01/01/${CURRENT_YEAR}`);
-  const [dateTo, setDateTo] = useState<string>(getToday());
+  const [drePeriod, setDrePeriod] = useState<DrePeriodFilterValue>({
+    range: DEFAULT_RANGE,
+    periodType: 'month',
+  });
 
   const { data: dreTables, isLoading } = useDreOperacionalReport({
-    dateFrom,
-    dateTo,
+    dateFrom: drePeriod.range.dateFrom,
+    dateTo: drePeriod.range.dateTo,
     quoteCode: null,
     osNumber: null,
-    periodType: 'detail',
+    periodType: drePeriod.periodType,
     enabled: true,
   });
 
-  const { faturamentoBruto, resultadoPresumido, resultadoReal } = dreTables
-    ? extractTotals(dreTables)
-    : { faturamentoBruto: 0, resultadoPresumido: 0, resultadoReal: 0 };
+  const { faturamentoBrutoPresumido, faturamentoBrutoReal, resultadoPresumido, resultadoReal } =
+    dreTables
+      ? extractTotals(dreTables)
+      : {
+          faturamentoBrutoPresumido: 0,
+          faturamentoBrutoReal: 0,
+          resultadoPresumido: 0,
+          resultadoReal: 0,
+        };
 
   const delta = resultadoReal - resultadoPresumido;
   const deltaPositive = delta >= 0;
   const margemPresumidaPercent =
-    faturamentoBruto > 0 ? (resultadoPresumido / faturamentoBruto) * 100 : 0;
-  const margemRealPercent = faturamentoBruto > 0 ? (resultadoReal / faturamentoBruto) * 100 : 0;
+    faturamentoBrutoPresumido > 0 ? (resultadoPresumido / faturamentoBrutoPresumido) * 100 : 0;
+  const margemRealPercent =
+    faturamentoBrutoReal > 0 ? (resultadoReal / faturamentoBrutoReal) * 100 : 0;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Receipt className="w-6 h-6 text-primary" />
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">DRE Presumido vs Real</h2>
-            <p className="text-sm text-muted-foreground">
-              Margem planejada na cotação vs executada com custo operacional real
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground whitespace-nowrap">De</span>
-            <input
-              type="text"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              placeholder="dd/mm/aaaa"
-              className="w-28 border border-border rounded-md px-2 py-1.5 bg-background text-sm"
-            />
-            <span className="text-muted-foreground whitespace-nowrap">Até</span>
-            <input
-              type="text"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              placeholder="dd/mm/aaaa"
-              className="w-28 border border-border rounded-md px-2 py-1.5 bg-background text-sm"
-            />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Receipt className="w-6 h-6 text-primary" />
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">DRE Presumido vs Real</h2>
+              <p className="text-sm text-muted-foreground">
+                Margem planejada na cotação vs executada com custo operacional real
+              </p>
+            </div>
           </div>
           <Button variant="outline" size="sm" asChild>
             <Link to="/relatorios">
@@ -194,6 +183,7 @@ export function DreConsolidatedPanel() {
             </Link>
           </Button>
         </div>
+        <DrePeriodFilter value={drePeriod} onChange={setDrePeriod} />
       </div>
 
       {isLoading ? (
@@ -312,133 +302,149 @@ function DreDetailedTable({ tables }: { tables: DreTable[] }) {
 
       {expanded && (
         <div className="px-5 pb-5 pt-1 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[260px]" />
+              <col className="w-[110px]" />
+              <col className="w-[110px]" />
+              <col className="w-[110px]" />
+              <col className="w-[90px]" />
+              <col className="w-[100px]" />
+            </colgroup>
             <thead>
               <tr className="border-b text-muted-foreground text-xs uppercase tracking-wider">
                 <th className="text-left py-2 px-2 font-medium">Linha</th>
-                <th className="text-right py-2 px-2 font-medium">Presumido</th>
-                <th className="text-right py-2 px-2 font-medium">Real</th>
-                <th className="text-right py-2 px-2 font-medium">Δ</th>
-                <th className="text-right py-2 px-2 font-medium">Δ %</th>
+                <th className="text-right py-2 px-2 font-medium whitespace-nowrap">Presumido</th>
+                <th className="text-right py-2 px-2 font-medium whitespace-nowrap">Real</th>
+                <th className="text-right py-2 px-2 font-medium whitespace-nowrap">Δ</th>
+                <th className="text-right py-2 px-2 font-medium whitespace-nowrap">Δ %</th>
                 <th className="text-center py-2 px-2 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody>
-              {groupOrder.map((group) => {
-                const rows = rowsByGroup.get(group) ?? [];
-                if (rows.length === 0) return null;
-                return (
-                  <tr key={group}>
-                    <td colSpan={6}>
-                      <div className="mt-3 mb-1">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                          {groupLabels[group]}
-                        </span>
-                      </div>
-                      <table className="w-full">
-                        <tbody>
-                          {rows.map((row) => {
-                            const mapping = DRE_LINE_MAPPINGS.find(
-                              (m) => m.line_code === row.line_code
-                            );
-                            const isGroup = mapping?.is_group ?? false;
-                            const isTotal = row.line_code === 'resultado_liquido';
-                            const isMargin = row.line_code === 'margem_liquida';
-                            const isWorse =
-                              row.variance_value < 0 && Math.abs(row.presumed_value) > 0.01;
-
-                            return (
-                              <tr
-                                key={row.line_code}
-                                className={cn(
-                                  'border-b border-border/50',
-                                  isTotal && 'bg-primary/5 font-semibold',
-                                  isGroup && 'font-medium',
-                                  isMargin && 'italic text-muted-foreground'
-                                )}
-                              >
-                                <td
-                                  className={cn(
-                                    'py-2 px-2 text-left',
-                                    mapping?.indent_level === 1 && 'pl-6'
-                                  )}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    {row.line_label}
-                                    {row.missing_real_cost_flag && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-[9px] gap-1 border-yellow-300 text-yellow-700"
-                                      >
-                                        <AlertTriangle className="w-2.5 h-2.5" />
-                                        Sem dado real
-                                      </Badge>
-                                    )}
-                                    {row.has_formula_warning && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-[9px] gap-1 border-red-300 text-red-700"
-                                      >
-                                        <AlertTriangle className="w-2.5 h-2.5" />
-                                        Divergência
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="py-2 px-2 text-right tabular-nums">
-                                  {isMargin
-                                    ? `${row.presumed_value.toFixed(2)}%`
-                                    : formatCurrency(row.presumed_value)}
-                                </td>
-                                <td className="py-2 px-2 text-right tabular-nums">
-                                  {isMargin
-                                    ? `${row.real_value.toFixed(2)}%`
-                                    : formatCurrency(row.real_value)}
-                                </td>
-                                <td
-                                  className={cn(
-                                    'py-2 px-2 text-right tabular-nums',
-                                    isWorse && 'text-red-600',
-                                    !isWorse && row.variance_value > 0 && 'text-green-600'
-                                  )}
-                                >
-                                  {isMargin
-                                    ? `${row.variance_value >= 0 ? '+' : ''}${row.variance_value.toFixed(2)}%`
-                                    : `${row.variance_value >= 0 ? '+' : ''}${formatCurrency(row.variance_value)}`}
-                                </td>
-                                <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">
-                                  {Math.abs(row.presumed_value) > 0.01
-                                    ? `${row.variance_percent >= 0 ? '+' : ''}${row.variance_percent.toFixed(1)}%`
-                                    : '—'}
-                                </td>
-                                <td className="py-2 px-2 text-center">
-                                  {isWorse ? (
-                                    <Badge variant="destructive" className="text-[9px] gap-1">
-                                      <AlertTriangle className="w-2.5 h-2.5" />
-                                      Abaixo
-                                    </Badge>
-                                  ) : row.variance_value > 0 && !isMargin ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[9px] gap-1 border-green-300 text-green-700"
-                                    >
-                                      <CheckCircle2 className="w-2.5 h-2.5" />
-                                      Acima
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground text-xs">—</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+            {groupOrder.map((group) => {
+              const rows = rowsByGroup.get(group) ?? [];
+              if (rows.length === 0) return null;
+              return (
+                <tbody key={group}>
+                  <tr>
+                    <td colSpan={6} className="py-2 px-2">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        {groupLabels[group]}
+                      </span>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
+                  {rows.map((row) => {
+                    const mapping = DRE_LINE_MAPPINGS.find((m) => m.line_code === row.line_code);
+                    const isGroup = mapping?.is_group ?? false;
+                    const isTotal = row.line_code === 'resultado_liquido';
+                    const isMargin = row.line_code === 'margem_liquida';
+                    const isWorse = row.variance_value < 0 && Math.abs(row.presumed_value) > 0.01;
+
+                    const prefix =
+                      row.line_code === 'faturamento_bruto'
+                        ? '(+)'
+                        : row.line_code === 'impostos' ||
+                            row.line_code === 'overhead' ||
+                            row.line_code === 'custos_diretos'
+                          ? '(-)'
+                          : row.line_code === 'receita_liquida' ||
+                              row.line_code === 'resultado_liquido'
+                            ? '(=)'
+                            : null;
+
+                    return (
+                      <tr
+                        key={row.line_code}
+                        className={cn(
+                          'border-b border-border/50',
+                          isTotal && 'bg-primary/5 font-semibold',
+                          isGroup && 'font-medium',
+                          isMargin && 'italic text-muted-foreground'
+                        )}
+                      >
+                        <td
+                          className={cn(
+                            'py-2 px-2 text-left whitespace-nowrap',
+                            mapping?.indent_level === 1 && 'pl-6'
+                          )}
+                        >
+                          <span className="inline-flex items-center">
+                            {prefix && (
+                              <span className="inline-block w-7 shrink-0 text-muted-foreground text-xs tabular-nums">
+                                {prefix}
+                              </span>
+                            )}
+                            <span>{row.line_label}</span>
+                            {row.missing_real_cost_flag && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] gap-1 border-yellow-300 text-yellow-700 ml-1"
+                              >
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                                Sem dado real
+                              </Badge>
+                            )}
+                            {row.has_formula_warning && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] gap-1 border-red-300 text-red-700 ml-1"
+                              >
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                                Divergência
+                              </Badge>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2 text-right tabular-nums whitespace-nowrap">
+                          {isMargin
+                            ? `${row.presumed_value.toFixed(2)}%`
+                            : formatCurrency(row.presumed_value)}
+                        </td>
+                        <td className="py-2 px-2 text-right tabular-nums whitespace-nowrap">
+                          {isMargin
+                            ? `${row.real_value.toFixed(2)}%`
+                            : formatCurrency(row.real_value)}
+                        </td>
+                        <td
+                          className={cn(
+                            'py-2 px-2 text-right tabular-nums whitespace-nowrap',
+                            isWorse && 'text-red-600',
+                            !isWorse && row.variance_value > 0 && 'text-green-600'
+                          )}
+                        >
+                          {isMargin
+                            ? `${row.variance_value >= 0 ? '+' : ''}${row.variance_value.toFixed(2)}%`
+                            : `${row.variance_value >= 0 ? '+' : ''}${formatCurrency(row.variance_value)}`}
+                        </td>
+                        <td className="py-2 px-2 text-right tabular-nums text-muted-foreground whitespace-nowrap">
+                          {Math.abs(row.presumed_value) > 0.01
+                            ? `${row.variance_percent >= 0 ? '+' : ''}${row.variance_percent.toFixed(1)}%`
+                            : '—'}
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          {isWorse ? (
+                            <Badge variant="destructive" className="text-[9px] gap-1">
+                              <AlertTriangle className="w-2.5 h-2.5" />
+                              Abaixo
+                            </Badge>
+                          ) : row.variance_value > 0 && !isMargin ? (
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] gap-1 border-green-300 text-green-700"
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5" />
+                              Acima
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              );
+            })}
           </table>
         </div>
       )}

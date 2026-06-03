@@ -32,7 +32,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
-import { formatRouteUf, StoredPricingBreakdown } from '@/lib/freightCalculator';
+import { formatRouteUf, getMarginStatus, StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 
@@ -104,8 +104,11 @@ export function QuoteCard({
   const anttTotal = breakdown?.meta?.antt?.total;
   const kmBandLabel = breakdown?.meta?.kmBandLabel || null;
   const kmStatus = breakdown?.meta?.kmStatus || 'OK';
-  const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
-  const marginPercent = breakdown?.meta?.marginPercent;
+  const targetMarginPercent =
+    breakdown?.profitability?.profitMarginTarget ?? breakdown?.rates?.targetMarginPercent ?? 15;
+  const marginPercent =
+    breakdown?.profitability?.margemPercent ?? breakdown?.meta?.marginPercent ?? 0;
+  const marginStatus = breakdown ? getMarginStatus(marginPercent, targetMarginPercent) : 'UNKNOWN';
 
   const canEmail = quote.stage === 'enviado' || quote.stage === 'negociacao';
   const canConvert = quote.stage === 'ganho';

@@ -50,6 +50,8 @@ import {
   StoredPricingBreakdown,
   TollPlaza,
   FREIGHT_CONSTANTS,
+  isMarginBelowTarget,
+  resolveMargemBrutaDisplay,
 } from '@/lib/freightCalculator';
 import {
   Table,
@@ -106,6 +108,23 @@ const STAGE_LABELS: Record<QuoteStage, { label: string; color: string }> = {
 };
 
 const TARGET_MARGIN_PERCENT = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
+const PRICE_EPS_REAIS = 0.01;
+
+/** Mantém desconto comercial no breakdown quando o valor da cotação é menor que o preço de tabela. */
+function mergeBreakdownWithNegotiatedDiscount(
+  breakdown: StoredPricingBreakdown,
+  negotiatedValueReais: number,
+  formulaTotalReais: number
+): StoredPricingBreakdown {
+  const discount = Math.max(0, Math.round((formulaTotalReais - negotiatedValueReais) * 100) / 100);
+  return {
+    ...breakdown,
+    totals: {
+      ...breakdown.totals,
+      discount,
+    },
+  };
+}
 
 export function QuoteDetailModal({
   open,
@@ -251,11 +270,6 @@ export function QuoteDetailModal({
   const kmBandLabel = breakdown?.meta?.kmBandLabel;
   const kmStatus = breakdown?.meta?.kmStatus || 'OK';
 
-  // Cálculo original de margem (meta) ainda usado para alertas gerais
-  const originalMarginPercent =
-    breakdown?.meta?.marginPercent ?? breakdown?.profitability?.margemPercent;
-  const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
-
   // Visão contábil (DRE Asset-Light):
   // Total Cliente = Faturamento Bruto - Desconto | Receita Líquida = Total - Impostos
   // Resultado Líquido e Margem % vêm do breakdown quando disponível
@@ -288,15 +302,44 @@ export function QuoteDetailModal({
       ? Number(custoMotoristaView ?? custosCarreteiroView)
       : pisoAnttView;
   const cargaDescargaView = breakdown?.profitability?.custosDescarga ?? 0;
-  const provisaoDasView = breakdown?.totals?.das ?? 0;
-  const margemBrutaView =
-    totalClienteView -
-    custoCarreteiroParaMargem -
-    cargaDescargaView -
-    provisaoDasView -
-    (breakdown?.totals?.icms ?? 0);
-
   const overheadView = breakdown?.profitability?.overhead ?? 0;
+
+  // Rentabilidade: sempre usar o snapshot do calculate-freight (profitability.*).
+  // A fórmula antiga (totalCliente − custoMotorista − ICMS) ignorava custoServicos e
+  // misturava piso ANTT com frete contratado — ex.: COT-2026-06-0002 mostrava ~R$ 13,5k
+  // de margem bruta vs ~R$ 5,8k gravados no motor.
+  const c = breakdown?.components;
+  const custoServicosView =
+    breakdown?.profitability?.custoServicos ??
+    (c?.toll ?? 0) +
+      (c?.aluguelMaquinas ?? 0) +
+      (c?.gris ?? 0) +
+      (c?.tso ?? 0) +
+      (c?.rctrc ?? 0) +
+      (c?.adValorem ?? 0) +
+      (c?.tde ?? 0) +
+      (c?.tear ?? 0) +
+      (c?.dispatchFee ?? 0) +
+      (c?.conditionalFeesTotal ?? 0) +
+      (c?.waitingTimeCost ?? 0);
+  const custoMotoristaAnttView =
+    (breakdown?.profitability as { custoMotoristaAntt?: number } | undefined)?.custoMotoristaAntt ??
+    pisoAnttView;
+  const receitaLiquidaFromBreakdown =
+    receitaLiquidaView ??
+    (totalClienteView > 0 ? totalClienteView - (breakdown?.totals?.totalImpostos ?? 0) : null);
+
+  const margemBrutaView =
+    receitaLiquidaFromBreakdown != null
+      ? resolveMargemBrutaDisplay(
+          breakdown?.profitability?.margemBruta,
+          receitaLiquidaFromBreakdown,
+          overheadView,
+          custoMotoristaAnttView,
+          custoServicosView
+        )
+      : (breakdown?.profitability?.margemBruta ?? 0);
+
   const resultadoLiquidoView = (
     breakdown?.profitability?.resultadoLiquido != null
       ? breakdown.profitability.resultadoLiquido
@@ -314,13 +357,8 @@ export function QuoteDetailModal({
       ?.profitMarginTarget ??
     (breakdown?.profitability as { profit_margin_target?: number })?.profit_margin_target ??
     TARGET_MARGIN_PERCENT;
-  const isBelowTargetView = margemPercentView < targetMargin;
-
-  // Mantém compatibilidade com o alerta de margem existente
-  const marginPercent = originalMarginPercent;
-  const isBelowTarget =
-    marginStatus === 'BELOW_TARGET' ||
-    (originalMarginPercent !== undefined && originalMarginPercent < targetMargin);
+  // Alerta: margem atual vs meta da cotação (não usar marginStatus do snapshot — era vs 15% fixo)
+  const isBelowTarget = isMarginBelowTarget(margemPercentView, targetMargin);
 
   const handleAdvancePercentChange = async (value: string) => {
     if (!quote) return;
@@ -427,6 +465,11 @@ export function QuoteDetailModal({
         (response.meta as { antt_piso_carreteiro?: number }).antt_piso_carreteiro ?? 0;
       const floorApplied = (response.meta as { antt_floor_applied?: boolean }).antt_floor_applied;
 
+      const formulaTotalFromBreakdown = Number(bd?.totals?.totalCliente ?? 0);
+      const formulaPriceUnchanged =
+        formulaTotalFromBreakdown > 0 &&
+        Math.abs(newCalcValue - formulaTotalFromBreakdown) <= PRICE_EPS_REAIS;
+
       if (floorApplied && pisoFromResponse > 0 && currentValue < pisoFromResponse) {
         // Valor abaixo do piso ANTT — salva breakdown e abre dialog de conformidade
         await updateQuoteMutation.mutateAsync({
@@ -435,11 +478,26 @@ export function QuoteDetailModal({
         });
         queryClient.invalidateQueries({ queryKey: ['quotes'] });
         setAnttDialog({ open: true, suggestedValue: newCalcValue, piso: pisoFromResponse });
-      } else if (currentValue > 0 && Math.abs(newCalcValue - currentValue) > 0.01) {
-        // Recálculo divergiu do valor negociado (maior ou menor) — apresentar escolha
+      } else if (formulaPriceUnchanged && currentValue > 0) {
+        // Preço de tabela igual ao anterior — só atualiza DRE; preserva valor negociado/desconto
+        const patched = mergeBreakdownWithNegotiatedDiscount(
+          newBreakdown,
+          currentValue,
+          newCalcValue
+        );
+        await updateQuoteMutation.mutateAsync({
+          id: quote.id,
+          updates: {
+            pricing_breakdown: patched as unknown as Json,
+            discount_value: patched.totals.discount ?? 0,
+          },
+        });
+        queryClient.invalidateQueries({ queryKey: ['quotes'] });
+        toast.success('Memória de cálculo atualizada. Valor negociado mantido.');
+      } else if (currentValue > 0 && Math.abs(newCalcValue - currentValue) > PRICE_EPS_REAIS) {
+        // Preço de tabela mudou e difere do valor negociado — apresentar escolha
         setSuggestedValueDialog({ open: true, newBreakdown, newCalcValue });
       } else {
-        // Sem divergência — atualiza apenas a memória de cálculo
         await updateQuoteMutation.mutateAsync({
           id: quote.id,
           updates: { pricing_breakdown: newBreakdown as unknown as Json },
@@ -458,11 +516,16 @@ export function QuoteDetailModal({
     if (!quote || !suggestedValueDialog.newBreakdown) return;
     setIsApplyingSuggestedValue(true);
     try {
+      const breakdownNoDiscount: StoredPricingBreakdown = {
+        ...suggestedValueDialog.newBreakdown,
+        totals: { ...suggestedValueDialog.newBreakdown.totals, discount: 0 },
+      };
       await updateQuoteMutation.mutateAsync({
         id: quote.id,
         updates: {
           value: suggestedValueDialog.newCalcValue,
-          pricing_breakdown: suggestedValueDialog.newBreakdown as unknown as Json,
+          discount_value: 0,
+          pricing_breakdown: breakdownNoDiscount as unknown as Json,
         },
       });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
@@ -479,9 +542,18 @@ export function QuoteDetailModal({
     if (!quote || !suggestedValueDialog.newBreakdown) return;
     setIsApplyingSuggestedValue(true);
     try {
+      const negotiated = Number(quote.value) || 0;
+      const patched = mergeBreakdownWithNegotiatedDiscount(
+        suggestedValueDialog.newBreakdown,
+        negotiated,
+        suggestedValueDialog.newCalcValue
+      );
       await updateQuoteMutation.mutateAsync({
         id: quote.id,
-        updates: { pricing_breakdown: suggestedValueDialog.newBreakdown as unknown as Json },
+        updates: {
+          pricing_breakdown: patched as unknown as Json,
+          discount_value: patched.totals.discount ?? 0,
+        },
       });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       setSuggestedValueDialog({ open: false, newBreakdown: null, newCalcValue: 0 });
@@ -926,7 +998,6 @@ export function QuoteDetailModal({
               margemPercent={margemPercentView}
               isBelowTarget={isBelowTarget}
               targetMarginPercent={targetMargin}
-              marginPercentForAlert={marginPercent}
               regimeFiscal={
                 (breakdown?.profitability as { regimeFiscal?: string } | undefined)?.regimeFiscal
               }
@@ -1349,21 +1420,38 @@ export function QuoteDetailModal({
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm">
                 <p>
-                  O recálculo resultou em{' '}
+                  O preço de tabela recalculado é{' '}
                   <span className="font-semibold text-foreground">
                     {formatCurrency(suggestedValueDialog.newCalcValue)}
                   </span>
-                  ,{' '}
-                  {suggestedValueDialog.newCalcValue > currentQuoteValue ? 'superior' : 'inferior'}{' '}
-                  ao valor negociado atual de{' '}
-                  <span className="font-semibold text-foreground">
-                    {formatCurrency(currentQuoteValue)}
-                  </span>
+                  {currentQuoteValue > 0 && (
+                    <>
+                      ,{' '}
+                      {suggestedValueDialog.newCalcValue > currentQuoteValue
+                        ? 'superior'
+                        : 'inferior'}{' '}
+                      ao valor negociado de{' '}
+                      <span className="font-semibold text-foreground">
+                        {formatCurrency(currentQuoteValue)}
+                      </span>
+                    </>
+                  )}
                   .
                 </p>
+                {currentQuoteValue > 0 &&
+                  suggestedValueDialog.newCalcValue > currentQuoteValue + PRICE_EPS_REAIS && (
+                    <p>
+                      Desconto comercial implícito:{' '}
+                      <span className="font-semibold text-foreground">
+                        {formatCurrency(suggestedValueDialog.newCalcValue - currentQuoteValue)}
+                      </span>
+                      .
+                    </p>
+                  )}
                 <p className="text-muted-foreground">
-                  Deseja aplicar o valor sugerido ou manter o valor negociado e apenas atualizar a
-                  memória de cálculo?
+                  <strong>Aplicar valor sugerido</strong> — alinha a cotação ao preço de tabela
+                  (zera desconto). <strong>Manter valor atual</strong> — atualiza margem, impostos e
+                  composição no breakdown, sem alterar o valor ao cliente.
                 </p>
               </div>
             </AlertDialogDescription>

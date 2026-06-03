@@ -8,10 +8,11 @@ import { toast } from 'sonner';
 import { useDreOperacionalReport } from '@/hooks/useDreOperacionalReport';
 import { useVehicleTypesOperational } from '@/hooks/useVehicleTypes';
 import { DreOperacionalTable } from '@/components/reports/DreOperacionalTable';
-import { DateFilterRange } from '@/components/filters/DateFilterRange';
+import { DrePeriodFilter, type DrePeriodFilterValue } from '@/components/filters/DrePeriodFilter';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRsPerKmByRoute } from '@/hooks/useRsPerKmByRoute';
 import { RsPerKmTable } from '@/components/reports/RsPerKmTable';
+import { DreAuditPanel } from '@/components/reports/DreAuditPanel';
 import {
   useDeleteRouteMetricsConfig,
   useRouteMetrics,
@@ -19,38 +20,26 @@ import {
   useUpsertRouteMetricsConfig,
 } from '@/hooks/useRouteMetrics';
 import { RouteMetricsCards } from '@/components/reports/RouteMetricsCards';
-import {
-  type DateFilterMode,
-  type DateFilterRange as DateFilterRangeType,
-  getRangeFromMonth,
-  getCurrentMonthYear,
-} from '@/lib/dateFilterUtils';
+import { getRangeFromMonth, getCurrentMonthYear } from '@/lib/dateFilterUtils';
 import type { PeriodType } from '@/modules/dre';
-
-const PERIOD_OPTIONS: { value: PeriodType; label: string }[] = [
-  { value: 'detail', label: 'Detalhado' },
-  { value: 'month', label: 'Mês' },
-  { value: 'quarter', label: 'Trimestre' },
-  { value: 'year', label: 'Ano' },
-];
 
 const { month: CUR_MONTH, year: CUR_YEAR } = getCurrentMonthYear();
 const DEFAULT_RANGE = getRangeFromMonth(CUR_MONTH, CUR_YEAR);
+const DEFAULT_PERIOD: PeriodType = 'month';
 
 export default function Reports() {
-  const [filterMode, setFilterMode] = useState<DateFilterMode>('month');
-  const [dateFrom, setDateFrom] = useState<string>(DEFAULT_RANGE.dateFrom);
-  const [dateTo, setDateTo] = useState<string>(DEFAULT_RANGE.dateTo);
+  const [drePeriod, setDrePeriod] = useState<DrePeriodFilterValue>({
+    range: DEFAULT_RANGE,
+    periodType: DEFAULT_PERIOD,
+  });
   const [quoteCode, setQuoteCode] = useState<string>('');
   const [osNumber, setOsNumber] = useState<string>('');
-  const [periodType, setPeriodType] = useState<PeriodType>('detail');
   const [vehicleTypeId, setVehicleTypeId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'dre' | 'rs-km' | 'metrics'>('dre');
+  const [activeTab, setActiveTab] = useState<'dre' | 'rs-km' | 'metrics' | 'audit'>('dre');
 
-  const handleRangeChange = (range: DateFilterRangeType) => {
-    setDateFrom(range.dateFrom);
-    setDateTo(range.dateTo);
-  };
+  const dateFrom = drePeriod.range.dateFrom;
+  const dateTo = drePeriod.range.dateTo;
+  const periodType = drePeriod.periodType;
 
   const { data: vehicleTypes } = useVehicleTypesOperational();
   const { data: dreTables, isLoading: isLoadingDre } = useDreOperacionalReport({
@@ -140,70 +129,55 @@ export default function Reports() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
       >
-        <div className="flex flex-wrap items-end gap-4 mb-6">
-          <DateFilterRange
-            mode={filterMode}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            onModeChange={setFilterMode}
-            onRangeChange={handleRangeChange}
-          />
-          <div className="grid gap-1.5">
-            <Label className="text-xs">COT</Label>
-            <Input
-              placeholder="COT-2026-02-0001"
-              value={quoteCode}
-              onChange={(e) => setQuoteCode(e.target.value)}
-              className="w-40"
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label className="text-xs">OS</Label>
-            <Input
-              placeholder="OS-2026-02-0001"
-              value={osNumber}
-              onChange={(e) => setOsNumber(e.target.value)}
-              className="w-40"
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label className="text-xs">Visão</Label>
-            <select
-              value={periodType}
-              onChange={(e) => setPeriodType(e.target.value as PeriodType)}
-              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+        <div className="flex flex-col gap-4 mb-6">
+          {/* Filtro DRE: período com botões */}
+          {activeTab === 'dre' && <DrePeriodFilter value={drePeriod} onChange={setDrePeriod} />}
+
+          {/* Filtros complementares */}
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="grid gap-1.5">
+              <Label className="text-xs">COT</Label>
+              <Input
+                placeholder="COT-2026-02-0001"
+                value={quoteCode}
+                onChange={(e) => setQuoteCode(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">OS</Label>
+              <Input
+                placeholder="OS-2026-02-0001"
+                value={osNumber}
+                onChange={(e) => setOsNumber(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Tipo veículo</Label>
+              <select
+                value={vehicleTypeId ?? ''}
+                onChange={(e) => setVehicleTypeId(e.target.value || null)}
+                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm min-w-[140px]"
+              >
+                <option value="">Todos</option>
+                {(vehicleTypes ?? []).map((vt) => (
+                  <option key={vt.id} value={vt.id}>
+                    {vt.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={exportDreCsv}
+              disabled={!dreTables || dreTables.length === 0}
+              className="h-9 px-4 rounded-md border border-border bg-background hover:bg-muted/50 disabled:opacity-50 flex items-center gap-2 text-sm"
             >
-              {PERIOD_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              <Download className="w-4 h-4" />
+              Exportar CSV
+            </button>
           </div>
-          <div className="grid gap-1.5">
-            <Label className="text-xs">Tipo veículo</Label>
-            <select
-              value={vehicleTypeId ?? ''}
-              onChange={(e) => setVehicleTypeId(e.target.value || null)}
-              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm min-w-[140px]"
-            >
-              <option value="">Todos</option>
-              {(vehicleTypes ?? []).map((vt) => (
-                <option key={vt.id} value={vt.id}>
-                  {vt.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            type="button"
-            onClick={exportDreCsv}
-            disabled={!dreTables || dreTables.length === 0}
-            className="h-9 px-4 rounded-md border border-border bg-background hover:bg-muted/50 disabled:opacity-50 flex items-center gap-2 text-sm"
-          >
-            <Download className="w-4 h-4" />
-            Exportar CSV
-          </button>
         </div>
         <Tabs
           value={activeTab}
@@ -213,6 +187,7 @@ export default function Reports() {
             <TabsTrigger value="dre">DRE Operacional</TabsTrigger>
             <TabsTrigger value="rs-km">R$/KM por rota (OS reais)</TabsTrigger>
             <TabsTrigger value="metrics">Métricas</TabsTrigger>
+            <TabsTrigger value="audit">Auditoria COT/OS</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dre" className="space-y-4">
@@ -241,6 +216,10 @@ export default function Reports() {
               </span>
             </div>
             <RsPerKmTable rows={rsPerKmQuery.data ?? []} isLoading={rsPerKmQuery.isLoading} />
+          </TabsContent>
+
+          <TabsContent value="audit" className="space-y-4">
+            <DreAuditPanel />
           </TabsContent>
 
           <TabsContent value="metrics" className="space-y-4">
