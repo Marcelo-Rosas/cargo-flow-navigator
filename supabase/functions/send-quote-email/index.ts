@@ -82,8 +82,12 @@ Deno.serve(async (req) => {
     let quote: Record<string, unknown>;
     let routeStops;
     let paymentTerm;
+    let company;
     try {
-      ({ quote, routeStops, paymentTerm } = await fetchQuoteEmailContext(supabase, body.quoteId));
+      ({ quote, routeStops, paymentTerm, company } = await fetchQuoteEmailContext(
+        supabase,
+        body.quoteId
+      ));
     } catch (err) {
       return new Response(JSON.stringify({ error: String(err) }), {
         status: 404,
@@ -92,8 +96,8 @@ Deno.serve(async (req) => {
     }
 
     const quoteCode = (quote.quote_code as string) || body.quoteId.slice(0, 8);
-    const content = buildQuoteEmailContent(quote, paymentTerm, routeStops, emailMode);
-    const html = buildQuoteEmailHtml(quote, paymentTerm, routeStops, emailMode);
+    const content = buildQuoteEmailContent(quote, paymentTerm, routeStops, emailMode, company);
+    const html = buildQuoteEmailHtml(quote, paymentTerm, routeStops, emailMode, company);
 
     const emailPayload: Record<string, unknown> = {
       from: 'Vectra Cargo <cotacao@vectracargo.com.br>',

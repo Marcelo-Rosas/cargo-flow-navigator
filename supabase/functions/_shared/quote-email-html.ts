@@ -96,16 +96,23 @@ export function buildQuoteEmailHtmlFromContent(content: QuoteEmailContent): stri
         <td style="padding:6px 16px 16px;color:#7f8c8d;font-size:12px;font-weight:500;">Saldo (${payment.balancePercent}%)</td>
         <td style="padding:6px 16px 16px;color:#003d66;font-size:12px;font-weight:600;text-align:right;">${escapeHtml(payment.balanceAmount)}</td>
       </tr>`
-          : payment.termName
-            ? `
-      <tr>
-        <td colspan="2" style="padding:0 16px 16px;color:#7f8c8d;font-size:12px;">
-          Prazo: ${payment.days ?? 0} dias
-        </td>
-      </tr>`
-            : `
+          : `
       <tr><td colspan="2" style="padding:0 16px 16px;">&nbsp;</td></tr>`
       }
+    </table>`
+    : '';
+
+  const bankRowsHtml = content.bankRows?.length
+    ? content.bankRows
+        .map((row, i) => infoRow(row.label, row.value, i === content.bankRows!.length - 1))
+        .join('')
+    : '';
+
+  const bankHtml = bankRowsHtml
+    ? `
+    ${sectionHeader('Dados bancários')}
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-left:4px solid #e9ecef;border-radius:6px;overflow:hidden;margin-bottom:24px;padding:0 16px;">
+      ${bankRowsHtml}
     </table>`
     : '';
 
@@ -174,6 +181,7 @@ export function buildQuoteEmailHtmlFromContent(content: QuoteEmailContent): stri
             </table>
             ${taxHtml}
             ${paymentHtml}
+            ${bankHtml}
             ${notesHtml}
           </td>
         </tr>
@@ -196,9 +204,10 @@ export function buildQuoteEmailHtml(
   quote: Record<string, unknown>,
   paymentTerm: PaymentTerm | null,
   routeStops: RouteStop[] = [],
-  emailMode: QuoteEmailMode = 'simplified'
+  emailMode: QuoteEmailMode = 'simplified',
+  company: Record<string, unknown> | null = null
 ): string {
   return buildQuoteEmailHtmlFromContent(
-    buildQuoteEmailContent(quote, paymentTerm, routeStops, emailMode)
+    buildQuoteEmailContent(quote, paymentTerm, routeStops, emailMode, company)
   );
 }

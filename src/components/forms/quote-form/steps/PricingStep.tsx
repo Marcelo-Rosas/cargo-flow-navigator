@@ -17,7 +17,15 @@ import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { DatePickerString } from '@/components/ui/date-picker';
-import { Loader2, TrendingUp, ReceiptText, MapPin, PackageCheck } from 'lucide-react';
+import {
+  Loader2,
+  TrendingUp,
+  ReceiptText,
+  MapPin,
+  PackageCheck,
+  AlertTriangle,
+} from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatters';
 import { SectionBlock } from '@/components/ui/section-block';
@@ -30,7 +38,11 @@ import type { AdditionalFeesSelection } from '@/components/quotes/AdditionalFees
 import type { EquipmentRentalItem } from '@/components/quotes/EquipmentRentalSection';
 import type { UnloadingCostItem } from '@/components/quotes/UnloadingCostSection';
 import type { QuoteFormData } from '../types';
-import type { FreightCalculationOutput } from '@/lib/freightCalculator';
+import {
+  type FreightCalculationOutput,
+  resolveMargemBrutaDisplay,
+  isMarginBelowTarget,
+} from '@/lib/freightCalculator';
 
 interface PaymentTerm {
   id: string;
@@ -88,6 +100,21 @@ export function PricingStep({
   );
 
   const showAllIn = !isLegacy && calculationResult?.status === 'OK' && (t?.totalCliente ?? 0) > 0;
+
+  const receitaLiquida =
+    p?.receitaLiquida ??
+    Math.max(0, (t?.totalCliente ?? 0) - (t?.totalImpostos ?? (t?.das ?? 0) + (t?.icms ?? 0)));
+  const custoMotoristaAntt = p?.custoMotoristaAntt ?? c?.baseFreight ?? 0;
+  const custoServicos = p?.custoServicos ?? 0;
+  const margemContribuicao = resolveMargemBrutaDisplay(
+    p?.margemBruta,
+    receitaLiquida,
+    p?.overhead ?? 0,
+    custoMotoristaAntt,
+    custoServicos
+  );
+  const targetMargin = p?.profitMarginTarget ?? calculationResult?.rates?.profitMarginPercent ?? 15;
+  const showMarginAlert = showAllIn && isMarginBelowTarget(p?.margemPercent ?? 0, targetMargin);
 
   // Auto-fill delivery days only if fields are still empty (respects manual edits)
   useEffect(() => {
@@ -484,7 +511,24 @@ export function PricingStep({
                 </TabsContent>
 
                 <TabsContent value="rentabilidade" className="p-5 space-y-3 text-sm mt-0">
-                  <ResultRow label="Receita Bruta" value={formatCurrency(t?.receitaBruta ?? 0)} />
+                  {showMarginAlert && (
+                    <Alert className="bg-warning/10 border-warning py-2">
+                      <AlertTriangle className="h-4 w-4 text-warning-foreground" />
+                      <AlertDescription className="text-warning-foreground text-xs">
+                        Margem operacional {(p?.margemPercent ?? 0).toFixed(1)}% abaixo da meta de{' '}
+                        {targetMargin}%
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Overhead é custo estrutural (% da receita líquida), já deduzido nos indicadores
+                    — não é lucro.
+                  </p>
+                  <ResultRow label="Receita líquida" value={formatCurrency(receitaLiquida)} />
+                  <ResultRow
+                    label="Receita Bruta (faturamento)"
+                    value={formatCurrency(t?.receitaBruta ?? t?.totalCliente ?? 0)}
+                  />
                   {p?.regimeFiscal === 'lucro_presumido' ? (
                     <>
                       {(t?.pis ?? 0) > 0 && (
@@ -526,10 +570,13 @@ export function PricingStep({
 
                   <Separator className="my-2" />
                   <ResultRow
-                    label="Margem Bruta (R$)"
-                    value={formatCurrency(p?.margemBruta ?? 0)}
+                    label="Margem de contribuição"
+                    value={formatCurrency(margemContribuicao)}
                   />
-                  <ResultRow label="Overhead (Fixo)" value={formatCurrency(p?.overhead ?? 0)} />
+                  <ResultRow
+                    label={`Overhead (${calculationResult?.rates?.overheadPercent?.toFixed(0) ?? '—'}% s/ receita líq.)`}
+                    value={`−${formatCurrency(p?.overhead ?? 0)}`}
+                  />
 
                   <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-950/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900 mt-4">
                     <div className="flex flex-col">

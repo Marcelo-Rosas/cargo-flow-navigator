@@ -11,7 +11,8 @@ export function buildQuoteEmailContent(
   quote: Record<string, unknown>,
   paymentTerm: PaymentTerm | null,
   routeStops: RouteStop[] = [],
-  emailMode: QuoteEmailMode = 'simplified'
+  emailMode: QuoteEmailMode = 'simplified',
+  company: Record<string, unknown> | null = null
 ): QuoteEmailContent {
   const breakdown = quote.pricing_breakdown as Record<string, unknown> | null;
   const meta = breakdown?.meta as Record<string, unknown> | null;
@@ -136,6 +137,8 @@ export function buildQuoteEmailContent(
   const additionalShippers = (
     Array.isArray(quote.additional_shippers) ? quote.additional_shippers : []
   ) as Array<{ name?: string }>;
+  const destinations = routeStops.filter((s) => s.stop_type === 'destination');
+  const stops = routeStops.filter((s) => s.stop_type === 'stop');
 
   if (isCIF) {
     clientRows.push({ label: 'Cliente (Embarcador)', value: shipperName || '—' });
@@ -144,14 +147,14 @@ export function buildQuoteEmailContent(
     });
   } else {
     clientRows.push({ label: 'Cliente', value: clientName });
-    routeStops.forEach((s, i) => {
+    destinations.forEach((s, i) => {
       const val = s.name?.trim() || s.city_uf?.trim() || s.cep || '—';
       clientRows.push({ label: `Destinatário ${i + 1}`, value: val });
     });
   }
 
   const routeRows: EmailRow[] = [{ label: 'Origem', value: origin }];
-  routeStops.forEach((s, i) => {
+  stops.forEach((s, i) => {
     const val = s.city_uf?.trim() || s.name?.trim() || s.cep || '—';
     routeRows.push({ label: `Parada ${i + 1}`, value: val });
   });
@@ -186,6 +189,16 @@ export function buildQuoteEmailContent(
       }
     : undefined;
 
+  const bankRows: EmailRow[] = [];
+  const bankName = (company?.bank_name as string | null) ?? null;
+  const bankAgency = (company?.bank_agency as string | null) ?? null;
+  const bankAccount = (company?.bank_account as string | null) ?? null;
+  const bankPixKey = (company?.bank_pix_key as string | null) ?? null;
+  if (bankName) bankRows.push({ label: 'Banco', value: bankName });
+  if (bankAgency) bankRows.push({ label: 'Agência', value: bankAgency });
+  if (bankAccount) bankRows.push({ label: 'Conta', value: bankAccount });
+  if (bankPixKey) bankRows.push({ label: 'Chave Pix', value: bankPixKey });
+
   return {
     quoteCode,
     value,
@@ -195,6 +208,7 @@ export function buildQuoteEmailContent(
     pricingRows,
     taxRow,
     payment,
+    bankRows: bankRows.length ? bankRows : undefined,
     notes: notes || undefined,
   };
 }

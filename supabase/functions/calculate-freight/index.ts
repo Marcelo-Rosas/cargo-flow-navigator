@@ -939,7 +939,7 @@ Deno.serve(async (req) => {
     // =====================================================
 
     const routeUfLabel = formatRouteUf(input.origin, input.destination);
-    const marginStatus = getMarginStatus(margemPercent);
+    const marginStatus = getMarginStatus(margemPercent, profitMarginPercent);
 
     const meta: FreightMeta = {
       route_uf_label: routeUfLabel,

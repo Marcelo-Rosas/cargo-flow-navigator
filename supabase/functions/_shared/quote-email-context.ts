@@ -8,6 +8,7 @@ export async function fetchQuoteEmailContext(
   quote: Record<string, unknown>;
   routeStops: RouteStop[];
   paymentTerm: PaymentTerm | null;
+  company: Record<string, unknown> | null;
 }> {
   const { data: quote, error: quoteError } = await supabase
     .from('quotes')
@@ -21,9 +22,9 @@ export async function fetchQuoteEmailContext(
 
   const { data: routeStops = [] } = await supabase
     .from('quote_route_stops')
-    .select('sequence, name, city_uf, cep')
+    .select('sequence, name, city_uf, cep, stop_type')
     .eq('quote_id', quoteId)
-    .eq('stop_type', 'stop')
+    .in('stop_type', ['stop', 'destination'])
     .order('sequence', { ascending: true });
 
   let paymentTerm: PaymentTerm | null = null;
@@ -36,9 +37,12 @@ export async function fetchQuoteEmailContext(
     paymentTerm = data;
   }
 
+  const { data: company } = await supabase.from('company_settings').select('*').maybeSingle();
+
   return {
     quote: quote as Record<string, unknown>,
     routeStops: (routeStops ?? []) as RouteStop[],
     paymentTerm,
+    company: (company as Record<string, unknown> | null) ?? null,
   };
 }

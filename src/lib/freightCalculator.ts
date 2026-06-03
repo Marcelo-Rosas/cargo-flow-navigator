@@ -42,6 +42,47 @@ export function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+/** Status da margem operacional vs meta (±0,5 p.p. — paridade com calculate-freight). */
+export function getMarginStatus(
+  marginPercent: number,
+  targetMarginPercent: number = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT
+): 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET' {
+  if (marginPercent > targetMarginPercent + 0.5) return 'ABOVE_TARGET';
+  if (marginPercent < targetMarginPercent - 0.5) return 'BELOW_TARGET';
+  return 'AT_TARGET';
+}
+
+export function isMarginBelowTarget(
+  marginPercent: number,
+  targetMarginPercent: number = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT
+): boolean {
+  return getMarginStatus(marginPercent, targetMarginPercent) === 'BELOW_TARGET';
+}
+
+/**
+ * Margem de contribuição (motor: receita líquida − overhead − piso ANTT − custos de serviço).
+ * Corrige snapshots legados que gravaram fórmula inflada (ex.: total − motorista − impostos).
+ */
+export function resolveMargemBrutaDisplay(
+  storedMargemBruta: number | null | undefined,
+  receitaLiquida: number,
+  overhead: number,
+  custoMotoristaAntt: number,
+  custoServicos: number
+): number {
+  if (!Number.isFinite(receitaLiquida) || receitaLiquida <= 0) {
+    return storedMargemBruta ?? 0;
+  }
+  const derived = round2(receitaLiquida - overhead - custoMotoristaAntt - custoServicos);
+  if (storedMargemBruta == null || !Number.isFinite(storedMargemBruta)) {
+    return derived;
+  }
+  if (Math.abs(storedMargemBruta - derived) > 50) {
+    return derived;
+  }
+  return storedMargemBruta;
+}
+
 // ============================================
 // TYPES - MARKUP SCOPE
 // ============================================
@@ -1077,14 +1118,16 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   // ---- STEP 9: DRE ASSET-LIGHT ----
   const dasProvision = das;
   const overhead = round2(receitaLiquida * (params.overheadPercent / 100));
-  const resultadoLiquido = round2(receitaLiquida - overhead - custosDiretos);
-  const margemBruta = round2(receitaLiquida - overhead - custoMotorista - custoServicos);
+  const custoMotoristaContratado = custoMotorista;
+  const custoMotoristaAntt = anttFloorApplied ? pisoAntt : baseCost;
+  const resultadoLiquido = round2(
+    receitaLiquida - overhead - custoMotoristaContratado - descargaValue
+  );
+  const margemBruta = round2(receitaLiquida - overhead - custoMotoristaAntt - custoServicos);
   const margemPercent = totalCliente > 0 ? round2((resultadoLiquido / totalCliente) * 100) : 0;
 
   // ---- STEP 10: META STATUS ----
-  let marginStatus: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET' = 'AT_TARGET';
-  if (margemPercent > params.targetMarginPercent) marginStatus = 'ABOVE_TARGET';
-  else if (margemPercent < params.targetMarginPercent) marginStatus = 'BELOW_TARGET';
+  const marginStatus = getMarginStatus(margemPercent, params.profitMarginPercent);
 
   return {
     status: 'OK',
@@ -1156,8 +1199,8 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       // - Antt: piso legal mínimo (= piso ANTT quando aplicado, senão = baseCost/frete_peso)
       // - Contratado: NTC base (frete_peso) — o que o motorista recebe em condição padrão
       // - Real: valor negociado na OS (alimentado externamente após fechamento)
-      custoMotoristaAntt: custoMotorista,
-      custoMotoristaContratado: baseCost,
+      custoMotoristaAntt,
+      custoMotoristaContratado,
       custoMotoristaReal: null,
       custosDescarga: descargaValue,
       custoServicos,

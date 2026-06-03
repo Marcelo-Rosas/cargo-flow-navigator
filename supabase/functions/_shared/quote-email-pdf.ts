@@ -4,8 +4,10 @@ import type { EmailRow, QuoteEmailContent } from './quote-email-types.ts';
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
-const MARGIN = 40;
+// Layout mais compacto para caber em 1 página na maioria dos casos.
+const MARGIN = 34;
 const CONTENT_W = PAGE_W - MARGIN * 2;
+const FOOTER_H = 40;
 
 const palette = {
   navy: rgb(0, 61 / 255, 102 / 255),
@@ -28,6 +30,7 @@ interface PdfCtx {
   y: number;
   font: PDFFont;
   fontBold: PDFFont;
+  pages: PDFPage[];
 }
 
 function decodeLogoBytes(): Uint8Array {
@@ -41,10 +44,12 @@ function decodeLogoBytes(): Uint8Array {
 function newPage(ctx: PdfCtx): void {
   ctx.page = ctx.doc.addPage([PAGE_W, PAGE_H]);
   ctx.y = PAGE_H - MARGIN;
+  ctx.pages.push(ctx.page);
 }
 
 function ensureSpace(ctx: PdfCtx, needed: number): void {
-  if (ctx.y - needed < MARGIN + 30) newPage(ctx);
+  // Reserva espaço para o rodapé (não deixar conteúdo colidir).
+  if (ctx.y - needed < MARGIN + FOOTER_H) newPage(ctx);
 }
 
 function drawGradientBar(ctx: PdfCtx): void {
@@ -71,7 +76,8 @@ function drawGradientBar(ctx: PdfCtx): void {
 
 async function drawHeader(ctx: PdfCtx, content: QuoteEmailContent): Promise<void> {
   const logoBytes = decodeLogoBytes();
-  const logo = await ctx.doc.embedJpg(logoBytes);
+  // LOGO_BASE64 hoje é PNG; usar embedPng evita erros "SOI not found in JPEG".
+  const logo = await ctx.doc.embedPng(logoBytes);
   const logoH = 38;
   const logoW = (logo.width / logo.height) * logoH;
 
@@ -126,7 +132,7 @@ async function drawHeader(ctx: PdfCtx, content: QuoteEmailContent): Promise<void
 
 function drawSectionHeader(ctx: PdfCtx, title: string): void {
   ensureSpace(ctx, 44);
-  const barH = 26;
+  const barH = 22;
   ctx.y -= barH;
   ctx.page.drawRectangle({ x: MARGIN, y: ctx.y, width: 4, height: barH, color: palette.orange });
   ctx.page.drawRectangle({
@@ -138,17 +144,17 @@ function drawSectionHeader(ctx: PdfCtx, title: string): void {
   });
   ctx.page.drawText(title.toUpperCase(), {
     x: MARGIN + 14,
-    y: ctx.y + 8,
+    y: ctx.y + 7,
     size: 9,
     font: ctx.fontBold,
     color: palette.navy,
   });
-  ctx.y -= 10;
+  ctx.y -= 8;
 }
 
 function drawKeyValueRows(ctx: PdfCtx, rows: EmailRow[]): void {
   rows.forEach((row, index) => {
-    ensureSpace(ctx, 22);
+    ensureSpace(ctx, 20);
     ctx.page.drawText(row.label, {
       x: MARGIN,
       y: ctx.y - 12,
@@ -165,7 +171,7 @@ function drawKeyValueRows(ctx: PdfCtx, rows: EmailRow[]): void {
       font: ctx.font,
       color: palette.navy,
     });
-    ctx.y -= 18;
+    ctx.y -= 16;
     if (index < rows.length - 1) {
       ctx.page.drawLine({
         start: { x: MARGIN, y: ctx.y + 8 },
@@ -175,55 +181,53 @@ function drawKeyValueRows(ctx: PdfCtx, rows: EmailRow[]): void {
       });
     }
   });
-  ctx.y -= 10;
+  ctx.y -= 6;
 }
 
 function drawPricingTable(ctx: PdfCtx, rows: EmailRow[]): void {
   if (rows.length === 0) return;
-  ensureSpace(ctx, 28 + rows.length * 20);
-  const tableTop = ctx.y;
-  const tableH = rows.length * 20 + 8;
-  ctx.page.drawRectangle({
-    x: MARGIN,
-    y: tableTop - tableH,
-    width: CONTENT_W,
-    height: tableH,
-    color: palette.lightGray,
-  });
-  ctx.y = tableTop - 6;
   rows.forEach((row, index) => {
+    ensureSpace(ctx, 22);
+    const rowH = 20;
+    ctx.page.drawRectangle({
+      x: MARGIN,
+      y: ctx.y - rowH,
+      width: CONTENT_W,
+      height: rowH,
+      color: palette.lightGray,
+    });
     ctx.page.drawText(row.label, {
       x: MARGIN + 10,
-      y: ctx.y - 12,
+      y: ctx.y - 13,
       size: 10,
       font: ctx.font,
       color: palette.gray,
       maxWidth: CONTENT_W * 0.62,
     });
-    const valueWidth = ctx.font.widthOfTextAtSize(row.value, 10);
+    const valueWidth = ctx.fontBold.widthOfTextAtSize(row.value, 10);
     ctx.page.drawText(row.value, {
       x: PAGE_W - MARGIN - 10 - valueWidth,
-      y: ctx.y - 12,
+      y: ctx.y - 13,
       size: 10,
       font: ctx.fontBold,
       color: palette.navy,
     });
-    ctx.y -= 20;
+    ctx.y -= rowH;
     if (index < rows.length - 1) {
       ctx.page.drawLine({
-        start: { x: MARGIN + 8, y: ctx.y + 10 },
-        end: { x: PAGE_W - MARGIN - 8, y: ctx.y + 10 },
+        start: { x: MARGIN + 8, y: ctx.y },
+        end: { x: PAGE_W - MARGIN - 8, y: ctx.y },
         thickness: 0.5,
         color: palette.border,
       });
     }
   });
-  ctx.y -= 8;
+  ctx.y -= 10;
 }
 
 function drawTotalBox(ctx: PdfCtx, content: QuoteEmailContent): void {
-  ensureSpace(ctx, 56);
-  const boxH = 48;
+  ensureSpace(ctx, 44);
+  const boxH = 34;
   ctx.y -= boxH;
   ctx.page.drawRectangle({
     x: MARGIN,
@@ -234,21 +238,21 @@ function drawTotalBox(ctx: PdfCtx, content: QuoteEmailContent): void {
   });
   ctx.page.drawText('VALOR TOTAL', {
     x: MARGIN + 14,
-    y: ctx.y + 18,
-    size: 10,
+    y: ctx.y + 13,
+    size: 9,
     font: ctx.fontBold,
     color: palette.whiteMuted,
   });
-  const totalSize = 22;
+  const totalSize = 18;
   const totalW = ctx.fontBold.widthOfTextAtSize(content.valueFormatted, totalSize);
   ctx.page.drawText(content.valueFormatted, {
     x: PAGE_W - MARGIN - 14 - totalW,
-    y: ctx.y + 14,
+    y: ctx.y + 10,
     size: totalSize,
     font: ctx.fontBold,
     color: palette.orange,
   });
-  ctx.y -= 18;
+  ctx.y -= 10;
 }
 
 function drawTaxRow(ctx: PdfCtx, row: EmailRow): void {
@@ -287,9 +291,10 @@ function drawPaymentBlock(ctx: PdfCtx, content: QuoteEmailContent): void {
   const payment = content.payment;
   if (!payment) return;
 
-  ensureSpace(ctx, 90);
+  // Precisa reservar altura suficiente para não “vazar” sobre a próxima seção.
+  ensureSpace(ctx, 96);
   const startY = ctx.y;
-  const boxH = payment.advancePercent > 0 ? 92 : payment.termName ? 72 : 48;
+  const boxH = payment.advancePercent > 0 ? 92 : payment.termName ? 58 : 50;
   ctx.y -= boxH;
   ctx.page.drawRectangle({
     x: MARGIN,
@@ -300,7 +305,8 @@ function drawPaymentBlock(ctx: PdfCtx, content: QuoteEmailContent): void {
   });
   ctx.page.drawRectangle({ x: MARGIN, y: ctx.y, width: 4, height: boxH, color: palette.blue });
 
-  let lineY = startY - 18;
+  // Subir o conteúdo: menos padding-top para alinhar melhor com o banner acima.
+  let lineY = startY - 12;
   ctx.page.drawText('CONDIÇÃO DE PAGAMENTO', {
     x: MARGIN + 14,
     y: lineY - 12,
@@ -308,7 +314,7 @@ function drawPaymentBlock(ctx: PdfCtx, content: QuoteEmailContent): void {
     font: ctx.fontBold,
     color: palette.navy,
   });
-  lineY -= 22;
+  lineY -= 18;
 
   if (payment.termName) {
     ctx.page.drawText(payment.termName, {
@@ -318,7 +324,7 @@ function drawPaymentBlock(ctx: PdfCtx, content: QuoteEmailContent): void {
       font: ctx.fontBold,
       color: palette.navy,
     });
-    lineY -= 20;
+    lineY -= 16;
   }
 
   if (payment.methodLabel) {
@@ -337,7 +343,7 @@ function drawPaymentBlock(ctx: PdfCtx, content: QuoteEmailContent): void {
       font: ctx.fontBold,
       color: palette.navy,
     });
-    lineY -= 18;
+    lineY -= 14;
   }
 
   if (payment.termName && payment.advancePercent > 0) {
@@ -357,7 +363,7 @@ function drawPaymentBlock(ctx: PdfCtx, content: QuoteEmailContent): void {
       font: ctx.fontBold,
       color: palette.navy,
     });
-    lineY -= 16;
+    lineY -= 14;
     const balLabel = `Saldo (${payment.balancePercent}%)`;
     ctx.page.drawText(balLabel, {
       x: MARGIN + 14,
@@ -374,17 +380,9 @@ function drawPaymentBlock(ctx: PdfCtx, content: QuoteEmailContent): void {
       font: ctx.fontBold,
       color: palette.navy,
     });
-  } else if (payment.termName && payment.days != null) {
-    ctx.page.drawText(`Prazo: ${payment.days} dias`, {
-      x: MARGIN + 14,
-      y: lineY - 10,
-      size: 9,
-      font: ctx.font,
-      color: palette.gray,
-    });
   }
 
-  ctx.y -= 12;
+  ctx.y -= 8;
 }
 
 function wrapText(text: string, maxChars: number): string[] {
@@ -407,35 +405,39 @@ function wrapText(text: string, maxChars: number): string[] {
 function drawNotes(ctx: PdfCtx, notes: string): void {
   drawSectionHeader(ctx, 'Observações');
   const lines = notes.split('\n').flatMap((paragraph) => wrapText(paragraph, 88));
-  ensureSpace(ctx, 24 + lines.length * 14);
-  const boxH = lines.length * 14 + 16;
-  ctx.y -= boxH;
-  ctx.page.drawRectangle({
-    x: MARGIN,
-    y: ctx.y,
-    width: CONTENT_W,
-    height: boxH,
-    color: palette.notesBg,
-  });
-  ctx.page.drawRectangle({ x: MARGIN, y: ctx.y, width: 4, height: boxH, color: palette.border });
-  let lineY = ctx.y + boxH - 18;
+  const lineH = 14;
   for (const line of lines) {
+    ensureSpace(ctx, lineH + 8);
+    // Fundo leve e barra esquerda por linha (paginação natural).
+    ctx.page.drawRectangle({
+      x: MARGIN,
+      y: ctx.y - lineH - 2,
+      width: CONTENT_W,
+      height: lineH + 2,
+      color: palette.notesBg,
+    });
+    ctx.page.drawRectangle({
+      x: MARGIN,
+      y: ctx.y - lineH - 2,
+      width: 4,
+      height: lineH + 2,
+      color: palette.border,
+    });
     ctx.page.drawText(line, {
       x: MARGIN + 14,
-      y: lineY,
+      y: ctx.y - 12,
       size: 9,
       font: ctx.font,
       color: rgb(0.33, 0.33, 0.33),
       maxWidth: CONTENT_W - 28,
     });
-    lineY -= 14;
+    ctx.y -= lineH + 4;
   }
   ctx.y -= 8;
 }
 
-function drawFooter(ctx: PdfCtx): void {
-  ensureSpace(ctx, 40);
-  ctx.page.drawLine({
+function drawFooter(page: PDFPage, font: PDFFont): void {
+  page.drawLine({
     start: { x: MARGIN, y: MARGIN + 28 },
     end: { x: PAGE_W - MARGIN, y: MARGIN + 28 },
     thickness: 0.5,
@@ -447,15 +449,15 @@ function drawFooter(ctx: PdfCtx): void {
   ];
   let y = MARGIN + 16;
   for (const line of footerLines) {
-    const w = ctx.font.widthOfTextAtSize(line, 8);
-    ctx.page.drawText(line, {
+    const w = font.widthOfTextAtSize(line, 7);
+    page.drawText(line, {
       x: (PAGE_W - w) / 2,
       y,
-      size: 8,
-      font: ctx.font,
+      size: 7,
+      font,
       color: palette.footer,
     });
-    y -= 11;
+    y -= 10;
   }
 }
 
@@ -469,7 +471,9 @@ export async function renderQuoteEmailPdf(content: QuoteEmailContent): Promise<U
     y: PAGE_H - MARGIN,
     font,
     fontBold,
+    pages: [],
   };
+  ctx.pages.push(ctx.page);
 
   drawGradientBar(ctx);
   await drawHeader(ctx, content);
@@ -486,8 +490,13 @@ export async function renderQuoteEmailPdf(content: QuoteEmailContent): Promise<U
 
   if (content.taxRow) drawTaxRow(ctx, content.taxRow);
   drawPaymentBlock(ctx, content);
+  if (content.bankRows?.length) {
+    drawSectionHeader(ctx, 'Dados bancários');
+    drawKeyValueRows(ctx, content.bankRows);
+  }
   if (content.notes) drawNotes(ctx, content.notes);
-  drawFooter(ctx);
+  // Rodapé em todas as páginas.
+  for (const page of ctx.pages) drawFooter(page, font);
 
   return doc.save();
 }

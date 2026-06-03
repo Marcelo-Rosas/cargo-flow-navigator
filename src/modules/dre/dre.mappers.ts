@@ -63,9 +63,21 @@ export function mapOrderToDreRow(
     numFallback(pb, ['totals', 'totalCliente'], ['totals', 'total_cliente']) || order.value;
   const dasPresumido = num(pb.totals, 'das');
   const icmsPresumido = num(pb.totals, 'icms');
+  const pisPresumido = num(pb.totals, 'pis');
+  const cofinsPresumido = num(pb.totals, 'cofins');
+  const csllPresumido = num(pb.totals, 'csll');
+  const irpjPresumido = num(pb.totals, 'irpj');
   const receitaLiquidaPresumida =
     numFallback(pb, ['profitability', 'receitaLiquida'], ['profitability', 'receita_liquida']) ??
-    round2(receitaBrutaPresumida - dasPresumido - icmsPresumido);
+    round2(
+      receitaBrutaPresumida -
+        dasPresumido -
+        icmsPresumido -
+        pisPresumido -
+        cofinsPresumido -
+        csllPresumido -
+        irpjPresumido
+    );
 
   const hasPb = hasProfitabilityData(pb);
   const custoMotoristaPresumido = hasPb
@@ -108,13 +120,23 @@ export function mapOrderToDreRow(
   const pedagioReal = order.pedagio_real != null ? Number(order.pedagio_real) : pedagioPresumido;
   const descargaReal =
     order.descarga_real != null ? Number(order.descarga_real) : descargaPresumida;
-  const aluguelMaquinasReal = 0;
-  const maoDeObraReal = 0;
+  const aluguelMaquinasReal =
+    (order as unknown as Record<string, unknown>).aluguel_maquinas_real != null
+      ? Number((order as unknown as Record<string, unknown>).aluguel_maquinas_real)
+      : aluguelMaquinasPresumido;
+  const maoDeObraReal =
+    (order as unknown as Record<string, unknown>).mao_de_obra_real != null
+      ? Number((order as unknown as Record<string, unknown>).mao_de_obra_real)
+      : maoDeObraPresumida;
 
   const real = computeDreRealFromPresumido({
     receitaBrutaPresumida,
     dasPresumido,
     icmsPresumido,
+    pisPresumido,
+    cofinsPresumido,
+    csllPresumido,
+    irpjPresumido,
     receitaLiquidaPresumida,
     custoMotoristaPresumido,
     pedagioPresumido,
@@ -152,6 +174,18 @@ export function mapOrderToDreRow(
 
     icmsPresumido,
     icmsReal: icmsPresumido,
+
+    pisPresumido,
+    pisReal: pisPresumido,
+
+    cofinsPresumido,
+    cofinsReal: cofinsPresumido,
+
+    csllPresumido,
+    csllReal: csllPresumido,
+
+    irpjPresumido,
+    irpjReal: irpjPresumido,
 
     receitaLiquidaPresumida,
     receitaLiquidaReal: receitaLiquidaPresumida,

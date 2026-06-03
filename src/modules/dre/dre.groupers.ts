@@ -84,6 +84,10 @@ function aggregateOrdersToSingle(orders: OrderDreInput[]): OrderDreInput | null 
   let receitaBruta = 0;
   let das = 0;
   let icms = 0;
+  let pis = 0;
+  let cofins = 0;
+  let csll = 0;
+  let irpj = 0;
   let receitaLiquida = 0;
   let custoMotoristaP = 0;
   let pedagioP = 0;
@@ -96,6 +100,8 @@ function aggregateOrdersToSingle(orders: OrderDreInput[]): OrderDreInput | null 
   let custoMotoristaR = 0;
   let pedagioR = 0;
   let descargaR = 0;
+  let aluguelMaquinasR = 0;
+  let maoDeObraR = 0;
 
   for (const o of orders) {
     const pb = o.pricing_breakdown as {
@@ -115,8 +121,19 @@ function aggregateOrdersToSingle(orders: OrderDreInput[]): OrderDreInput | null 
     receitaBruta += rec;
     das += pb?.totals?.das ?? 0;
     icms += pb?.totals?.icms ?? 0;
+    pis += pb?.totals?.pis ?? 0;
+    cofins += pb?.totals?.cofins ?? 0;
+    csll += pb?.totals?.csll ?? 0;
+    irpj += pb?.totals?.irpj ?? 0;
     receitaLiquida +=
-      pb?.profitability?.receitaLiquida ?? rec - (pb?.totals?.das ?? 0) - (pb?.totals?.icms ?? 0);
+      pb?.profitability?.receitaLiquida ??
+      rec -
+        (pb?.totals?.das ?? 0) -
+        (pb?.totals?.icms ?? 0) -
+        (pb?.totals?.pis ?? 0) -
+        (pb?.totals?.cofins ?? 0) -
+        (pb?.totals?.csll ?? 0) -
+        (pb?.totals?.irpj ?? 0);
     custoMotoristaP +=
       pb?.profitability?.custoMotorista ?? pb?.profitability?.custosCarreteiro ?? 0;
     pedagioP += pb?.components?.toll ?? 0;
@@ -129,6 +146,8 @@ function aggregateOrdersToSingle(orders: OrderDreInput[]): OrderDreInput | null 
     custoMotoristaR += o.carreteiro_real ?? 0;
     pedagioR += o.pedagio_real ?? 0;
     descargaR += o.descarga_real ?? 0;
+    aluguelMaquinasR += (o as unknown as Record<string, unknown>).aluguel_maquinas_real ?? 0;
+    maoDeObraR += (o as unknown as Record<string, unknown>).mao_de_obra_real ?? 0;
   }
 
   const pb = first.pricing_breakdown as Record<string, unknown> | null;
@@ -141,6 +160,10 @@ function aggregateOrdersToSingle(orders: OrderDreInput[]): OrderDreInput | null 
           receitaBruta,
           das,
           icms,
+          pis,
+          cofins,
+          csll,
+          irpj,
         },
         profitability: {
           ...(pb.profitability as object),
@@ -168,6 +191,8 @@ function aggregateOrdersToSingle(orders: OrderDreInput[]): OrderDreInput | null 
     carreteiro_real: custoMotoristaR,
     pedagio_real: pedagioR,
     descarga_real: descargaR,
+    aluguel_maquinas_real: aluguelMaquinasR,
+    mao_de_obra_real: maoDeObraR,
   };
 }
 

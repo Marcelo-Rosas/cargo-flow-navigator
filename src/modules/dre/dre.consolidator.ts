@@ -79,6 +79,8 @@ export function consolidateDreTables(tables: DreTable[], periodType: PeriodType)
         (p.get('carga_descarga') ?? 0) +
         (p.get('espera') ?? 0) +
         (p.get('taxas_condicionais') ?? 0) +
+        (p.get('aluguel_maquinas') ?? 0) +
+        (p.get('mao_de_obra') ?? 0) +
         (p.get('outros_custos') ?? 0)
     );
     const rCustosDiretos = round2(
@@ -87,6 +89,8 @@ export function consolidateDreTables(tables: DreTable[], periodType: PeriodType)
         (r.get('carga_descarga') ?? 0) +
         (r.get('espera') ?? 0) +
         (r.get('taxas_condicionais') ?? 0) +
+        (r.get('aluguel_maquinas') ?? 0) +
+        (r.get('mao_de_obra') ?? 0) +
         (r.get('outros_custos') ?? 0)
     );
     p.set('custos_diretos', pCustosDiretos);

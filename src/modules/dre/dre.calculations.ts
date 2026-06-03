@@ -22,6 +22,10 @@ export function computeDreRealFromPresumido(params: {
   receitaBrutaPresumida: number;
   dasPresumido: number;
   icmsPresumido: number;
+  pisPresumido: number;
+  cofinsPresumido: number;
+  csllPresumido: number;
+  irpjPresumido: number;
   receitaLiquidaPresumida: number;
   custoMotoristaPresumido: number;
   pedagioPresumido: number;
@@ -37,6 +41,9 @@ export function computeDreRealFromPresumido(params: {
   aluguelMaquinasReal: number;
   descargaReal: number;
   maoDeObraReal: number;
+  esperaReal?: number;
+  taxasCondicionaisReal?: number;
+  outrosCustosReal?: number;
 }): Pick<
   DreComparativoRow,
   'custosDiretosReais' | 'resultadoReal' | 'margemRealPercent' | 'deltaResultado' | 'deltaPercent'
@@ -51,10 +58,20 @@ export function computeDreRealFromPresumido(params: {
     aluguelMaquinasReal,
     descargaReal,
     maoDeObraReal,
+    esperaReal = 0,
+    taxasCondicionaisReal = 0,
+    outrosCustosReal = 0,
   } = params;
 
   const custosDiretosReais = round2(
-    custoMotoristaReal + pedagioReal + aluguelMaquinasReal + descargaReal + maoDeObraReal
+    custoMotoristaReal +
+      pedagioReal +
+      aluguelMaquinasReal +
+      descargaReal +
+      maoDeObraReal +
+      esperaReal +
+      taxasCondicionaisReal +
+      outrosCustosReal
   );
 
   const resultadoReal = round2(receitaLiquidaPresumida - custosDiretosReais - overheadPresumido);

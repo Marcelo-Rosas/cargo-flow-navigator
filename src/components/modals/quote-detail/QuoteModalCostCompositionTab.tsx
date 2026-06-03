@@ -942,21 +942,33 @@ export function QuoteModalCostCompositionTab({
               : 'rounded-lg p-4 border bg-success/5 border-success/20'
           }
         >
-          <h5 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
+          <h5 className="font-semibold text-foreground mb-1 flex items-center gap-2 text-sm">
             <TrendingUp className="w-3.5 h-3.5" />
-            Rentabilidade
+            Indicadores de rentabilidade
           </h5>
+          <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
+            Overhead é <span className="font-medium">custo estrutural</span> (% da receita líquida),
+            embutido no gross-up e já deduzido nos valores abaixo — não é lucro nem se subtrai de
+            novo do resultado.
+          </p>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Margem Bruta (R$)</span>
-              <span className="font-medium tabular-nums">{formatCurrency(margemBruta)}</span>
+              <span className="text-muted-foreground">Receita líquida</span>
+              <span className="font-medium tabular-nums">{formatCurrency(receitaLiquida)}</span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>(−) Overhead ({breakdown.rates?.overheadPercent?.toFixed(0) ?? '—'}%)</span>
+              <span className="tabular-nums">−{formatCurrency(overhead)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Overhead</span>
-              <span className="font-medium tabular-nums">{formatCurrency(overhead)}</span>
+              <span className="text-muted-foreground">Margem de contribuição</span>
+              <span className="font-medium tabular-nums">{formatCurrency(margemBruta)}</span>
             </div>
-            <div className="flex justify-between items-center gap-2">
-              <span className="font-semibold">Resultado Líquido</span>
+            <p className="text-[10px] text-muted-foreground -mt-1">
+              Após overhead, piso ANTT e custos de serviço (pedágio, taxas, aluguel, etc.)
+            </p>
+            <div className="flex justify-between items-center gap-2 pt-1 border-t border-border/60">
+              <span className="font-semibold">Resultado líquido</span>
               <Badge
                 variant={resultadoLiquido >= 0 ? 'default' : 'destructive'}
                 className={resultadoLiquido >= 0 ? 'bg-success text-success-foreground' : ''}
@@ -964,8 +976,11 @@ export function QuoteModalCostCompositionTab({
                 {formatCurrency(resultadoLiquido)}
               </Badge>
             </div>
+            <p className="text-[10px] text-muted-foreground -mt-1">
+              Após overhead, frete contratado (NTC) e carga/descarga — base da margem operacional %
+            </p>
             <div className="flex justify-between items-center gap-2">
-              <span className="font-semibold">Margem Operacional</span>
+              <span className="font-semibold">Margem operacional</span>
               <Badge
                 variant={isBelowTarget ? 'destructive' : 'default'}
                 className={!isBelowTarget ? 'bg-success text-success-foreground' : ''}

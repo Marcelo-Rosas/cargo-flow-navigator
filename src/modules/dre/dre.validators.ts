@@ -25,6 +25,8 @@ export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
   const cargaDescarga = get(rows, 'carga_descarga');
   const espera = get(rows, 'espera');
   const taxasCondicionais = get(rows, 'taxas_condicionais');
+  const aluguelMaquinas = get(rows, 'aluguel_maquinas');
+  const maoDeObra = get(rows, 'mao_de_obra');
   const outrosCustos = get(rows, 'outros_custos');
   const custosDiretos = get(rows, 'custos_diretos');
   const receitaLiquida = get(rows, 'receita_liquida');
@@ -39,6 +41,8 @@ export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
       cargaDescarga.presumed_value +
       espera.presumed_value +
       taxasCondicionais.presumed_value +
+      aluguelMaquinas.presumed_value +
+      maoDeObra.presumed_value +
       outrosCustos.presumed_value
   );
   const expectedCustosDiretosReal = round2(
@@ -47,6 +51,8 @@ export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
       cargaDescarga.real_value +
       espera.real_value +
       taxasCondicionais.real_value +
+      aluguelMaquinas.real_value +
+      maoDeObra.real_value +
       outrosCustos.real_value
   );
 

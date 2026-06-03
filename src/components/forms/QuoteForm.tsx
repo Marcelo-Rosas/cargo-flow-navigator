@@ -94,7 +94,12 @@ import {
   extractUf,
   StoredPricingBreakdown,
   TollPlaza,
+  isMarginBelowTarget,
+  type FreightCalculationOutput,
 } from '@/lib/freightCalculator';
+import { buildStoredBreakdownFromEdgeResponse } from '@/hooks/useCalculateFreight';
+import { useEdgeFreightPreview } from '@/hooks/use-edge-freight-preview';
+import type { CalculateFreightInput, CalculateFreightResponse } from '@/types/freight';
 import { zodPhone } from '@/lib/validators';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { QuoteFormWizard } from '@/components/forms/quote-form/QuoteFormWizard';
@@ -665,6 +670,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       markupPercent: resolvePricingRule(pricingRules, 'markup_percent', vtId, 30),
       overheadPercent: resolvePricingRule(pricingRules, 'overhead_percent', vtId, 15),
       profitMarginPercent: resolvePricingRule(pricingRules, 'profit_margin_percent', vtId, 15),
+      targetMarginPercent: resolvePricingRule(pricingRules, 'profit_margin_percent', vtId, 15),
       regimeSimplesNacional: (regimeSimplesVal ?? 1) === 1,
       excessoSublimite: (excessoVal ?? 0) === 1,
       grisPercent: resolvePricingRule(pricingRules, 'gris_percent', vtId, 0.3),
@@ -837,8 +843,72 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debounced.cargoValue,
   ]);
 
-  // Passo 3: calcular frete final com as taxas condicionais (valores debounced)
-  const calculationResult = useMemo(() => {
+  const conditionalFeeCodes = useMemo(() => {
+    if (!conditionalFeesData?.length) return [] as string[];
+    return additionalFeesSelection.conditionalFees
+      .map((id) => conditionalFeesData.find((f) => f.id === id)?.code)
+      .filter((code): code is string => typeof code === 'string' && code.length > 0);
+  }, [conditionalFeesData, additionalFeesSelection.conditionalFees]);
+
+  const edgeFreightInput = useMemo((): CalculateFreightInput | null => {
+    if (isLegacy || !open) return null;
+    const km = debouncedKmBand;
+    if (km <= 0 || !debounced.priceTableId) return null;
+    const w = debouncedEffectiveWeightKg;
+    if (w <= 0 && (debounced.volume ?? 0) <= 0) return null;
+    return {
+      origin: debounced.origin || '',
+      destination: debounced.destination || '',
+      km_distance: km,
+      weight_kg: w > 0 ? w : 1,
+      volume_m3: debounced.volume || 0,
+      cargo_value: debounced.cargoValue || 0,
+      toll_value: debounced.toll ?? 0,
+      price_table_id: debounced.priceTableId,
+      vehicle_type_code: selectedVehicle?.code,
+      payment_term_code: selectedPaymentTerm?.code ?? 'D30',
+      descarga_value: debounced.descarga ?? 0,
+      aluguel_maquinas_value: debounced.aluguelMaquinas ?? 0,
+      conditional_fees: conditionalFeeCodes.length > 0 ? conditionalFeeCodes : undefined,
+      waiting_hours: additionalFeesSelection.waitingTimeEnabled
+        ? additionalFeesSelection.waitingTimeHours
+        : undefined,
+      das_percent: resolvedPricingParams.dasPercent,
+      markup_percent: resolvedPricingParams.markupPercent,
+      overhead_percent: resolvedPricingParams.overheadPercent,
+    };
+  }, [
+    isLegacy,
+    open,
+    debouncedKmBand,
+    debounced,
+    debouncedEffectiveWeightKg,
+    debounced.priceTableId,
+    selectedVehicle?.code,
+    selectedPaymentTerm?.code,
+    conditionalFeeCodes,
+    additionalFeesSelection.waitingTimeEnabled,
+    additionalFeesSelection.waitingTimeHours,
+    resolvedPricingParams.dasPercent,
+    resolvedPricingParams.markupPercent,
+    resolvedPricingParams.overheadPercent,
+  ]);
+
+  const lastEdgeFreightResponseRef = useRef<CalculateFreightResponse | null>(null);
+
+  const { data: edgeFreightPreview } = useEdgeFreightPreview(
+    edgeFreightInput,
+    !isLegacy && open && !!priceTableRow && !isLoadingPriceRow
+  );
+
+  useEffect(() => {
+    if (edgeFreightPreview?.raw) {
+      lastEdgeFreightResponseRef.current = edgeFreightPreview.raw;
+    }
+  }, [edgeFreightPreview?.raw]);
+
+  // Passo 3: calcular frete final com as taxas condicionais (valores debounced) — fallback local
+  const localCalculationResult = useMemo(() => {
     return calculateFreight({
       originCity: debounced.origin || '',
       destinationCity: debounced.destination || '',
@@ -892,6 +962,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     additionalFeesSelection.waitingTimeHours,
     additionalFeesSelection.waitingTimeEnabled,
   ]);
+
+  /** Prévia: Edge (fonte de verdade) com fallback local enquanto carrega ou em erro */
+  const calculationResult: FreightCalculationOutput =
+    edgeFreightPreview?.output ?? localCalculationResult;
 
   useEffect(() => {
     if (open) {
@@ -1369,6 +1443,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       let pricingBreakdown: StoredPricingBreakdown;
       if (useStoredPricing) {
         pricingBreakdown = quote!.pricing_breakdown as unknown as StoredPricingBreakdown;
+      } else if (lastEdgeFreightResponseRef.current) {
+        pricingBreakdown = buildStoredBreakdownFromEdgeResponse(
+          lastEdgeFreightResponseRef.current,
+          quote?.pricing_breakdown as StoredPricingBreakdown | null
+        ) as StoredPricingBreakdown;
       } else {
         pricingBreakdown = buildStoredBreakdown(calculationResult, {
           originCity: data.origin,
@@ -1662,16 +1741,20 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 )}
 
                 {/* Margin Alert (oculto no modo legacy) */}
-                {!isLegacy && calculationResult.meta.marginStatus === 'BELOW_TARGET' && (
-                  <Alert className="bg-warning/10 border-warning">
-                    <AlertTriangle className="h-4 w-4 text-warning-foreground" />
-                    <AlertDescription className="text-warning-foreground">
-                      Margem operacional de{' '}
-                      {calculationResult.profitability.margemPercent.toFixed(1)}% abaixo da meta de{' '}
-                      {resolvedPricingParams.profitMarginPercent}%
-                    </AlertDescription>
-                  </Alert>
-                )}
+                {!isLegacy &&
+                  isMarginBelowTarget(
+                    calculationResult.profitability.margemPercent,
+                    resolvedPricingParams.profitMarginPercent
+                  ) && (
+                    <Alert className="bg-warning/10 border-warning">
+                      <AlertTriangle className="h-4 w-4 text-warning-foreground" />
+                      <AlertDescription className="text-warning-foreground">
+                        Margem operacional de{' '}
+                        {calculationResult.profitability.margemPercent.toFixed(1)}% abaixo da meta
+                        de {resolvedPricingParams.profitMarginPercent}%
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
                 {USE_WIZARD ? (
                   <div className="flex flex-col flex-1 min-h-0 overflow-hidden py-4">
