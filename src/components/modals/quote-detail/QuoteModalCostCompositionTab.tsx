@@ -947,9 +947,9 @@ export function QuoteModalCostCompositionTab({
             Indicadores de rentabilidade
           </h5>
           <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
-            Overhead é <span className="font-medium">custo estrutural</span> (% da receita líquida),
-            embutido no gross-up e já deduzido nos valores abaixo — não é lucro nem se subtrai de
-            novo do resultado.
+            Lotação: frete peso = max(tabela NTC + over km, piso ANTT + over mínimo). Overhead é{' '}
+            <span className="font-medium">custo estrutural</span> (% da receita líquida). Margem de
+            contribuição e margem operacional usam a mesma base (frete golden + serviços NTC).
           </p>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
@@ -965,7 +965,7 @@ export function QuoteModalCostCompositionTab({
               <span className="font-medium tabular-nums">{formatCurrency(margemBruta)}</span>
             </div>
             <p className="text-[10px] text-muted-foreground -mt-1">
-              Após overhead, piso ANTT e custos de serviço (pedágio, taxas, aluguel, etc.)
+              Receita líquida − overhead − frete peso (golden) − custos de serviço NTC
             </p>
             <div className="flex justify-between items-center gap-2 pt-1 border-t border-border/60">
               <span className="font-semibold">Resultado líquido</span>
@@ -977,7 +977,7 @@ export function QuoteModalCostCompositionTab({
               </Badge>
             </div>
             <p className="text-[10px] text-muted-foreground -mt-1">
-              Após overhead, frete contratado (NTC) e carga/descarga — base da margem operacional %
+              Igual à margem de contribuição (resultado líquido ÷ faturamento ALL-IN)
             </p>
             <div className="flex justify-between items-center gap-2">
               <span className="font-semibold">Margem operacional</span>

@@ -104,17 +104,22 @@ export function PricingStep({
   const receitaLiquida =
     p?.receitaLiquida ??
     Math.max(0, (t?.totalCliente ?? 0) - (t?.totalImpostos ?? (t?.das ?? 0) + (t?.icms ?? 0)));
-  const custoMotoristaAntt = p?.custoMotoristaAntt ?? c?.baseFreight ?? 0;
+  const custoMotoristaGolden = c?.baseCost ?? c?.baseFreight ?? 0;
   const custoServicos = p?.custoServicos ?? 0;
   const margemContribuicao = resolveMargemBrutaDisplay(
     p?.margemBruta,
     receitaLiquida,
     p?.overhead ?? 0,
-    custoMotoristaAntt,
+    custoMotoristaGolden,
     custoServicos
   );
+  const resultadoLiquido = p?.resultadoLiquido ?? margemContribuicao;
+  const margemPercentDisplay =
+    (t?.totalCliente ?? 0) > 0 ? (resultadoLiquido / (t?.totalCliente ?? 1)) * 100 : 0;
   const targetMargin = p?.profitMarginTarget ?? calculationResult?.rates?.profitMarginPercent ?? 15;
-  const showMarginAlert = showAllIn && isMarginBelowTarget(p?.margemPercent ?? 0, targetMargin);
+  const showMarginAlert =
+    showAllIn &&
+    (isMarginBelowTarget(margemPercentDisplay, targetMargin) || margemContribuicao < 0);
 
   // Auto-fill delivery days only if fields are still empty (respects manual edits)
   useEffect(() => {
@@ -515,7 +520,7 @@ export function PricingStep({
                     <Alert className="bg-warning/10 border-warning py-2">
                       <AlertTriangle className="h-4 w-4 text-warning-foreground" />
                       <AlertDescription className="text-warning-foreground text-xs">
-                        Margem operacional {(p?.margemPercent ?? 0).toFixed(1)}% abaixo da meta de{' '}
+                        Margem operacional {margemPercentDisplay.toFixed(1)}% abaixo da meta de{' '}
                         {targetMargin}%
                       </AlertDescription>
                     </Alert>
@@ -584,7 +589,7 @@ export function PricingStep({
                         Resultado Líquido
                       </span>
                       <span className="text-[10px] text-emerald-600 dark:text-emerald-500 font-medium">
-                        Margem Operacional: {(p?.margemPercent ?? 0).toFixed(2)}%
+                        Margem Operacional: {margemPercentDisplay.toFixed(2)}%
                       </span>
                     </div>
                     <span className="font-black text-xl text-emerald-700 dark:text-emerald-400">

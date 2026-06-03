@@ -343,23 +343,26 @@ export function QuoteDetailModal({
       (c?.dispatchFee ?? 0) +
       (c?.conditionalFeesTotal ?? 0) +
       (c?.waitingTimeCost ?? 0);
-  const custoMotoristaAnttView =
-    (breakdown?.profitability as { custoMotoristaAntt?: number } | undefined)?.custoMotoristaAntt ??
-    pisoAnttView;
   const receitaLiquidaFromBreakdown =
     receitaLiquidaView ??
     (totalClienteView > 0
       ? totalClienteView - (breakdown?.totals?.totalImpostos ?? 0) * faturamentoRatio
       : null);
 
+  const custoMotoristaGoldenView = round2(
+    (breakdown?.components?.baseCost ?? breakdown?.components?.baseFreight ?? 0) * faturamentoRatio
+  );
+  const custoServicosScaled = round2(custoServicosView * faturamentoRatio);
+  const overheadScaled = round2(overheadView * faturamentoRatio);
+
   const margemBrutaView =
     receitaLiquidaFromBreakdown != null
       ? resolveMargemBrutaDisplay(
           breakdown?.profitability?.margemBruta,
           receitaLiquidaFromBreakdown,
-          round2(overheadView * faturamentoRatio),
-          custoMotoristaAnttView,
-          custoServicosView
+          overheadScaled,
+          custoMotoristaGoldenView,
+          custoServicosScaled
         )
       : (breakdown?.profitability?.margemBruta ?? 0);
 
@@ -367,9 +370,9 @@ export function QuoteDetailModal({
   const resultadoLiquidoView = (
     breakdown?.profitability?.resultadoLiquido != null
       ? round2(resultadoSnapshot * faturamentoRatio)
-      : margemBrutaView - round2(overheadView * faturamentoRatio)
+      : margemBrutaView
   ) as number;
-  /** Margem operacional sempre sobre o faturamento exibido (evita 21,9% da tabela com R$ 29,3k negociado) */
+  /** Margem operacional = resultado líquido / faturamento exibido (lotação: mesma base que contribuição) */
   const margemPercentView = (
     totalClienteView > 0 ? round2((resultadoLiquidoView / totalClienteView) * 100) : 0
   ) as number;
@@ -378,7 +381,7 @@ export function QuoteDetailModal({
     breakdown?.rates?.targetMarginPercent ??
     breakdown?.rates?.profitMarginPercent ??
     TARGET_MARGIN_PERCENT;
-  const isBelowTarget = isMarginBelowTarget(margemPercentView, targetMargin);
+  const isBelowTarget = isMarginBelowTarget(margemPercentView, targetMargin) || margemBrutaView < 0;
 
   const handleAdvancePercentChange = async (value: string) => {
     if (!quote) return;
@@ -1205,7 +1208,7 @@ export function QuoteDetailModal({
                   custosDescarga={cargaDescargaView}
                   conditionalFeesData={conditionalFeesData ?? undefined}
                   margemBruta={margemBrutaView}
-                  overhead={overheadView}
+                  overhead={overheadScaled}
                   resultadoLiquido={resultadoLiquidoView}
                   margemPercent={margemPercentView}
                   isBelowTarget={isBelowTarget}

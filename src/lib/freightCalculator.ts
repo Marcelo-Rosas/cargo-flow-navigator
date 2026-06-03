@@ -16,6 +16,7 @@
  */
 
 import { Database } from '@/integrations/supabase/types';
+import { calculateLotacaoProfitability, resolveLotacaoFretePeso } from '@/lib/lotacao-freight-base';
 
 type PriceTableRow = Database['public']['Tables']['price_table_rows']['Row'];
 
@@ -60,20 +61,20 @@ export function isMarginBelowTarget(
 }
 
 /**
- * Margem de contribuição (motor: receita líquida − overhead − piso ANTT − custos de serviço).
+ * Margem de contribuição (motor lotação: receita líquida − overhead − frete peso golden − serviços).
  * Corrige snapshots legados que gravaram fórmula inflada (ex.: total − motorista − impostos).
  */
 export function resolveMargemBrutaDisplay(
   storedMargemBruta: number | null | undefined,
   receitaLiquida: number,
   overhead: number,
-  custoMotoristaAntt: number,
+  custoMotoristaBase: number,
   custoServicos: number
 ): number {
   if (!Number.isFinite(receitaLiquida) || receitaLiquida <= 0) {
     return storedMargemBruta ?? 0;
   }
-  const derived = round2(receitaLiquida - overhead - custoMotoristaAntt - custoServicos);
+  const derived = round2(receitaLiquida - overhead - custoMotoristaBase - custoServicos);
   if (storedMargemBruta == null || !Number.isFinite(storedMargemBruta)) {
     return derived;
   }
@@ -176,6 +177,10 @@ export interface FreightCalculationInput {
     costValuePercent?: number;
     /** Ad Valorem Lotação (%). Substitui GRIS/TSO para FTL. Default 0.03 (RCTR-C + RC-DC). */
     adValoremLotacaoPercent?: number;
+    /** Over sobre mínimo ANTT (lotação). */
+    overLotacaoPercent?: number;
+    /** Over por faixa de km (lotação). */
+    overLotacaoKmPercent?: number;
   };
 
   // Custos diretos (valores fixos em R$ e/ou %)
@@ -404,6 +409,10 @@ export interface StoredPricingBreakdown {
     anttFloorApplied?: boolean;
     /** Frete peso original da tabela de preços (antes do piso ANTT) */
     fretePesoOriginal?: number;
+    lotacaoOverKmPercent?: number;
+    lotacaoOverAnttPercent?: number;
+    lotacaoPisoComOver?: number;
+    lotacaoFreteTabelaComOverKm?: number;
 
     // ANTT piso mínimo (memória de cálculo) - opcional
     antt?: {
@@ -629,6 +638,8 @@ function resolveParams(input: FreightCalculationInput) {
     costValuePercent: pp?.costValuePercent ?? 0.3,
     /** Ad Valorem Lotação: substitui GRIS/TSO para FTL. Default 0.03% (RCTR-C 0,015% + RC-DC 0,015%). */
     adValoremLotacaoPercent: pp?.adValoremLotacaoPercent ?? 0.03,
+    overLotacaoPercent: pp?.overLotacaoPercent ?? 0,
+    overLotacaoKmPercent: pp?.overLotacaoKmPercent ?? 0,
   };
 }
 
@@ -1034,10 +1045,22 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const waitingTimeCost = round2(input.extras?.waitingTimeCost ?? 0);
 
   // ---- STEP 7: CUSTOS DIRETOS (Asset-Light) ----
-  // MP 1.343/2026: em lotação, custo motorista não pode ser inferior ao Piso ANTT
   const pisoAntt = input.pisoAnttCarreteiro ?? 0;
-  const anttFloorApplied = !isLtl && pisoAntt > 0 && pisoAntt > baseCost;
-  const custoMotorista = anttFloorApplied ? pisoAntt : baseCost;
+  let lotacaoFreteMeta: ReturnType<typeof resolveLotacaoFretePeso> | null = null;
+  let fretePesoGolden = baseCost;
+  if (!isLtl) {
+    lotacaoFreteMeta = resolveLotacaoFretePeso({
+      freteTabela: baseCost,
+      pisoAntt,
+      km: input.kmDistance ?? 0,
+      overKmPercent: params.overLotacaoKmPercent ?? 0,
+      overAnttPercent: params.overLotacaoPercent ?? 0,
+      round: round2,
+    });
+    fretePesoGolden = lotacaoFreteMeta.fretePeso;
+  }
+  const anttFloorApplied = lotacaoFreteMeta?.anttFloorApplied ?? false;
+  const custoMotorista = !isLtl ? fretePesoGolden : baseCost;
   const aluguelMaquinas = round2(input.aluguelMaquinasValue ?? 0);
   const custoServicos = round2(
     input.tollValue +
@@ -1119,12 +1142,30 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const dasProvision = das;
   const overhead = round2(receitaLiquida * (params.overheadPercent / 100));
   const custoMotoristaContratado = custoMotorista;
-  const custoMotoristaAntt = anttFloorApplied ? pisoAntt : baseCost;
-  const resultadoLiquido = round2(
-    receitaLiquida - overhead - custoMotoristaContratado - descargaValue
-  );
-  const margemBruta = round2(receitaLiquida - overhead - custoMotoristaAntt - custoServicos);
-  const margemPercent = totalCliente > 0 ? round2((resultadoLiquido / totalCliente) * 100) : 0;
+  const custoMotoristaAntt = lotacaoFreteMeta?.pisoAntt ?? pisoAntt;
+
+  let margemBruta: number;
+  let resultadoLiquido: number;
+  let margemPercent: number;
+
+  if (!isLtl) {
+    const lotacaoProfit = calculateLotacaoProfitability({
+      receitaLiquida,
+      overhead,
+      fretePeso: fretePesoGolden,
+      custoServicos,
+      custosDescarga: descargaValue,
+      totalCliente,
+      profitMarginPercent: params.profitMarginPercent ?? FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT,
+    });
+    margemBruta = lotacaoProfit.margemBruta;
+    resultadoLiquido = lotacaoProfit.resultadoLiquido;
+    margemPercent = lotacaoProfit.margemPercent;
+  } else {
+    resultadoLiquido = round2(receitaLiquida - overhead - custoMotoristaContratado - descargaValue);
+    margemBruta = round2(receitaLiquida - overhead - custoMotoristaAntt - custoServicos);
+    margemPercent = totalCliente > 0 ? round2((resultadoLiquido / totalCliente) * 100) : 0;
+  }
 
   // ---- STEP 10: META STATUS ----
   const marginStatus = getMarginStatus(margemPercent, params.profitMarginPercent);
@@ -1145,7 +1186,11 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       ltlMinWeightApplied: ltlMinWeightApplied || undefined,
       originalWeightKg,
       anttFloorApplied: anttFloorApplied || undefined,
-      fretePesoOriginal: anttFloorApplied ? baseCost : undefined,
+      fretePesoOriginal: !isLtl && baseCost !== fretePesoGolden ? baseCost : undefined,
+      lotacaoOverKmPercent: lotacaoFreteMeta?.overKmPercent,
+      lotacaoOverAnttPercent: lotacaoFreteMeta?.overAnttPercent,
+      lotacaoPisoComOver: lotacaoFreteMeta?.pisoComOverAntt,
+      lotacaoFreteTabelaComOverKm: lotacaoFreteMeta?.freteTabelaComOverKm,
     },
     components: {
       baseCost: custoMotorista,
