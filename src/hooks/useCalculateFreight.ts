@@ -185,6 +185,14 @@ export function buildStoredBreakdownFromEdgeResponse(
       anttCalculatedAt: (response.meta as { antt_calculated_at?: string }).antt_calculated_at,
       anttFloorForced:
         (response.meta as { antt_floor_forced?: boolean }).antt_floor_forced || undefined,
+      lotacaoOverKmPercent: (response.meta as { lotacao_over_km_percent?: number })
+        .lotacao_over_km_percent,
+      lotacaoOverAnttPercent: (response.meta as { lotacao_over_antt_percent?: number })
+        .lotacao_over_antt_percent,
+      lotacaoPisoComOver: (response.meta as { lotacao_piso_com_over?: number })
+        .lotacao_piso_com_over,
+      lotacaoFreteTabelaComOverKm: (response.meta as { lotacao_frete_tabela_com_over_km?: number })
+        .lotacao_frete_tabela_com_over_km,
     },
     weights: {
       cubageWeight: cubKg,

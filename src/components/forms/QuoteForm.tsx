@@ -97,6 +97,7 @@ import {
   isMarginBelowTarget,
   type FreightCalculationOutput,
 } from '@/lib/freightCalculator';
+import { resolveLotacaoKmOverPercent } from '@/lib/lotacao-freight-base';
 import { buildStoredBreakdownFromEdgeResponse } from '@/hooks/useCalculateFreight';
 import { useEdgeFreightPreview } from '@/hooks/use-edge-freight-preview';
 import type { CalculateFreightInput, CalculateFreightResponse } from '@/types/freight';
@@ -678,8 +679,12 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       costValuePercent: resolvePricingRule(pricingRules, 'cost_value_percent', vtId, 0.3),
       tdePercent: resolvePricingRule(pricingRules, 'tde_percent', vtId, 20),
       tearPercent: resolvePricingRule(pricingRules, 'tear_percent', vtId, 20),
+      overLotacaoPercent: resolvePricingRule(pricingRules, 'over_lotacao_percent', vtId, 0),
+      overLotacaoKmPercent: resolveLotacaoKmOverPercent(debouncedKmBand, (key) =>
+        resolvePricingRule(pricingRules, key, vtId)
+      ),
     };
-  }, [pricingRules, debounced.vehicleTypeId, taxRegimeSimples]);
+  }, [pricingRules, debounced.vehicleTypeId, debouncedKmBand, taxRegimeSimples]);
 
   // ANTT floor rate (Piso mínimo carreteiro) - Tabela A / Carga Geral
   const selectedVehicle = vehicleTypes?.find((v) => v.id === watchedVehicleTypeId) ?? null;
