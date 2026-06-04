@@ -1,6 +1,6 @@
 /**
  * Grava snapshot de company_settings para smoke de contrato com dados reais.
- * Requer SUPABASE_URL + SUPABASE_SR_KEY no .env (service role bypassa RLS).
+ * Requer SUPABASE_URL + service role no .env (SUPABASE_SR_KEY ou SUPABASE_SERVICE_ROLE_KEY).
  *
  *   npx tsx scripts/fetch-company-settings-fixture.ts
  */
@@ -8,12 +8,15 @@ import 'dotenv/config';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
+import { resolveServiceRoleKey } from './integration-health.ts';
 
 const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-const key = process.env.SUPABASE_SR_KEY;
+const key = resolveServiceRoleKey();
 
 if (!url || !key) {
-  console.error('[fetch-company] Defina SUPABASE_URL e SUPABASE_SR_KEY no .env');
+  console.error(
+    '[fetch-company] Defina SUPABASE_URL e SUPABASE_SR_KEY (ou SUPABASE_SERVICE_ROLE_KEY) no .env'
+  );
   process.exit(1);
 }
 

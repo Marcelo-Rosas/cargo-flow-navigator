@@ -19,7 +19,15 @@ import {
   calculateBillableWeight,
   roundCurrency,
   getMarginStatus,
+  sumRiskRepasse,
+  calculateGrossUpHibrido,
 } from '../_shared/freight-types.ts';
+import {
+  ANTT_CARGO_TYPE_DEFAULT,
+  ANTT_FLOOR_DEFAULT_FLAGS,
+  calculateAnttPisoBrl,
+  resolveAnttOperationTable,
+} from '../_shared/antt-floor-calc.ts';
 import {
   calculateLotacaoProfitability,
   LOTACAO_OVER_ANTT_KEY,
@@ -513,7 +521,10 @@ Deno.serve(async (req) => {
     const tde = 0;
     const tear = 0;
 
-    const axesCount = vehicleTypeAxesCountForRules;
+    const axesCount =
+      vehicleTypeAxesCountForRules ??
+      toFiniteNumber((input as { vehicle_axes_count?: number }).vehicle_axes_count) ??
+      null;
 
     // =====================================================
     // PISO ANTT (CARRETEIRO) — antes do frete peso golden (lotação)
@@ -525,19 +536,32 @@ Deno.serve(async (req) => {
 
     if (axesCount != null && axesCount > 0 && input.km_distance != null && input.km_distance > 0) {
       const kmBandAntt = Math.ceil(Number(input.km_distance));
+      const anttFlags = {
+        composicaoVeicular:
+          input.antt_composicao_veicular ?? ANTT_FLOOR_DEFAULT_FLAGS.composicaoVeicular,
+        altoDesempenho: input.antt_alto_desempenho ?? ANTT_FLOOR_DEFAULT_FLAGS.altoDesempenho,
+        retornoVazio: input.antt_retorno_vazio ?? ANTT_FLOOR_DEFAULT_FLAGS.retornoVazio,
+      };
+      const operationTable = resolveAnttOperationTable(anttFlags);
 
       const { data: anttRate } = await supabase
         .from('antt_floor_rates')
         .select('id, ccd, cc')
-        .eq('operation_table', 'A')
-        .eq('cargo_type', 'carga_geral')
+        .eq('operation_table', operationTable)
+        .eq('cargo_type', ANTT_CARGO_TYPE_DEFAULT)
         .eq('axes_count', axesCount)
         .order('valid_from', { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
 
       if (anttRate?.ccd != null && anttRate?.cc != null) {
-        pisoAnttCarreteiro = roundCurrency(kmBandAntt * Number(anttRate.ccd) + Number(anttRate.cc));
+        const pisoCalc = calculateAnttPisoBrl({
+          kmDistance: kmBandAntt,
+          ccd: Number(anttRate.ccd),
+          cc: Number(anttRate.cc),
+          retornoVazio: anttFlags.retornoVazio,
+        });
+        pisoAnttCarreteiro = roundCurrency(pisoCalc.total);
         anttFloorRateId = (anttRate as { id?: string }).id ?? undefined;
       }
     }
@@ -556,18 +580,18 @@ Deno.serve(async (req) => {
         round: roundCurrency,
       });
       frete_peso = lotacaoFreteMeta.fretePeso;
-      if (lotacaoFreteMeta.pisoAplicado) {
+      if (lotacaoFreteMeta.anttCostBaseUsed) {
         fallbacksApplied.push(
-          `lotacao: frete_peso = piso ANTT + ${lotacaoFreteMeta.overAnttPercent}% (R$ ${lotacaoFreteMeta.pisoComOverAntt})`
+          `lotacao: base custo motorista = piso ANTT + ${lotacaoFreteMeta.overAnttPercent}% (R$ ${lotacaoFreteMeta.pisoComOverAntt})`
         );
+        if (lotacaoFreteMeta.freteTabelaComOverKm > lotacaoFreteMeta.pisoComOverAntt + 0.01) {
+          fallbacksApplied.push(
+            `lotacao: tabela NTC + ${lotacaoFreteMeta.overKmPercent}% km = R$ ${lotacaoFreteMeta.freteTabelaComOverKm} (referência, fora do gross-up)`
+          );
+        }
       } else if (lotacaoFreteMeta.overKmPercent > 0) {
         fallbacksApplied.push(
-          `lotacao: frete_peso = tabela + ${lotacaoFreteMeta.overKmPercent}% km (R$ ${lotacaoFreteMeta.freteTabelaComOverKm})`
-        );
-      }
-      if (frete_peso > frete_peso_tabela + 0.01) {
-        fallbacksApplied.push(
-          `lotacao: frete_peso tabela R$ ${frete_peso_tabela} → golden R$ ${frete_peso}`
+          `lotacao: base custo = tabela + ${lotacaoFreteMeta.overKmPercent}% km (R$ ${lotacaoFreteMeta.freteTabelaComOverKm}) — sem piso ANTT`
         );
       }
     }
@@ -843,7 +867,8 @@ Deno.serve(async (req) => {
 
     const anttFloorApplied =
       modality === 'lotacao' &&
-      (lotacaoFreteMeta?.anttFloorApplied ??
+      (lotacaoFreteMeta?.anttCostBaseUsed ??
+        lotacaoFreteMeta?.anttFloorApplied ??
         (pisoAnttCarreteiro > 0 && pisoAnttCarreteiro > frete_peso_tabela));
     const enforceAnttFloor = !!(input as { enforce_antt_floor?: boolean }).enforce_antt_floor;
     const anttFloorForced =
@@ -853,28 +878,23 @@ Deno.serve(async (req) => {
     console.log(
       `[calculate-freight] Lotação frete: tabela=${frete_peso_tabela}, piso=${pisoAnttCarreteiro}, golden=${frete_peso}, pisoAplicado=${lotacaoFreteMeta?.pisoAplicado ?? false}`
     );
-    const custoServicos =
+    const repasseRisco = roundCurrency(gris + tso + frete_valor + adValorem);
+    const custoServicosOperacionais = roundCurrency(
       toll +
-      gris +
-      tso +
-      frete_valor +
-      adValorem +
-      tde +
-      tear +
-      dispatchFee +
-      conditionalFeesTotal +
-      waitingTimeCost +
-      aluguelMaquinasValue +
-      tacAdjustment +
-      paymentAdjustment;
-    // custoMotoristaContratado: o que o motorista recebe = frete_peso (ou piso ANTT quando forçado).
-    // gris/tso/frete_valor/dispatchFee são receita/repasse da Vectra, não custo do motorista.
-    // ntc_base mantido como referência de mercado NTC (meta) mas não entra no custo direto.
+        tde +
+        tear +
+        dispatchFee +
+        conditionalFeesTotal +
+        waitingTimeCost +
+        aluguelMaquinasValue +
+        tacAdjustment +
+        paymentAdjustment
+    );
+    /** Soma exibida (operacional + repasse); repasse não entra no divisor do gross-up (v5). */
+    const custoServicos = roundCurrency(custoServicosOperacionais + repasseRisco);
     const custoMotoristaContratado = fretePesoForGrossUp;
     const custosDescarga = descargaValue;
-    // custosDiretos usa custoMotoristaContratado (NTC realista) para precificação do cliente.
-    // custoMotoristaAntt (piso legal) é usado apenas em margemBruta como base de custo mínimo.
-    const custosDiretos = custoMotoristaContratado + custoServicos + custosDescarga;
+    const custosDiretos = custoMotoristaContratado + custoServicosOperacionais + custosDescarga;
 
     let regimeFiscal: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
     let icmsNoDivisor: boolean;
@@ -940,7 +960,8 @@ Deno.serve(async (req) => {
       }
       totalCliente = roundCurrency(receitaFinal + das + icms + pis + cofins + irpj + csll);
     } else {
-      totalCliente = roundCurrency(custosDiretos / (1 - taxaBruta));
+      const totalClienteCore = roundCurrency(custosDiretos / (1 - taxaBruta));
+      totalCliente = roundCurrency(totalClienteCore + repasseRisco);
       if (regimeFiscal === 'lucro_presumido') {
         das = 0;
         pis = roundCurrency(totalCliente * (pisPercent / 100));
@@ -971,8 +992,10 @@ Deno.serve(async (req) => {
           receitaLiquida,
           overhead,
           fretePeso: frete_peso,
-          custoServicos,
+          pisoAntt: pisoAnttCarreteiro,
+          custoServicos: custoServicosOperacionais,
           custosDescarga,
+          custosDiretos,
           totalCliente,
           profitMarginPercent,
         },
@@ -985,7 +1008,9 @@ Deno.serve(async (req) => {
       resultadoLiquido = roundCurrency(
         receitaLiquida - overhead - custoMotoristaContratado - custosDescarga
       );
-      margemBruta = roundCurrency(receitaLiquida - overhead - custoMotoristaAntt - custoServicos);
+      margemBruta = roundCurrency(
+        receitaLiquida - overhead - custoMotoristaAntt - custoServicosOperacionais
+      );
       margemPercent = totalCliente > 0 ? roundCurrency((resultadoLiquido / totalCliente) * 100) : 0;
     }
 
@@ -996,12 +1021,58 @@ Deno.serve(async (req) => {
     const routeUfLabel = formatRouteUf(input.origin, input.destination);
     const marginStatus = getMarginStatus(margemPercent, profitMarginPercent);
 
+    // =====================================================
+    // TRIPLO MATCH (BENCHMARK)
+    // =====================================================
+    let ckanBenchmarkGross: number | undefined;
+
+    if (input.benchmarks?.ckanBenchmark) {
+      const repasseRisco = sumRiskRepasse({ gris, tso, rctrc, adValorem });
+      const ckanCustosDiretos = roundCurrency(
+        input.benchmarks.ckanBenchmark + custoServicosOperacionais + descargaValue
+      );
+
+      const ckanGrossUp = calculateGrossUpHibrido(
+        ckanCustosDiretos,
+        overheadPercent,
+        profitMarginPercent,
+        regimeSimplesNacional,
+        dasPercent,
+        icmsPercent,
+        pisPercent,
+        cofinsPercent,
+        irpjEffectivePercent,
+        csllEffectivePercent,
+        repasseRisco
+      );
+      ckanBenchmarkGross = ckanGrossUp.totalCliente;
+    }
+
+    let matchStatus:
+      | {
+          status: 'WIN' | 'LOSS' | 'WARNING';
+          ckanBenchmarkLiquido?: number;
+          ckanGrossValue?: number;
+        }
+      | undefined;
+
+    if (ckanBenchmarkGross != null && ckanBenchmarkGross > 0) {
+      const ckanLiquido = input.benchmarks?.ckanBenchmark;
+      const targetTeto = ckanBenchmarkGross * 1.05;
+      matchStatus = {
+        status: totalCliente <= targetTeto ? 'WIN' : 'LOSS',
+        ckanBenchmarkLiquido: ckanLiquido,
+        ckanGrossValue: ckanBenchmarkGross,
+      };
+    }
+
     const meta: FreightMeta = {
       route_uf_label: routeUfLabel,
       km_band_label: kmBandLabel,
       km_status: kmStatus,
       margin_status: marginStatus,
       margin_percent: roundCurrency(margemPercent),
+      ...(matchStatus && { match_status: matchStatus }),
       cubage_factor: cubageFactor,
       cubage_weight_kg: roundCurrency(cubageWeightKg),
       billable_weight_kg: roundCurrency(billableWeightKg),
@@ -1011,14 +1082,18 @@ Deno.serve(async (req) => {
       antt_piso_carreteiro: roundCurrency(pisoAnttCarreteiro),
       antt_floor_applied: anttFloorApplied,
       ...(modality === 'lotacao' &&
-        frete_peso_tabela !== frete_peso && {
-          frete_peso_original: roundCurrency(frete_peso_tabela),
+        lotacaoFreteMeta &&
+        lotacaoFreteMeta.anttCostBaseUsed &&
+        lotacaoFreteMeta.freteTabelaComOverKm > lotacaoFreteMeta.pisoComOverAntt + 0.01 && {
+          frete_peso_original: roundCurrency(lotacaoFreteMeta.freteTabelaComOverKm),
         }),
       ...(lotacaoFreteMeta && {
         lotacao_over_km_percent: lotacaoFreteMeta.overKmPercent,
         lotacao_over_antt_percent: lotacaoFreteMeta.overAnttPercent,
         lotacao_piso_com_over: roundCurrency(lotacaoFreteMeta.pisoComOverAntt),
         lotacao_frete_tabela_com_over_km: roundCurrency(lotacaoFreteMeta.freteTabelaComOverKm),
+        lotacao_frete_referencia_max: roundCurrency(lotacaoFreteMeta.fretePesoReferenciaMax),
+        antt_cost_base_used: lotacaoFreteMeta.anttCostBaseUsed,
       }),
       ...(anttFloorRateId && { antt_floor_rate_id: anttFloorRateId }),
       antt_calculated_at: new Date().toISOString(),

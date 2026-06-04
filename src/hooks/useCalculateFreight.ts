@@ -65,9 +65,40 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
       kmStatus: response.meta.km_status,
       marginStatus: response.meta.margin_status,
       marginPercent: response.meta.margin_percent,
+      matchStatus: response.meta.match_status
+        ? {
+            status: response.meta.match_status.status,
+            ckanBenchmarkLiquido:
+              response.meta.match_status.ckan_benchmark_liquido ??
+              (response.meta.match_status as { ckanBenchmarkLiquido?: number })
+                .ckanBenchmarkLiquido ??
+              response.meta.match_status.history2025Value,
+            ckanGrossValue:
+              response.meta.match_status.ckan_gross_value ??
+              response.meta.match_status.ckanGrossValue,
+            history2025Value: response.meta.match_status.history2025Value,
+          }
+        : undefined,
       cubageFactor: response.meta.cubage_factor,
       cubageWeightKg: response.meta.cubage_weight_kg,
       billableWeightKg: response.meta.billable_weight_kg,
+      kmBandUsed: response.meta.km_band_used,
+      anttFloorApplied: response.meta.antt_floor_applied,
+      anttCostBaseUsed:
+        (response.meta as { antt_cost_base_used?: boolean }).antt_cost_base_used ??
+        response.meta.antt_floor_applied,
+      fretePesoOriginal: response.meta.frete_peso_original,
+      anttPisoCarreteiro: response.meta.antt_piso_carreteiro,
+      lotacaoFreteReferenciaMax: (response.meta as { lotacao_frete_referencia_max?: number })
+        .lotacao_frete_referencia_max,
+      lotacaoPisoComOver: (response.meta as { lotacao_piso_com_over?: number })
+        .lotacao_piso_com_over,
+      lotacaoFreteTabelaComOverKm: (response.meta as { lotacao_frete_tabela_com_over_km?: number })
+        .lotacao_frete_tabela_com_over_km,
+      lotacaoOverKmPercent: (response.meta as { lotacao_over_km_percent?: number })
+        .lotacao_over_km_percent,
+      lotacaoOverAnttPercent: (response.meta as { lotacao_over_antt_percent?: number })
+        .lotacao_over_antt_percent,
     },
     components: {
       baseCost: response.components.base_cost,
@@ -117,10 +148,21 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
       totalCliente: response.totals.total_cliente,
     },
     profitability: {
-      custoMotorista: response.profitability.custo_motorista,
-      custosCarreteiro: response.profitability.custos_carreteiro,
-      custoMotoristaAntt: response.profitability.custo_motorista_antt,
-      custoMotoristaContratado: response.profitability.custo_motorista_contratado,
+      // Paridade com freightCalculator local: custoMotorista = frete peso contratado (golden)
+      custoMotorista:
+        response.profitability.custo_motorista_contratado ??
+        response.profitability.custos_carreteiro ??
+        response.components.base_cost,
+      custosCarreteiro:
+        response.profitability.custos_carreteiro ??
+        response.profitability.custo_motorista_contratado ??
+        response.components.base_cost,
+      custoMotoristaAntt:
+        response.profitability.custo_motorista_antt ?? response.profitability.custo_motorista,
+      custoMotoristaContratado:
+        response.profitability.custo_motorista_contratado ??
+        response.profitability.custos_carreteiro ??
+        response.components.base_cost,
       custoMotoristaReal: response.profitability.custo_motorista_real ?? null,
       custosDescarga: response.profitability.custos_descarga,
       custoServicos: response.profitability.custos_servicos ?? 0,
@@ -232,10 +274,21 @@ export function buildStoredBreakdownFromEdgeResponse(
       totalCliente: response.totals.total_cliente,
     },
     profitability: {
-      custoMotorista: response.profitability.custo_motorista,
-      custosCarreteiro: response.profitability.custos_carreteiro,
-      custoMotoristaAntt: response.profitability.custo_motorista_antt,
-      custoMotoristaContratado: response.profitability.custo_motorista_contratado,
+      // Paridade com freightCalculator local: custoMotorista = frete peso contratado (golden)
+      custoMotorista:
+        response.profitability.custo_motorista_contratado ??
+        response.profitability.custos_carreteiro ??
+        response.components.base_cost,
+      custosCarreteiro:
+        response.profitability.custos_carreteiro ??
+        response.profitability.custo_motorista_contratado ??
+        response.components.base_cost,
+      custoMotoristaAntt:
+        response.profitability.custo_motorista_antt ?? response.profitability.custo_motorista,
+      custoMotoristaContratado:
+        response.profitability.custo_motorista_contratado ??
+        response.profitability.custos_carreteiro ??
+        response.components.base_cost,
       custoMotoristaReal: response.profitability.custo_motorista_real ?? null,
       custosDescarga: response.profitability.custos_descarga,
       custoServicos: response.profitability.custos_servicos ?? 0,

@@ -46,7 +46,7 @@ export function useCepLookup(): UseCepLookupReturn {
         return null;
       }
 
-      return data.data;
+      return data.data ?? null;
     } catch {
       setError('Erro ao buscar CEP');
       return null;
@@ -56,4 +56,22 @@ export function useCepLookup(): UseCepLookupReturn {
   };
 
   return { lookup, isLoading, error };
+}
+
+/** Lookup sem estado React — para handlers em formulários grandes. */
+export async function fetchCepData(cep: string): Promise<CepData | null> {
+  const clean = cep.replace(/\D/g, '');
+  if (clean.length !== 8) return null;
+
+  const data = await invokeEdgeFunction<{
+    success: boolean;
+    data?: CepData;
+    error?: string;
+  }>('lookup-cep', {
+    body: { cep: clean },
+    requireAuth: false,
+  });
+
+  if (!data?.success || !data.data) return null;
+  return data.data;
 }

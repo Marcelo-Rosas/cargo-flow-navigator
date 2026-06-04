@@ -83,9 +83,9 @@ export function CargoLogisticsStep({
 
   return (
     <div className="space-y-6">
-      <SectionBlock label="Detalhes da Carga">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-w-0">
+      <SectionBlock variant="card" label="Detalhes da Carga">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 min-w-0">
             <FormField
               control={form.control}
               name="cargo_type"
@@ -190,10 +190,10 @@ export function CargoLogisticsStep({
         </div>
       </SectionBlock>
 
-      <SectionBlock label="Configuração Logística">
-        <div className="space-y-4">
+      <SectionBlock variant="card" label="Configuração Logística">
+        <div className="space-y-6">
           {!isLegacy && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
                 name="freight_modality"
@@ -247,7 +247,7 @@ export function CargoLogisticsStep({
               />
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FormField
               control={form.control}
               name="payment_term_id"
@@ -324,7 +324,7 @@ export function CargoLogisticsStep({
 
           {/* Condição Financeira: datas condicionais ao prazo selecionado */}
           {selectedTerm && (
-            <SectionBlock label="Datas de Pagamento" collapsible defaultOpen>
+            <SectionBlock variant="card" label="Datas de Pagamento" collapsible defaultOpen>
               <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30 min-w-0">
                 {advPercent > 0 ? (
                   <div className="grid gap-3 sm:grid-cols-2">

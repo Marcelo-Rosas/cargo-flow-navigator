@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -83,7 +83,9 @@ import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate
 import { useActivePolicies } from '@/hooks/useRiskPolicies';
 import { useInsuranceOptions } from '@/hooks/useInsuranceOptionsRefactored';
 import { useAuth } from '@/hooks/useAuth';
-import { invokeEdgeFunction } from '@/lib/supabase-invoke';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
+import { fetchCepData } from '@/hooks/useCepLookup';
+import { formatCityUfFromCep, sanitizeCep } from '@/lib/cep-utils';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
@@ -100,10 +102,18 @@ import {
 import { resolveLotacaoKmOverPercent } from '@/lib/lotacao-freight-base';
 import { buildStoredBreakdownFromEdgeResponse } from '@/hooks/useCalculateFreight';
 import { useEdgeFreightPreview } from '@/hooks/use-edge-freight-preview';
+import { shouldPreferLocalLotacaoFreightPreview } from '@/lib/prefer-lotacao-freight-preview';
 import type { CalculateFreightInput, CalculateFreightResponse } from '@/types/freight';
 import { zodPhone } from '@/lib/validators';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { AnttFloorWizardCard } from '@/components/forms/quote-form/AnttFloorWizardCard';
 import { QuoteFormWizard } from '@/components/forms/quote-form/QuoteFormWizard';
+import { useFreightBenchmarks } from '@/hooks/useFreightBenchmarks';
+import {
+  inferAnttFlagsFromStoredMeta,
+  resolveAnttOperationTable,
+  ANTT_FLOOR_DEFAULT_FLAGS,
+} from '@/lib/antt-floor-calc';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type PriceTableRow = Database['public']['Tables']['price_tables']['Row'];
@@ -311,13 +321,18 @@ const quoteSchema = z
     payment_method: z.string().optional(),
     km_distance: z.number().min(0, 'Distância inválida').optional(),
     // Pricing components
-    cargo_value: z.number().min(0, 'Valor inválido').optional().default(0),
+    cargo_value: z
+      .number({ invalid_type_error: 'Deve ser um número' })
+      .min(1, 'Valor da carga é obrigatório'),
     toll: z.number().min(0, 'Valor inválido').optional().default(0),
     aluguel_maquinas: z.number().min(0, 'Valor inválido').optional().default(0),
     descarga: z.number().min(0, 'Valor inválido').optional().default(0),
     // NTC flags
     tde_enabled: z.boolean().optional().default(false),
     tear_enabled: z.boolean().optional().default(false),
+    antt_composicao_veicular: z.boolean().optional().default(true),
+    antt_alto_desempenho: z.boolean().optional().default(false),
+    antt_retorno_vazio: z.boolean().optional().default(false),
     discount: z.number().min(0, 'Desconto não pode ser negativo').optional().default(0),
     notes: z.string().max(500, 'Observações muito longas').optional(),
     validity_date: z.string().optional(),
@@ -354,6 +369,9 @@ const quoteSchema = z
           shipper_id: z.string().optional(),
           name: z.string(),
           email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+          /** CEP do ponto de coleta (embarcador adicional). Entra no cálculo de km antes das entregas. */
+          cep: z.string().optional(),
+          city_uf: z.string().optional(),
         })
       )
       .optional()
@@ -406,9 +424,6 @@ interface QuoteFormProps {
   onClose: () => void;
   quote?: Quote | null;
 }
-
-// Utility: sanitize CEP to 8 digits
-const sanitizeCep = (value: string) => value.replace(/\D/g, '').slice(0, 8);
 
 const kgToUnit = (kg: number, unit: 'kg' | 'ton') => (unit === 'ton' ? kg / 1000 : kg);
 const unitToKg = (value: number, unit: 'kg' | 'ton') => (unit === 'ton' ? value * 1000 : value);
@@ -474,7 +489,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       shipper_name: '',
       shipper_email: '',
       freight_type: 'FOB',
-      freight_modality: undefined,
+      freight_modality: 'lotacao',
       origin_cep: '',
       destination_cep: '',
       origin: '',
@@ -495,6 +510,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       // mas deixam de ser controlados manualmente na UI (governança via regras).
       tde_enabled: false,
       tear_enabled: false,
+      antt_composicao_veicular: ANTT_FLOOR_DEFAULT_FLAGS.composicaoVeicular,
+      antt_alto_desempenho: ANTT_FLOOR_DEFAULT_FLAGS.altoDesempenho,
+      antt_retorno_vazio: ANTT_FLOOR_DEFAULT_FLAGS.retornoVazio,
       notes: '',
       validity_date: '',
       advance_due_date: '',
@@ -527,6 +545,22 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedPriceTableId = form.watch('price_table_id');
   const watchedKmDistance = form.watch('km_distance');
   const watchedVehicleTypeId = form.watch('vehicle_type_id');
+  const watchedAnttComposicao = form.watch('antt_composicao_veicular');
+  const watchedAnttAltoDesempenho = form.watch('antt_alto_desempenho');
+  const watchedAnttRetornoVazio = form.watch('antt_retorno_vazio');
+
+  const anttFloorFlags = useMemo(
+    () => ({
+      composicaoVeicular: watchedAnttComposicao ?? ANTT_FLOOR_DEFAULT_FLAGS.composicaoVeicular,
+      altoDesempenho: watchedAnttAltoDesempenho ?? ANTT_FLOOR_DEFAULT_FLAGS.altoDesempenho,
+      retornoVazio: watchedAnttRetornoVazio ?? ANTT_FLOOR_DEFAULT_FLAGS.retornoVazio,
+    }),
+    [watchedAnttComposicao, watchedAnttAltoDesempenho, watchedAnttRetornoVazio]
+  );
+  const anttOperationTable = useMemo(
+    () => resolveAnttOperationTable(anttFloorFlags),
+    [anttFloorFlags]
+  );
 
   // Filtrar tabelas pela modalidade (lotação → só lotação; fracionado → só fracionado)
   const priceTablesFiltered =
@@ -540,6 +574,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedToll = form.watch('toll');
   const watchedAluguelMaquinas = form.watch('aluguel_maquinas');
   const watchedDescarga = form.watch('descarga');
+  const watchedCargoType = form.watch('cargo_type');
 
   // Dual Debounce: StableSnapshot (400ms) + CostsSnapshot (50ms)
   const stableSnapshot = JSON.stringify([
@@ -552,6 +587,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     watchedPriceTableId,
     watchedVehicleTypeId,
     watchedFreightModality,
+    watchedCargoType,
   ]);
   const costsSnapshot = JSON.stringify([watchedToll, watchedAluguelMaquinas, watchedDescarga]);
   const debouncedStable = useDebouncedValue(stableSnapshot, 400);
@@ -571,6 +607,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         priceTableId: (stable[6] as string) ?? '',
         vehicleTypeId: (stable[7] as string) ?? '',
         freightModality: (stable[8] as 'lotacao' | 'fracionado' | undefined) ?? undefined,
+        cargoType: (stable[9] as string) ?? '',
         toll: (costs[0] as number) ?? 0,
         aluguelMaquinas: (costs[1] as number) ?? 0,
         descarga: (costs[2] as number) ?? 0,
@@ -586,6 +623,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         priceTableId: '',
         vehicleTypeId: '',
         freightModality: undefined as 'lotacao' | 'fracionado' | undefined,
+        cargoType: '',
         toll: 0,
         aluguelMaquinas: 0,
         descarga: 0,
@@ -695,10 +733,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const axesCountForAntt = selectedVehicle?.axes_count ?? savedAxesCount;
   const kmDistanceForAntt = Number(watchedKmDistance || 0);
 
+  const isLotacaoWizard = watchedFreightModality === 'lotacao';
   const { data: anttRate } = useAnttFloorRate({
-    operationTable: 'A',
+    operationTable: anttOperationTable,
     cargoType: 'carga_geral',
-    axesCount: axesCountForAntt ?? undefined,
+    axesCount: isLotacaoWizard ? (axesCountForAntt ?? undefined) : undefined,
   });
 
   // Normalize weight to kg; clamp to DECIMAL(10,2) max (99.999.999,99)
@@ -714,7 +753,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     () => extractUf(watchedDestination || '') ?? '',
     [watchedDestination]
   );
-  const watchedCargoType = form.watch('cargo_type');
   const { data: activePolicies = [], isLoading: loadingPolicies } = useActivePolicies();
   const {
     data: insuranceOptions = [],
@@ -748,18 +786,36 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     return null;
   }, [anttRate, watchedKmDistance, savedAnttMeta]);
 
-  // Piso ANTT em R$ — input para freightCalculator aplicar MP 1.343/2026 em lotação.
-  // Sem isso, custoMotorista cai para baseCost (= frete_peso) mesmo quando o piso é maior.
+  // Piso ANTT em R$ — base de custo do gross-up em lotação (MP 1.343/2026); tabela NTC é referência.
   const pisoAnttCarreteiroForCalc = useMemo<number | undefined>(() => {
-    if (!anttRate || !axesCountForAntt) return undefined;
+    if (!isLotacaoWizard || !axesCountForAntt) return undefined;
     const km = Number(debouncedKmBand || 0);
     if (km <= 0) return undefined;
+    const ccd = anttRate
+      ? Number(anttRate.ccd)
+      : savedAnttMeta?.ccd != null
+        ? Number(savedAnttMeta.ccd)
+        : null;
+    const cc = anttRate
+      ? Number(anttRate.cc)
+      : savedAnttMeta?.cc != null
+        ? Number(savedAnttMeta.cc)
+        : null;
+    if (ccd == null || cc == null) return undefined;
     return calculateAnttMinimum({
       kmDistance: km,
-      ccd: Number(anttRate.ccd),
-      cc: Number(anttRate.cc),
+      ccd,
+      cc,
+      retornoVazio: anttFloorFlags.retornoVazio,
     }).total;
-  }, [anttRate, axesCountForAntt, debouncedKmBand]);
+  }, [
+    isLotacaoWizard,
+    anttRate,
+    savedAnttMeta,
+    axesCountForAntt,
+    debouncedKmBand,
+    anttFloorFlags.retornoVazio,
+  ]);
 
   // Passo 1: calcular frete sem taxas condicionais (usa valores debounced)
   const baseCalculationResult = useMemo(() => {
@@ -855,6 +911,22 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       .filter((code): code is string => typeof code === 'string' && code.length > 0);
   }, [conditionalFeesData, additionalFeesSelection.conditionalFees]);
 
+  const { data: benchmarksData } = useFreightBenchmarks({
+    origin: debounced.origin || '',
+    destination: debounced.destination || '',
+    cargoType: debounced.cargoType || undefined,
+    kmDistance: debouncedKmBand,
+    enabled: open && !isLegacy,
+  });
+
+  const freightBenchmarksInput = useMemo(
+    () =>
+      benchmarksData?.ckanBenchmark && benchmarksData.ckanBenchmark > 0
+        ? { ckanBenchmark: benchmarksData.ckanBenchmark }
+        : undefined,
+    [benchmarksData?.ckanBenchmark]
+  );
+
   const edgeFreightInput = useMemo((): CalculateFreightInput | null => {
     if (isLegacy || !open) return null;
     const km = debouncedKmBand;
@@ -871,6 +943,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       toll_value: debounced.toll ?? 0,
       price_table_id: debounced.priceTableId,
       vehicle_type_code: selectedVehicle?.code,
+      vehicle_axes_count: axesCountForAntt ?? undefined,
       payment_term_code: selectedPaymentTerm?.code ?? 'D30',
       descarga_value: debounced.descarga ?? 0,
       aluguel_maquinas_value: debounced.aluguelMaquinas ?? 0,
@@ -881,6 +954,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       das_percent: resolvedPricingParams.dasPercent,
       markup_percent: resolvedPricingParams.markupPercent,
       overhead_percent: resolvedPricingParams.overheadPercent,
+      ...(debounced.freightModality === 'lotacao'
+        ? {
+            antt_composicao_veicular: anttFloorFlags.composicaoVeicular,
+            antt_alto_desempenho: anttFloorFlags.altoDesempenho,
+            antt_retorno_vazio: anttFloorFlags.retornoVazio,
+          }
+        : {}),
+      benchmarks: freightBenchmarksInput,
     };
   }, [
     isLegacy,
@@ -890,6 +971,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debouncedEffectiveWeightKg,
     debounced.priceTableId,
     selectedVehicle?.code,
+    axesCountForAntt,
     selectedPaymentTerm?.code,
     conditionalFeeCodes,
     additionalFeesSelection.waitingTimeEnabled,
@@ -897,6 +979,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     resolvedPricingParams.dasPercent,
     resolvedPricingParams.markupPercent,
     resolvedPricingParams.overheadPercent,
+    debounced.freightModality,
+    anttFloorFlags,
+    freightBenchmarksInput,
   ]);
 
   const lastEdgeFreightResponseRef = useRef<CalculateFreightResponse | null>(null);
@@ -942,6 +1027,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         waitingTimeHours: additionalFeesSelection.waitingTimeHours,
         waitingTimeEnabled: additionalFeesSelection.waitingTimeEnabled,
       },
+      benchmarks: freightBenchmarksInput,
     });
   }, [
     debounced.origin,
@@ -968,9 +1054,32 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     additionalFeesSelection.waitingTimeEnabled,
   ]);
 
-  /** Prévia: Edge (fonte de verdade) com fallback local enquanto carrega ou em erro */
-  const calculationResult: FreightCalculationOutput =
-    edgeFreightPreview?.output ?? localCalculationResult;
+  /** Prévia: Edge quando paridade OK; lotação com piso usa local se Edge ainda max(tabela,piso). */
+  const calculationResult: FreightCalculationOutput = useMemo(() => {
+    const edge = edgeFreightPreview?.output;
+    const local = localCalculationResult;
+    if (!edge) return local;
+
+    const localPiso = pisoAnttCarreteiroForCalc ?? 0;
+    if (
+      isLotacaoWizard &&
+      shouldPreferLocalLotacaoFreightPreview({
+        local,
+        edge,
+        edgeRaw: edgeFreightPreview?.raw ?? null,
+        localPiso,
+      })
+    ) {
+      return local;
+    }
+    return edge;
+  }, [
+    edgeFreightPreview?.output,
+    edgeFreightPreview?.raw,
+    localCalculationResult,
+    pisoAnttCarreteiroForCalc,
+    isLotacaoWizard,
+  ]);
 
   useEffect(() => {
     if (open) {
@@ -983,7 +1092,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     // Reset user edit flags when form opens/closes
     userEditedOrigin.current = false;
     userEditedDestination.current = false;
-    if (quote) setPreserveOriginalPrice(true);
+    if (quote) {
+      const bd = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+      const alreadyAnttBase = bd?.meta?.anttCostBaseUsed === true;
+      setPreserveOriginalPrice(alreadyAnttBase);
+    }
 
     if (quote) {
       // Restaurar seleção de taxas condicionais do breakdown salvo
@@ -1043,6 +1156,14 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             ?.profitability?.custosDescarga ?? 0,
         tde_enabled: (bd?.components?.tde ?? 0) > 0,
         tear_enabled: (bd?.components?.tear ?? 0) > 0,
+        ...(() => {
+          const af = inferAnttFlagsFromStoredMeta(bd?.meta?.antt);
+          return {
+            antt_composicao_veicular: af.composicaoVeicular,
+            antt_alto_desempenho: af.altoDesempenho,
+            antt_retorno_vazio: af.retornoVazio,
+          };
+        })(),
         discount:
           ((bd?.totals as { discount?: number } | undefined)?.discount ??
             Number((quote as unknown as Record<string, unknown>).discount_value)) ||
@@ -1079,7 +1200,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         shipper_name: '',
         shipper_email: '',
         freight_type: 'FOB',
-        freight_modality: undefined,
+        freight_modality: 'lotacao',
         origin_cep: '',
         destination_cep: '',
         origin: '',
@@ -1097,6 +1218,9 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         descarga: 0,
         tde_enabled: false,
         tear_enabled: false,
+        antt_composicao_veicular: ANTT_FLOOR_DEFAULT_FLAGS.composicaoVeicular,
+        antt_alto_desempenho: ANTT_FLOOR_DEFAULT_FLAGS.altoDesempenho,
+        antt_retorno_vazio: ANTT_FLOOR_DEFAULT_FLAGS.retornoVazio,
         notes: '',
         validity_date: '',
         advance_due_date: '',
@@ -1162,7 +1286,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
           shouldDirty: true,
         });
         // Atualiza destino (Cidade - UF) via lookup de CEP, respeitando edição manual
-        void handleDestinationCepBlur();
+        void fillDestinationFromCep(sanitizeCep(selectedClient.zip_code));
       }
     }
   };
@@ -1178,67 +1302,78 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       if (selectedShipper.zip_code) {
         form.setValue('origin_cep', sanitizeCep(selectedShipper.zip_code), { shouldDirty: true });
         // Atualiza origem (Cidade - UF) via lookup de CEP, respeitando edição manual
-        void handleOriginCepBlur();
+        void fillOriginFromCep(sanitizeCep(selectedShipper.zip_code));
       }
     }
   };
 
-  // CEP Lookup handlers
-  const handleOriginCepBlur = async () => {
-    const cep = sanitizeCep(form.getValues('origin_cep') || '');
-    if (cep.length !== 8) return;
+  const fillOriginFromCep = useCallback(
+    async (cepRaw?: string) => {
+      const cep = sanitizeCep(cepRaw ?? (form.getValues('origin_cep') || ''));
+      if (cep.length !== 8) return;
 
-    setIsLoadingOriginCep(true);
-    try {
-      const data = await invokeEdgeFunction<{
-        success: boolean;
-        data?: { formatted: string };
-        error?: string;
-      }>('lookup-cep', { body: { cep }, requireAuth: false });
-
-      if (!data?.success) {
-        toast.error('CEP de origem não encontrado');
-        return;
+      setIsLoadingOriginCep(true);
+      try {
+        const data = await fetchCepData(cep);
+        if (!data) {
+          toast.error('CEP de origem não encontrado');
+          return;
+        }
+        const cityUf = formatCityUfFromCep(data);
+        if (!userEditedOrigin.current && cityUf.length >= 2) {
+          form.setValue('origin', cityUf, { shouldValidate: true, shouldDirty: true });
+        }
+      } catch {
+        toast.error('Erro ao buscar CEP de origem');
+      } finally {
+        setIsLoadingOriginCep(false);
       }
+    },
+    [form]
+  );
 
-      // SafeSet: only update if user hasn't manually edited
-      if (!userEditedOrigin.current && data.data?.formatted) {
-        form.setValue('origin', data.data.formatted);
+  const fillDestinationFromCep = useCallback(
+    async (cepRaw?: string) => {
+      const cep = sanitizeCep(cepRaw ?? (form.getValues('destination_cep') || ''));
+      if (cep.length !== 8) return;
+
+      setIsLoadingDestinationCep(true);
+      try {
+        const data = await fetchCepData(cep);
+        if (!data) {
+          toast.error('CEP de destino não encontrado');
+          return;
+        }
+        const cityUf = formatCityUfFromCep(data);
+        if (!userEditedDestination.current && cityUf.length >= 2) {
+          form.setValue('destination', cityUf, { shouldValidate: true, shouldDirty: true });
+        }
+      } catch {
+        toast.error('Erro ao buscar CEP de destino');
+      } finally {
+        setIsLoadingDestinationCep(false);
       }
-    } catch {
-      toast.error('Erro ao buscar CEP de origem');
-    } finally {
-      setIsLoadingOriginCep(false);
-    }
-  };
+    },
+    [form]
+  );
 
-  const handleDestinationCepBlur = async () => {
-    const cep = sanitizeCep(form.getValues('destination_cep') || '');
-    if (cep.length !== 8) return;
+  const handleOriginCepBlur = () => fillOriginFromCep();
+  const handleDestinationCepBlur = () => fillDestinationFromCep();
 
-    setIsLoadingDestinationCep(true);
-    try {
-      const data = await invokeEdgeFunction<{
-        success: boolean;
-        data?: { formatted: string };
-        error?: string;
-      }>('lookup-cep', { body: { cep }, requireAuth: false });
-
-      if (!data?.success) {
-        toast.error('CEP de destino não encontrado');
-        return;
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      const originCep = sanitizeCep(form.getValues('origin_cep') || '');
+      if (originCep.length === 8 && (form.getValues('origin') || '').trim().length < 2) {
+        void fillOriginFromCep(originCep);
       }
-
-      // SafeSet: only update if user hasn't manually edited
-      if (!userEditedDestination.current && data.data?.formatted) {
-        form.setValue('destination', data.data.formatted);
+      const destCep = sanitizeCep(form.getValues('destination_cep') || '');
+      if (destCep.length === 8 && (form.getValues('destination') || '').trim().length < 2) {
+        void fillDestinationFromCep(destCep);
       }
-    } catch {
-      toast.error('Erro ao buscar CEP de destino');
-    } finally {
-      setIsLoadingDestinationCep(false);
-    }
-  };
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [open, quote?.id, form, fillOriginFromCep, fillDestinationFromCep]);
 
   const handleCalculateKm = async () => {
     const originCep = sanitizeCep(form.getValues('origin_cep') || '');
@@ -1255,10 +1390,25 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     }
 
     const waypoints: { cep: string; city_uf?: string; label?: string }[] = [];
+    const additionalShippers = form.getValues('additional_shippers') ?? [];
+    for (const sh of additionalShippers) {
+      const cep = sanitizeCep(sh.cep ?? '');
+      if (cep.length === 8 && cep !== originCep) {
+        waypoints.push({
+          cep,
+          city_uf: sh.city_uf?.trim() || undefined,
+          label: sh.name?.trim() ? `Coleta: ${sh.name.trim()}` : 'Coleta',
+        });
+      }
+    }
     for (const s of stops) {
       const cep = sanitizeCep(s.cep ?? '');
       if (cep.length === 8) {
-        waypoints.push({ cep, city_uf: s.city_uf?.trim() || undefined });
+        waypoints.push({
+          cep,
+          city_uf: s.city_uf?.trim() || undefined,
+          label: 'Entrega',
+        });
       }
     }
 
@@ -1274,13 +1424,15 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         };
         error?: string;
       }>('calculate-distance-webrouter', {
-        origin_cep: originCep,
-        destination_cep: destinationCep,
-        waypoints: waypoints.length > 0 ? waypoints : undefined,
-        origin_uf: originUfForApi,
-        destination_uf: destinationUfForApi,
-        categoria_veiculo: selectedVehicle?.ailog_category ?? undefined,
-        axes_count: selectedVehicle?.axes_count ?? undefined,
+        body: {
+          origin_cep: originCep,
+          destination_cep: destinationCep,
+          waypoints: waypoints.length > 0 ? waypoints : undefined,
+          origin_uf: originUfForApi,
+          destination_uf: destinationUfForApi,
+          categoria_veiculo: selectedVehicle?.ailog_category ?? undefined,
+          axes_count: selectedVehicle?.axes_count ?? undefined,
+        },
       });
 
       if (!data?.success) {
@@ -1483,16 +1635,24 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       if (!useStoredPricing) {
         // Enriquecer breakdown com Piso ANTT (carreteiro), quando houver dados suficientes
         if (anttRate && axesCountForAntt && data.km_distance && Number(data.km_distance) > 0) {
+          const saveAnttFlags = {
+            composicaoVeicular:
+              data.antt_composicao_veicular ?? ANTT_FLOOR_DEFAULT_FLAGS.composicaoVeicular,
+            altoDesempenho: data.antt_alto_desempenho ?? ANTT_FLOOR_DEFAULT_FLAGS.altoDesempenho,
+            retornoVazio: data.antt_retorno_vazio ?? ANTT_FLOOR_DEFAULT_FLAGS.retornoVazio,
+          };
           const anttCalcForSave = calculateAnttMinimum({
             kmDistance: Number(data.km_distance),
             ccd: Number(anttRate.ccd),
             cc: Number(anttRate.cc),
+            retornoVazio: saveAnttFlags.retornoVazio,
           });
 
           pricingBreakdown = {
             ...pricingBreakdown,
             meta: {
               ...pricingBreakdown.meta,
+              anttPisoCarreteiro: anttCalcForSave.total,
               antt: {
                 operationTable: anttRate.operation_table,
                 cargoType: anttRate.cargo_type,
@@ -1501,9 +1661,11 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                 ccd: Number(anttRate.ccd),
                 cc: Number(anttRate.cc),
                 ida: anttCalcForSave.ida,
-                retornoVazio: 0,
+                retornoVazio: anttCalcForSave.retornoVazio,
                 total: anttCalcForSave.total,
                 calculatedAt: new Date().toISOString(),
+                composicaoVeicular: saveAnttFlags.composicaoVeicular,
+                altoDesempenho: saveAnttFlags.altoDesempenho,
               },
             },
           };
@@ -1837,6 +1999,23 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                       setSelectedInsuranceOption={setSelectedInsuranceOption}
                       insuranceOriginUf={insuranceOriginUf}
                       insuranceDestinationUf={insuranceDestinationUf}
+                      anttFloorFlags={anttFloorFlags}
+                      onAnttFloorFlagsChange={(patch) => {
+                        if (patch.composicaoVeicular !== undefined) {
+                          form.setValue('antt_composicao_veicular', patch.composicaoVeicular);
+                        }
+                        if (patch.altoDesempenho !== undefined) {
+                          form.setValue('antt_alto_desempenho', patch.altoDesempenho);
+                        }
+                        if (patch.retornoVazio !== undefined) {
+                          form.setValue('antt_retorno_vazio', patch.retornoVazio);
+                        }
+                      }}
+                      pisoAnttPreview={pisoAnttCarreteiroForCalc ?? null}
+                      anttAxesCount={axesCountForAntt ?? null}
+                      anttCcd={anttRate?.ccd != null ? Number(anttRate.ccd) : null}
+                      anttCc={anttRate?.cc != null ? Number(anttRate.cc) : null}
+                      anttKmDistance={kmDistanceForAntt}
                     />
                   </div>
                 ) : (
@@ -2017,12 +2196,16 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                                     mask="cep"
                                     placeholder="00000-000"
                                     value={field.value || ''}
-                                    onValueChange={(rawValue) =>
-                                      field.onChange(String(rawValue ?? ''))
-                                    }
+                                    onValueChange={(rawValue) => {
+                                      const digits = String(rawValue ?? '');
+                                      field.onChange(digits);
+                                      if (digits.replace(/\D/g, '').length === 8) {
+                                        void handleOriginCepBlur();
+                                      }
+                                    }}
                                     onBlur={() => {
                                       field.onBlur();
-                                      handleOriginCepBlur();
+                                      void handleOriginCepBlur();
                                     }}
                                     disabled={isLoadingOriginCep}
                                   />
@@ -2048,12 +2231,16 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                                     mask="cep"
                                     placeholder="00000-000"
                                     value={field.value || ''}
-                                    onValueChange={(rawValue) =>
-                                      field.onChange(String(rawValue ?? ''))
-                                    }
+                                    onValueChange={(rawValue) => {
+                                      const digits = String(rawValue ?? '');
+                                      field.onChange(digits);
+                                      if (digits.replace(/\D/g, '').length === 8) {
+                                        void handleDestinationCepBlur();
+                                      }
+                                    }}
                                     onBlur={() => {
                                       field.onBlur();
-                                      handleDestinationCepBlur();
+                                      void handleDestinationCepBlur();
                                     }}
                                     disabled={isLoadingDestinationCep}
                                   />
@@ -2357,6 +2544,28 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                             </FormItem>
                           )}
                         />
+
+                        {isLotacaoWizard && (
+                          <AnttFloorWizardCard
+                            flags={anttFloorFlags}
+                            onChange={(patch) => {
+                              if (patch.composicaoVeicular !== undefined) {
+                                form.setValue('antt_composicao_veicular', patch.composicaoVeicular);
+                              }
+                              if (patch.altoDesempenho !== undefined) {
+                                form.setValue('antt_alto_desempenho', patch.altoDesempenho);
+                              }
+                              if (patch.retornoVazio !== undefined) {
+                                form.setValue('antt_retorno_vazio', patch.retornoVazio);
+                              }
+                            }}
+                            pisoPreview={pisoAnttCarreteiroForCalc ?? null}
+                            axesCount={axesCountForAntt ?? null}
+                            ccd={anttRate?.ccd != null ? Number(anttRate.ccd) : null}
+                            cc={anttRate?.cc != null ? Number(anttRate.cc) : null}
+                            kmDistance={kmDistanceForAntt}
+                          />
+                        )}
 
                         {/* Condição Financeira: datas manuais para adiantamento e saldo */}
                         {selectedPaymentTerm && (
