@@ -49,18 +49,35 @@ describe('resolveLotacaoFretePeso', () => {
 });
 
 describe('calculateLotacaoProfitability', () => {
-  it('unifica margem bruta e resultado liquido', () => {
+  it('lucro alvo = % sobre custos diretos; margem bruta = contribuição DRE', () => {
+    const p = calculateLotacaoProfitability({
+      receitaLiquida: 10000,
+      overhead: 1000,
+      fretePeso: 7000,
+      custoServicos: 500,
+      custosDescarga: 200,
+      custosDiretos: 7700,
+      totalCliente: 13000,
+      profitMarginPercent: 15,
+    });
+    expect(p.margemBruta).toBe(1300);
+    expect(p.resultadoLiquido).toBe(1155);
+    expect(p.margemPercent).toBeCloseTo(15, 1);
+  });
+
+  it('contribuição negativa ainda pode ter lucro alvo positivo se CD*PM > 0', () => {
     const p = calculateLotacaoProfitability({
       receitaLiquida: 10000,
       overhead: 1000,
       fretePeso: 12000,
       custoServicos: 500,
       custosDescarga: 0,
+      custosDiretos: 12500,
       totalCliente: 13000,
       profitMarginPercent: 10,
     });
     expect(p.margemBruta).toBe(-3500);
-    expect(p.resultadoLiquido).toBe(-3500);
-    expect(p.margemPercent).toBeCloseTo(-26.92, 1);
+    expect(p.resultadoLiquido).toBe(1250);
+    expect(p.margemPercent).toBeCloseTo(10, 1);
   });
 });

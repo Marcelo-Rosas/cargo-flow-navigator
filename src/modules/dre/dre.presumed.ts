@@ -150,7 +150,23 @@ export function computePresumedFromBreakdown(
   );
   values.set('custos_diretos', custosDiretos);
 
-  const resultadoRecomputado = round2(receitaLiquida - overhead - custosDiretos);
+  const profitMarginTarget =
+    numFallback(
+      breakdown,
+      ['profitability', 'profitMarginTarget'],
+      ['profitability', 'profit_margin_target']
+    ) ||
+    numFallback(breakdown, ['rates', 'profitMarginPercent'], ['rates', 'profit_margin_percent']) ||
+    0;
+  const isLotacaoSnapshot =
+    breakdown?.meta != null &&
+    (numOrUndef(breakdown.meta as object, 'anttFloorApplied') != null ||
+      numOrUndef(breakdown.meta as object, 'lotacaoPisoComOver') != null ||
+      numOrUndef(breakdown.meta as object, 'lotacao_piso_com_over') != null);
+  const resultadoRecomputado =
+    isLotacaoSnapshot && custosDiretos > 0 && profitMarginTarget > 0
+      ? round2(custosDiretos * (profitMarginTarget / 100))
+      : round2(receitaLiquida - overhead - custosDiretos);
   values.set('resultado_liquido', resultadoRecomputado);
 
   const margemPercent = faturamento > 0 ? round2((resultadoRecomputado / faturamento) * 100) : 0;

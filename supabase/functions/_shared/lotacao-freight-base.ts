@@ -71,6 +71,7 @@ export interface LotacaoProfitabilityInput {
   fretePeso: number;
   custoServicos: number;
   custosDescarga: number;
+  custosDiretos: number;
   totalCliente: number;
   profitMarginPercent: number;
 }
@@ -89,11 +90,23 @@ export function calculateLotacaoProfitability(
 ): LotacaoProfitabilityResult {
   const custoMotoristaContratado = round(input.fretePeso);
   const margemBruta = round(
-    input.receitaLiquida - input.overhead - custoMotoristaContratado - input.custoServicos
+    input.receitaLiquida -
+      input.overhead -
+      custoMotoristaContratado -
+      input.custoServicos -
+      input.custosDescarga
   );
-  const resultadoLiquido = margemBruta;
+  const custosDiretos = round(Math.max(0, input.custosDiretos));
+  const resultadoLiquido =
+    custosDiretos > 0 && input.profitMarginPercent > 0
+      ? round(custosDiretos * (input.profitMarginPercent / 100))
+      : margemBruta;
   const margemPercent =
-    input.totalCliente > 0 ? round((resultadoLiquido / input.totalCliente) * 100) : 0;
+    custosDiretos > 0
+      ? round((resultadoLiquido / custosDiretos) * 100)
+      : input.totalCliente > 0
+        ? round((resultadoLiquido / input.totalCliente) * 100)
+        : 0;
 
   return {
     margemBruta,

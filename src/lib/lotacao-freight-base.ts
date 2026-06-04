@@ -72,6 +72,8 @@ export interface LotacaoProfitabilityInput {
   fretePeso: number;
   custoServicos: number;
   custosDescarga: number;
+  /** Motorista + serviços + descarga — base do gross-up e do lucro alvo */
+  custosDiretos: number;
   totalCliente: number;
   profitMarginPercent: number;
 }
@@ -84,18 +86,33 @@ export interface LotacaoProfitabilityResult {
   custoMotoristaAntt: number;
 }
 
-/** DRE lotação unificada: mesma base de custo motorista (frete peso golden) nos indicadores. */
+/**
+ * Lotação: separa margem de contribuição (DRE) do lucro alvo embutido no gross-up.
+ * Antes resultadoLiquido = margemBruta (~30% do FAT) — inflava o "lucro" exibido.
+ */
 export function calculateLotacaoProfitability(
   input: LotacaoProfitabilityInput,
   round: (n: number) => number = (n) => Math.round((n + Number.EPSILON) * 100) / 100
 ): LotacaoProfitabilityResult {
   const custoMotoristaContratado = round(input.fretePeso);
   const margemBruta = round(
-    input.receitaLiquida - input.overhead - custoMotoristaContratado - input.custoServicos
+    input.receitaLiquida -
+      input.overhead -
+      custoMotoristaContratado -
+      input.custoServicos -
+      input.custosDescarga
   );
-  const resultadoLiquido = margemBruta;
+  const custosDiretos = round(Math.max(0, input.custosDiretos));
+  const resultadoLiquido =
+    custosDiretos > 0 && input.profitMarginPercent > 0
+      ? round(custosDiretos * (input.profitMarginPercent / 100))
+      : margemBruta;
   const margemPercent =
-    input.totalCliente > 0 ? round((resultadoLiquido / input.totalCliente) * 100) : 0;
+    custosDiretos > 0
+      ? round((resultadoLiquido / custosDiretos) * 100)
+      : input.totalCliente > 0
+        ? round((resultadoLiquido / input.totalCliente) * 100)
+        : 0;
 
   return {
     margemBruta,

@@ -43,7 +43,11 @@
     "cf:log-explorer:retry-access": "npm run cf:log-explorer -- --apply --only access_requests",
     "cf:log-explorer:queries": "npx tsx scripts/cloudflare-log-explorer/run-query.ts --list",
     "cf:log-explorer:query": "npx tsx scripts/cloudflare-log-explorer/run-query.ts",
-    "cf:log-explorer:test-all": "node scripts/cloudflare-log-explorer/run-all-tests.mjs"
+    "cf:log-explorer:test-all": "node scripts/cloudflare-log-explorer/run-all-tests.mjs",
+    "smoke:health": "npx tsx scripts/integration-health.ts",
+    "smoke:health:sr": "npx tsx scripts/integration-health.ts --require-sr",
+    "smoke:integration": "npx tsx scripts/smoke-integration.ts --report",
+    "smoke:integration:real": "npx tsx scripts/smoke-integration.ts --real --report"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

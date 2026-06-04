@@ -68,6 +68,18 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
       cubageFactor: response.meta.cubage_factor,
       cubageWeightKg: response.meta.cubage_weight_kg,
       billableWeightKg: response.meta.billable_weight_kg,
+      kmBandUsed: response.meta.km_band_used,
+      anttFloorApplied: response.meta.antt_floor_applied,
+      fretePesoOriginal: response.meta.frete_peso_original,
+      anttPisoCarreteiro: response.meta.antt_piso_carreteiro,
+      lotacaoPisoComOver: (response.meta as { lotacao_piso_com_over?: number })
+        .lotacao_piso_com_over,
+      lotacaoFreteTabelaComOverKm: (response.meta as { lotacao_frete_tabela_com_over_km?: number })
+        .lotacao_frete_tabela_com_over_km,
+      lotacaoOverKmPercent: (response.meta as { lotacao_over_km_percent?: number })
+        .lotacao_over_km_percent,
+      lotacaoOverAnttPercent: (response.meta as { lotacao_over_antt_percent?: number })
+        .lotacao_over_antt_percent,
     },
     components: {
       baseCost: response.components.base_cost,

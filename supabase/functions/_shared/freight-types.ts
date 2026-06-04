@@ -71,6 +71,9 @@ export interface CalculateFreightInput {
   aluguel_maquinas_value?: number;
   /** Forçar piso ANTT no cálculo: recalcula gross-up partindo de pisoAnttCarreteiro como frete_peso */
   enforce_antt_floor?: boolean;
+  antt_composicao_veicular?: boolean;
+  antt_alto_desempenho?: boolean;
+  antt_retorno_vazio?: boolean;
 }
 
 // ============================================

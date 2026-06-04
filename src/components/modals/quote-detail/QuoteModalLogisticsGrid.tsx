@@ -16,6 +16,12 @@ interface QuoteModalLogisticsGridProps {
   custoMotorista?: number | null;
   /** Total cobrado do cliente para indicador R$/KM */
   totalCliente?: number | null;
+  /** Custos diretos (motorista + pedágio + seguros + …) para R$/km realista */
+  custosDiretos?: number | null;
+  /** Resultado líquido (margem operacional) */
+  resultadoLiquido?: number | null;
+  /** Piso ANTT total de referência */
+  pisoAntt?: number | null;
 }
 
 export function QuoteModalLogisticsGrid({
@@ -31,6 +37,9 @@ export function QuoteModalLogisticsGrid({
   cargoType,
   custoMotorista,
   totalCliente,
+  custosDiretos,
+  resultadoLiquido,
+  pisoAntt,
 }: QuoteModalLogisticsGridProps) {
   const weightFormatted =
     weight != null && weight > 0
@@ -126,45 +135,47 @@ export function QuoteModalLogisticsGrid({
         )}
       </div>
 
-      {/* Performance R$/KM — Spread como indicador principal */}
+      {/* Performance R$/KM — margem líquida (não confundir com venda − só motorista) */}
       {kmDistance != null &&
         kmDistance > 0 &&
-        custoMotorista != null &&
         totalCliente != null &&
         totalCliente > 0 &&
         (() => {
-          const spreadPerKm = (totalCliente - custoMotorista) / kmDistance;
-          const custoPerKm = custoMotorista / kmDistance;
           const vendaPerKm = totalCliente / kmDistance;
+          const margemPerKm =
+            resultadoLiquido != null && resultadoLiquido > 0 ? resultadoLiquido / kmDistance : null;
+          const custosPerKm =
+            custosDiretos != null && custosDiretos > 0
+              ? custosDiretos / kmDistance
+              : custoMotorista != null
+                ? custoMotorista / kmDistance
+                : null;
+          const pisoPerKm = pisoAntt != null && pisoAntt > 0 ? pisoAntt / kmDistance : null;
           return (
             <div className="col-span-2 mt-4 space-y-3">
-              {/* Spread em destaque — saúde da operação */}
-              <div className="rounded-lg border bg-primary/5 border-primary/20 p-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-xs font-semibold text-primary uppercase tracking-wider">
-                      Spread de Operação (Venda — Custo)
-                    </p>
-                    <p className="text-xl font-bold text-primary tabular-nums">
-                      R${' '}
-                      {spreadPerKm.toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                      /km
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="bg-background">
-                    R$/KM
-                  </Badge>
+              {margemPerKm != null && (
+                <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 p-4">
+                  <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">
+                    Margem líquida / km
+                  </p>
+                  <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                    R${' '}
+                    {margemPerKm.toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                    /km
+                  </p>
                 </div>
-              </div>
+              )}
               <div className="grid grid-cols-2 gap-4 rounded-lg border bg-muted/30 p-4">
                 <div>
-                  <p className="mb-1 text-xs text-muted-foreground">Custo (pago ao motorista)</p>
+                  <p className="mb-1 text-xs text-muted-foreground">
+                    {custosDiretos != null ? 'Custos diretos/km' : 'Motorista/km'}
+                  </p>
                   <p className="text-base font-bold tabular-nums text-destructive">
                     R${' '}
-                    {custoPerKm.toLocaleString('pt-BR', {
+                    {(custosPerKm ?? 0).toLocaleString('pt-BR', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}

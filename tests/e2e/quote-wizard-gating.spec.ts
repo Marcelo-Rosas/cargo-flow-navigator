@@ -72,7 +72,7 @@ const fillBaseQuoteForm = async (page: Page, km: string) => {
   await page.getByLabel('Nome do Cliente *').fill('E2E Cliente');
   await page.getByLabel('Origem *').fill('São Paulo, SP');
   await page.getByLabel('Destino *').fill('Rio de Janeiro, RJ');
-  await page.getByRole('button', { name: /Próximo/i }).click();
+  await page.getByRole('button', { name: /Continuar|Próximo/i }).click();
 
   await page.getByLabel('Tabela de Preços').click();
   await page.getByRole('option', { name: /Tabela Teste/i }).click();
@@ -80,13 +80,13 @@ const fillBaseQuoteForm = async (page: Page, km: string) => {
   await page.getByRole('option', { name: /50\/50/i }).click();
   await page.getByLabel('Distância (km)').fill(km);
   await page.getByLabel('Peso').fill('1000');
-  await page.getByRole('button', { name: /Próximo/i }).click();
+  await page.getByRole('button', { name: /Continuar|Próximo/i }).click();
 
   await page.getByLabel('Valor da Carga').fill('1000');
-  await page.getByRole('button', { name: /Próximo/i }).click();
+  await page.getByRole('button', { name: /Continuar|Próximo/i }).click();
 
   // Step 4 — Seguro (skip)
-  await page.getByRole('button', { name: /Próximo/i }).click();
+  await page.getByRole('button', { name: /Continuar|Próximo/i }).click();
 };
 
 test('wizard blocks CTA when km out of range', async ({ page }) => {

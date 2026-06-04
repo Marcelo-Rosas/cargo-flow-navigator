@@ -1,0 +1,53 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - generic [ref=e27]:
+      - generic [ref=e29]:
+        - img "Vectra Hub Cargo" [ref=e31]
+        - generic [ref=e32]: Vectra Cargo
+      - generic [ref=e33]:
+        - heading "Gerencie suas operações de transporte em um só lugar" [level=1] [ref=e34]
+        - paragraph [ref=e35]: Do comercial ao operacional, integre cotações, ordens de serviço e documentos com automação inteligente.
+        - list [ref=e36]:
+          - listitem [ref=e37]: Pipeline comercial integrado
+          - listitem [ref=e39]: Gestão de ordens de serviço
+          - listitem [ref=e41]: Controle documental (NF-e, CT-e, POD)
+          - listitem [ref=e43]: Rastreamento em tempo real
+      - paragraph [ref=e45]: © 2024 Vectra Cargo. Todos os direitos reservados.
+    - generic [ref=e48]:
+      - heading "Bem-vindo de volta" [level=2] [ref=e49]
+      - paragraph [ref=e50]: Entre com suas credenciais para acessar o sistema
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - text: E-mail
+          - generic [ref=e53]:
+            - img [ref=e54]
+            - textbox "E-mail" [active] [ref=e57]:
+              - /placeholder: seu@vectracargo.com.br
+              - text: invalido@test.com
+        - generic [ref=e58]:
+          - generic [ref=e59]:
+            - generic [ref=e60]: Senha
+            - button "Esqueceu a senha?" [ref=e61] [cursor=pointer]
+          - generic [ref=e62]:
+            - img [ref=e63]
+            - textbox "Senha" [ref=e66]:
+              - /placeholder: ••••••••
+            - button "Mostrar senha" [ref=e67] [cursor=pointer]:
+              - img
+        - generic [ref=e68]:
+          - checkbox "Manter conectado" [ref=e69] [cursor=pointer]
+          - checkbox
+          - generic [ref=e70]: Manter conectado
+        - button "Entrar" [ref=e71] [cursor=pointer]:
+          - text: Entrar
+          - img
+      - paragraph [ref=e72]:
+        - text: Acesso restrito a colaboradores Vectra Cargo.
+        - text: Solicite seu acesso ao administrador do sistema.
+```

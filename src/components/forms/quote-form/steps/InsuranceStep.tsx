@@ -216,16 +216,8 @@ export function InsuranceStep({
 
   // ---------- Render ----------
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-          <Shield className="w-4 h-4" /> Seguro de Carga
-        </p>
-      </div>
-
-      {/* ===== MANDATORY POLICIES SECTION ===== */}
-      <SectionBlock label="Apólices Obrigatórias (RCTR-C / RC-DC)">
+    <div className="space-y-4">
+      <SectionBlock variant="card" label="Apólices Obrigatórias (RCTR-C / RC-DC)">
         <p className="text-xs text-muted-foreground mb-3">
           Seguros obrigatórios por lei para transporte rodoviário de cargas (RCTR-C e RC-DC). As
           apólices abaixo são aplicadas automaticamente.
@@ -301,7 +293,7 @@ export function InsuranceStep({
       {/* ===== OPTIONAL ADDITIONAL COVERAGE ===== */}
       <Separator />
 
-      <SectionBlock label="Cobertura Adicional (opcional)">
+      <SectionBlock variant="card" label="Cobertura Adicional (opcional)">
         <div className="flex items-center space-x-2">
           <FormField
             control={form.control}
@@ -326,7 +318,7 @@ export function InsuranceStep({
 
       {/* Optional insurance selector (visible when checkbox is checked) */}
       {insuranceEligible && (
-        <SectionBlock label="Nível de Cobertura Adicional" className="space-y-4">
+        <SectionBlock variant="card" label="Nível de Cobertura Adicional" className="space-y-4">
           <div>
             <h3 className="font-semibold text-sm mb-4">Selecione o nível de cobertura</h3>
 

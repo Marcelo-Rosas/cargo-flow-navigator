@@ -43,6 +43,8 @@ import {
   resolveMargemBrutaDisplay,
   isMarginBelowTarget,
 } from '@/lib/freightCalculator';
+import { AnttFloorWizardCard } from '@/components/forms/quote-form/AnttFloorWizardCard';
+import type { AnttFloorFlags } from '@/lib/antt-floor-calc';
 
 interface PaymentTerm {
   id: string;
@@ -62,6 +64,13 @@ interface PricingStepProps {
   onEquipmentRentalChange: (total: number, items: EquipmentRentalItem[]) => void;
   unloadingCostItems: UnloadingCostItem[];
   onUnloadingCostChange: (total: number, items: UnloadingCostItem[]) => void;
+  anttFloorFlags?: AnttFloorFlags;
+  onAnttFloorFlagsChange?: (patch: Partial<AnttFloorFlags>) => void;
+  pisoAnttPreview?: number | null;
+  anttAxesCount?: number | null;
+  anttCcd?: number | null;
+  anttCc?: number | null;
+  anttKmDistance?: number;
 }
 
 export function PricingStep({
@@ -76,6 +85,13 @@ export function PricingStep({
   onUnloadingCostChange,
   isLegacy = false,
   paymentTerms = [],
+  anttFloorFlags,
+  onAnttFloorFlagsChange,
+  pisoAnttPreview = null,
+  anttAxesCount = null,
+  anttCcd = null,
+  anttCc = null,
+  anttKmDistance = 0,
 }: PricingStepProps) {
   const c = calculationResult?.components;
   const t = calculationResult?.totals;
@@ -93,6 +109,23 @@ export function PricingStep({
   const watchDestination = form.watch('destination');
   const watchKmDistance = form.watch('km_distance');
   const watchModality = form.watch('freight_modality');
+  const isLotacao = watchModality === 'lotacao';
+  const anttFloorApplied = Boolean(m?.anttFloorApplied);
+  const freteTabelaBase =
+    m?.fretePesoOriginal ??
+    m?.lotacaoFreteTabelaComOverKm ??
+    (anttFloorApplied ? undefined : c?.baseFreight) ??
+    c?.baseFreight ??
+    0;
+  const pisoAnttRaw = m?.anttPisoCarreteiro ?? pisoAnttPreview ?? 0;
+  const pisoAnttComOver = m?.lotacaoPisoComOver ?? pisoAnttRaw;
+  const pagMotoristaBase = p?.custoMotoristaContratado ?? c?.baseCost ?? 0;
+  const pisoNaoAplicadoNoCalculo =
+    isLotacao &&
+    pisoAnttComOver > 0 &&
+    pagMotoristaBase > 0 &&
+    pagMotoristaBase < pisoAnttComOver * 0.95;
+  const custosDiretosPreview = p?.custosDiretos ?? 0;
 
   const deliveryDays = useMemo(
     () => estimateDeliveryDays(watchKmDistance || 0, watchModality || 'lotacao'),
@@ -113,9 +146,19 @@ export function PricingStep({
     custoMotoristaGolden,
     custoServicos
   );
-  const resultadoLiquido = p?.resultadoLiquido ?? margemContribuicao;
+  const custosDiretosCalc = p?.custosDiretos ?? 0;
+  const targetMarginStep =
+    p?.profitMarginTarget ?? calculationResult?.rates?.profitMarginPercent ?? 15;
+  const resultadoLiquido =
+    custosDiretosCalc > 0 && targetMarginStep > 0
+      ? custosDiretosCalc * (targetMarginStep / 100)
+      : (p?.resultadoLiquido ?? margemContribuicao);
   const margemPercentDisplay =
-    (t?.totalCliente ?? 0) > 0 ? (resultadoLiquido / (t?.totalCliente ?? 1)) * 100 : 0;
+    custosDiretosCalc > 0 && isLotacao
+      ? (resultadoLiquido / custosDiretosCalc) * 100
+      : (t?.totalCliente ?? 0) > 0
+        ? (resultadoLiquido / (t?.totalCliente ?? 1)) * 100
+        : 0;
   const targetMargin = p?.profitMarginTarget ?? calculationResult?.rates?.profitMarginPercent ?? 15;
   const showMarginAlert =
     showAllIn &&
@@ -149,11 +192,8 @@ export function PricingStep({
   }, [c]);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {isLegacy ? 'FAT + PAG (manual)' : 'Composição Financeira'}
-        </p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-end gap-2 -mt-2 mb-1">
         <div className="flex items-center gap-2">
           {!isLegacy && calculationResult?.status === 'OUT_OF_RANGE' && (
             <Badge variant="destructive" className="text-[10px]">
@@ -178,7 +218,7 @@ export function PricingStep({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
         {/* COLUNA A: ENTRADAS */}
-        <SectionBlock label="Entradas">
+        <SectionBlock variant="card" label="Entradas e custos">
           <div className="space-y-6">
             {isLegacy && (
               <>
@@ -344,6 +384,26 @@ export function PricingStep({
             )}
             {!isLegacy && (
               <>
+                {isLotacao && anttFloorFlags && onAnttFloorFlagsChange ? (
+                  <AnttFloorWizardCard
+                    flags={anttFloorFlags}
+                    onChange={onAnttFloorFlagsChange}
+                    pisoPreview={pisoAnttPreview}
+                    axesCount={anttAxesCount}
+                    ccd={anttCcd}
+                    cc={anttCc}
+                    kmDistance={anttKmDistance}
+                  />
+                ) : (
+                  !isLegacy &&
+                  watchModality === 'fracionado' && (
+                    <p className="text-xs text-muted-foreground rounded-md border border-dashed p-3">
+                      Piso ANTT e custo motorista por tabela NTC aplicam-se em{' '}
+                      <strong>Lotação</strong>. Altere a modalidade no passo Carga e Logística.
+                    </p>
+                  )
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -386,21 +446,26 @@ export function PricingStep({
                 </div>
 
                 <div className="space-y-4 min-w-0">
-                  <SectionBlock label="Aluguel de Máquinas" collapsible defaultOpen>
+                  <SectionBlock variant="card" label="Aluguel de Máquinas" collapsible defaultOpen>
                     <EquipmentRentalSection
                       value={form.watch('aluguel_maquinas') || 0}
                       onChange={onEquipmentRentalChange}
                       initialItems={equipmentRentalItems}
                     />
                   </SectionBlock>
-                  <SectionBlock label="Carga e Descarga" collapsible defaultOpen>
+                  <SectionBlock variant="card" label="Carga e Descarga" collapsible defaultOpen>
                     <UnloadingCostSection
                       value={form.watch('descarga') || 0}
                       onChange={onUnloadingCostChange}
                       initialItems={unloadingCostItems}
                     />
                   </SectionBlock>
-                  <SectionBlock label="Taxas Condicionais e Estadia" collapsible defaultOpen>
+                  <SectionBlock
+                    variant="card"
+                    label="Taxas Condicionais e Estadia"
+                    collapsible
+                    defaultOpen
+                  >
                     <AdditionalFeesSection
                       selection={additionalFeesSelection}
                       onChange={setAdditionalFeesSelection}
@@ -416,7 +481,7 @@ export function PricingStep({
         </SectionBlock>
 
         {/* COLUNA B: RESULTADOS */}
-        <SectionBlock label="Resultado">
+        <SectionBlock variant="card" label="Resultado do cálculo">
           <div
             className={cn(
               'transition-all duration-300',
@@ -461,10 +526,48 @@ export function PricingStep({
                 </TabsList>
 
                 <TabsContent value="memoria" className="p-5 space-y-3 text-sm mt-0">
-                  <ResultRow
-                    label="Frete Peso (Base)"
-                    value={formatCurrency(c?.baseFreight ?? 0)}
-                  />
+                  {pisoNaoAplicadoNoCalculo && (
+                    <Alert variant="destructive" className="py-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription className="text-xs leading-snug">
+                        O piso ANTT estimado ({formatCurrency(pisoAnttComOver)}) é maior que o PAG
+                        base usado no cálculo ({formatCurrency(pagMotoristaBase)}). O total cliente
+                        pode estar subprecificado. Verifique eixos do veículo e recalcule; o sistema
+                        passará a usar o piso no frete peso.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {isLotacao && (
+                    <>
+                      <ResultRow
+                        label="Frete tabela (NTC, peso × R$/t)"
+                        value={formatCurrency(freteTabelaBase)}
+                      />
+                      {pisoAnttComOver > 0 && (
+                        <ResultRow
+                          label="Piso ANTT (calculadora)"
+                          value={formatCurrency(pisoAnttComOver)}
+                        />
+                      )}
+                      <ResultRow
+                        label="Frete peso aplicado (max tabela × piso)"
+                        value={formatCurrency(pagMotoristaBase)}
+                        emphasize
+                      />
+                      {anttFloorApplied && (
+                        <p className="text-[10px] text-emerald-700 dark:text-emerald-400 -mt-1">
+                          Piso ANTT definiu o frete peso (base do gross-up).
+                        </p>
+                      )}
+                      <Separator className="my-1" />
+                    </>
+                  )}
+                  {!isLotacao && (
+                    <ResultRow
+                      label="Frete Peso (Base)"
+                      value={formatCurrency(c?.baseFreight ?? 0)}
+                    />
+                  )}
                   {c?.toll != null && c.toll > 0 && (
                     <ResultRow label="Pedágio" value={formatCurrency(c.toll)} />
                   )}
@@ -507,6 +610,16 @@ export function PricingStep({
                   )}
 
                   <Separator className="my-2" />
+                  {custosDiretosPreview > 0 && (
+                    <ResultRow
+                      label="Custos diretos (base gross-up)"
+                      value={formatCurrency(custosDiretosPreview)}
+                    />
+                  )}
+                  <p className="text-[10px] text-muted-foreground leading-snug">
+                    Total cliente = gross-up sobre custos diretos + margem + impostos — não é a soma
+                    das linhas acima.
+                  </p>
                   <div className="flex justify-between items-center bg-primary/10 p-3 rounded-lg border border-primary/20">
                     <span className="font-bold text-primary text-xs uppercase">Total Cliente</span>
                     <span className="font-black text-xl text-primary">
@@ -586,10 +699,12 @@ export function PricingStep({
                   <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-950/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900 mt-4">
                     <div className="flex flex-col">
                       <span className="font-bold text-emerald-700 dark:text-emerald-400 text-xs uppercase">
-                        Resultado Líquido
+                        Lucro alvo (s/ custos diretos)
                       </span>
                       <span className="text-[10px] text-emerald-600 dark:text-emerald-500 font-medium">
-                        Margem Operacional: {margemPercentDisplay.toFixed(2)}%
+                        {isLotacao
+                          ? `Margem s/ CD: ${margemPercentDisplay.toFixed(2)}%`
+                          : `Margem operacional: ${margemPercentDisplay.toFixed(2)}%`}
                       </span>
                     </div>
                     <span className="font-black text-xl text-emerald-700 dark:text-emerald-400">
@@ -605,7 +720,7 @@ export function PricingStep({
 
       {/* RESUMO COMERCIAL ALL-IN */}
       {showAllIn && (
-        <SectionBlock label="Resumo Comercial">
+        <SectionBlock variant="card" label="Resumo Comercial">
           <Card className="bg-muted/30 border p-5 space-y-4">
             {/* Rota */}
             <div className="flex items-center gap-2 text-sm">
@@ -713,11 +828,28 @@ export function PricingStep({
   );
 }
 
-function ResultRow({ label, value }: { label: string; value: string }) {
+function ResultRow({
+  label,
+  value,
+  emphasize = false,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
   return (
-    <div className="flex justify-between text-xs sm:text-sm animate-in fade-in duration-300">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value}</span>
+    <div
+      className={cn(
+        'flex justify-between text-xs sm:text-sm animate-in fade-in duration-300',
+        emphasize && 'rounded-md bg-muted/40 px-2 py-1.5 -mx-0.5'
+      )}
+    >
+      <span className={emphasize ? 'font-medium text-foreground' : 'text-muted-foreground'}>
+        {label}
+      </span>
+      <span className={cn('font-medium', emphasize && 'font-semibold text-foreground')}>
+        {value}
+      </span>
     </div>
   );
 }

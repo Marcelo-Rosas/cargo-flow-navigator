@@ -1,5 +1,6 @@
 import type { UseFormReturn } from 'react-hook-form';
-import { CheckCircle2, Tag } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Tag } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { SectionBlock } from '@/components/ui/section-block';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
@@ -41,6 +42,9 @@ export function ReviewStep({
   const values = form.getValues();
   const discount = form.watch('discount') ?? 0;
   const baseFreight = calculationResult?.components?.baseFreight ?? 0;
+  const meta = calculationResult?.meta;
+  const pisoAntt = meta?.anttPisoCarreteiro ?? meta?.lotacaoPisoComOver ?? 0;
+  const pisoGap = !isLegacy && pisoAntt > 0 && baseFreight > 0 && baseFreight < pisoAntt * 0.95;
   const totalBruto = isLegacy
     ? Number(values.value) || 0
     : (calculationResult?.totals?.totalCliente ?? 0);
@@ -64,8 +68,8 @@ export function ReviewStep({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <SectionBlock label="Rota e Cliente">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
+        <SectionBlock variant="card" label="Rota e Cliente">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Cliente</span>
@@ -109,7 +113,7 @@ export function ReviewStep({
           </div>
         </SectionBlock>
 
-        <SectionBlock label="Carga e Transporte">
+        <SectionBlock variant="card" label="Carga e Transporte">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tipo de Carga</span>
@@ -137,8 +141,21 @@ export function ReviewStep({
         </SectionBlock>
       </div>
 
+      {pisoGap && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            Piso ANTT ({formatCurrency(pisoAntt)}) acima do frete peso no cálculo (
+            {formatCurrency(baseFreight)}). Revise na etapa Financeiro antes de salvar.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Composição Financeira */}
-      <SectionBlock label={isLegacy ? 'FAT + PAG (manual)' : 'Composição Financeira'}>
+      <SectionBlock
+        variant="card"
+        label={isLegacy ? 'FAT + PAG (manual)' : 'Composição Financeira'}
+      >
         {isLegacy ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-3 rounded-lg bg-muted/30 border border-border">
@@ -219,7 +236,7 @@ export function ReviewStep({
         values.advance_due_date ||
         values.balance_due_date ||
         values.estimated_loading_date) && (
-        <SectionBlock label="Pagamento e Datas">
+        <SectionBlock variant="card" label="Pagamento e Datas">
           <div className="space-y-2 text-sm">
             {values.payment_method && (
               <div className="flex justify-between">
@@ -260,7 +277,7 @@ export function ReviewStep({
 
       {/* Observações */}
       {values.notes && (
-        <SectionBlock label="Observações">
+        <SectionBlock variant="card" label="Observações">
           <p className="text-sm italic text-muted-foreground/80 leading-relaxed">
             &ldquo;{values.notes}&rdquo;
           </p>
