@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import type { StoredPricingBreakdown } from '@/lib/freightCalculator';
+import { resolvePisoAnttCarreteiroReais } from '@/lib/carreteiro-cost';
 
 interface ConditionalFee {
   id: string;
@@ -93,6 +94,10 @@ export function QuoteModalCostCompositionTab({
   )?.regimeFiscal;
   const isLucroPresumido = regimeFiscal === 'lucro_presumido';
   const custoEfetivoMotorista = breakdown.components?.baseFreight ?? 0;
+  const custoMotoristaPisoAntt =
+    breakdown.profitability?.custoMotoristaContratado ??
+    breakdown.profitability?.custoMotorista ??
+    (resolvePisoAnttCarreteiroReais(breakdown) || pisoAnttTotal);
   const pedagio = breakdown.components?.toll ?? 0;
   const grisValue = breakdown.components?.gris ?? 0;
   const tsoValue = breakdown.components?.tso ?? 0;
@@ -806,12 +811,22 @@ export function QuoteModalCostCompositionTab({
                 </TableRow>
                 <TableRow>
                   <TableCell className="pl-8 text-muted-foreground">
-                    • Custo Motorista (Frete Base)
+                    • Custo Motorista (Piso ANTT / carreteiro)
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-destructive">
-                    -{formatCurrency(custoEfetivoMotorista)}
+                    -{formatCurrency(custoMotoristaPisoAntt)}
                   </TableCell>
                 </TableRow>
+                {custoEfetivoMotorista > custoMotoristaPisoAntt + 0.01 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground text-xs">
+                      • Frete peso contratado (NTC, ref. gross-up)
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
+                      {formatCurrency(custoEfetivoMotorista)}
+                    </TableCell>
+                  </TableRow>
+                )}
                 {pedagio > 0 && (
                   <TableRow>
                     <TableCell className="pl-8 text-muted-foreground">• Pedágio</TableCell>

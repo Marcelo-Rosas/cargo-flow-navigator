@@ -580,18 +580,18 @@ Deno.serve(async (req) => {
         round: roundCurrency,
       });
       frete_peso = lotacaoFreteMeta.fretePeso;
-      if (lotacaoFreteMeta.pisoAplicado) {
+      if (lotacaoFreteMeta.anttCostBaseUsed) {
         fallbacksApplied.push(
-          `lotacao: frete_peso = piso ANTT + ${lotacaoFreteMeta.overAnttPercent}% (R$ ${lotacaoFreteMeta.pisoComOverAntt})`
+          `lotacao: base custo motorista = piso ANTT + ${lotacaoFreteMeta.overAnttPercent}% (R$ ${lotacaoFreteMeta.pisoComOverAntt})`
         );
+        if (lotacaoFreteMeta.freteTabelaComOverKm > lotacaoFreteMeta.pisoComOverAntt + 0.01) {
+          fallbacksApplied.push(
+            `lotacao: tabela NTC + ${lotacaoFreteMeta.overKmPercent}% km = R$ ${lotacaoFreteMeta.freteTabelaComOverKm} (referência, fora do gross-up)`
+          );
+        }
       } else if (lotacaoFreteMeta.overKmPercent > 0) {
         fallbacksApplied.push(
-          `lotacao: frete_peso = tabela + ${lotacaoFreteMeta.overKmPercent}% km (R$ ${lotacaoFreteMeta.freteTabelaComOverKm})`
-        );
-      }
-      if (frete_peso > frete_peso_tabela + 0.01) {
-        fallbacksApplied.push(
-          `lotacao: frete_peso tabela R$ ${frete_peso_tabela} → golden R$ ${frete_peso}`
+          `lotacao: base custo = tabela + ${lotacaoFreteMeta.overKmPercent}% km (R$ ${lotacaoFreteMeta.freteTabelaComOverKm}) — sem piso ANTT`
         );
       }
     }
@@ -867,7 +867,8 @@ Deno.serve(async (req) => {
 
     const anttFloorApplied =
       modality === 'lotacao' &&
-      (lotacaoFreteMeta?.anttFloorApplied ??
+      (lotacaoFreteMeta?.anttCostBaseUsed ??
+        lotacaoFreteMeta?.anttFloorApplied ??
         (pisoAnttCarreteiro > 0 && pisoAnttCarreteiro > frete_peso_tabela));
     const enforceAnttFloor = !!(input as { enforce_antt_floor?: boolean }).enforce_antt_floor;
     const anttFloorForced =
@@ -991,6 +992,7 @@ Deno.serve(async (req) => {
           receitaLiquida,
           overhead,
           fretePeso: frete_peso,
+          pisoAntt: pisoAnttCarreteiro,
           custoServicos: custoServicosOperacionais,
           custosDescarga,
           custosDiretos,
@@ -1047,31 +1049,21 @@ Deno.serve(async (req) => {
     }
 
     let matchStatus:
-      | { status: 'WIN' | 'LOSS' | 'WARNING'; history2025Value?: number; ckanGrossValue?: number }
+      | {
+          status: 'WIN' | 'LOSS' | 'WARNING';
+          ckanBenchmarkLiquido?: number;
+          ckanGrossValue?: number;
+        }
       | undefined;
 
-    if (input.benchmarks?.historyBenchmark2025 || ckanBenchmarkGross) {
-      const historyVal = input.benchmarks?.historyBenchmark2025;
-      const ckanVal = ckanBenchmarkGross;
-
-      let targetTeto = 0;
-      if (historyVal && ckanVal) {
-        targetTeto = Math.min(historyVal, ckanVal) * 1.05;
-      } else if (historyVal) {
-        targetTeto = historyVal * 1.05;
-      } else if (ckanVal) {
-        targetTeto = ckanVal * 1.05;
-      }
-
-      if (targetTeto > 0) {
-        matchStatus = {
-          status: totalCliente <= targetTeto ? 'WIN' : 'LOSS',
-          history2025Value: historyVal,
-          ckanGrossValue: ckanVal,
-        };
-      } else {
-        matchStatus = { status: 'WARNING' };
-      }
+    if (ckanBenchmarkGross != null && ckanBenchmarkGross > 0) {
+      const ckanLiquido = input.benchmarks?.ckanBenchmark;
+      const targetTeto = ckanBenchmarkGross * 1.05;
+      matchStatus = {
+        status: totalCliente <= targetTeto ? 'WIN' : 'LOSS',
+        ckanBenchmarkLiquido: ckanLiquido,
+        ckanGrossValue: ckanBenchmarkGross,
+      };
     }
 
     const meta: FreightMeta = {
@@ -1090,14 +1082,18 @@ Deno.serve(async (req) => {
       antt_piso_carreteiro: roundCurrency(pisoAnttCarreteiro),
       antt_floor_applied: anttFloorApplied,
       ...(modality === 'lotacao' &&
-        frete_peso_tabela !== frete_peso && {
-          frete_peso_original: roundCurrency(frete_peso_tabela),
+        lotacaoFreteMeta &&
+        lotacaoFreteMeta.anttCostBaseUsed &&
+        lotacaoFreteMeta.freteTabelaComOverKm > lotacaoFreteMeta.pisoComOverAntt + 0.01 && {
+          frete_peso_original: roundCurrency(lotacaoFreteMeta.freteTabelaComOverKm),
         }),
       ...(lotacaoFreteMeta && {
         lotacao_over_km_percent: lotacaoFreteMeta.overKmPercent,
         lotacao_over_antt_percent: lotacaoFreteMeta.overAnttPercent,
         lotacao_piso_com_over: roundCurrency(lotacaoFreteMeta.pisoComOverAntt),
         lotacao_frete_tabela_com_over_km: roundCurrency(lotacaoFreteMeta.freteTabelaComOverKm),
+        lotacao_frete_referencia_max: roundCurrency(lotacaoFreteMeta.fretePesoReferenciaMax),
+        antt_cost_base_used: lotacaoFreteMeta.anttCostBaseUsed,
       }),
       ...(anttFloorRateId && { antt_floor_rate_id: anttFloorRateId }),
       antt_calculated_at: new Date().toISOString(),

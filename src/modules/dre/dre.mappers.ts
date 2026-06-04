@@ -1,5 +1,7 @@
 import type { OrderDreInput, OrderPricingBreakdown, DreComparativoRow } from './dre.types';
 import { computeDreRealFromPresumido } from './dre.calculations';
+import { resolvePisoAnttCarreteiroReais } from '@/lib/carreteiro-cost';
+import type { StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 /** Arredonda para 2 casas */
 function round2(n: number): number {
@@ -81,8 +83,22 @@ export function mapOrderToDreRow(
 
   const hasPb = hasProfitabilityData(pb);
   const custoMotoristaPresumido = hasPb
-    ? numFallback(pb, ['profitability', 'custoMotorista'], ['profitability', 'custo_motorista']) ||
-      numFallback(pb, ['profitability', 'custosCarreteiro'], ['profitability', 'custos_carreteiro'])
+    ? (() => {
+        const piso = resolvePisoAnttCarreteiroReais(pb as StoredPricingBreakdown);
+        if (piso > 0) return piso;
+        return (
+          numFallback(
+            pb,
+            ['profitability', 'custoMotorista'],
+            ['profitability', 'custo_motorista']
+          ) ||
+          numFallback(
+            pb,
+            ['profitability', 'custosCarreteiro'],
+            ['profitability', 'custos_carreteiro']
+          )
+        );
+      })()
     : (order.carreteiro_real ?? 0);
   const pedagioPresumido = hasPb ? num(pb.components, 'toll') || 0 : (order.pedagio_real ?? 0);
   const aluguelMaquinasPresumido = num(pb.components, 'aluguelMaquinas') ?? 0;

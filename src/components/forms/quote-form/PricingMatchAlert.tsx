@@ -6,18 +6,21 @@ import { cn } from '@/lib/utils';
 
 interface PricingMatchAlertProps {
   nossoPreco: number;
-  historyValue?: number;
+  /** Frete seco CKAN (R$ total) */
+  ckanBenchmarkLiquido?: number;
+  /** Teto bruto CKAN após gross-up */
   ckanGrossValue?: number;
   status?: 'WIN' | 'LOSS' | 'WARNING';
 }
 
 export function PricingMatchAlert({
   nossoPreco,
-  historyValue,
+  ckanBenchmarkLiquido,
   ckanGrossValue,
   status = 'WARNING',
 }: PricingMatchAlertProps) {
-  const maxVal = Math.max(nossoPreco, historyValue || 0, ckanGrossValue || 0);
+  const refLiquido = ckanBenchmarkLiquido ?? 0;
+  const maxVal = Math.max(nossoPreco, refLiquido, ckanGrossValue || 0);
 
   const getPercentageWidth = (val: number) => {
     if (maxVal === 0) return '0%';
@@ -75,27 +78,25 @@ export function PricingMatchAlert({
           </div>
         </div>
 
-        {/* Histórico 2025 */}
-        {historyValue ? (
+        {refLiquido > 0 ? (
           <div className="space-y-1">
             <div className="flex justify-between text-xs font-medium text-muted-foreground">
-              <span>Histórico 2025 (Mirofish)</span>
-              <span>{formatCurrency(historyValue)}</span>
+              <span>CKAN mercado (frete seco)</span>
+              <span>{formatCurrency(refLiquido)}</span>
             </div>
             <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-blue-400 rounded-full opacity-70"
-                style={{ width: getPercentageWidth(historyValue) }}
+                style={{ width: getPercentageWidth(refLiquido) }}
               />
             </div>
           </div>
         ) : null}
 
-        {/* Teto CKAN */}
         {ckanGrossValue ? (
           <div className="space-y-1">
             <div className="flex justify-between text-xs font-medium text-muted-foreground">
-              <span>Benchmark ANTT (Teto Bruto)</span>
+              <span>CKAN teto bruto (gross-up)</span>
               <span>{formatCurrency(ckanGrossValue)}</span>
             </div>
             <div className="h-2 w-full bg-muted rounded-full overflow-hidden">

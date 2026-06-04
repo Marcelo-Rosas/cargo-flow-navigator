@@ -44,6 +44,8 @@ import type { CalculateFreightInput } from '@/types/freight';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { inferAnttFlagsFromStoredMeta, resolveAnttOperationTable } from '@/lib/antt-floor-calc';
+import { resolvePisoAnttCarreteiroReais } from '@/lib/carreteiro-cost';
+import { resolveAnttRsKm, resolvePisoAnttTotalReais } from '@/lib/antt-rs-km';
 import { supabase } from '@/integrations/supabase/client';
 import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import {
@@ -308,7 +310,10 @@ export function QuoteDetailModal({
   const receitaLiquidaView =
     receitaLiquidaSnapshot != null ? round2(receitaLiquidaSnapshot * faturamentoRatio) : null;
 
-  const pisoAnttView = Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0);
+  const pisoAnttView = resolvePisoAnttTotalReais({
+    breakdown,
+    anttLiveTotal: anttCalc?.total,
+  });
   // Piso de compliance: usa anttCalc (taxa atual) ou breakdown meta como fallback
   const pisoAnttCompliance = anttCalc?.total ?? breakdown?.meta?.anttPisoCarreteiro ?? 0;
   const priceTableModality = (priceTable as { modality?: string } | null)?.modality;
@@ -321,9 +326,16 @@ export function QuoteDetailModal({
     breakdown?.profitability?.custosCarreteiro ??
     (breakdown?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
     null;
-  const custoMotoristaView =
+  const pisoAnttCarreteiroView = resolvePisoAnttCarreteiroReais(breakdown);
+  const custoMotoristaContratadoView =
+    breakdown?.profitability?.custoMotoristaContratado ??
+    breakdown?.profitability?.custosCarreteiro ??
     (breakdown?.profitability as { custoMotorista?: number } | undefined)?.custoMotorista ??
     custosCarreteiroView;
+  const custoMotoristaView =
+    priceTableModality === 'lotacao' && (pisoAnttCarreteiroView > 0 || custoMotoristaContratadoView)
+      ? (custoMotoristaContratadoView ?? pisoAnttCarreteiroView)
+      : custoMotoristaContratadoView;
   const custoCarreteiroParaMargem =
     (custoMotoristaView ?? custosCarreteiroView) != null &&
     Number(custoMotoristaView ?? custosCarreteiroView) > 0
@@ -1113,7 +1125,11 @@ export function QuoteDetailModal({
                   )}
                   {custoMotoristaView != null && (
                     <DataCard
-                      label="Custo Motorista"
+                      label={
+                        priceTableModality === 'lotacao'
+                          ? 'Custo Motorista (Piso ANTT)'
+                          : 'Custo Motorista'
+                      }
                       value={formatCurrency(Number(custoMotoristaView))}
                       icon={Truck}
                       variant="warning"
@@ -1137,6 +1153,13 @@ export function QuoteDetailModal({
                       custoMotoristaView != null ? Number(custoMotoristaView) / km : null;
                     const custosDiretosKm =
                       custosDiretos != null && custosDiretos > 0 ? custosDiretos / km : null;
+                    const anttRsKmView = resolveAnttRsKm({
+                      kmDistance: km,
+                      pisoAnttTotal: pisoAnttView,
+                      ccd:
+                        anttRate?.ccd != null ? Number(anttRate.ccd) : breakdown?.meta?.antt?.ccd,
+                      cc: anttRate?.cc != null ? Number(anttRate.cc) : breakdown?.meta?.antt?.cc,
+                    });
                     return (
                       <div className="mt-2 space-y-2">
                         <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
@@ -1196,12 +1219,20 @@ export function QuoteDetailModal({
                           <div>
                             <p className="text-muted-foreground mb-0.5">Piso ANTT ref.</p>
                             <p className="font-semibold">
-                              R${' '}
-                              {(pisoAnttView / km).toLocaleString('pt-BR', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                              /km
+                              {anttRsKmView != null ? (
+                                <>
+                                  R${' '}
+                                  {anttRsKmView.toLocaleString('pt-BR', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                  /km
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground text-[10px]">
+                                  Calcule o piso (eixos + km)
+                                </span>
+                              )}
                             </p>
                           </div>
                         </div>

@@ -92,7 +92,7 @@ export interface FreightMeta {
   margin_percent: number;
   match_status?: {
     status: 'WIN' | 'LOSS' | 'WARNING';
-    history2025Value?: number;
+    ckanBenchmarkLiquido?: number;
     ckanGrossValue?: number;
   };
   cubage_factor: number;

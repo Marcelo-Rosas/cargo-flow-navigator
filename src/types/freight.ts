@@ -42,8 +42,12 @@ export interface FreightMeta {
   margin_percent: number;
   match_status?: {
     status: 'WIN' | 'LOSS' | 'WARNING';
+    /** @deprecated */
     history2025Value?: number;
+    ckan_benchmark_liquido?: number;
+    ckanBenchmarkLiquido?: number;
     ckanGrossValue?: number;
+    ckan_gross_value?: number;
   };
   cubage_factor: number;
   cubage_weight_kg: number;

@@ -45,6 +45,7 @@ import {
 } from '@/lib/freightCalculator';
 import { AnttFloorWizardCard } from '@/components/forms/quote-form/AnttFloorWizardCard';
 import type { AnttFloorFlags } from '@/lib/antt-floor-calc';
+import { resolveAnttRsKm } from '@/lib/antt-rs-km';
 
 interface PaymentTerm {
   id: string;
@@ -120,11 +121,9 @@ export function PricingStep({
   const pisoAnttRaw = m?.anttPisoCarreteiro ?? pisoAnttPreview ?? 0;
   const pisoAnttComOver = m?.lotacaoPisoComOver ?? pisoAnttRaw;
   const pagMotoristaBase = p?.custoMotoristaContratado ?? c?.baseCost ?? 0;
-  const pisoNaoAplicadoNoCalculo =
-    isLotacao &&
-    pisoAnttComOver > 0 &&
-    pagMotoristaBase > 0 &&
-    pagMotoristaBase < pisoAnttComOver * 0.95;
+  const freteTabelaReferencia = m?.fretePesoOriginal ?? m?.lotacaoFreteTabelaComOverKm ?? 0;
+  const tabelaAcimaDoPisoNoCalculo =
+    isLotacao && pisoAnttComOver > 0 && freteTabelaReferencia > pisoAnttComOver * 1.05;
   const custosDiretosPreview = p?.custosDiretos ?? 0;
 
   const deliveryDays = useMemo(
@@ -137,7 +136,8 @@ export function PricingStep({
   const receitaLiquida =
     p?.receitaLiquida ??
     Math.max(0, (t?.totalCliente ?? 0) - (t?.totalImpostos ?? (t?.das ?? 0) + (t?.icms ?? 0)));
-  const custoMotoristaGolden = c?.baseCost ?? c?.baseFreight ?? 0;
+  const custoMotoristaGolden =
+    isLotacao && pisoAnttComOver > 0 ? pisoAnttComOver : (c?.baseCost ?? c?.baseFreight ?? 0);
   const custoServicos = p?.custoServicos ?? 0;
   const margemContribuicao = resolveMargemBrutaDisplay(
     p?.margemBruta,
@@ -163,6 +163,21 @@ export function PricingStep({
   const showMarginAlert =
     showAllIn &&
     (isMarginBelowTarget(margemPercentDisplay, targetMargin) || margemContribuicao < 0);
+
+  const kmForIndicators = Number(watchKmDistance || 0);
+  const vendaPerKm =
+    kmForIndicators > 0 && (t?.totalCliente ?? 0) > 0
+      ? (t?.totalCliente ?? 0) / kmForIndicators
+      : null;
+  const custosDiretosPerKm =
+    kmForIndicators > 0 && custosDiretosPreview > 0 ? custosDiretosPreview / kmForIndicators : null;
+  const pisoAnttTotalForKm = pisoAnttComOver > 0 ? pisoAnttComOver : pisoAnttRaw;
+  const anttPerKm = resolveAnttRsKm({
+    kmDistance: kmForIndicators,
+    pisoAnttTotal: pisoAnttTotalForKm,
+    ccd: anttCcd,
+    cc: anttCc,
+  });
 
   // Auto-fill delivery days only if fields are still empty (respects manual edits)
   useEffect(() => {
@@ -526,14 +541,13 @@ export function PricingStep({
                 </TabsList>
 
                 <TabsContent value="memoria" className="p-5 space-y-3 text-sm mt-0">
-                  {pisoNaoAplicadoNoCalculo && (
-                    <Alert variant="destructive" className="py-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription className="text-xs leading-snug">
-                        O piso ANTT estimado ({formatCurrency(pisoAnttComOver)}) é maior que o PAG
-                        base usado no cálculo ({formatCurrency(pagMotoristaBase)}). O total cliente
-                        pode estar subprecificado. Verifique eixos do veículo e recalcule; o sistema
-                        passará a usar o piso no frete peso.
+                  {tabelaAcimaDoPisoNoCalculo && (
+                    <Alert className="py-2 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+                      <AlertTriangle className="h-4 w-4 text-amber-700" />
+                      <AlertDescription className="text-xs leading-snug text-amber-900 dark:text-amber-200">
+                        Base de custo no gross-up: Piso ANTT ({formatCurrency(pisoAnttComOver)}).
+                        Tabela NTC de referência: {formatCurrency(freteTabelaReferencia)} (não entra
+                        no total cliente).
                       </AlertDescription>
                     </Alert>
                   )}
@@ -550,13 +564,19 @@ export function PricingStep({
                         />
                       )}
                       <ResultRow
-                        label="Frete peso aplicado (max tabela × piso)"
+                        label="Base custo motorista (Piso ANTT — gross-up)"
                         value={formatCurrency(pagMotoristaBase)}
                         emphasize
                       />
+                      {freteTabelaReferencia > pagMotoristaBase + 0.01 && (
+                        <ResultRow
+                          label="Frete tabela NTC (referência)"
+                          value={formatCurrency(freteTabelaReferencia)}
+                        />
+                      )}
                       {anttFloorApplied && (
                         <p className="text-[10px] text-emerald-700 dark:text-emerald-400 -mt-1">
-                          Piso ANTT definiu o frete peso (base do gross-up).
+                          Piso ANTT é a base de cálculo do valor final do frete.
                         </p>
                       )}
                       <Separator className="my-1" />
@@ -695,6 +715,33 @@ export function PricingStep({
                     label={`Overhead (${calculationResult?.rates?.overheadPercent?.toFixed(0) ?? '—'}% s/ receita líq.)`}
                     value={`−${formatCurrency(p?.overhead ?? 0)}`}
                   />
+
+                  {kmForIndicators > 0 && (t?.totalCliente ?? 0) > 0 && (
+                    <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/30 p-3 text-xs tabular-nums">
+                      <div>
+                        <p className="text-muted-foreground mb-0.5">Venda/km</p>
+                        <p className="font-semibold text-foreground">
+                          {vendaPerKm != null ? formatCurrency(vendaPerKm) : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-0.5">Custos diretos/km</p>
+                        <p className="font-semibold text-destructive">
+                          {custosDiretosPerKm != null ? formatCurrency(custosDiretosPerKm) : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-0.5">Piso ANTT ref.</p>
+                        <p className="font-semibold">
+                          {anttPerKm != null
+                            ? `${formatCurrency(anttPerKm)}/km`
+                            : isLotacao
+                              ? '—'
+                              : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-950/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900 mt-4">
                     <div className="flex flex-col">

@@ -279,8 +279,12 @@ export interface FreightCalculationOutput {
     originalWeightKg?: number;
     /** MP 1.343/2026: Piso ANTT foi aplicado como custo motorista (lotação) */
     anttFloorApplied?: boolean;
+    /** true quando o gross-up usa piso ANTT (+ over) como base de custo */
+    anttCostBaseUsed?: boolean;
     /** Frete peso original da tabela (antes do piso ANTT) */
     fretePesoOriginal?: number;
+    /** max(tabela+over km, piso+over) — referência comercial */
+    lotacaoFreteReferenciaMax?: number;
     /** Valor do piso ANTT calculado (R$) */
     anttPisoCarreteiro?: number;
     /** ISO timestamp de quando o piso foi calculado (detectar staleness) */
@@ -293,7 +297,9 @@ export interface FreightCalculationOutput {
     lotacaoFreteTabelaComOverKm?: number;
     /** Resultado do Triplo Match de precificação */
     matchStatus?: {
+      /** @deprecated use ckanBenchmarkLiquido */
       history2025Value?: number;
+      ckanBenchmarkLiquido?: number;
       ckanGrossValue?: number;
       status?: 'WIN' | 'LOSS' | 'WARNING';
     };
@@ -439,8 +445,12 @@ export interface StoredPricingBreakdown {
     }>;
     /** MP 1.343/2026: Piso ANTT foi aplicado como custo motorista (lotação) */
     anttFloorApplied?: boolean;
+    /** true quando o gross-up usa piso ANTT (+ over) como base de custo */
+    anttCostBaseUsed?: boolean;
     /** Frete peso original da tabela de preços (antes do piso ANTT) */
     fretePesoOriginal?: number;
+    /** Valor do piso ANTT calculado (R$) */
+    anttPisoCarreteiro?: number;
     lotacaoOverKmPercent?: number;
     lotacaoOverAnttPercent?: number;
     lotacaoPisoComOver?: number;
@@ -463,7 +473,9 @@ export interface StoredPricingBreakdown {
     };
 
     matchStatus?: {
+      /** @deprecated use ckanBenchmarkLiquido */
       history2025Value?: number;
+      ckanBenchmarkLiquido?: number;
       ckanGrossValue?: number;
       status?: 'WIN' | 'LOSS' | 'WARNING';
     };
@@ -1207,6 +1219,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       receitaLiquida,
       overhead,
       fretePeso: fretePesoGolden,
+      pisoAntt: custoMotoristaAntt,
       custoServicos: custoServicosOperacionais,
       custosDescarga: descargaValue,
       custosDiretos,
@@ -1227,49 +1240,32 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   // ---- STEP 10: META STATUS ----
   const marginStatus = getMarginStatus(margemPercent, params.profitMarginPercent);
 
-  // ---- STEP 11: MATCH STATUS (Semaforo Triplo) ----
+  // ---- STEP 11: MATCH STATUS (CKAN mercado) ----
   let matchStatus;
-  if (input.benchmarks?.ckanBenchmark || input.benchmarks?.historyBenchmark2025) {
-    const historyValue = input.benchmarks.historyBenchmark2025;
-    let ckanGrossValue: number | undefined;
-
-    if (input.benchmarks.ckanBenchmark) {
-      // Gross up do CKAN para achar o Teto Bruto de Mercado
-      // O CKAN é o 'frete seco', então adicionamos pedágio e descarga
-      const ckanCustosDiretos = round2(
-        input.benchmarks.ckanBenchmark + custoServicosOperacionais + descargaValue
-      );
-      const ckanGrossUp = calculateGrossUpHibrido(
-        ckanCustosDiretos,
-        params.overheadPercent,
-        params.dasPercent,
-        profitMarginPercent,
-        icmsPercentForGrossUp,
-        regimeSimples,
-        excessoSublimite,
-        regimeLucroPresumido,
-        params.pisPercent ?? 0,
-        params.cofinsPercent ?? 0,
-        params.irpjEffectivePercent ?? 0,
-        params.csllEffectivePercent ?? 0,
-        repasseRisco
-      );
-      ckanGrossValue = ckanGrossUp.totalCliente;
-    }
-
-    let status: 'WIN' | 'LOSS' | 'WARNING' = 'WARNING';
-    const ckanTeto = ckanGrossValue ?? historyValue ?? Infinity;
-
-    // Comparação: Nosso Preço x Teto
-    if (totalCliente <= ckanTeto * 1.05) {
-      // Se nosso preço for até 5% acima do teto de mercado, consideramos WIN
-      status = 'WIN';
-    } else {
-      status = 'LOSS';
-    }
+  const ckanLiquido = input.benchmarks?.ckanBenchmark;
+  if (ckanLiquido != null && ckanLiquido > 0) {
+    const ckanCustosDiretos = round2(ckanLiquido + custoServicosOperacionais + descargaValue);
+    const ckanGrossUp = calculateGrossUpHibrido(
+      ckanCustosDiretos,
+      params.overheadPercent,
+      params.dasPercent,
+      profitMarginPercent,
+      icmsPercentForGrossUp,
+      regimeSimples,
+      excessoSublimite,
+      regimeLucroPresumido,
+      params.pisPercent ?? 0,
+      params.cofinsPercent ?? 0,
+      params.irpjEffectivePercent ?? 0,
+      params.csllEffectivePercent ?? 0,
+      repasseRisco
+    );
+    const ckanGrossValue = ckanGrossUp.totalCliente;
+    const ckanTeto = ckanGrossValue * 1.05;
+    const status: 'WIN' | 'LOSS' = totalCliente <= ckanTeto ? 'WIN' : 'LOSS';
 
     matchStatus = {
-      history2025Value: historyValue,
+      ckanBenchmarkLiquido: ckanLiquido,
       ckanGrossValue,
       status,
     };
@@ -1291,11 +1287,22 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       ltlMinWeightApplied: ltlMinWeightApplied || undefined,
       originalWeightKg,
       anttFloorApplied: anttFloorApplied || undefined,
-      fretePesoOriginal: !isLtl && baseCost !== fretePesoGolden ? baseCost : undefined,
+      anttCostBaseUsed: lotacaoFreteMeta?.anttCostBaseUsed || undefined,
+      fretePesoOriginal:
+        !isLtl &&
+        lotacaoFreteMeta?.anttCostBaseUsed &&
+        (lotacaoFreteMeta.freteTabelaComOverKm ?? 0) >
+          (lotacaoFreteMeta.pisoComOverAntt ?? 0) + 0.01
+          ? lotacaoFreteMeta.freteTabelaComOverKm
+          : !isLtl && baseCost !== fretePesoGolden
+            ? baseCost
+            : undefined,
       lotacaoOverKmPercent: lotacaoFreteMeta?.overKmPercent,
       lotacaoOverAnttPercent: lotacaoFreteMeta?.overAnttPercent,
+      anttPisoCarreteiro: lotacaoFreteMeta?.pisoAntt ?? (pisoAntt > 0 ? pisoAntt : undefined),
       lotacaoPisoComOver: lotacaoFreteMeta?.pisoComOverAntt,
       lotacaoFreteTabelaComOverKm: lotacaoFreteMeta?.freteTabelaComOverKm,
+      lotacaoFreteReferenciaMax: lotacaoFreteMeta?.fretePesoReferenciaMax,
       matchStatus,
     },
     components: {
@@ -1402,7 +1409,13 @@ export function buildStoredBreakdown(
       kmByUf: input.kmByUf,
       icmsMode: input.kmByUf && Object.keys(input.kmByUf).length > 0 ? 'B' : 'A',
       anttFloorApplied: output.meta.anttFloorApplied,
+      anttCostBaseUsed: output.meta.anttCostBaseUsed,
       fretePesoOriginal: output.meta.fretePesoOriginal,
+      anttPisoCarreteiro: output.meta.anttPisoCarreteiro,
+      lotacaoOverKmPercent: output.meta.lotacaoOverKmPercent,
+      lotacaoOverAnttPercent: output.meta.lotacaoOverAnttPercent,
+      lotacaoPisoComOver: output.meta.lotacaoPisoComOver,
+      lotacaoFreteTabelaComOverKm: output.meta.lotacaoFreteTabelaComOverKm,
       matchStatus: output.meta.matchStatus,
     },
 

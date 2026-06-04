@@ -309,8 +309,13 @@ export function QuoteCard({
             {matchStatus && (
               <div className="border-t border-border pt-2 space-y-0.5">
                 <p className="font-medium text-muted-foreground">Triplo Match:</p>
-                {matchStatus.history2025Value && (
-                  <p>Histórico: {formatCurrency(matchStatus.history2025Value)}</p>
+                {(matchStatus.ckanBenchmarkLiquido ?? matchStatus.history2025Value) != null && (
+                  <p>
+                    CKAN:{' '}
+                    {formatCurrency(
+                      matchStatus.ckanBenchmarkLiquido ?? matchStatus.history2025Value ?? 0
+                    )}
+                  </p>
                 )}
                 {matchStatus.ckanGrossValue && (
                   <p>Teto CKAN: {formatCurrency(matchStatus.ckanGrossValue)}</p>

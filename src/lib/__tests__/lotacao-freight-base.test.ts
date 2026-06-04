@@ -21,7 +21,7 @@ describe('resolveLotacaoKmOverPercent', () => {
 });
 
 describe('resolveLotacaoFretePeso', () => {
-  it('aplica max(tabela+over km, piso+over antt)', () => {
+  it('usa piso ANTT como base de custo quando piso > tabela', () => {
     const r = resolveLotacaoFretePeso({
       freteTabela: 5000,
       pisoAntt: 10000,
@@ -32,18 +32,36 @@ describe('resolveLotacaoFretePeso', () => {
     expect(r.freteTabelaComOverKm).toBe(8000);
     expect(r.pisoComOverAntt).toBe(15500);
     expect(r.fretePeso).toBe(15500);
+    expect(r.fretePesoReferenciaMax).toBe(15500);
+    expect(r.anttCostBaseUsed).toBe(true);
     expect(r.pisoAplicado).toBe(true);
   });
 
-  it('usa tabela quando maior que piso com over', () => {
+  it('usa piso ANTT como base mesmo quando tabela+over é maior (COT-2026-06-0002)', () => {
     const r = resolveLotacaoFretePeso({
       freteTabela: 20000,
-      pisoAntt: 8000,
+      pisoAntt: 17304.92,
+      km: 2761,
+      overKmPercent: 34,
+      overAnttPercent: 0,
+    });
+    expect(r.freteTabelaComOverKm).toBe(26800);
+    expect(r.pisoComOverAntt).toBe(17304.92);
+    expect(r.fretePeso).toBe(17304.92);
+    expect(r.fretePesoReferenciaMax).toBe(26800);
+    expect(r.anttCostBaseUsed).toBe(true);
+  });
+
+  it('sem piso ANTT, usa tabela+over km', () => {
+    const r = resolveLotacaoFretePeso({
+      freteTabela: 20000,
+      pisoAntt: 0,
       km: 200,
       overKmPercent: 60,
       overAnttPercent: 55,
     });
     expect(r.fretePeso).toBe(32000);
+    expect(r.anttCostBaseUsed).toBe(false);
     expect(r.pisoAplicado).toBe(false);
   });
 });
@@ -54,6 +72,7 @@ describe('calculateLotacaoProfitability', () => {
       receitaLiquida: 10000,
       overhead: 1000,
       fretePeso: 7000,
+      pisoAntt: 7000,
       custoServicos: 500,
       custosDescarga: 200,
       custosDiretos: 7700,

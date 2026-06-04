@@ -1,80 +1,41 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { resolveCkanBenchmarkLiquidoReais } from '@/lib/ckan-benchmark';
 
 export interface UseFreightBenchmarksOptions {
   origin: string;
   destination: string;
-  cargoType?: string;
+  cargoType?: string | null;
+  kmDistance?: number;
   enabled?: boolean;
+}
+
+export interface FreightBenchmarksResult {
+  /** Frete seco CKAN (R$) — base para gross-up no match */
+  ckanBenchmark: number;
+  ckanBenchmarkPerKm: number;
 }
 
 export function useFreightBenchmarks({
   origin,
   destination,
   cargoType,
+  kmDistance = 0,
   enabled = true,
 }: UseFreightBenchmarksOptions) {
   return useQuery({
-    queryKey: ['freight-benchmarks', origin, destination, cargoType],
-    queryFn: async () => {
-      // 1. Fetch History Benchmark (2025)
-      // Calculamos a média do total_cliente para cotações ganhas (stage = 'ganho')
-      let historyBenchmark2025: number | undefined = undefined;
-
-      const originStr = origin ? origin.trim().toLowerCase() : '';
-      const destStr = destination ? destination.trim().toLowerCase() : '';
-
-      if (originStr && destStr) {
-        // Obter UFs
-        const ufRegex = /([A-Z]{2})\s*$/i;
-        const matchOrig = origin.match(ufRegex);
-        const matchDest = destination.match(ufRegex);
-
-        const ufOrigem = matchOrig ? matchOrig[1].toUpperCase() : null;
-        const ufDestino = matchDest ? matchDest[1].toUpperCase() : null;
-
-        if (ufOrigem && ufDestino) {
-          const { data, error } = await supabase
-            .from('quotes')
-            .select('pricing_breakdown')
-            .eq('stage', 'ganho')
-            .ilike('origin', `%${ufOrigem}%`)
-            .ilike('destination', `%${ufDestino}%`)
-            .order('created_at', { ascending: false })
-            .limit(50);
-
-          if (!error && data && data.length > 0) {
-            let totalSum = 0;
-            let validCount = 0;
-
-            for (const row of data) {
-              const breakdown = row.pricing_breakdown as any;
-              if (breakdown?.totals?.totalCliente) {
-                totalSum += Number(breakdown.totals.totalCliente);
-                validCount++;
-              }
-            }
-
-            if (validCount > 0) {
-              historyBenchmark2025 = totalSum / validCount;
-            }
-          }
-        }
-      }
-
-      // 2. Fetch CKAN Benchmark
-      // Como a tabela/API do CKAN será integrada posteriormente, vamos manter como undefined
-      // ou se existir uma tabela antt_ckan_freight_data poderemos buscá-la aqui.
-      let ckanBenchmark: number | undefined = undefined;
-
-      // TODO: Implementar busca na tabela do CKAN quando disponível
-
+    queryKey: ['freight-benchmarks-ckan', origin, destination, cargoType, kmDistance],
+    queryFn: async (): Promise<FreightBenchmarksResult> => {
+      const km = Math.max(0, Number(kmDistance) || 0);
+      const ckanBenchmark =
+        km > 0 && origin?.trim() && destination?.trim()
+          ? resolveCkanBenchmarkLiquidoReais({ kmDistance: km, cargoType })
+          : 0;
       return {
-        historyBenchmark2025,
         ckanBenchmark,
+        ckanBenchmarkPerKm: km > 0 ? Math.round((ckanBenchmark / km) * 100) / 100 : 0,
       };
     },
-    enabled: enabled && !!origin && !!destination,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: enabled && !!origin?.trim() && !!destination?.trim() && (kmDistance ?? 0) > 0,
+    staleTime: 1000 * 60 * 30,
   });
 }
