@@ -32,6 +32,12 @@ export const calculateFreightInputSchema = z
     antt_composicao_veicular: z.boolean().optional(),
     antt_alto_desempenho: z.boolean().optional(),
     antt_retorno_vazio: z.boolean().optional(),
+    benchmarks: z
+      .object({
+        historyBenchmark2025: z.number().optional(),
+        ckanBenchmark: z.number().optional(),
+      })
+      .optional(),
   })
   .refine(
     (data: { weight_kg: number; volume_m3: number }) => data.weight_kg > 0 || data.volume_m3 > 0,

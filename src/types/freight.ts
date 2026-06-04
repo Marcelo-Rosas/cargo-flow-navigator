@@ -28,6 +28,10 @@ export interface CalculateFreightInput {
   antt_composicao_veicular?: boolean;
   antt_alto_desempenho?: boolean;
   antt_retorno_vazio?: boolean;
+  benchmarks?: {
+    historyBenchmark2025?: number;
+    ckanBenchmark?: number;
+  };
 }
 
 export interface FreightMeta {
@@ -36,6 +40,11 @@ export interface FreightMeta {
   km_status: 'OK' | 'OUT_OF_RANGE';
   margin_status: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
   margin_percent: number;
+  match_status?: {
+    status: 'WIN' | 'LOSS' | 'WARNING';
+    history2025Value?: number;
+    ckanGrossValue?: number;
+  };
   cubage_factor: number;
   cubage_weight_kg: number;
   billable_weight_kg: number;

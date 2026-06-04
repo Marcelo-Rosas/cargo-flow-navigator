@@ -118,7 +118,7 @@ export function IdentificationStep({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <SectionBlock
         variant="card"
         label="Dados do Cliente"
@@ -134,8 +134,8 @@ export function IdentificationStep({
           </Button>
         }
       >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
             <FormField
               control={form.control}
               name="client_id"
@@ -279,8 +279,8 @@ export function IdentificationStep({
           </Button>
         }
       >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
               name="shipper_id"
@@ -319,7 +319,7 @@ export function IdentificationStep({
               )}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
               name="shipper_name"
@@ -490,7 +490,7 @@ export function IdentificationStep({
       </SectionBlock>
 
       <SectionBlock variant="card" label="Rota">
-        <div className="space-y-4">
+        <div className="space-y-6">
           {!isLegacy && (
             <FormField
               control={form.control}
@@ -517,7 +517,7 @@ export function IdentificationStep({
               )}
             />
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 min-w-0">
             <FormField
               control={form.control}
               name="origin_cep"
@@ -587,7 +587,7 @@ export function IdentificationStep({
               )}
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 min-w-0">
             <FormField
               control={form.control}
               name="origin"

@@ -65,6 +65,7 @@ export function adaptToLocalFormat(response: CalculateFreightResponse) {
       kmStatus: response.meta.km_status,
       marginStatus: response.meta.margin_status,
       marginPercent: response.meta.margin_percent,
+      matchStatus: response.meta.match_status,
       cubageFactor: response.meta.cubage_factor,
       cubageWeightKg: response.meta.cubage_weight_kg,
       billableWeightKg: response.meta.billable_weight_kg,

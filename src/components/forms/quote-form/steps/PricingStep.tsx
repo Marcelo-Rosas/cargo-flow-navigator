@@ -222,7 +222,7 @@ export function PricingStep({
           <div className="space-y-6">
             {isLegacy && (
               <>
-                <div className="grid grid-cols-2 gap-4 p-4 rounded-lg border bg-card">
+                <div className="grid grid-cols-2 gap-6 p-4 rounded-lg border bg-card">
                   <FormField
                     control={form.control}
                     name="value"
@@ -272,7 +272,7 @@ export function PricingStep({
                     <span>{formatCurrency(legacyMargin)}</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="carrier_payment_term_id"
@@ -327,7 +327,7 @@ export function PricingStep({
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs">
                   <FormField
                     control={form.control}
                     name="quote_date"
@@ -404,7 +404,7 @@ export function PricingStep({
                   )
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="cargo_value"
@@ -445,7 +445,7 @@ export function PricingStep({
                   />
                 </div>
 
-                <div className="space-y-4 min-w-0">
+                <div className="space-y-6 min-w-0">
                   <SectionBlock variant="card" label="Aluguel de Máquinas" collapsible defaultOpen>
                     <EquipmentRentalSection
                       value={form.watch('aluguel_maquinas') || 0}
@@ -489,7 +489,7 @@ export function PricingStep({
             )}
           >
             {isLegacy ? (
-              <div className="w-full border rounded-xl p-5 space-y-4 bg-card shadow-sm">
+              <div className="w-full border rounded-xl p-5 space-y-6 bg-card shadow-sm">
                 <div className="flex justify-between items-center bg-primary/10 p-3 rounded-lg border border-primary/20">
                   <span className="font-bold text-primary text-xs uppercase">
                     Valor Cliente (FAT)
@@ -721,7 +721,7 @@ export function PricingStep({
       {/* RESUMO COMERCIAL ALL-IN */}
       {showAllIn && (
         <SectionBlock variant="card" label="Resumo Comercial">
-          <Card className="bg-muted/30 border p-5 space-y-4">
+          <Card className="bg-muted/30 border p-5 space-y-6">
             {/* Rota */}
             <div className="flex items-center gap-2 text-sm">
               <PackageCheck className="w-4 h-4 text-primary shrink-0" />
@@ -771,7 +771,7 @@ export function PricingStep({
             <Separator />
 
             {/* Validade + Observações */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
               <FormField
                 control={form.control}
                 name="validity_date"

@@ -107,6 +107,7 @@ import { zodPhone } from '@/lib/validators';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { AnttFloorWizardCard } from '@/components/forms/quote-form/AnttFloorWizardCard';
 import { QuoteFormWizard } from '@/components/forms/quote-form/QuoteFormWizard';
+import { useFreightBenchmarks } from '@/hooks/useFreightBenchmarks';
 import {
   inferAnttFlagsFromStoredMeta,
   resolveAnttOperationTable,
@@ -319,7 +320,9 @@ const quoteSchema = z
     payment_method: z.string().optional(),
     km_distance: z.number().min(0, 'Distância inválida').optional(),
     // Pricing components
-    cargo_value: z.number().min(0, 'Valor inválido').optional().default(0),
+    cargo_value: z
+      .number({ invalid_type_error: 'Deve ser um número' })
+      .min(1, 'Valor da carga é obrigatório'),
     toll: z.number().min(0, 'Valor inválido').optional().default(0),
     aluguel_maquinas: z.number().min(0, 'Valor inválido').optional().default(0),
     descarga: z.number().min(0, 'Valor inválido').optional().default(0),
@@ -887,6 +890,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       .filter((code): code is string => typeof code === 'string' && code.length > 0);
   }, [conditionalFeesData, additionalFeesSelection.conditionalFees]);
 
+  const { data: benchmarksData } = useFreightBenchmarks({
+    origin: debounced.origin || '',
+    destination: debounced.destination || '',
+    cargoType: 'Geral', // Default or from form if available
+    enabled: open && !isLegacy,
+  });
+
   const edgeFreightInput = useMemo((): CalculateFreightInput | null => {
     if (isLegacy || !open) return null;
     const km = debouncedKmBand;
@@ -921,6 +931,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             antt_retorno_vazio: anttFloorFlags.retornoVazio,
           }
         : {}),
+      benchmarks: benchmarksData,
     };
   }, [
     isLegacy,
@@ -940,6 +951,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     resolvedPricingParams.overheadPercent,
     debounced.freightModality,
     anttFloorFlags,
+    benchmarksData,
   ]);
 
   const lastEdgeFreightResponseRef = useRef<CalculateFreightResponse | null>(null);

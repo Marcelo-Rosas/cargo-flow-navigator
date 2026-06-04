@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/formatters';
 import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import type { QuoteFormData } from '../types';
 import { PAYMENT_METHOD_LABELS } from '@/types/pricing';
+import { PricingMatchAlert } from '../PricingMatchAlert';
 
 function formatDateBR(d: string | undefined): string {
   if (!d) return '—';
@@ -149,6 +150,18 @@ export function ReviewStep({
             {formatCurrency(baseFreight)}). Revise na etapa Financeiro antes de salvar.
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Semáforo de Precificação */}
+      {meta?.matchStatus && !isLegacy && (
+        <SectionBlock variant="card" label="Análise de Competitividade (Semáforo)">
+          <PricingMatchAlert
+            nossoPreco={totalCliente}
+            historyValue={meta.matchStatus.history2025Value}
+            ckanGrossValue={meta.matchStatus.ckanGrossValue}
+            status={meta.matchStatus.status}
+          />
+        </SectionBlock>
       )}
 
       {/* Composição Financeira */}

@@ -17,6 +17,8 @@ import {
   Pencil,
   Trash2,
   TrendingUp,
+  CheckCircle2,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -109,6 +111,7 @@ export function QuoteCard({
   const marginPercent =
     breakdown?.profitability?.margemPercent ?? breakdown?.meta?.marginPercent ?? 0;
   const marginStatus = breakdown ? getMarginStatus(marginPercent, targetMarginPercent) : 'UNKNOWN';
+  const matchStatus = breakdown?.meta?.matchStatus;
 
   const canEmail = quote.stage === 'enviado' || quote.stage === 'negociacao';
   const canConvert = quote.stage === 'ganho';
@@ -158,6 +161,30 @@ export function QuoteCard({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {matchStatus && (
+              <Badge
+                variant={
+                  matchStatus.status === 'WIN'
+                    ? 'success'
+                    : matchStatus.status === 'LOSS'
+                      ? 'destructive'
+                      : 'warning'
+                }
+                className="text-[10px] px-1.5 py-0 h-5 gap-0.5"
+                title={
+                  matchStatus.status === 'WIN'
+                    ? 'Preço Competitivo'
+                    : matchStatus.status === 'LOSS'
+                      ? 'Fora de Mercado'
+                      : 'Sem dados suficientes'
+                }
+              >
+                {matchStatus.status === 'WIN' && <CheckCircle2 className="w-2.5 h-2.5" />}
+                {matchStatus.status === 'LOSS' && <AlertTriangle className="w-2.5 h-2.5" />}
+                {matchStatus.status === 'WARNING' && <Info className="w-2.5 h-2.5" />}
+                Match
+              </Badge>
+            )}
             {marginStatus === 'BELOW_TARGET' && (
               <Badge variant="warning" className="text-[10px] px-1.5 py-0 h-5 gap-0.5">
                 <AlertTriangle className="w-2.5 h-2.5" />
@@ -276,6 +303,17 @@ export function QuoteCard({
                   <p className="text-warning-foreground">
                     Impacto NTC: +{formatCurrency(mirofishInsight.ntc_impact)} / CT-e
                   </p>
+                )}
+              </div>
+            )}
+            {matchStatus && (
+              <div className="border-t border-border pt-2 space-y-0.5">
+                <p className="font-medium text-muted-foreground">Triplo Match:</p>
+                {matchStatus.history2025Value && (
+                  <p>Histórico: {formatCurrency(matchStatus.history2025Value)}</p>
+                )}
+                {matchStatus.ckanGrossValue && (
+                  <p>Teto CKAN: {formatCurrency(matchStatus.ckanGrossValue)}</p>
                 )}
               </div>
             )}

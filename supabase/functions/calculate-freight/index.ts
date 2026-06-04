@@ -19,6 +19,8 @@ import {
   calculateBillableWeight,
   roundCurrency,
   getMarginStatus,
+  sumRiskRepasse,
+  calculateGrossUpHibrido,
 } from '../_shared/freight-types.ts';
 import {
   ANTT_CARGO_TYPE_DEFAULT,
@@ -1017,12 +1019,68 @@ Deno.serve(async (req) => {
     const routeUfLabel = formatRouteUf(input.origin, input.destination);
     const marginStatus = getMarginStatus(margemPercent, profitMarginPercent);
 
+    // =====================================================
+    // TRIPLO MATCH (BENCHMARK)
+    // =====================================================
+    let ckanBenchmarkGross: number | undefined;
+
+    if (input.benchmarks?.ckanBenchmark) {
+      const repasseRisco = sumRiskRepasse({ gris, tso, rctrc, adValorem });
+      const ckanCustosDiretos = roundCurrency(
+        input.benchmarks.ckanBenchmark + custoServicosOperacionais + descargaValue
+      );
+
+      const ckanGrossUp = calculateGrossUpHibrido(
+        ckanCustosDiretos,
+        overheadPercent,
+        profitMarginPercent,
+        regimeSimplesNacional,
+        dasPercent,
+        icmsPercent,
+        pisPercent,
+        cofinsPercent,
+        irpjEffectivePercent,
+        csllEffectivePercent,
+        repasseRisco
+      );
+      ckanBenchmarkGross = ckanGrossUp.totalCliente;
+    }
+
+    let matchStatus:
+      | { status: 'WIN' | 'LOSS' | 'WARNING'; history2025Value?: number; ckanGrossValue?: number }
+      | undefined;
+
+    if (input.benchmarks?.historyBenchmark2025 || ckanBenchmarkGross) {
+      const historyVal = input.benchmarks?.historyBenchmark2025;
+      const ckanVal = ckanBenchmarkGross;
+
+      let targetTeto = 0;
+      if (historyVal && ckanVal) {
+        targetTeto = Math.min(historyVal, ckanVal) * 1.05;
+      } else if (historyVal) {
+        targetTeto = historyVal * 1.05;
+      } else if (ckanVal) {
+        targetTeto = ckanVal * 1.05;
+      }
+
+      if (targetTeto > 0) {
+        matchStatus = {
+          status: totalCliente <= targetTeto ? 'WIN' : 'LOSS',
+          history2025Value: historyVal,
+          ckanGrossValue: ckanVal,
+        };
+      } else {
+        matchStatus = { status: 'WARNING' };
+      }
+    }
+
     const meta: FreightMeta = {
       route_uf_label: routeUfLabel,
       km_band_label: kmBandLabel,
       km_status: kmStatus,
       margin_status: marginStatus,
       margin_percent: roundCurrency(margemPercent),
+      ...(matchStatus && { match_status: matchStatus }),
       cubage_factor: cubageFactor,
       cubage_weight_kg: roundCurrency(cubageWeightKg),
       billable_weight_kg: roundCurrency(billableWeightKg),

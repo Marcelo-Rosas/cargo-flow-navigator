@@ -82,10 +82,10 @@ export function CargoLogisticsStep({
   const showPesoFaturavel = pesoFaturavelInfo && (weightKg > 0 || volumeM3 > 0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <SectionBlock variant="card" label="Detalhes da Carga">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-w-0">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 min-w-0">
             <FormField
               control={form.control}
               name="cargo_type"
@@ -191,9 +191,9 @@ export function CargoLogisticsStep({
       </SectionBlock>
 
       <SectionBlock variant="card" label="Configuração Logística">
-        <div className="space-y-4">
+        <div className="space-y-6">
           {!isLegacy && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
                 name="freight_modality"
@@ -247,7 +247,7 @@ export function CargoLogisticsStep({
               />
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FormField
               control={form.control}
               name="payment_term_id"

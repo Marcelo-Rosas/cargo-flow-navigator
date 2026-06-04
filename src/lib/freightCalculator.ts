@@ -238,6 +238,12 @@ export interface FreightCalculationInput {
     }>;
   };
 
+  // Benchmarks para comparativo Triplo (Semaforo)
+  benchmarks?: {
+    historyBenchmark2025?: number; // Preço Bruto Histórico
+    ckanBenchmark?: number; // Preço Líquido (Seco)
+  };
+
   // Legacy overrides (backwards compat, pricingParams takes precedence)
   dasPercent?: number;
   markupPercent?: number;
@@ -281,6 +287,16 @@ export interface FreightCalculationOutput {
     anttCalculatedAt?: string;
     /** true quando enforce_antt_floor forçou gross-up a partir do piso */
     anttFloorForced?: boolean;
+    lotacaoOverKmPercent?: number;
+    lotacaoOverAnttPercent?: number;
+    lotacaoPisoComOver?: number;
+    lotacaoFreteTabelaComOverKm?: number;
+    /** Resultado do Triplo Match de precificação */
+    matchStatus?: {
+      history2025Value?: number;
+      ckanGrossValue?: number;
+      status?: 'WIN' | 'LOSS' | 'WARNING';
+    };
   };
 
   components: {
@@ -444,6 +460,12 @@ export interface StoredPricingBreakdown {
       calculatedAt: string;
       composicaoVeicular?: boolean;
       altoDesempenho?: boolean;
+    };
+
+    matchStatus?: {
+      history2025Value?: number;
+      ckanGrossValue?: number;
+      status?: 'WIN' | 'LOSS' | 'WARNING';
     };
   };
 
@@ -685,7 +707,7 @@ export function sumRiskRepasse(components: {
   );
 }
 
-function calculateGrossUpHibrido(
+export function calculateGrossUpHibrido(
   custosDiretos: number,
   overheadPercent: number,
   dasPercent: number,
@@ -1205,6 +1227,54 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   // ---- STEP 10: META STATUS ----
   const marginStatus = getMarginStatus(margemPercent, params.profitMarginPercent);
 
+  // ---- STEP 11: MATCH STATUS (Semaforo Triplo) ----
+  let matchStatus;
+  if (input.benchmarks?.ckanBenchmark || input.benchmarks?.historyBenchmark2025) {
+    const historyValue = input.benchmarks.historyBenchmark2025;
+    let ckanGrossValue: number | undefined;
+
+    if (input.benchmarks.ckanBenchmark) {
+      // Gross up do CKAN para achar o Teto Bruto de Mercado
+      // O CKAN é o 'frete seco', então adicionamos pedágio e descarga
+      const ckanCustosDiretos = round2(
+        input.benchmarks.ckanBenchmark + custoServicosOperacionais + descargaValue
+      );
+      const ckanGrossUp = calculateGrossUpHibrido(
+        ckanCustosDiretos,
+        params.overheadPercent,
+        params.dasPercent,
+        profitMarginPercent,
+        icmsPercentForGrossUp,
+        regimeSimples,
+        excessoSublimite,
+        regimeLucroPresumido,
+        params.pisPercent ?? 0,
+        params.cofinsPercent ?? 0,
+        params.irpjEffectivePercent ?? 0,
+        params.csllEffectivePercent ?? 0,
+        repasseRisco
+      );
+      ckanGrossValue = ckanGrossUp.totalCliente;
+    }
+
+    let status: 'WIN' | 'LOSS' | 'WARNING' = 'WARNING';
+    const ckanTeto = ckanGrossValue ?? historyValue ?? Infinity;
+
+    // Comparação: Nosso Preço x Teto
+    if (totalCliente <= ckanTeto * 1.05) {
+      // Se nosso preço for até 5% acima do teto de mercado, consideramos WIN
+      status = 'WIN';
+    } else {
+      status = 'LOSS';
+    }
+
+    matchStatus = {
+      history2025Value: historyValue,
+      ckanGrossValue,
+      status,
+    };
+  }
+
   return {
     status: 'OK',
     meta: {
@@ -1226,6 +1296,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       lotacaoOverAnttPercent: lotacaoFreteMeta?.overAnttPercent,
       lotacaoPisoComOver: lotacaoFreteMeta?.pisoComOverAntt,
       lotacaoFreteTabelaComOverKm: lotacaoFreteMeta?.freteTabelaComOverKm,
+      matchStatus,
     },
     components: {
       baseCost: custoMotorista,
@@ -1332,6 +1403,7 @@ export function buildStoredBreakdown(
       icmsMode: input.kmByUf && Object.keys(input.kmByUf).length > 0 ? 'B' : 'A',
       anttFloorApplied: output.meta.anttFloorApplied,
       fretePesoOriginal: output.meta.fretePesoOriginal,
+      matchStatus: output.meta.matchStatus,
     },
 
     weights: {
