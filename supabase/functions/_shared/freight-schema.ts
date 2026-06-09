@@ -1,7 +1,7 @@
 /**
  * Zod schema for calculate-freight payload validation
  */
-import { z } from 'npm:zod@3.23.8';
+import { z } from 'zod';
 
 export const calculateFreightInputSchema = z
   .object({
@@ -28,6 +28,16 @@ export const calculateFreightInputSchema = z
     carreteiro_percent: z.number().min(0).max(100).optional(),
     descarga_value: z.number().min(0).optional(),
     aluguel_maquinas_value: z.number().min(0).optional(),
+    mao_de_obra_value: z.number().min(0).optional(),
+    outros_custos_value: z.number().min(0).optional(),
+    pis_percent: z.number().min(0).max(100).optional(),
+    cofins_percent: z.number().min(0).max(100).optional(),
+    csll_percent: z.number().min(0).max(100).optional(),
+    irpj_percent: z.number().min(0).max(100).optional(),
+    icms_percent: z.number().min(0).max(100).optional(),
+    regime_simples_nacional: z.boolean().optional(),
+    excesso_sublimite: z.boolean().optional(),
+    regime_lucro_presumido: z.boolean().optional(),
     enforce_antt_floor: z.boolean().optional(),
     antt_composicao_veicular: z.boolean().optional(),
     antt_alto_desempenho: z.boolean().optional(),

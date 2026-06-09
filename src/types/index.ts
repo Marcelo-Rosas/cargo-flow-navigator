@@ -65,6 +65,10 @@ export interface ServiceOrder {
   hasNfe: boolean;
   hasCte: boolean;
   hasPod: boolean;
+  /** Número do CIOT gerado para esta OS */
+  ciotNumber?: string;
+  /** Status do CIOT na ANTT */
+  ciotStatus?: 'pending' | 'generated' | 'cancelled' | 'error';
   occurrences: Occurrence[];
 }
 
@@ -82,7 +86,7 @@ export interface Occurrence {
 }
 
 // Document Types
-export type DocumentType = 'nfe' | 'cte' | 'pod' | 'outros';
+export type DocumentType = 'nfe' | 'cte' | 'pod' | 'ciot' | 'outros';
 
 export interface Document {
   id: string;

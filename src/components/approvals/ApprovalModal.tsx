@@ -90,24 +90,44 @@ export function ApprovalModal({ approval, open, onOpenChange }: Props) {
     return desc || null;
   }, [approval?.description, approval?.entity_type, approval?.entity_id, quoteCode]);
 
+  const approvalId = approval?.id;
+  const approvalStatus = approval?.status;
+  const approvalEntityType = approval?.entity_type;
+  const approvalEntityId = approval?.entity_id;
+  const requestAiMutate = requestAi.mutate;
+  const requestAiIsPending = requestAi.isPending;
+  const hasAiAnalysis = !!aiAnalysis;
+  const insightsLength = insights?.length;
+
   useEffect(() => {
     if (!open) return;
-    if (!approval) return;
-    if (approval.status !== 'pending') return;
-    if (aiAnalysis) return;
-    if (requestAi.isPending) return;
+    if (!approvalId) return;
+    if (approvalStatus !== 'pending') return;
+    if (hasAiAnalysis) return;
+    if (requestAiIsPending) return;
     if (isInsightsLoading) return;
 
-    if (!approval.entity_type || !approval.entity_id) return;
-    if (requestedForRef.current === approval.id) return;
+    if (!approvalEntityType || !approvalEntityId) return;
+    if (requestedForRef.current === approvalId) return;
 
-    requestedForRef.current = approval.id;
-    requestAi.mutate({
+    requestedForRef.current = approvalId;
+    requestAiMutate({
       analysisType: 'approval_summary',
-      entityId: approval.entity_id,
-      entityType: approval.entity_type,
+      entityId: approvalEntityId,
+      entityType: approvalEntityType,
     });
-  }, [open, approval, aiAnalysis, requestAi, insights?.length, isInsightsLoading]);
+  }, [
+    open,
+    approvalId,
+    approvalStatus,
+    approvalEntityType,
+    approvalEntityId,
+    hasAiAnalysis,
+    requestAiMutate,
+    requestAiIsPending,
+    isInsightsLoading,
+    insightsLength,
+  ]);
 
   const handleDecision = (decision: 'approved' | 'rejected') => {
     if (!approval) return;

@@ -14,6 +14,7 @@ import {
   Pencil,
   XCircle,
   Copy,
+  Shield,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
+import { formatCurrency } from '@/lib/formatters';
 import {
   DocumentConfig,
   getNextStage,
@@ -47,6 +49,7 @@ interface OrderCardProps {
   onRegisterOccurrence?: () => void;
   onUploadDocument?: () => void;
   onCancelOrder?: () => void;
+  onGenerateCiot?: () => void;
   canManageActions?: boolean;
 }
 
@@ -56,6 +59,7 @@ export function OrderCard({
   onRegisterOccurrence,
   onUploadDocument,
   onCancelOrder,
+  onGenerateCiot,
   canManageActions = true,
 }: OrderCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -65,15 +69,6 @@ export function OrderCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
   };
 
   const formatDate = (date: string) => {
@@ -316,6 +311,37 @@ export function OrderCard({
             <AlertTriangle className="w-3 h-3" />
             {occurrences.length} ocorrência{occurrences.length !== 1 ? 's' : ''}
           </Badge>
+        </div>
+      )}
+
+      {/* CIOT Badge / Button */}
+      {order.stage !== 'entregue' && (
+        <div className="mb-3">
+          {(order as unknown as { ciot_status?: string | null }).ciot_status === 'generated' ? (
+            <Badge
+              variant="outline"
+              className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 gap-1"
+            >
+              <Shield className="w-3 h-3" />
+              CIOT {(order as unknown as { ciot_number?: string | null }).ciot_number}
+            </Badge>
+          ) : (
+            canManageActions &&
+            (order.stage === 'documentacao' || order.stage === 'coleta_realizada') && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-7 border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onGenerateCiot?.();
+                }}
+              >
+                <Shield className="w-3 h-3 mr-1" />
+                Gerar CIOT
+              </Button>
+            )
+          )}
         </div>
       )}
 

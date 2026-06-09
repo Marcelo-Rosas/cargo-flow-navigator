@@ -3,6 +3,10 @@
 
 begin;
 
+drop view if exists public.financial_payable_kanban cascade;
+drop view if exists public.financial_receivable_kanban cascade;
+drop view if exists public.financial_documents_kanban cascade;
+
 create or replace view public.financial_documents_kanban as
 select
   d.id,

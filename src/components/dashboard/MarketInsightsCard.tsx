@@ -165,11 +165,7 @@ export function MarketInsightsCard() {
         />
         <MetricBox
           label="Diesel S-10"
-          value={
-            alert.diesel
-              ? `R$ ${alert.diesel.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/L`
-              : '--'
-          }
+          value={alert.diesel ? `${formatCurrency(alert.diesel)}/L` : '--'}
           sub="Preco medio nacional"
         />
         <MetricBox

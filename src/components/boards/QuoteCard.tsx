@@ -34,6 +34,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
+import { formatCurrency } from '@/lib/formatters';
 import { formatRouteUf, getMarginStatus, StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
@@ -68,14 +69,6 @@ interface QuoteCardProps {
   onConvert?: () => void;
   canManageActions?: boolean;
 }
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
 
 const formatDate = (date: string) =>
   new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(date));

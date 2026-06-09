@@ -1,0 +1,63 @@
+# Recálculo em massa da memória de precificação (regime tributário / DRE).
+# Disparo manual — não roda em todo push (evita alterar produção sem revisão).
+#
+# Secrets obrigatórios no repositório:
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#
+# Após deploy de calculate-freight ou mudança em pricing_rules_config:
+#   1. workflow_dispatch com apply=false → revisar log
+#   2. workflow_dispatch com apply=true → gravar breakdowns
+
+name: Recalc Quote Pricing
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Gravar no banco (--apply). false = dry-run.'
+        type: boolean
+        default: false
+      quote_code:
+        description: 'Código opcional (ex. COT-2026-06-0003). Vazio = lote padrão.'
+        required: false
+        type: string
+      only_stale:
+        description: 'Só cotações com regime desatualizado vs regras globais'
+        type: boolean
+        default: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  recalc-pricing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Recalc pricing breakdown (dry-run or apply)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          ARGS=(scripts/recalc-regime-lucro-presumido.ts)
+          if [ "${{ inputs.apply }}" = "true" ]; then
+            ARGS+=(--apply)
+          fi
+          if [ -n "${{ inputs.quote_code }}" ]; then
+            ARGS+=(--quote-code "${{ inputs.quote_code }}")
+          fi
+          if [ "${{ inputs.only_stale }}" = "true" ]; then
+            ARGS+=(--only-stale)
+          fi
+          npx tsx "${ARGS[@]}"

@@ -69,6 +69,16 @@ export interface CalculateFreightInput {
   carreteiro_percent?: number;
   descarga_value?: number;
   aluguel_maquinas_value?: number;
+  mao_de_obra_value?: number;
+  outros_custos_value?: number;
+  pis_percent?: number;
+  cofins_percent?: number;
+  csll_percent?: number;
+  irpj_percent?: number;
+  icms_percent?: number;
+  regime_simples_nacional?: boolean;
+  excesso_sublimite?: boolean;
+  regime_lucro_presumido?: boolean;
   /** Forçar piso ANTT no cálculo: recalcula gross-up partindo de pisoAnttCarreteiro como frete_peso */
   enforce_antt_floor?: boolean;
   antt_composicao_veicular?: boolean;

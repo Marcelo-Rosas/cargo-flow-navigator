@@ -12,7 +12,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useLoadCompositionSuggestion } from '@/hooks/useLoadCompositionSuggestions';
 import { useGenerateOptimalRoute } from '@/hooks/useGenerateOptimalRoute';
-import { formatCurrencyFromCents, formatCurrency, formatDate } from '@/lib/formatters';
+import { formatCurrencyFromCents, formatDate } from '@/lib/formatters';
+import { formatCurrency } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -534,13 +535,9 @@ export function LoadCompositionModal({
                 <div className="bg-green-50 p-4 rounded-lg border border-green-100">
                   <div className="text-xs font-medium text-green-600 mb-2">Economia Estimada</div>
                   <div className="text-3xl font-bold text-green-700 mb-2">
-                    R${' '}
                     {composition.estimated_savings_brl / 100 > 0
-                      ? (composition.estimated_savings_brl / 100).toLocaleString('pt-BR', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })
-                      : '0'}
+                      ? formatCurrency(composition.estimated_savings_brl / 100)
+                      : formatCurrency(0)}
                   </div>
                   {metrics.efficiency > 0 && (
                     <div className="text-xs text-green-600">
@@ -602,7 +599,7 @@ export function LoadCompositionModal({
                   totalDistanceKm={routeData?.total_distance_km}
                   totalDurationMin={routeData?.total_duration_min}
                   totalTollCentavos={
-                    (routeData?.total_toll_centavos ?? composition.total_toll_centavos) ?? undefined
+                    routeData?.total_toll_centavos ?? composition.total_toll_centavos ?? undefined
                   }
                   routeSource={routeData?.route_source}
                   routings={composition.routings}
@@ -652,21 +649,13 @@ export function LoadCompositionModal({
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <div className="text-xs font-medium text-gray-600 mb-1">Custo Original</div>
                     <div className="text-2xl font-bold text-gray-900">
-                      R${' '}
-                      {metrics.originalCost.toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                      {formatCurrency(metrics.originalCost)}
                     </div>
                   </div>
                   <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                     <div className="text-xs font-medium text-blue-600 mb-1">Custo Consolidado</div>
                     <div className="text-2xl font-bold text-blue-700">
-                      R${' '}
-                      {metrics.composedCost.toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                      {formatCurrency(metrics.composedCost)}
                     </div>
                   </div>
                 </div>
@@ -675,11 +664,7 @@ export function LoadCompositionModal({
               <div className="bg-green-50 p-4 rounded-lg border border-green-100">
                 <div className="text-xs font-medium text-green-600 mb-1">Economia Estimada</div>
                 <div className="text-2xl font-bold text-green-700">
-                  R${' '}
-                  {metrics.savings.toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatCurrency(metrics.savings)}
                   {metrics.efficiency > 0 && (
                     <span className="text-base font-normal ml-2">
                       ({metrics.efficiency.toFixed(1)}% de km)

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { QuoteFormData } from '../types';
+import { QuoteComplianceStrip } from '../FinancialDualStrip';
 
 const PAYMENT_METHODS = ['pix', 'boleto', 'cartao', 'transferencia', 'outro'] as const;
 const PAYMENT_METHOD_LABELS: Record<(typeof PAYMENT_METHODS)[number], string> = {
@@ -80,6 +81,9 @@ export function CargoLogisticsStep({
   const volumeM3 = Number(watchedVolume || 0);
   const pesoFaturavelInfo = computePesoFaturavel(weightKg, volumeM3);
   const showPesoFaturavel = pesoFaturavelInfo && (weightKg > 0 || volumeM3 > 0);
+  const watchedFreightModality = form.watch('freight_modality');
+  const watchedPriceTableId = form.watch('price_table_id');
+  const selectedTable = priceTablesFiltered.find((t) => t.id === watchedPriceTableId);
 
   return (
     <div className="space-y-6">
@@ -246,6 +250,12 @@ export function CargoLogisticsStep({
                 )}
               />
             </div>
+          )}
+          {!isLegacy && (
+            <QuoteComplianceStrip
+              freightModality={watchedFreightModality}
+              priceTableModality={selectedTable?.modality ?? null}
+            />
           )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FormField

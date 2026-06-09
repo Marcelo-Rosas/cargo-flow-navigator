@@ -9,6 +9,7 @@ import type { DiscountProposal } from '@/types/load-composition';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle, TrendingDown, DollarSign, Waypoints } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 export interface DiscountProposalBreakdownProps {
   discounts: DiscountProposal[];
@@ -54,21 +55,21 @@ export function DiscountProposalBreakdown({
         <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
           <div className="text-xs font-medium text-blue-600 mb-1">Preço Original Total</div>
           <div className="text-lg font-bold text-blue-700">
-            R$ {(summary.totalOriginal / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+            {formatCurrency(summary.totalOriginal / 100)}
           </div>
         </div>
 
         <div className="bg-green-50 p-3 rounded-lg border border-green-100">
           <div className="text-xs font-medium text-green-600 mb-1">Total de Desconto</div>
           <div className="text-lg font-bold text-green-700">
-            R$ {(summary.totalDiscount / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+            {formatCurrency(summary.totalDiscount / 100)}
           </div>
         </div>
 
         <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 col-span-2">
           <div className="text-xs font-medium text-purple-600 mb-1">Preço Final</div>
           <div className="text-lg font-bold text-purple-700">
-            R$ {(summary.totalFinal / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+            {formatCurrency(summary.totalFinal / 100)}
           </div>
         </div>
       </div>
@@ -85,22 +86,14 @@ export function DiscountProposalBreakdown({
                   <div>
                     <span className="text-emerald-700">Economia ANTT (CCD/CC):</span>
                     <p className="font-semibold text-emerald-900">
-                      R${' '}
-                      {(anttEconomyCentavos / 100).toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                      {formatCurrency(anttEconomyCentavos / 100)}
                     </p>
                   </div>
                 )}
                 <div>
                   <span className="text-emerald-700">Economia de Pedágio:</span>
                   <p className="font-semibold text-emerald-900">
-                    R${' '}
-                    {(tollEconomyCentavos / 100).toLocaleString('pt-BR', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatCurrency(tollEconomyCentavos / 100)}
                   </p>
                 </div>
               </div>
@@ -169,10 +162,7 @@ export function DiscountProposalBreakdown({
 
                     {/* Original Price */}
                     <td className="px-3 py-2 font-medium text-gray-900">
-                      R${' '}
-                      {(discount.original_quote_price_brl / 100).toLocaleString('pt-BR', {
-                        maximumFractionDigits: 2,
-                      })}
+                      {formatCurrency(discount.original_quote_price_brl / 100)}
                     </td>
 
                     {/* Original Margin */}
@@ -182,12 +172,7 @@ export function DiscountProposalBreakdown({
                           {discount.original_margin_percent.toFixed(1)}%
                         </span>
                         <span className="text-xs text-gray-600">
-                          (R$
-                          {(discount.original_margin_brl / 100).toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                          )
+                          ({formatCurrency(discount.original_margin_brl / 100)})
                         </span>
                       </div>
                     </td>
@@ -196,10 +181,7 @@ export function DiscountProposalBreakdown({
                     <td className="px-3 py-2 text-center">
                       <div className="flex flex-col items-center">
                         <span className="font-bold text-green-700">
-                          -R${' '}
-                          {(discount.discount_offered_brl / 100).toLocaleString('pt-BR', {
-                            maximumFractionDigits: 2,
-                          })}
+                          -{formatCurrency(discount.discount_offered_brl / 100)}
                         </span>
                         <span className="text-xs text-gray-600">
                           ({discount.discount_percent.toFixed(2)}%)
@@ -209,10 +191,7 @@ export function DiscountProposalBreakdown({
 
                     {/* Final Price */}
                     <td className="px-3 py-2 font-bold text-blue-700">
-                      R${' '}
-                      {(discount.final_quote_price_brl / 100).toLocaleString('pt-BR', {
-                        maximumFractionDigits: 2,
-                      })}
+                      {formatCurrency(discount.final_quote_price_brl / 100)}
                     </td>
 
                     {/* Final Margin */}
@@ -229,11 +208,7 @@ export function DiscountProposalBreakdown({
                             {discount.final_margin_percent.toFixed(1)}%
                           </span>
                           <span className="text-xs text-gray-600">
-                            R$
-                            {(discount.final_margin_brl / 100).toLocaleString('pt-BR', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
+                            {formatCurrency(discount.final_margin_brl / 100)}
                           </span>
                         </div>
                       </div>

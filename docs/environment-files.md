@@ -49,6 +49,19 @@ Existem **dois valores diferentes** de `OPENAI_API_KEY`:
 
 Se a key foi rotacionada, atualize **ambos** manualmente. Não há sincronização automática entre esses arquivos.
 
+### Gemini (Google AI)
+
+| Onde | Variável | Quem lê |
+|------|----------|---------|
+| `supabase/.env.local` | `GOOGLE_API_KEY` | Supabase CLI local, `scripts/ping-gemini.mjs` |
+| Supabase Dashboard → Secrets | `GEMINI_API_KEY` | Edge Functions em produção (`_shared/gemini.ts`) |
+
+**Produção:** o secret deve ser `GEMINI_API_KEY` com o **mesmo valor** de `GOOGLE_API_KEY` do `.env.local` (Primary). Sincronizar:
+
+```powershell
+.\scripts\sync-gemini-secret.ps1
+```
+
 ## Checklist de setup para novo desenvolvedor
 
 ```bash

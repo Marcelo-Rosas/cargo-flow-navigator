@@ -1,6 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatNumber } from '@/lib/formatters';
 import { AlertCircle, TrendingUp, Zap, RefreshCw, Fuel } from 'lucide-react';
 import { useMarketInsights, getAlertStyles } from '@/hooks/useMarketInsights';
 import { usePetrobrasDiesel } from '@/hooks/usePetrobrasDiesel';
@@ -80,7 +81,7 @@ export function MarketIntelligencePanel() {
                 className={`text-sm font-medium tabular-nums whitespace-nowrap ${activePetrobras.variacao_pct >= 0 ? 'text-[#dc2626]' : 'text-[#16a34a]'}`}
               >
                 {activePetrobras.variacao_pct >= 0 ? '+' : ''}
-                {activePetrobras.variacao_pct.toFixed(2).replace('.', ',')}%
+                {formatNumber(activePetrobras.variacao_pct)}%
               </span>
             )}
             <Button
@@ -203,7 +204,7 @@ export function MarketIntelligencePanel() {
   const alertStyles = getAlertStyles(insights.alerta_nivel);
 
   const fmtPct = (v: number) => {
-    const pct = (v * 100).toFixed(2).replace('.', ',');
+    const pct = formatNumber(v * 100);
     return `${v >= 0 ? '+' : ''}${pct}%`;
   };
 

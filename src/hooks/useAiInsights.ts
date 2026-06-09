@@ -125,7 +125,7 @@ export function useRequestAiAnalysis() {
             entityId,
             entityType,
             // Worker has default model; pass explicitly for clarity.
-            model: 'gemini-2.5-pro',
+            model: 'gemini-2.5-flash',
           },
         });
       }

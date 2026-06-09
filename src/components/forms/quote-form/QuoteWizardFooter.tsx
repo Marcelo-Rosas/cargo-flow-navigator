@@ -110,7 +110,7 @@ export function QuoteWizardFooter({
                 checked={preserveOriginalPrice}
                 onCheckedChange={(c) => onPreserveOriginalPriceChange(!!c)}
               />
-              Manter valor original
+              Manter valor negociado (atualiza DRE e memória)
             </label>
           ) : null}
 
@@ -126,10 +126,24 @@ export function QuoteWizardFooter({
               </Button>
             )}
             {canNext ? (
-              <Button type="button" onClick={onNext} className="min-w-[120px]">
-                Continuar
-                <ChevronRight className="w-4 h-4 ml-1" aria-hidden />
-              </Button>
+              <>
+                {isEditing && canSubmit ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    data-testid="wizard-save-draft"
+                    onClick={onSubmit}
+                    disabled={isLoading}
+                    className="min-w-[120px]"
+                  >
+                    {isLoading ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                ) : null}
+                <Button type="button" onClick={onNext} className="min-w-[120px]">
+                  Continuar
+                  <ChevronRight className="w-4 h-4 ml-1" aria-hidden />
+                </Button>
+              </>
             ) : (
               <Button
                 type="button"
