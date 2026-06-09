@@ -38,7 +38,7 @@ export function FinancialDualStrip({
             )}
           </div>
           <p className="text-[10px] text-amber-700/80 dark:text-amber-500/90 mb-0.5">
-            Base motorista (contratado)
+            {pag.anttApplied ? 'Piso ANTT (carreteiro)' : 'Base motorista (contratado)'}
           </p>
           <p className="text-xl font-bold tabular-nums text-amber-950 dark:text-amber-100">
             {formatCurrency(pag.motorista)}

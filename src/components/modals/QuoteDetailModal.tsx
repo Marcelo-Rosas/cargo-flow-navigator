@@ -353,9 +353,10 @@ export function QuoteDetailModal({
     breakdown?.profitability?.custosCarreteiro ??
     (breakdown?.profitability as { custoMotorista?: number } | undefined)?.custoMotorista ??
     custosCarreteiroView;
+  /** Lotação: exibir piso ANTT carreteiro (sem over %), alinhado à aba Custos. */
   const custoMotoristaView =
-    priceTableModality === 'lotacao' && (pisoAnttCarreteiroView > 0 || custoMotoristaContratadoView)
-      ? (custoMotoristaContratadoView ?? pisoAnttCarreteiroView)
+    priceTableModality === 'lotacao' && pisoAnttCarreteiroView > 0
+      ? pisoAnttCarreteiroView
       : custoMotoristaContratadoView;
   const pisoAnttView = resolvePisoAnttTotalReais({
     breakdown,
@@ -402,9 +403,11 @@ export function QuoteDetailModal({
       ? totalClienteView - (breakdown?.totals?.totalImpostos ?? 0) * faturamentoRatio
       : null);
 
-  const custoMotoristaGoldenView = round2(
-    (breakdown?.components?.baseCost ?? breakdown?.components?.baseFreight ?? 0) * faturamentoRatio
-  );
+  const custoMotoristaGoldenBase =
+    priceTableModality === 'lotacao' && pisoAnttCarreteiroView > 0
+      ? pisoAnttCarreteiroView
+      : (breakdown?.components?.baseCost ?? breakdown?.components?.baseFreight ?? 0);
+  const custoMotoristaGoldenView = round2(custoMotoristaGoldenBase * faturamentoRatio);
   const custoServicosScaled = round2(custoServicosView * faturamentoRatio);
   const overheadScaled = round2(overheadView * faturamentoRatio);
 
@@ -1399,6 +1402,8 @@ export function QuoteDetailModal({
                   resultadoLiquido={resultadoLiquidoView}
                   margemPercent={margemPercentView}
                   isBelowTarget={isBelowTarget}
+                  receitaLiquidaDisplay={receitaLiquidaFromBreakdown ?? undefined}
+                  discountDisplay={discountView > 0 ? discountView : undefined}
                   targetMarginPercent={targetMargin}
                   canManage={!!canManage}
                   axesCount={axesCount}

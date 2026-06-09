@@ -31,6 +31,7 @@ import {
   useCollectionOrders,
   useCreateCollectionOrder,
 } from '@/hooks/useCollectionOrders';
+import { useOrderAdditionalShipperPreview } from '@/hooks/useOrderAdditionalShipper';
 import { cn } from '@/lib/utils';
 import type { Database } from '@/integrations/supabase/types.generated';
 import type { CollectionOrderPartyData } from '@/types/collectionOrder';
@@ -69,6 +70,20 @@ export function CollectionOrderSection({ order, shipperPreview }: CollectionOrde
   const [senderNumber, setSenderNumber] = useState('');
   const [senderComplement, setSenderComplement] = useState('');
   const [senderNeighborhood, setSenderNeighborhood] = useState('');
+  const [sender2Number, setSender2Number] = useState('');
+  const [sender2Complement, setSender2Complement] = useState('');
+  const [sender2Neighborhood, setSender2Neighborhood] = useState('');
+
+  const orderRow = order as Order & {
+    quote_id?: string | null;
+    additional_shippers?: unknown;
+  };
+  const { data: additionalShipperPreview } = useOrderAdditionalShipperPreview({
+    orderId: order.id,
+    quoteId: orderRow.quote_id,
+    orderAdditionalShippers: orderRow.additional_shippers,
+  });
+  const hasSecondSender = !!additionalShipperPreview?.name?.trim();
 
   const [cancelTarget, setCancelTarget] = useState<{ id: string; number: string } | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -88,6 +103,9 @@ export function CollectionOrderSection({ order, shipperPreview }: CollectionOrde
     setSenderNumber('');
     setSenderComplement('');
     setSenderNeighborhood('');
+    setSender2Number('');
+    setSender2Complement('');
+    setSender2Neighborhood('');
     setIssueOpen(true);
   };
 
@@ -97,11 +115,19 @@ export function CollectionOrderSection({ order, shipperPreview }: CollectionOrde
     if (senderComplement.trim()) senderOverride.address_complement = senderComplement.trim();
     if (senderNeighborhood.trim()) senderOverride.address_neighborhood = senderNeighborhood.trim();
 
+    const sender2Override: Partial<CollectionOrderPartyData> = {};
+    if (sender2Number.trim()) sender2Override.address_number = sender2Number.trim();
+    if (sender2Complement.trim()) sender2Override.address_complement = sender2Complement.trim();
+    if (sender2Neighborhood.trim())
+      sender2Override.address_neighborhood = sender2Neighborhood.trim();
+
     try {
       const result = await createMut.mutateAsync({
         orderId: order.id,
         additionalInfo: additionalInfo.trim() || null,
         senderOverride: Object.keys(senderOverride).length > 0 ? senderOverride : undefined,
+        sender2Override:
+          hasSecondSender && Object.keys(sender2Override).length > 0 ? sender2Override : undefined,
       });
       toast.success(`OC ${result.collectionOrder.oc_number} emitida`);
       setIssueOpen(false);
@@ -260,11 +286,15 @@ export function CollectionOrderSection({ order, shipperPreview }: CollectionOrde
           <div className="space-y-4 py-2">
             <div className="space-y-3 p-3 rounded-md border border-border bg-muted/40">
               <div className="text-xs font-medium text-foreground">
-                Endereço de coleta — preencha o número, bairro e complemento desta operação.
+                Remetente 1 — endereço de coleta
                 <span className="block text-muted-foreground font-normal mt-0.5">
-                  Esses dados ficam apenas no snapshot da OC. Não alteram o cadastro do embarcador.
+                  Preencha número, bairro e complemento desta operação. Ficam apenas no snapshot da
+                  OC.
                 </span>
               </div>
+              <p className="text-xs text-muted-foreground">
+                {order.shipper_name || 'Embarcador principal da OS'}
+              </p>
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <Label htmlFor="sender-number" className="text-xs">
@@ -304,6 +334,59 @@ export function CollectionOrderSection({ order, shipperPreview }: CollectionOrde
                 </div>
               </div>
             </div>
+
+            {hasSecondSender && additionalShipperPreview && (
+              <div className="space-y-3 p-3 rounded-md border border-border bg-muted/40">
+                <div className="text-xs font-medium text-foreground">
+                  Remetente 2 — coleta adicional
+                  <span className="block text-muted-foreground font-normal mt-0.5">
+                    Herdado da cotação ({additionalShipperPreview.name}
+                    {additionalShipperPreview.city || additionalShipperPreview.state
+                      ? ` · ${[additionalShipperPreview.city, additionalShipperPreview.state].filter(Boolean).join(' - ')}`
+                      : ''}
+                    ).
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <Label htmlFor="sender2-number" className="text-xs">
+                      Número
+                    </Label>
+                    <Input
+                      id="sender2-number"
+                      value={sender2Number}
+                      onChange={(e) => setSender2Number(e.target.value)}
+                      placeholder="Ex.: 1248"
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor="sender2-neighborhood" className="text-xs">
+                      Bairro
+                    </Label>
+                    <Input
+                      id="sender2-neighborhood"
+                      value={sender2Neighborhood}
+                      onChange={(e) => setSender2Neighborhood(e.target.value)}
+                      placeholder="Ex.: Vila Mariana"
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <Label htmlFor="sender2-complement" className="text-xs">
+                      Complemento
+                    </Label>
+                    <Input
+                      id="sender2-complement"
+                      value={sender2Complement}
+                      onChange={(e) => setSender2Complement(e.target.value)}
+                      placeholder="Ex.: Galpão A"
+                      className="h-8"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <Label htmlFor="additional-info" className="text-sm">

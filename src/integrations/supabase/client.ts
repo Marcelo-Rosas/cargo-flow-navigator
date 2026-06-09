@@ -2,23 +2,57 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY');
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+function mask(value: string, start = 6, end = 4): string {
+  if (!value) return '(empty)';
+  if (value.length <= start + end) return `${value.slice(0, 3)}...`;
+  return `${value.slice(0, start)}...${value.slice(-end)}`;
 }
+
+function assertSupabaseEnv(): void {
+  const problems: string[] = [];
+  if (!supabaseUrl) problems.push('VITE_SUPABASE_URL ausente');
+  if (!supabaseKey) problems.push('VITE_SUPABASE_PUBLISHABLE_KEY ausente');
+  if (supabaseUrl && !/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(supabaseUrl)) {
+    problems.push('VITE_SUPABASE_URL inválida (esperado: https://<project-ref>.supabase.co)');
+  }
+  if (supabaseKey) {
+    const trimmed = supabaseKey.trim();
+    if (trimmed !== supabaseKey)
+      problems.push('VITE_SUPABASE_PUBLISHABLE_KEY com espaços/quebras nas bordas');
+    if (!(trimmed.startsWith('sb_publishable_') || trimmed.startsWith('eyJ'))) {
+      problems.push('VITE_SUPABASE_PUBLISHABLE_KEY parece formato inválido');
+    }
+    if (trimmed.length < 20) problems.push('VITE_SUPABASE_PUBLISHABLE_KEY curta demais');
+  }
+  if (problems.length) {
+    console.error('[Supabase Env Check] Falhou:', {
+      problems,
+      url: supabaseUrl ?? '(missing)',
+      key_preview: supabaseKey ? mask(supabaseKey) : '(missing)',
+      key_length: supabaseKey?.length ?? 0,
+    });
+    throw new Error(`Configuração Supabase inválida: ${problems.join(' | ')}`);
+  }
+  console.info('[Supabase Env Check] OK', {
+    url: supabaseUrl,
+    key_preview: mask(supabaseKey!),
+    key_length: supabaseKey!.length,
+  });
+}
+
+assertSupabaseEnv();
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(
-  SUPABASE_URL as string,
-  SUPABASE_PUBLISHABLE_KEY as string,
-  {
-    auth: {
-      storage: localStorage,
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-  }
-);
+export const supabase = createClient<Database>(supabaseUrl!, supabaseKey!, {
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});

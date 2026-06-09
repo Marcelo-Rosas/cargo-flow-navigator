@@ -36,11 +36,18 @@ import { useOwners } from '@/hooks/useOwners';
 import { useVehicleTypesFleetForm } from '@/hooks/useVehicleTypes';
 import { toast } from 'sonner';
 import type { VehicleWithRelations } from '@/hooks/useVehicles';
-import { zodPlate } from '@/lib/validators';
+import { validatePlate, zodPlate } from '@/lib/validators';
 import { calculatePalletsFromVolume } from '@/lib/pallets';
 
 const vehicleSchema = z.object({
   plate: zodPlate,
+  plate_2: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || validatePlate(v),
+      'Placa da carreta inválida – use o formato ABC1234 ou ABC1D23 (Mercosul)'
+    ),
   brand: z.string().optional(),
   model: z.string().optional(),
   year: z
@@ -78,6 +85,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
     resolver: zodResolver(vehicleSchema),
     defaultValues: {
       plate: '',
+      plate_2: '',
       brand: '',
       model: '',
       year: '',
@@ -97,6 +105,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
     if (vehicle) {
       form.reset({
         plate: vehicle.plate,
+        plate_2: vehicle.plate_2 || '',
         brand: vehicle.brand || '',
         model: vehicle.model || '',
         year: vehicle.year ? String(vehicle.year) : '',
@@ -119,6 +128,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
     } else {
       form.reset({
         plate: '',
+        plate_2: '',
         brand: '',
         model: '',
         year: '',
@@ -138,11 +148,13 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
   const onSubmit = async (data: VehicleFormData) => {
     try {
       const plate = data.plate.trim().toUpperCase().replace(/[-\s]/g, '');
+      const plate2 = data.plate_2?.trim().toUpperCase().replace(/[-\s]/g, '') || null;
       if (isEditing && vehicle) {
         await updateVehicleMutation.mutateAsync({
           id: vehicle.id,
           updates: {
             plate,
+            plate_2: plate2,
             brand: data.brand || null,
             model: data.model || null,
             year: data.year ? parseInt(data.year, 10) : null,
@@ -161,6 +173,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
       } else {
         await createVehicleMutation.mutateAsync({
           plate,
+          plate_2: plate2,
           brand: data.brand || null,
           model: data.model || null,
           year: data.year ? parseInt(data.year, 10) : null,
@@ -220,7 +233,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                 Identificação
               </p>
 
-              {/* Placa + Ano */}
+              {/* Placa + Placa Carreta */}
               <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
@@ -247,6 +260,38 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="plate_2"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Placa Carreta</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="ABC1D23"
+                          {...field}
+                          className="font-mono uppercase tracking-widest"
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value
+                                .toUpperCase()
+                                .replace(/[^A-Z0-9]/g, '')
+                                .slice(0, 7)
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <p className="text-[10px] text-muted-foreground">
+                        Reboque/semirreboque — sai como "Carreta" na Ordem de Coleta.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Ano */}
+              <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
                   name="year"

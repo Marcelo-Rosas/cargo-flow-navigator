@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  loadShipperById,
+  resolveFirstAdditionalShipperEntry,
+  shipperRecordToPartyData,
+} from '@/lib/collection-order-parties';
 import { generateCollectionOrderPdf } from '@/lib/generateCollectionOrderPdf';
 import type {
   CollectionOrder,
@@ -84,8 +89,10 @@ export interface CreateCollectionOrderInput {
   orderId: string;
   /** Texto livre para "Informações Adicionais" (auto da cotação + edits) */
   additionalInfo?: string | null;
-  /** Override opcional dos campos do remetente (para preencher Nº/Bairro/Comp se shipper estava sem) */
+  /** Override opcional dos campos do remetente 1 (Nº/Bairro/Comp da coleta) */
   senderOverride?: Partial<CollectionOrderPartyData>;
+  /** Override opcional do remetente 2 (coleta adicional da cotação) */
+  sender2Override?: Partial<CollectionOrderPartyData>;
 }
 
 export function useCreateCollectionOrder(orderId: string | undefined) {
@@ -96,6 +103,7 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
       orderId: oid,
       additionalInfo,
       senderOverride,
+      sender2Override,
     }: CreateCollectionOrderInput) => {
       // 1. Carregar dados base
       const { data: order, error: orderErr } = await supabase
@@ -105,6 +113,7 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
            shipper_id, client_id, driver_id, vehicle_plate, vehicle_brand, vehicle_model, vehicle_type_name,
            driver_name, driver_phone, driver_cnh, driver_antt,
            eta, pickup_date, origin, destination, origin_cep, destination_cep,
+           quote_id, additional_shippers,
            shipper:shippers(id, name, cnpj, cpf, phone, email, address, address_number, address_complement, address_neighborhood, zip_code, city, state),
            client:clients(id, name, cnpj, cpf, phone, email, address, address_number, address_complement, address_neighborhood, zip_code, city, state),
            driver:drivers(id, name, cpf, cnh, antt, phone)`
@@ -116,6 +125,7 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
       if (!order) throw new Error('OS nao encontrada');
 
       // 2. Buscar carreta + dados do proprietario via vehicles → owners
+      // Prioridade: veiculo pela placa da OS (vehicle_plate); fallback: 1o veiculo do motorista.
       let trailerPlate: string | null = null;
       let ownerInfo: {
         cpf_cnpj: string | null;
@@ -123,23 +133,37 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
         state: string | null;
         registered_at: string | null;
       } | null = null;
-      if (order.driver_id) {
-        const { data: veh } = await supabase
+      const vehicleSelect =
+        'plate, plate_2, owner_id, owner:owners(cpf_cnpj, city, state, created_at)';
+      let veh: Record<string, unknown> | null = null;
+      const osPlate = order.vehicle_plate?.trim().toUpperCase().replace(/[-\s]/g, '');
+      if (osPlate) {
+        const { data } = await supabase
           .from('vehicles')
-          .select('plate, plate_2, owner_id, owner:owners(cpf_cnpj, city, state, created_at)')
+          .select(vehicleSelect)
+          .ilike('plate', osPlate)
+          .limit(1)
+          .maybeSingle();
+        veh = data;
+      }
+      if (!veh && order.driver_id) {
+        const { data } = await supabase
+          .from('vehicles')
+          .select(vehicleSelect)
           .eq('driver_id', order.driver_id)
           .limit(1)
           .maybeSingle();
-        trailerPlate = veh?.plate_2 ?? null;
-        const ow = (veh as unknown as { owner?: Record<string, unknown> | null })?.owner ?? null;
-        if (ow) {
-          ownerInfo = {
-            cpf_cnpj: (ow.cpf_cnpj as string) ?? null,
-            city: (ow.city as string) ?? null,
-            state: (ow.state as string) ?? null,
-            registered_at: (ow.created_at as string) ?? null,
-          };
-        }
+        veh = data;
+      }
+      trailerPlate = (veh?.plate_2 as string | null) ?? null;
+      const ow = (veh as unknown as { owner?: Record<string, unknown> | null })?.owner ?? null;
+      if (ow) {
+        ownerInfo = {
+          cpf_cnpj: (ow.cpf_cnpj as string) ?? null,
+          city: (ow.city as string) ?? null,
+          state: (ow.state as string) ?? null,
+          registered_at: (ow.created_at as string) ?? null,
+        };
       }
 
       // 2b. Buscar ultimo resultado ANTT/RNTRC da OS via risk_evidence
@@ -230,21 +254,46 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
       // Numero, complemento e bairro NAO vem do cadastro do shipper — sao
       // dados da operacao de coleta especifica e vem do senderOverride
       // preenchido pelo operador no Wizard da OC.
-      const sender: CollectionOrderPartyData = {
-        name: (shipper?.name as string) ?? '',
-        cnpj: (shipper?.cnpj as string) ?? null,
-        cpf: (shipper?.cpf as string) ?? null,
-        phone: (shipper?.phone as string) ?? null,
-        email: (shipper?.email as string) ?? null,
-        address: (shipper?.address as string) ?? null,
-        address_number: null,
-        address_complement: null,
-        address_neighborhood: null,
-        zip_code: (shipper?.zip_code as string) ?? order.origin_cep ?? null,
-        city: (shipper?.city as string) ?? null,
-        state: (shipper?.state as string) ?? null,
-        ...(senderOverride ?? {}),
+      const sender =
+        shipperRecordToPartyData(shipper, {
+          fallbackZip: order.origin_cep,
+          override: senderOverride,
+        }) ??
+        ({
+          name: '',
+          cnpj: null,
+          cpf: null,
+          phone: null,
+          email: null,
+          address: null,
+          address_number: null,
+          address_complement: null,
+          address_neighborhood: null,
+          zip_code: order.origin_cep ?? null,
+          city: null,
+          state: null,
+          ...(senderOverride ?? {}),
+        } satisfies CollectionOrderPartyData);
+
+      const orderRow = order as {
+        quote_id?: string | null;
+        additional_shippers?: unknown;
       };
+      const additionalEntry = await resolveFirstAdditionalShipperEntry(supabase, {
+        quoteId: orderRow.quote_id ?? null,
+        orderAdditionalShippers: orderRow.additional_shippers,
+      });
+
+      let sender2: CollectionOrderPartyData | null = null;
+      if (additionalEntry) {
+        const additionalShipper = additionalEntry.shipper_id
+          ? await loadShipperById(supabase, additionalEntry.shipper_id)
+          : null;
+        sender2 = shipperRecordToPartyData(additionalShipper, {
+          quoteEntry: additionalEntry,
+          override: sender2Override,
+        });
+      }
 
       const recipient: CollectionOrderPartyData = {
         name: (client?.name as string) ?? '',
@@ -314,6 +363,7 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
         issued_at: issuedAtIso,
         issued_by_name: issuedByName,
         sender,
+        sender_2: sender2,
         recipient,
         driver: driverData,
         vehicle: vehicleData,
@@ -346,6 +396,7 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
           order_id: oid,
           status: 'emitida',
           sender_data: sender as unknown as Record<string, unknown>,
+          sender_2_data: sender2 as unknown as Record<string, unknown> | null,
           recipient_data: recipient as unknown as Record<string, unknown>,
           driver_data: driverData as unknown as Record<string, unknown>,
           vehicle_data: vehicleData as unknown as Record<string, unknown>,

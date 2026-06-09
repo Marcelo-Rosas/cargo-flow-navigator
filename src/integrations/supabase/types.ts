@@ -649,6 +649,7 @@ export type Database = {
           pdf_storage_path: string | null;
           pickup_date: string | null;
           recipient_data: Json;
+          sender_2_data: Json | null;
           sender_data: Json;
           status: Database['public']['Enums']['collection_order_status'];
           updated_at: string;
@@ -675,6 +676,7 @@ export type Database = {
           pdf_storage_path?: string | null;
           pickup_date?: string | null;
           recipient_data: Json;
+          sender_2_data?: Json | null;
           sender_data: Json;
           status?: Database['public']['Enums']['collection_order_status'];
           updated_at?: string;
@@ -701,6 +703,7 @@ export type Database = {
           pdf_storage_path?: string | null;
           pickup_date?: string | null;
           recipient_data?: Json;
+          sender_2_data?: Json | null;
           sender_data?: Json;
           status?: Database['public']['Enums']['collection_order_status'];
           updated_at?: string;
@@ -4052,6 +4055,7 @@ export type Database = {
       };
       orders: {
         Row: {
+          additional_shippers: Json;
           assigned_to: string | null;
           cargo_type: string | null;
           cargo_value: number | null;
@@ -4127,6 +4131,7 @@ export type Database = {
           weight: number | null;
         };
         Insert: {
+          additional_shippers?: Json;
           assigned_to?: string | null;
           cargo_type?: string | null;
           cargo_value?: number | null;
@@ -4202,6 +4207,7 @@ export type Database = {
           weight?: number | null;
         };
         Update: {
+          additional_shippers?: Json;
           assigned_to?: string | null;
           cargo_type?: string | null;
           cargo_value?: number | null;

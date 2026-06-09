@@ -72,9 +72,11 @@ export interface CollectionOrderAnttData {
 /** Snapshot tipado retornado em CollectionOrderRow.{sender,recipient,...}_data */
 export type CollectionOrder = Omit<
   CollectionOrderRow,
-  'sender_data' | 'recipient_data' | 'driver_data' | 'vehicle_data' | 'cargo_data'
+  'sender_data' | 'sender_2_data' | 'recipient_data' | 'driver_data' | 'vehicle_data' | 'cargo_data'
 > & {
   sender_data: CollectionOrderPartyData;
+  /** Segundo ponto de coleta (embarcador adicional da cotação), quando houver */
+  sender_2_data: CollectionOrderPartyData | null;
   recipient_data: CollectionOrderPartyData;
   driver_data: CollectionOrderDriverData;
   vehicle_data: CollectionOrderVehicleData;

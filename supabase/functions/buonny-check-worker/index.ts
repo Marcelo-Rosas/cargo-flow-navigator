@@ -10,6 +10,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getCorsHeaders } from '../_shared/cors.ts';
 
 // Types
 interface InsuranceOption {
@@ -160,21 +161,25 @@ function validateRequest(req: CheckWorkerRequest): { valid: boolean; error?: str
 /**
  * Main handler
  */
+function jsonResponse(
+  body: unknown,
+  status: number,
+  corsHeaders: Record<string, string>
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   const startTime = performance.now();
   const requestId = crypto.randomUUID();
   const environment = Deno.env.get('ENVIRONMENT') || 'prod';
+  const corsHeaders = getCorsHeaders(req);
 
-  // CORS
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   // Parse request
@@ -182,10 +187,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: 'Invalid JSON body' }, 400, corsHeaders);
   }
 
   // Validate
@@ -217,10 +219,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    return new Response(JSON.stringify({ error: validation.error }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: validation.error }, 400, corsHeaders);
   }
 
   // Initialize Supabase
@@ -236,15 +235,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       })
     );
 
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(
+      {
         options: DEFAULT_COVERAGE_OPTIONS,
         timestamp: new Date().toISOString(),
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }
+      },
+      200,
+      corsHeaders
     );
   }
 
@@ -282,10 +279,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       timestamp: new Date().toISOString(),
     };
 
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse(response, 200, corsHeaders);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorCode = errorMessage.includes('timeout')
@@ -325,9 +319,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       timestamp: new Date().toISOString(),
     };
 
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse(response, 200, corsHeaders);
   }
 });

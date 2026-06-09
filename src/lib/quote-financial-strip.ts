@@ -1,3 +1,4 @@
+import { readMetaAnttPisoCarreteiro, resolvePisoAnttCarreteiroReais } from '@/lib/carreteiro-cost';
 import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import {
   isMarginBelowTarget,
@@ -7,6 +8,23 @@ import {
   sumRiskRepasse,
   type StoredPricingBreakdown,
 } from '@/lib/freightCalculator';
+
+/** PAG ao carreteiro: piso ANTT em lotação; não escala com desconto comercial no FAT. */
+function resolvePagMotoristaReais(
+  breakdown: StoredPricingBreakdown | FreightCalculationOutput,
+  anttApplied: boolean
+): number {
+  const p = breakdown.profitability;
+  const c = breakdown.components;
+  if (anttApplied) {
+    const piso =
+      'meta' in breakdown && breakdown.meta
+        ? resolvePisoAnttCarreteiroReais(breakdown as StoredPricingBreakdown)
+        : readMetaAnttPisoCarreteiro(breakdown.meta) || Number(p?.custoMotoristaAntt ?? 0);
+    if (piso > 0) return piso;
+  }
+  return p?.custoMotoristaContratado ?? c?.baseCost ?? c?.baseFreight ?? 0;
+}
 
 export interface QuoteFinancialStripPag {
   motorista: number;
@@ -54,11 +72,12 @@ export function buildQuoteFinancialStripFromCalculation(
   const totalCliente = Math.max(0, totalBruto - discount);
 
   const anttApplied = m?.anttCostBaseUsed === true || m?.anttFloorApplied === true;
-  const pisoAntt = m?.lotacaoPisoComOver ?? m?.anttPisoCarreteiro ?? 0;
+  const pisoAntt =
+    readMetaAnttPisoCarreteiro(m) ||
+    Number(m?.anttPisoCarreteiro ?? 0) ||
+    Number(p?.custoMotoristaAntt ?? 0);
   const freteTabelaRef = m?.fretePesoOriginal ?? m?.lotacaoFreteTabelaComOverKm ?? 0;
-  const motorista =
-    p?.custoMotoristaContratado ??
-    (anttApplied && pisoAntt > 0 ? pisoAntt : (c?.baseCost ?? c?.baseFreight ?? 0));
+  const motorista = resolvePagMotoristaReais(calculation, anttApplied);
 
   const receitaLiquida =
     p?.receitaLiquida ??
@@ -150,22 +169,27 @@ export function buildQuoteFinancialStripFromBreakdown(
   if (totalCliente <= 0) return null;
 
   const anttApplied = m?.anttCostBaseUsed === true || m?.anttFloorApplied === true;
-  const pisoAntt = scale(m?.lotacaoPisoComOver ?? m?.anttPisoCarreteiro);
-  const freteTabelaRef = scale(m?.fretePesoOriginal ?? m?.lotacaoFreteTabelaComOverKm);
-  const motorista = scale(
-    p?.custoMotoristaContratado ??
-      (anttApplied && pisoAntt > 0 ? pisoAntt : (c?.baseCost ?? c?.baseFreight))
-  );
+  const pisoAntt = resolvePisoAnttCarreteiroReais(breakdown);
+  const freteTabelaRef = m?.fretePesoOriginal ?? m?.lotacaoFreteTabelaComOverKm ?? 0;
+  /** Custos operacionais (PAG) não reduzem com desconto comercial no FAT. */
+  const motorista = resolvePagMotoristaReais(breakdown, anttApplied);
+  const pedagio = round2(c?.toll ?? 0);
+  const repasse = sumRiskRepasse({
+    gris: c?.gris,
+    tso: c?.tso,
+    rctrc: c?.rctrc,
+    adValorem: c?.adValorem,
+  });
 
   const receitaLiquida = scale(p?.receitaLiquida);
   const custoMotoristaGolden =
-    anttApplied && pisoAntt > 0 ? pisoAntt : scale(c?.baseCost ?? c?.baseFreight);
+    anttApplied && pisoAntt > 0 ? pisoAntt : round2(c?.baseCost ?? c?.baseFreight ?? 0);
   const margemContribuicao = resolveMargemBrutaDisplay(
     p?.margemBruta != null ? scale(p.margemBruta) : undefined,
     receitaLiquida,
     scale(p?.overhead),
     custoMotoristaGolden,
-    scale(p?.custoServicos)
+    round2(p?.custoServicos ?? 0)
   );
 
   const custosDiretos = scale(p?.custosDiretos);
@@ -194,18 +218,15 @@ export function buildQuoteFinancialStripFromBreakdown(
 
   return {
     pag: {
-      motorista,
-      pedagio: scale(c?.toll),
-      repasse: sumRiskRepasse({
-        gris: scale(c?.gris),
-        tso: scale(c?.tso),
-        rctrc: scale(c?.rctrc),
-        adValorem: scale(c?.adValorem),
-      }),
-      pisoAntt: pisoAntt > 0 ? pisoAntt : undefined,
+      motorista: round2(motorista),
+      pedagio,
+      repasse,
+      pisoAntt: pisoAntt > 0 ? round2(pisoAntt) : undefined,
       anttApplied,
       tabelaReferencia:
-        anttApplied && freteTabelaRef > (pisoAntt || motorista) * 1.05 ? freteTabelaRef : undefined,
+        anttApplied && freteTabelaRef > (pisoAntt || motorista) * 1.05
+          ? round2(freteTabelaRef)
+          : undefined,
     },
     fat: {
       totalCliente: round2(totalCliente),
