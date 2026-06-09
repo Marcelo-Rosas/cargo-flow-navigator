@@ -96,7 +96,7 @@ async function loadLogoBase64(): Promise<string | null> {
   try {
     // Dynamic import com `?url` — Vite resolve em build, Node ignora (cai no
     // catch). Ambiente Node deve usar logoBase64Override no payload.
-    const mod = (await import('@/assets/logo_vectra_cargo.png?url')) as { default?: string };
+    const mod = (await import('@/assets/logo_vectra_cargo.jpg?url')) as { default?: string };
     const logoUrl = mod.default;
     if (!logoUrl) return null;
     const res = await fetch(logoUrl);

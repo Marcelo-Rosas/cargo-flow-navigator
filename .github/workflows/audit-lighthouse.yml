@@ -46,11 +46,11 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
-      - name: Install Lighthouse + serve + wait-on
-        run: npm install --no-save lighthouse serve wait-on
+      - name: Install Lighthouse + wait-on
+        run: npm install --no-save lighthouse wait-on
 
-      - name: Start local server
-        run: npx serve -s dist -l 3000 &
+      - name: Start preview server
+        run: npx vite preview --port 3000 &
 
       - name: Wait for server
         run: npx wait-on http://localhost:3000 --timeout 15000

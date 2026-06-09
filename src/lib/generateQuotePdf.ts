@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency, formatDate } from '@/lib/formatters';
-import logoUrl from '@/assets/logo_vectra_cargo.png?url';
+import logoUrl from '@/assets/logo_vectra_cargo.jpg?url';
 import type { StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 type QuotePdfMode = 'simplified' | 'detailed';
