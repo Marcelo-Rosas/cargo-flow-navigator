@@ -1117,7 +1117,8 @@ export function QuoteModalCostCompositionTab({
             Indicadores de rentabilidade
           </h5>
           <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
-            Lotação: frete peso = max(tabela NTC + over km, piso ANTT + over mínimo). Overhead é{' '}
+            Lotação: gross-up inicia no piso ANTT da calculadora (ceil(km)×CCD+CC, sem over).
+            Referência comercial: max(tabela NTC + over km, piso). Overhead é{' '}
             <span className="font-medium">custo estrutural</span> (% da receita líquida). Margem de
             contribuição e margem operacional usam a mesma base (frete golden + serviços NTC).
           </p>

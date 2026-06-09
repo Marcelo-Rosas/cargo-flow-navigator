@@ -15,9 +15,15 @@ additional_redirect_urls = [
   "http://localhost:8080/reset-password",
   # Produção e previews
   "https://app.vectracargo.com.br",
+  "https://app.vectracargo.com.br/**",
   "https://app.vectracargo.com.br**",
   "https://*.app.vectracargo.com.br",
+  "https://*.app.vectracargo.com.br/**",
   "https://*.app.vectracargo.com.br**",
+  "https://cargo-flow-navigator.pages.dev",
+  "https://cargo-flow-navigator.pages.dev/**",
+  "https://*.cargo-flow-navigator.pages.dev",
+  "https://*.cargo-flow-navigator.pages.dev/**",
 ]
 
 [functions.import-price-table]

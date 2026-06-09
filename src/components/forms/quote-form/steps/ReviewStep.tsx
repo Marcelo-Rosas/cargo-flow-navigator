@@ -49,7 +49,7 @@ export function ReviewStep({
   const discount = form.watch('discount') ?? 0;
   const meta = calculationResult?.meta;
   const anttCostBaseUsed = meta?.anttCostBaseUsed === true;
-  const pisoAntt = meta?.lotacaoPisoComOver ?? meta?.anttPisoCarreteiro ?? 0;
+  const pisoAntt = meta?.anttPisoCarreteiro ?? meta?.lotacaoPisoComOver ?? 0;
   const freteTabelaRef = meta?.fretePesoOriginal ?? meta?.lotacaoFreteTabelaComOverKm ?? 0;
   const baseFreight =
     calculationResult?.profitability?.custoMotoristaContratado ??

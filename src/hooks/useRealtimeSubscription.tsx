@@ -17,7 +17,7 @@ export function useRealtimeSubscription(tables: TableName[]) {
   const tablesKey = useMemo(() => tables.sort().join(','), [tables]);
 
   useEffect(() => {
-    const tablesSet = new Set(tables);
+    const tablesSet = new Set(tablesKey ? (tablesKey.split(',') as TableName[]) : []);
 
     const channel = supabase
       .channel('realtime-changes')

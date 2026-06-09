@@ -1,6 +1,6 @@
 /**
- * Lotação (FTL): base de custo carreteiro para gross-up = Piso ANTT (+ over mínimo), quando calculado.
- * Tabela NTC (+ over km) é referência comercial; fretePesoReferenciaMax = max(tabela, piso) para compliance de venda.
+ * Lotação (FTL): base de custo carreteiro para gross-up = Piso ANTT bruto, quando calculado.
+ * Tabela NTC (+ over km) é referência comercial; fretePesoReferenciaMax = max(tabela+over km, piso) para compliance.
  * Paridade obrigatória com supabase/functions/_shared/lotacao-freight-base.ts
  */
 
@@ -26,9 +26,9 @@ export function resolveLotacaoKmOverPercent(km: number, resolveRule: ResolvePric
 }
 
 export interface LotacaoFretePesoResult {
-  /** Base de custo motorista (Piso ANTT + over) usada no gross-up e custos diretos */
+  /** Base de custo motorista (piso ANTT bruto) usada no gross-up e custos diretos */
   fretePeso: number;
-  /** max(tabela+over km, piso+over) — referência e piso mínimo de venda */
+  /** max(tabela+over km, piso ANTT) — referência comercial e piso mínimo de venda */
   fretePesoReferenciaMax: number;
   freteTabela: number;
   freteTabelaComOverKm: number;
@@ -53,17 +53,19 @@ export function resolveLotacaoFretePeso(params: {
 }): LotacaoFretePesoResult {
   const round = params.round ?? ((n: number) => Math.round((n + Number.EPSILON) * 100) / 100);
   const freteTabela = round(Math.max(0, params.freteTabela));
+  /** Piso já calculado pela fórmula ANTT (ceil(km)×CCD+CC); não reaplicar over nem markup. */
   const pisoAntt = round(Math.max(0, params.pisoAntt));
   const freteTabelaComOverKm = round(freteTabela * (1 + params.overKmPercent / 100));
-  const pisoComOverAntt = pisoAntt > 0 ? round(pisoAntt * (1 + params.overAnttPercent / 100)) : 0;
-  const fretePesoReferenciaMax = round(Math.max(freteTabelaComOverKm, pisoComOverAntt));
-  const anttCostBaseUsed = pisoComOverAntt > 0;
-  const fretePeso = anttCostBaseUsed ? pisoComOverAntt : freteTabelaComOverKm;
+  /** Legado/meta: igual ao piso bruto (over ANTT não entra no gross-up). */
+  const pisoComOverAntt = pisoAntt;
+  const fretePesoReferenciaMax = round(Math.max(freteTabelaComOverKm, pisoAntt));
+  const anttCostBaseUsed = pisoAntt > 0;
+  const fretePeso = anttCostBaseUsed ? pisoAntt : freteTabelaComOverKm;
   const pisoAplicado = anttCostBaseUsed;
   const anttFloorApplied =
     anttCostBaseUsed ||
     (pisoAntt > 0 && pisoAntt > freteTabela) ||
-    pisoComOverAntt >= freteTabelaComOverKm;
+    pisoAntt >= freteTabelaComOverKm;
 
   return {
     fretePeso,

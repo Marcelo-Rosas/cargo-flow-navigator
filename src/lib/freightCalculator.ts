@@ -147,7 +147,7 @@ export interface FreightCalculationInput {
     dispatchFee: number;
   };
 
-  /** Piso ANTT carreteiro (R$). Quando fornecido, em lotação o custo motorista = MAX(frete_peso, pisoAntt). */
+  /** Piso ANTT carreteiro (R$) — fórmula calculadora ceil(km)×CCD+CC. Em lotação, base seca do gross-up. */
   pisoAnttCarreteiro?: number;
 
   // Alíquota ICMS (já normalizada em %). Ignorada quando kmByUf + icmsByUf presentes.
@@ -1137,7 +1137,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       overAnttPercent: params.overLotacaoPercent ?? 0,
       round: round2,
     });
-    fretePesoGolden = lotacaoFreteMeta.fretePeso;
+    fretePesoGolden = pisoAntt > 0 ? round2(pisoAntt) : lotacaoFreteMeta.fretePeso;
   }
   const anttFloorApplied = lotacaoFreteMeta?.anttFloorApplied ?? false;
   const custoMotorista = !isLtl ? fretePesoGolden : baseCost;
@@ -1301,8 +1301,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       fretePesoOriginal:
         !isLtl &&
         lotacaoFreteMeta?.anttCostBaseUsed &&
-        (lotacaoFreteMeta.freteTabelaComOverKm ?? 0) >
-          (lotacaoFreteMeta.pisoComOverAntt ?? 0) + 0.01
+        (lotacaoFreteMeta.freteTabelaComOverKm ?? 0) > (lotacaoFreteMeta.pisoAntt ?? 0) + 0.01
           ? lotacaoFreteMeta.freteTabelaComOverKm
           : !isLtl && baseCost !== fretePesoGolden
             ? baseCost
