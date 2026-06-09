@@ -1,0 +1,4 @@
+# Config mínima para rodar só o túnel sefaz-proxy-vectra via --token.
+# Evita carregar ~/.cloudflared/config.yml (outro túnel: gymsite/ollama).
+protocol: http2
+no-autoupdate: true

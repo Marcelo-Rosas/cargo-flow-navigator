@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Upload,
   Search,
   FileText,
   Image,
@@ -15,6 +14,7 @@ import {
   Loader2,
   FileCheck,
   RotateCcw,
+  KeyRound,
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,15 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -39,9 +48,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { openDocument, downloadDocument } from '@/lib/storage';
 import { useDocuments, useDeleteDocument } from '@/hooks/useDocuments';
-import { useValidateDocument } from '@/hooks/useValidateDocument';
+import { getValidateDocumentId, useValidateDocument } from '@/hooks/useValidateDocument';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Database } from '@/integrations/supabase/types';
@@ -94,10 +104,12 @@ const typeColors: Record<DocumentType, string> = {
 };
 
 const statusConfig = {
-  valid: { icon: CheckCircle, color: 'text-success', label: 'Válido' },
+  valid: { icon: CheckCircle, color: 'text-success', label: 'Válido (local)' },
   pending: { icon: Clock, color: 'text-warning', label: 'Pendente' },
   invalid: { icon: AlertCircle, color: 'text-destructive', label: 'Inválido' },
-  xml_parsed: { icon: FileCheck, color: 'text-primary', label: 'Validado' },
+  xml_parsed: { icon: FileCheck, color: 'text-primary', label: 'XML OK' },
+  sefaz_authorized: { icon: CheckCircle, color: 'text-success', label: 'SEFAZ OK' },
+  sefaz_cancelled: { icon: AlertCircle, color: 'text-destructive', label: 'Cancelada SEFAZ' },
 };
 
 const getFileIcon = (fileName: string) => {
@@ -122,7 +134,38 @@ export default function Documents() {
   const validateDocumentMutation = useValidateDocument();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [isDragging, setIsDragging] = useState(false);
+  const [chaveDialogDocId, setChaveDialogDocId] = useState<string | null>(null);
+  const [chaveInput, setChaveInput] = useState('');
+
+  const isValidatingDoc = (docId: string) =>
+    validateDocumentMutation.isPending &&
+    validateDocumentMutation.variables != null &&
+    getValidateDocumentId(validateDocumentMutation.variables) === docId;
+
+  const handleSubmitChave = () => {
+    if (!chaveDialogDocId) return;
+    const digits = chaveInput.replace(/\D/g, '');
+    if (digits.length !== 44) {
+      toast.error('A chave de acesso deve ter 44 dígitos');
+      return;
+    }
+    validateDocumentMutation.mutate(
+      { documentId: chaveDialogDocId, nfe_key: digits },
+      {
+        onSuccess: () => {
+          setChaveDialogDocId(null);
+          setChaveInput('');
+        },
+      }
+    );
+  };
+
+  const handleDocumentCreated = useCallback(
+    (documentId: string) => {
+      validateDocumentMutation.mutate(documentId);
+    },
+    [validateDocumentMutation]
+  );
 
   const filteredDocuments = (documents || []).filter((doc) => {
     const search = searchTerm.toLowerCase();
@@ -213,12 +256,6 @@ export default function Documents() {
               <SelectItem value="outros">Outros</SelectItem>
             </SelectContent>
           </Select>
-          {canWrite && (
-            <Button className="gap-2">
-              <Upload className="w-4 h-4" />
-              Upload
-            </Button>
-          )}
         </div>
       </div>
 
@@ -227,30 +264,13 @@ export default function Documents() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-          }}
-          className={cn(
-            'border-2 border-dashed rounded-xl p-8 text-center mb-6 transition-colors',
-            isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-          )}
+          className="mb-6"
         >
-          <Upload
-            className={cn(
-              'w-10 h-10 mx-auto mb-3 transition-colors',
-              isDragging ? 'text-primary' : 'text-muted-foreground'
-            )}
+          <DocumentUpload
+            standaloneFiscalContext
+            onDocumentCreated={(documentId) => handleDocumentCreated(documentId)}
+            onSuccess={() => refetch()}
           />
-          <p className="text-foreground font-medium">Arraste e solte arquivos aqui</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            ou clique para selecionar (PDF, XML, imagens ou vídeos • até 500MB)
-          </p>
         </motion.div>
       )}
 
@@ -380,6 +400,21 @@ export default function Documents() {
                                 ` • Nº ${doc.validation_metadata.numero}`}
                             </span>
                           )}
+                          {(() => {
+                            const meta = doc.validation_metadata as {
+                              sefaz?: { x_motivo?: string; c_stat?: string; source?: string };
+                            } | null;
+                            const sefaz = meta?.sefaz;
+                            if (!sefaz?.x_motivo) return null;
+                            return (
+                              <span
+                                className="text-[10px] text-muted-foreground truncate max-w-[200px]"
+                                title={`SEFAZ ${sefaz.c_stat ?? ''} (${sefaz.source ?? 'consulta'})`}
+                              >
+                                {sefaz.x_motivo}
+                              </span>
+                            );
+                          })()}
                           {doc.validation_errors && doc.validation_errors.length > 0 && (
                             <span
                               className="text-[10px] text-destructive truncate max-w-[180px]"
@@ -400,6 +435,24 @@ export default function Documents() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          {canWrite &&
+                            (doc.type === 'nfe' || doc.type === 'cte' || doc.type === 'mdfe') &&
+                            !doc.nfe_key &&
+                            (doc.validation_status === 'pending' ||
+                              (doc.validation_errors?.length ?? 0) > 0) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                aria-label="Informar chave de acesso"
+                                onClick={() => {
+                                  setChaveDialogDocId(doc.id);
+                                  setChaveInput('');
+                                }}
+                              >
+                                <KeyRound className="w-4 h-4" />
+                              </Button>
+                            )}
                           {(doc.type === 'nfe' ||
                             doc.type === 'cte' ||
                             doc.type === 'mdfe' ||
@@ -409,14 +462,10 @@ export default function Documents() {
                               size="icon"
                               className="h-8 w-8"
                               aria-label="Revalidar documento"
-                              disabled={
-                                validateDocumentMutation.isPending &&
-                                validateDocumentMutation.variables === doc.id
-                              }
+                              disabled={isValidatingDoc(doc.id)}
                               onClick={() => validateDocumentMutation.mutate(doc.id)}
                             >
-                              {validateDocumentMutation.isPending &&
-                              validateDocumentMutation.variables === doc.id ? (
+                              {isValidatingDoc(doc.id) ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
                                 <RotateCcw className="w-4 h-4" />
@@ -491,6 +540,57 @@ export default function Documents() {
           </div>
         </motion.div>
       )}
+      <Dialog
+        open={chaveDialogDocId != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setChaveDialogDocId(null);
+            setChaveInput('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Chave de acesso NF-e / CT-e</DialogTitle>
+            <DialogDescription>
+              Cole os 44 dígitos da DANFE ou do XML. Em PDF escaneado sem texto, a extração
+              automática pode falhar — use a chave impressa no documento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="nfe-chave-input">Chave de acesso</Label>
+            <Input
+              id="nfe-chave-input"
+              inputMode="numeric"
+              placeholder="00000000000000000000000000000000000000000000"
+              value={chaveInput}
+              onChange={(e) => setChaveInput(e.target.value.replace(/\D/g, '').slice(0, 44))}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground tabular-nums">
+              {chaveInput.length}/44 dígitos
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChaveDialogDocId(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSubmitChave}
+              disabled={chaveInput.length !== 44 || validateDocumentMutation.isPending}
+            >
+              {validateDocumentMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Validando…
+                </>
+              ) : (
+                'Validar chave'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
