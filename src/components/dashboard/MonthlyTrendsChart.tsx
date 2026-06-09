@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useMonthlyTrends } from '@/hooks/useAdvancedDashboardStats';
 import { Loader2 } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 import {
   LineChart,
   Line,
@@ -11,16 +12,6 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    notation: 'compact',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-};
 
 export function MonthlyTrendsChart() {
   const { data: trendsData, isLoading } = useMonthlyTrends();
@@ -52,8 +43,7 @@ export function MonthlyTrendsChart() {
           <YAxis
             yAxisId="right"
             orientation="right"
-            tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
-            tickFormatter={(value) => formatCurrency(value)}
+            tickFormatter={(value) => formatCurrency(value, { notation: 'compact' })}
           />
           <Tooltip
             contentStyle={{
@@ -62,7 +52,8 @@ export function MonthlyTrendsChart() {
               borderRadius: '8px',
             }}
             formatter={(value, name) => {
-              if (name === 'revenue') return [formatCurrency(value as number), 'Receita'];
+              if (name === 'revenue')
+                return [formatCurrency(value as number, { notation: 'compact' }), 'Receita'];
               if (name === 'quotes') return [value, 'Cotações'];
               if (name === 'orders') return [value, 'OS'];
               return [value, name];

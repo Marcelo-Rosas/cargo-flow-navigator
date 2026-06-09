@@ -6,6 +6,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: '14.1';
   };
+  graphql_public: {
+    Tables: {
+      [_ in never]: never;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json;
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
   public: {
     Tables: {
       agent_jobs: {
@@ -421,6 +446,366 @@ export type Database = {
           },
         ];
       };
+      bairros_alternativos: {
+        Row: {
+          academias_existentes: Json | null;
+          bairro: string;
+          concorrentes_no_bairro: number | null;
+          id: string;
+          metodologia: string | null;
+          motivo: string | null;
+          ordem: number | null;
+          prioridade: string | null;
+          relatorio_id: string;
+          status_competitivo: string | null;
+          ticket_sugerido: string | null;
+        };
+        Insert: {
+          academias_existentes?: Json | null;
+          bairro: string;
+          concorrentes_no_bairro?: number | null;
+          id?: string;
+          metodologia?: string | null;
+          motivo?: string | null;
+          ordem?: number | null;
+          prioridade?: string | null;
+          relatorio_id: string;
+          status_competitivo?: string | null;
+          ticket_sugerido?: string | null;
+        };
+        Update: {
+          academias_existentes?: Json | null;
+          bairro?: string;
+          concorrentes_no_bairro?: number | null;
+          id?: string;
+          metodologia?: string | null;
+          motivo?: string | null;
+          ordem?: number | null;
+          prioridade?: string | null;
+          relatorio_id?: string;
+          status_competitivo?: string | null;
+          ticket_sugerido?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'bairros_alternativos_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'bairros_alternativos_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      candidatos: {
+        Row: {
+          area_estimada_m2: number | null;
+          avenida_principal: boolean | null;
+          created_at: string | null;
+          endereco: string | null;
+          estimativa_visibilidade: string | null;
+          id: string;
+          lat: number | null;
+          listing_id: string | null;
+          listing_source: string | null;
+          listing_url: string | null;
+          lng: number | null;
+          motivo: string | null;
+          nome: string;
+          place_id: string | null;
+          polos_geradores: Json | null;
+          posicao: number;
+          price_raw: string | null;
+          proximo_passo: string | null;
+          qualidade_sinal: string | null;
+          relatorio_id: string;
+          score_ancoragem: number | null;
+          score_geoscout: number | null;
+          score_geral: number | null;
+          status_business: string | null;
+          street_view_url: string | null;
+          telefone: string | null;
+          tem_24h: boolean | null;
+          tipo: string | null;
+          tipos_google: Json | null;
+          website: string | null;
+        };
+        Insert: {
+          area_estimada_m2?: number | null;
+          avenida_principal?: boolean | null;
+          created_at?: string | null;
+          endereco?: string | null;
+          estimativa_visibilidade?: string | null;
+          id?: string;
+          lat?: number | null;
+          listing_id?: string | null;
+          listing_source?: string | null;
+          listing_url?: string | null;
+          lng?: number | null;
+          motivo?: string | null;
+          nome: string;
+          place_id?: string | null;
+          polos_geradores?: Json | null;
+          posicao: number;
+          price_raw?: string | null;
+          proximo_passo?: string | null;
+          qualidade_sinal?: string | null;
+          relatorio_id: string;
+          score_ancoragem?: number | null;
+          score_geoscout?: number | null;
+          score_geral?: number | null;
+          status_business?: string | null;
+          street_view_url?: string | null;
+          telefone?: string | null;
+          tem_24h?: boolean | null;
+          tipo?: string | null;
+          tipos_google?: Json | null;
+          website?: string | null;
+        };
+        Update: {
+          area_estimada_m2?: number | null;
+          avenida_principal?: boolean | null;
+          created_at?: string | null;
+          endereco?: string | null;
+          estimativa_visibilidade?: string | null;
+          id?: string;
+          lat?: number | null;
+          listing_id?: string | null;
+          listing_source?: string | null;
+          listing_url?: string | null;
+          lng?: number | null;
+          motivo?: string | null;
+          nome?: string;
+          place_id?: string | null;
+          polos_geradores?: Json | null;
+          posicao?: number;
+          price_raw?: string | null;
+          proximo_passo?: string | null;
+          qualidade_sinal?: string | null;
+          relatorio_id?: string;
+          score_ancoragem?: number | null;
+          score_geoscout?: number | null;
+          score_geral?: number | null;
+          status_business?: string | null;
+          street_view_url?: string | null;
+          telefone?: string | null;
+          tem_24h?: boolean | null;
+          tipo?: string | null;
+          tipos_google?: Json | null;
+          website?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'candidatos_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'candidatos_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      cenarios_financeiros: {
+        Row: {
+          alunos_break_even: number | null;
+          alunos_pico_calculado: number | null;
+          alunos_projetados: number | null;
+          capacidade_maxima_alunos: number | null;
+          capacidade_simultanea_pico: number | null;
+          capex_alvara_e_taxas: number | null;
+          capex_contingencia_pct: number | null;
+          capex_contingencia_valor: number | null;
+          capex_equipamentos: number | null;
+          capex_estimado: number | null;
+          capex_obra_adaptacao: number | null;
+          capex_projeto_arquitetonico: number | null;
+          capex_total: number | null;
+          capital_giro: number | null;
+          capital_giro_meses: number | null;
+          custo_agua: number | null;
+          custo_aluguel: number | null;
+          custo_condominio: number | null;
+          custo_contabilidade: number | null;
+          custo_energia: number | null;
+          custo_folha: number | null;
+          custo_internet: number | null;
+          custo_iptu: number | null;
+          custo_manutencao: number | null;
+          custo_outros: number | null;
+          custo_seguro: number | null;
+          custo_sistema_gestao: number | null;
+          custos_fixos: number | null;
+          custos_fixos_total: number | null;
+          custos_totais: number | null;
+          folga_capacidade_pct: number | null;
+          frequencia_semanal_aluno: number | null;
+          id: string;
+          investimento_total: number | null;
+          justificativa: string | null;
+          lucro_mensal_estimado: number | null;
+          margem_percentual: number | null;
+          marketing_mensal: number | null;
+          marketing_pct_faturamento: number | null;
+          matr_por_m2_realista: number | null;
+          matriculas_agressivo: number | null;
+          matriculas_conservador: number | null;
+          matriculas_realista: number | null;
+          modelo: Database['public']['Enums']['cenario_modelo'];
+          payback_meses: number | null;
+          pico_share: number | null;
+          receita_mensal: number | null;
+          relatorio_id: string;
+          taxa_cancelamento_mensal: number | null;
+          taxa_inadimplencia: number | null;
+          ticket_medio: number | null;
+          ticket_realizado_estimado: number | null;
+          tir_anual_pct: number | null;
+          viabilidade: Database['public']['Enums']['viabilidade_status'] | null;
+          vpl_5_anos: number | null;
+        };
+        Insert: {
+          alunos_break_even?: number | null;
+          alunos_pico_calculado?: number | null;
+          alunos_projetados?: number | null;
+          capacidade_maxima_alunos?: number | null;
+          capacidade_simultanea_pico?: number | null;
+          capex_alvara_e_taxas?: number | null;
+          capex_contingencia_pct?: number | null;
+          capex_contingencia_valor?: number | null;
+          capex_equipamentos?: number | null;
+          capex_estimado?: number | null;
+          capex_obra_adaptacao?: number | null;
+          capex_projeto_arquitetonico?: number | null;
+          capex_total?: number | null;
+          capital_giro?: number | null;
+          capital_giro_meses?: number | null;
+          custo_agua?: number | null;
+          custo_aluguel?: number | null;
+          custo_condominio?: number | null;
+          custo_contabilidade?: number | null;
+          custo_energia?: number | null;
+          custo_folha?: number | null;
+          custo_internet?: number | null;
+          custo_iptu?: number | null;
+          custo_manutencao?: number | null;
+          custo_outros?: number | null;
+          custo_seguro?: number | null;
+          custo_sistema_gestao?: number | null;
+          custos_fixos?: number | null;
+          custos_fixos_total?: number | null;
+          custos_totais?: number | null;
+          folga_capacidade_pct?: number | null;
+          frequencia_semanal_aluno?: number | null;
+          id?: string;
+          investimento_total?: number | null;
+          justificativa?: string | null;
+          lucro_mensal_estimado?: number | null;
+          margem_percentual?: number | null;
+          marketing_mensal?: number | null;
+          marketing_pct_faturamento?: number | null;
+          matr_por_m2_realista?: number | null;
+          matriculas_agressivo?: number | null;
+          matriculas_conservador?: number | null;
+          matriculas_realista?: number | null;
+          modelo: Database['public']['Enums']['cenario_modelo'];
+          payback_meses?: number | null;
+          pico_share?: number | null;
+          receita_mensal?: number | null;
+          relatorio_id: string;
+          taxa_cancelamento_mensal?: number | null;
+          taxa_inadimplencia?: number | null;
+          ticket_medio?: number | null;
+          ticket_realizado_estimado?: number | null;
+          tir_anual_pct?: number | null;
+          viabilidade?: Database['public']['Enums']['viabilidade_status'] | null;
+          vpl_5_anos?: number | null;
+        };
+        Update: {
+          alunos_break_even?: number | null;
+          alunos_pico_calculado?: number | null;
+          alunos_projetados?: number | null;
+          capacidade_maxima_alunos?: number | null;
+          capacidade_simultanea_pico?: number | null;
+          capex_alvara_e_taxas?: number | null;
+          capex_contingencia_pct?: number | null;
+          capex_contingencia_valor?: number | null;
+          capex_equipamentos?: number | null;
+          capex_estimado?: number | null;
+          capex_obra_adaptacao?: number | null;
+          capex_projeto_arquitetonico?: number | null;
+          capex_total?: number | null;
+          capital_giro?: number | null;
+          capital_giro_meses?: number | null;
+          custo_agua?: number | null;
+          custo_aluguel?: number | null;
+          custo_condominio?: number | null;
+          custo_contabilidade?: number | null;
+          custo_energia?: number | null;
+          custo_folha?: number | null;
+          custo_internet?: number | null;
+          custo_iptu?: number | null;
+          custo_manutencao?: number | null;
+          custo_outros?: number | null;
+          custo_seguro?: number | null;
+          custo_sistema_gestao?: number | null;
+          custos_fixos?: number | null;
+          custos_fixos_total?: number | null;
+          custos_totais?: number | null;
+          folga_capacidade_pct?: number | null;
+          frequencia_semanal_aluno?: number | null;
+          id?: string;
+          investimento_total?: number | null;
+          justificativa?: string | null;
+          lucro_mensal_estimado?: number | null;
+          margem_percentual?: number | null;
+          marketing_mensal?: number | null;
+          marketing_pct_faturamento?: number | null;
+          matr_por_m2_realista?: number | null;
+          matriculas_agressivo?: number | null;
+          matriculas_conservador?: number | null;
+          matriculas_realista?: number | null;
+          modelo?: Database['public']['Enums']['cenario_modelo'];
+          payback_meses?: number | null;
+          pico_share?: number | null;
+          receita_mensal?: number | null;
+          relatorio_id?: string;
+          taxa_cancelamento_mensal?: number | null;
+          taxa_inadimplencia?: number | null;
+          ticket_medio?: number | null;
+          ticket_realizado_estimado?: number | null;
+          tir_anual_pct?: number | null;
+          viabilidade?: Database['public']['Enums']['viabilidade_status'] | null;
+          vpl_5_anos?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'cenarios_financeiros_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'cenarios_financeiros_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       clients: {
         Row: {
           address: string | null;
@@ -435,12 +820,14 @@ export type Database = {
           cnpj_lookup_at: string | null;
           cnpj_mask: string | null;
           company_size: string | null;
+          contact_enrichment_at: string | null;
           contact_name: string | null;
           cpf: number | null;
           created_at: string;
           created_by: string | null;
           efr: string | null;
           email: string | null;
+          enrichment_sources: Json | null;
           id: string;
           legal_nature: string | null;
           legal_nature_code: string | null;
@@ -477,12 +864,14 @@ export type Database = {
           cnpj_lookup_at?: string | null;
           cnpj_mask?: string | null;
           company_size?: string | null;
+          contact_enrichment_at?: string | null;
           contact_name?: string | null;
           cpf?: number | null;
           created_at?: string;
           created_by?: string | null;
           efr?: string | null;
           email?: string | null;
+          enrichment_sources?: Json | null;
           id?: string;
           legal_nature?: string | null;
           legal_nature_code?: string | null;
@@ -519,12 +908,14 @@ export type Database = {
           cnpj_lookup_at?: string | null;
           cnpj_mask?: string | null;
           company_size?: string | null;
+          contact_enrichment_at?: string | null;
           contact_name?: string | null;
           cpf?: number | null;
           created_at?: string;
           created_by?: string | null;
           efr?: string | null;
           email?: string | null;
+          enrichment_sources?: Json | null;
           id?: string;
           legal_nature?: string | null;
           legal_nature_code?: string | null;
@@ -583,6 +974,129 @@ export type Database = {
           code?: string;
           description?: string;
           id?: number;
+        };
+        Relationships: [];
+      };
+      cnpj_contato_cache: {
+        Row: {
+          bairro: string | null;
+          cnpj: string;
+          email: string | null;
+          enriched_at: string;
+          expires_at: string;
+          fonte: string;
+          municipio: string | null;
+          nome_fantasia: string | null;
+          qsa: Json;
+          razao_social: string | null;
+          socio_administrador: Json | null;
+          telefone: string | null;
+          uf: string | null;
+        };
+        Insert: {
+          bairro?: string | null;
+          cnpj: string;
+          email?: string | null;
+          enriched_at?: string;
+          expires_at: string;
+          fonte?: string;
+          municipio?: string | null;
+          nome_fantasia?: string | null;
+          qsa?: Json;
+          razao_social?: string | null;
+          socio_administrador?: Json | null;
+          telefone?: string | null;
+          uf?: string | null;
+        };
+        Update: {
+          bairro?: string | null;
+          cnpj?: string;
+          email?: string | null;
+          enriched_at?: string;
+          expires_at?: string;
+          fonte?: string;
+          municipio?: string | null;
+          nome_fantasia?: string | null;
+          qsa?: Json;
+          razao_social?: string | null;
+          socio_administrador?: Json | null;
+          telefone?: string | null;
+          uf?: string | null;
+        };
+        Relationships: [];
+      };
+      cnpj_fitness_estabelecimentos: {
+        Row: {
+          bairro: string | null;
+          cep: string | null;
+          cidade: string | null;
+          cnae_fiscal_principal: string | null;
+          cnaes_secundarios: string | null;
+          cnpj: string;
+          complemento: string | null;
+          created_at: string;
+          data_inicio_atividade: string | null;
+          data_situacao_cadastral: string | null;
+          email: string | null;
+          id: string;
+          logradouro: string | null;
+          municipio_codigo: string | null;
+          nome_fantasia: string | null;
+          numero: string | null;
+          razao_social: string | null;
+          ref_month: string;
+          segmento_operacao: string | null;
+          situacao_cadastral: number | null;
+          telefone: string | null;
+          uf: string | null;
+        };
+        Insert: {
+          bairro?: string | null;
+          cep?: string | null;
+          cidade?: string | null;
+          cnae_fiscal_principal?: string | null;
+          cnaes_secundarios?: string | null;
+          cnpj: string;
+          complemento?: string | null;
+          created_at?: string;
+          data_inicio_atividade?: string | null;
+          data_situacao_cadastral?: string | null;
+          email?: string | null;
+          id?: string;
+          logradouro?: string | null;
+          municipio_codigo?: string | null;
+          nome_fantasia?: string | null;
+          numero?: string | null;
+          razao_social?: string | null;
+          ref_month: string;
+          segmento_operacao?: string | null;
+          situacao_cadastral?: number | null;
+          telefone?: string | null;
+          uf?: string | null;
+        };
+        Update: {
+          bairro?: string | null;
+          cep?: string | null;
+          cidade?: string | null;
+          cnae_fiscal_principal?: string | null;
+          cnaes_secundarios?: string | null;
+          cnpj?: string;
+          complemento?: string | null;
+          created_at?: string;
+          data_inicio_atividade?: string | null;
+          data_situacao_cadastral?: string | null;
+          email?: string | null;
+          id?: string;
+          logradouro?: string | null;
+          municipio_codigo?: string | null;
+          nome_fantasia?: string | null;
+          numero?: string | null;
+          razao_social?: string | null;
+          ref_month?: string;
+          segmento_operacao?: string | null;
+          situacao_cadastral?: number | null;
+          telefone?: string | null;
+          uf?: string | null;
         };
         Relationships: [];
       };
@@ -1251,6 +1765,99 @@ export type Database = {
         };
         Relationships: [];
       };
+      competidores: {
+        Row: {
+          atividade_marketing: Json | null;
+          bairro_concorrente: string | null;
+          created_at: string | null;
+          distancia_km: number | null;
+          endereco: string | null;
+          google_maps_uri: string | null;
+          horarios_pico: Json | null;
+          id: string;
+          lat: number | null;
+          lng: number | null;
+          nome: string;
+          num_avaliacoes: number | null;
+          oferta_mapeada: Json | null;
+          origem_busca: string | null;
+          pico_semanal: string | null;
+          place_id: string | null;
+          rating_oficial: number | null;
+          relatorio_id: string;
+          reviews: Json | null;
+          telefone: string | null;
+          tem_24h: boolean | null;
+          website: string | null;
+          whatsapp_link: string | null;
+        };
+        Insert: {
+          atividade_marketing?: Json | null;
+          bairro_concorrente?: string | null;
+          created_at?: string | null;
+          distancia_km?: number | null;
+          endereco?: string | null;
+          google_maps_uri?: string | null;
+          horarios_pico?: Json | null;
+          id?: string;
+          lat?: number | null;
+          lng?: number | null;
+          nome: string;
+          num_avaliacoes?: number | null;
+          oferta_mapeada?: Json | null;
+          origem_busca?: string | null;
+          pico_semanal?: string | null;
+          place_id?: string | null;
+          rating_oficial?: number | null;
+          relatorio_id: string;
+          reviews?: Json | null;
+          telefone?: string | null;
+          tem_24h?: boolean | null;
+          website?: string | null;
+          whatsapp_link?: string | null;
+        };
+        Update: {
+          atividade_marketing?: Json | null;
+          bairro_concorrente?: string | null;
+          created_at?: string | null;
+          distancia_km?: number | null;
+          endereco?: string | null;
+          google_maps_uri?: string | null;
+          horarios_pico?: Json | null;
+          id?: string;
+          lat?: number | null;
+          lng?: number | null;
+          nome?: string;
+          num_avaliacoes?: number | null;
+          oferta_mapeada?: Json | null;
+          origem_busca?: string | null;
+          pico_semanal?: string | null;
+          place_id?: string | null;
+          rating_oficial?: number | null;
+          relatorio_id?: string;
+          reviews?: Json | null;
+          telefone?: string | null;
+          tem_24h?: boolean | null;
+          website?: string | null;
+          whatsapp_link?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'competidores_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'competidores_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       compliance_checks: {
         Row: {
           ai_analysis: Json | null;
@@ -1393,6 +2000,36 @@ export type Database = {
           user_id?: string | null;
           valid_from?: string | null;
           valid_until?: string | null;
+        };
+        Relationships: [];
+      };
+      'd1-wrapper': {
+        Row: {
+          _attrs: Json | null;
+          created_at: string | null;
+          file_size: number | null;
+          name: string | null;
+          num_tables: number | null;
+          uuid: string | null;
+          version: string | null;
+        };
+        Insert: {
+          _attrs?: Json | null;
+          created_at?: string | null;
+          file_size?: number | null;
+          name?: string | null;
+          num_tables?: number | null;
+          uuid?: string | null;
+          version?: string | null;
+        };
+        Update: {
+          _attrs?: Json | null;
+          created_at?: string | null;
+          file_size?: number | null;
+          name?: string | null;
+          num_tables?: number | null;
+          uuid?: string | null;
+          version?: string | null;
         };
         Relationships: [];
       };
@@ -1650,6 +2287,8 @@ export type Database = {
           type: Database['public']['Enums']['document_type'];
           updated_at: string;
           uploaded_by: string;
+          validation_errors: string[] | null;
+          validation_metadata: Json | null;
           validation_status: string | null;
         };
         Insert: {
@@ -1667,6 +2306,8 @@ export type Database = {
           type: Database['public']['Enums']['document_type'];
           updated_at?: string;
           uploaded_by: string;
+          validation_errors?: string[] | null;
+          validation_metadata?: Json | null;
           validation_status?: string | null;
         };
         Update: {
@@ -1684,6 +2325,8 @@ export type Database = {
           type?: Database['public']['Enums']['document_type'];
           updated_at?: string;
           uploaded_by?: string;
+          validation_errors?: string[] | null;
+          validation_metadata?: Json | null;
           validation_status?: string | null;
         };
         Relationships: [
@@ -3964,6 +4607,139 @@ export type Database = {
         };
         Relationships: [];
       };
+      oportunidades_prospeccao: {
+        Row: {
+          area_total_m2: number | null;
+          cidade: string | null;
+          cno: string | null;
+          cnpj: string;
+          contato_cnpj: Json | null;
+          contato_validado_em: string | null;
+          created_at: string;
+          data_inicio_atividade: string | null;
+          data_inicio_obra: string | null;
+          data_situacao_obra: string | null;
+          endereco_cno: Json | null;
+          endereco_cnpj: Json | null;
+          id: string;
+          motivo_match: string | null;
+          municipio_codigo: string | null;
+          nome_fantasia: string | null;
+          nome_obra: string | null;
+          org_id: string | null;
+          origem: string | null;
+          prioridade: string;
+          razao_social: string | null;
+          relatorio_id: string | null;
+          score_match: number | null;
+          segmento_operacao: string | null;
+          situacao_cadastral: number | null;
+          situacao_obra: string | null;
+          status: string;
+          uf: string | null;
+          updated_at: string;
+          webhook_enviado_at: string | null;
+          webhook_payload: Json | null;
+          webhook_resposta_http: number | null;
+          webhook_tentativas: number;
+          webhook_url: string | null;
+        };
+        Insert: {
+          area_total_m2?: number | null;
+          cidade?: string | null;
+          cno?: string | null;
+          cnpj: string;
+          contato_cnpj?: Json | null;
+          contato_validado_em?: string | null;
+          created_at?: string;
+          data_inicio_atividade?: string | null;
+          data_inicio_obra?: string | null;
+          data_situacao_obra?: string | null;
+          endereco_cno?: Json | null;
+          endereco_cnpj?: Json | null;
+          id?: string;
+          motivo_match?: string | null;
+          municipio_codigo?: string | null;
+          nome_fantasia?: string | null;
+          nome_obra?: string | null;
+          org_id?: string | null;
+          origem?: string | null;
+          prioridade?: string;
+          razao_social?: string | null;
+          relatorio_id?: string | null;
+          score_match?: number | null;
+          segmento_operacao?: string | null;
+          situacao_cadastral?: number | null;
+          situacao_obra?: string | null;
+          status?: string;
+          uf?: string | null;
+          updated_at?: string;
+          webhook_enviado_at?: string | null;
+          webhook_payload?: Json | null;
+          webhook_resposta_http?: number | null;
+          webhook_tentativas?: number;
+          webhook_url?: string | null;
+        };
+        Update: {
+          area_total_m2?: number | null;
+          cidade?: string | null;
+          cno?: string | null;
+          cnpj?: string;
+          contato_cnpj?: Json | null;
+          contato_validado_em?: string | null;
+          created_at?: string;
+          data_inicio_atividade?: string | null;
+          data_inicio_obra?: string | null;
+          data_situacao_obra?: string | null;
+          endereco_cno?: Json | null;
+          endereco_cnpj?: Json | null;
+          id?: string;
+          motivo_match?: string | null;
+          municipio_codigo?: string | null;
+          nome_fantasia?: string | null;
+          nome_obra?: string | null;
+          org_id?: string | null;
+          origem?: string | null;
+          prioridade?: string;
+          razao_social?: string | null;
+          relatorio_id?: string | null;
+          score_match?: number | null;
+          segmento_operacao?: string | null;
+          situacao_cadastral?: number | null;
+          situacao_obra?: string | null;
+          status?: string;
+          uf?: string | null;
+          updated_at?: string;
+          webhook_enviado_at?: string | null;
+          webhook_payload?: Json | null;
+          webhook_resposta_http?: number | null;
+          webhook_tentativas?: number;
+          webhook_url?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'oportunidades_prospeccao_org_id_fkey';
+            columns: ['org_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'oportunidades_prospeccao_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'oportunidades_prospeccao_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       order_gris_services: {
         Row: {
           amount_previsto: number | null;
@@ -4381,6 +5157,173 @@ export type Database = {
             columns: ['vehicle_type_id'];
             isOneToOne: false;
             referencedRelation: 'vehicle_types';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      organization_members: {
+        Row: {
+          created_at: string | null;
+          org_id: string;
+          role: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          org_id: string;
+          role?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          org_id?: string;
+          role?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'organization_members_org_id_fkey';
+            columns: ['org_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'organization_members_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
+      };
+      organizations: {
+        Row: {
+          created_at: string | null;
+          id: string;
+          limite_relatorios_mes: number;
+          nome: string;
+          plano: string;
+          slug: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          id?: string;
+          limite_relatorios_mes?: number;
+          nome: string;
+          plano?: string;
+          slug: string;
+          updated_at?: string | null;
+        };
+        Update: {
+          created_at?: string | null;
+          id?: string;
+          limite_relatorios_mes?: number;
+          nome?: string;
+          plano?: string;
+          slug?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      otimizacoes_custo: {
+        Row: {
+          agente: string;
+          aprovado_em: string | null;
+          aprovado_por: string | null;
+          criado_em: string | null;
+          criado_por: string | null;
+          descricao: string;
+          economia_brl_estimada: number;
+          economia_brl_real: number | null;
+          id: string;
+          implementado_em: string | null;
+          implementado_por: string | null;
+          justificativa_aprovacao: string | null;
+          modelo_atual: string | null;
+          modelo_sugerido: string | null;
+          org_id: string;
+          referencia_dados: Json | null;
+          resultado_observacao: string | null;
+          severidade: string;
+          status: Database['public']['Enums']['otimizacao_status'];
+          tipo: Database['public']['Enums']['otimizacao_tipo'];
+          titulo: string;
+        };
+        Insert: {
+          agente: string;
+          aprovado_em?: string | null;
+          aprovado_por?: string | null;
+          criado_em?: string | null;
+          criado_por?: string | null;
+          descricao: string;
+          economia_brl_estimada?: number;
+          economia_brl_real?: number | null;
+          id?: string;
+          implementado_em?: string | null;
+          implementado_por?: string | null;
+          justificativa_aprovacao?: string | null;
+          modelo_atual?: string | null;
+          modelo_sugerido?: string | null;
+          org_id: string;
+          referencia_dados?: Json | null;
+          resultado_observacao?: string | null;
+          severidade: string;
+          status?: Database['public']['Enums']['otimizacao_status'];
+          tipo: Database['public']['Enums']['otimizacao_tipo'];
+          titulo: string;
+        };
+        Update: {
+          agente?: string;
+          aprovado_em?: string | null;
+          aprovado_por?: string | null;
+          criado_em?: string | null;
+          criado_por?: string | null;
+          descricao?: string;
+          economia_brl_estimada?: number;
+          economia_brl_real?: number | null;
+          id?: string;
+          implementado_em?: string | null;
+          implementado_por?: string | null;
+          justificativa_aprovacao?: string | null;
+          modelo_atual?: string | null;
+          modelo_sugerido?: string | null;
+          org_id?: string;
+          referencia_dados?: Json | null;
+          resultado_observacao?: string | null;
+          severidade?: string;
+          status?: Database['public']['Enums']['otimizacao_status'];
+          tipo?: Database['public']['Enums']['otimizacao_tipo'];
+          titulo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'otimizacoes_custo_aprovado_por_fkey';
+            columns: ['aprovado_por'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
+            foreignKeyName: 'otimizacoes_custo_criado_por_fkey';
+            columns: ['criado_por'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
+            foreignKeyName: 'otimizacoes_custo_implementado_por_fkey';
+            columns: ['implementado_por'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+          {
+            foreignKeyName: 'otimizacoes_custo_org_id_fkey';
+            columns: ['org_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
             referencedColumns: ['id'];
           },
         ];
@@ -5293,6 +6236,86 @@ export type Database = {
           },
         ];
       };
+      prospects: {
+        Row: {
+          assigned_to: string | null;
+          bairro: string | null;
+          cep: string | null;
+          cidade: string | null;
+          created_at: string;
+          dados_publicos: Json;
+          decisor: Json | null;
+          endereco: string | null;
+          first_seen_at: string;
+          id: string;
+          instagram_handle: string;
+          last_check_at: string | null;
+          nome_publico: string | null;
+          notas: string | null;
+          origem: string;
+          receita_federal: Json | null;
+          score: number | null;
+          status: Database['public']['Enums']['scout_prospect_status'];
+          temperatura: Database['public']['Enums']['scout_temperatura'];
+          uf: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          assigned_to?: string | null;
+          bairro?: string | null;
+          cep?: string | null;
+          cidade?: string | null;
+          created_at?: string;
+          dados_publicos?: Json;
+          decisor?: Json | null;
+          endereco?: string | null;
+          first_seen_at?: string;
+          id?: string;
+          instagram_handle: string;
+          last_check_at?: string | null;
+          nome_publico?: string | null;
+          notas?: string | null;
+          origem?: string;
+          receita_federal?: Json | null;
+          score?: number | null;
+          status?: Database['public']['Enums']['scout_prospect_status'];
+          temperatura?: Database['public']['Enums']['scout_temperatura'];
+          uf?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          assigned_to?: string | null;
+          bairro?: string | null;
+          cep?: string | null;
+          cidade?: string | null;
+          created_at?: string;
+          dados_publicos?: Json;
+          decisor?: Json | null;
+          endereco?: string | null;
+          first_seen_at?: string;
+          id?: string;
+          instagram_handle?: string;
+          last_check_at?: string | null;
+          nome_publico?: string | null;
+          notas?: string | null;
+          origem?: string;
+          receita_federal?: Json | null;
+          score?: number | null;
+          status?: Database['public']['Enums']['scout_prospect_status'];
+          temperatura?: Database['public']['Enums']['scout_temperatura'];
+          uf?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'prospects_assigned_to_fkey';
+            columns: ['assigned_to'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
+      };
       quote_contracts: {
         Row: {
           created_at: string;
@@ -5826,6 +6849,351 @@ export type Database = {
         };
         Relationships: [];
       };
+      relatorio_api_calls: {
+        Row: {
+          agente: string;
+          api_sku: string;
+          created_at: string;
+          custo_brl: number;
+          id: string;
+          num_calls: number;
+          relatorio_id: string;
+          tool_name: string;
+        };
+        Insert: {
+          agente: string;
+          api_sku: string;
+          created_at?: string;
+          custo_brl?: number;
+          id?: string;
+          num_calls?: number;
+          relatorio_id: string;
+          tool_name: string;
+        };
+        Update: {
+          agente?: string;
+          api_sku?: string;
+          created_at?: string;
+          custo_brl?: number;
+          id?: string;
+          num_calls?: number;
+          relatorio_id?: string;
+          tool_name?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'relatorio_api_calls_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'relatorio_api_calls_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      relatorio_custos_agentes: {
+        Row: {
+          agente: string;
+          created_at: string;
+          custo_brl: number;
+          modelo: string;
+          relatorio_id: string;
+          tokens_in: number;
+          tokens_out: number;
+        };
+        Insert: {
+          agente: string;
+          created_at?: string;
+          custo_brl?: number;
+          modelo: string;
+          relatorio_id: string;
+          tokens_in?: number;
+          tokens_out?: number;
+        };
+        Update: {
+          agente?: string;
+          created_at?: string;
+          custo_brl?: number;
+          modelo?: string;
+          relatorio_id?: string;
+          tokens_in?: number;
+          tokens_out?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'relatorio_custos_agentes_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'relatorio_custos_agentes_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      relatorio_inputs: {
+        Row: {
+          a0_research_provider: string | null;
+          area_m2_max: number;
+          area_m2_min: number;
+          bairro: string;
+          bairros_indicados: Json | null;
+          cidade: string;
+          estacionamento_obrigatorio: boolean | null;
+          genero_alvo: string;
+          metadados: Json | null;
+          publico_alvo: string;
+          relatorio_id: string;
+          tamanho_preset: string | null;
+          tipo_negocio: Database['public']['Enums']['negocio_tipo'];
+          uf: string | null;
+        };
+        Insert: {
+          a0_research_provider?: string | null;
+          area_m2_max: number;
+          area_m2_min: number;
+          bairro: string;
+          bairros_indicados?: Json | null;
+          cidade: string;
+          estacionamento_obrigatorio?: boolean | null;
+          genero_alvo?: string;
+          metadados?: Json | null;
+          publico_alvo?: string;
+          relatorio_id: string;
+          tamanho_preset?: string | null;
+          tipo_negocio?: Database['public']['Enums']['negocio_tipo'];
+          uf?: string | null;
+        };
+        Update: {
+          a0_research_provider?: string | null;
+          area_m2_max?: number;
+          area_m2_min?: number;
+          bairro?: string;
+          bairros_indicados?: Json | null;
+          cidade?: string;
+          estacionamento_obrigatorio?: boolean | null;
+          genero_alvo?: string;
+          metadados?: Json | null;
+          publico_alvo?: string;
+          relatorio_id?: string;
+          tamanho_preset?: string | null;
+          tipo_negocio?: Database['public']['Enums']['negocio_tipo'];
+          uf?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'relatorio_inputs_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: true;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'relatorio_inputs_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: true;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      relatorio_outputs: {
+        Row: {
+          alertas: Json | null;
+          aluguel_max_m2: number | null;
+          aluguel_mediana_m2: number | null;
+          aluguel_mensal: number | null;
+          aluguel_min_m2: number | null;
+          cobertura_redes_a0: Json | null;
+          contato_decisor: Json | null;
+          embedding: string | null;
+          entrantes_cnpj_90d: Json;
+          fonte_aluguel: string | null;
+          justificativa_financeira: string | null;
+          market_context: Json | null;
+          modelo_recomendado: string | null;
+          nivel_saturacao: string | null;
+          obras_cno_em_curso: Json;
+          posicionamento_estrategico: Json | null;
+          posicionamento_recomendado: string | null;
+          queries_aluguel_com_dados: number | null;
+          rating_medio_concorrentes: number | null;
+          relatorio_id: string;
+          resumo_executivo: string | null;
+          score_bairro: number | null;
+          score_concorrencia: number | null;
+          score_demografico: number | null;
+          score_top1_candidato: number | null;
+          score_viabilidade: number | null;
+          total_concorrentes_analisados: number | null;
+          veredito: string;
+        };
+        Insert: {
+          alertas?: Json | null;
+          aluguel_max_m2?: number | null;
+          aluguel_mediana_m2?: number | null;
+          aluguel_mensal?: number | null;
+          aluguel_min_m2?: number | null;
+          cobertura_redes_a0?: Json | null;
+          contato_decisor?: Json | null;
+          embedding?: string | null;
+          entrantes_cnpj_90d?: Json;
+          fonte_aluguel?: string | null;
+          justificativa_financeira?: string | null;
+          market_context?: Json | null;
+          modelo_recomendado?: string | null;
+          nivel_saturacao?: string | null;
+          obras_cno_em_curso?: Json;
+          posicionamento_estrategico?: Json | null;
+          posicionamento_recomendado?: string | null;
+          queries_aluguel_com_dados?: number | null;
+          rating_medio_concorrentes?: number | null;
+          relatorio_id: string;
+          resumo_executivo?: string | null;
+          score_bairro?: number | null;
+          score_concorrencia?: number | null;
+          score_demografico?: number | null;
+          score_top1_candidato?: number | null;
+          score_viabilidade?: number | null;
+          total_concorrentes_analisados?: number | null;
+          veredito: string;
+        };
+        Update: {
+          alertas?: Json | null;
+          aluguel_max_m2?: number | null;
+          aluguel_mediana_m2?: number | null;
+          aluguel_mensal?: number | null;
+          aluguel_min_m2?: number | null;
+          cobertura_redes_a0?: Json | null;
+          contato_decisor?: Json | null;
+          embedding?: string | null;
+          entrantes_cnpj_90d?: Json;
+          fonte_aluguel?: string | null;
+          justificativa_financeira?: string | null;
+          market_context?: Json | null;
+          modelo_recomendado?: string | null;
+          nivel_saturacao?: string | null;
+          obras_cno_em_curso?: Json;
+          posicionamento_estrategico?: Json | null;
+          posicionamento_recomendado?: string | null;
+          queries_aluguel_com_dados?: number | null;
+          rating_medio_concorrentes?: number | null;
+          relatorio_id?: string;
+          resumo_executivo?: string | null;
+          score_bairro?: number | null;
+          score_concorrencia?: number | null;
+          score_demografico?: number | null;
+          score_top1_candidato?: number | null;
+          score_viabilidade?: number | null;
+          total_concorrentes_analisados?: number | null;
+          veredito?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'relatorio_outputs_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: true;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'relatorio_outputs_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: true;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      relatorios: {
+        Row: {
+          adk_run_id: string | null;
+          created_at: string | null;
+          custo_brl: number | null;
+          data_execucao: string | null;
+          erro_mensagem: string | null;
+          id: string;
+          markdown_completo: string | null;
+          market_tier_qwen: string | null;
+          market_wave: string | null;
+          notas_usuario: string | null;
+          org_id: string;
+          schema_version: string;
+          status: Database['public']['Enums']['relatorio_status'];
+          tempo_execucao_segundos: number | null;
+          tipo_relatorio: Database['public']['Enums']['relatorio_tipo'];
+          tokens_total: number | null;
+          updated_at: string | null;
+          user_id: string | null;
+        };
+        Insert: {
+          adk_run_id?: string | null;
+          created_at?: string | null;
+          custo_brl?: number | null;
+          data_execucao?: string | null;
+          erro_mensagem?: string | null;
+          id?: string;
+          markdown_completo?: string | null;
+          market_tier_qwen?: string | null;
+          market_wave?: string | null;
+          notas_usuario?: string | null;
+          org_id: string;
+          schema_version?: string;
+          status?: Database['public']['Enums']['relatorio_status'];
+          tempo_execucao_segundos?: number | null;
+          tipo_relatorio?: Database['public']['Enums']['relatorio_tipo'];
+          tokens_total?: number | null;
+          updated_at?: string | null;
+          user_id?: string | null;
+        };
+        Update: {
+          adk_run_id?: string | null;
+          created_at?: string | null;
+          custo_brl?: number | null;
+          data_execucao?: string | null;
+          erro_mensagem?: string | null;
+          id?: string;
+          markdown_completo?: string | null;
+          market_tier_qwen?: string | null;
+          market_wave?: string | null;
+          notas_usuario?: string | null;
+          org_id?: string;
+          schema_version?: string;
+          status?: Database['public']['Enums']['relatorio_status'];
+          tempo_execucao_segundos?: number | null;
+          tipo_relatorio?: Database['public']['Enums']['relatorio_tipo'];
+          tokens_total?: number | null;
+          updated_at?: string | null;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'relatorios_org_id_fkey';
+            columns: ['org_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'relatorios_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
+      };
       risk_costs: {
         Row: {
           apportioned: boolean | null;
@@ -6344,6 +7712,308 @@ export type Database = {
           },
         ];
       };
+      scout_cadencia: {
+        Row: {
+          canal: Database['public']['Enums']['scout_canal'];
+          condition: string | null;
+          created_at: string;
+          depends_on_message_id: string | null;
+          id: string;
+          prospect_id: string;
+          regra_key: string;
+          scheduled_at: string;
+          status: string;
+          stop_on_reply: boolean;
+          toque_numero: number;
+          updated_at: string;
+        };
+        Insert: {
+          canal: Database['public']['Enums']['scout_canal'];
+          condition?: string | null;
+          created_at?: string;
+          depends_on_message_id?: string | null;
+          id?: string;
+          prospect_id: string;
+          regra_key: string;
+          scheduled_at: string;
+          status?: string;
+          stop_on_reply?: boolean;
+          toque_numero: number;
+          updated_at?: string;
+        };
+        Update: {
+          canal?: Database['public']['Enums']['scout_canal'];
+          condition?: string | null;
+          created_at?: string;
+          depends_on_message_id?: string | null;
+          id?: string;
+          prospect_id?: string;
+          regra_key?: string;
+          scheduled_at?: string;
+          status?: string;
+          stop_on_reply?: boolean;
+          toque_numero?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'scout_cadencia_depends_on_message_id_fkey';
+            columns: ['depends_on_message_id'];
+            isOneToOne: false;
+            referencedRelation: 'scout_messages';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'scout_cadencia_prospect_id_fkey';
+            columns: ['prospect_id'];
+            isOneToOne: false;
+            referencedRelation: 'prospects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      scout_eventos: {
+        Row: {
+          actor: string | null;
+          created_at: string;
+          id: string;
+          payload: Json;
+          prospect_id: string | null;
+          tipo: string;
+        };
+        Insert: {
+          actor?: string | null;
+          created_at?: string;
+          id?: string;
+          payload?: Json;
+          prospect_id?: string | null;
+          tipo: string;
+        };
+        Update: {
+          actor?: string | null;
+          created_at?: string;
+          id?: string;
+          payload?: Json;
+          prospect_id?: string | null;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'scout_eventos_prospect_id_fkey';
+            columns: ['prospect_id'];
+            isOneToOne: false;
+            referencedRelation: 'prospects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      scout_jobs: {
+        Row: {
+          attempts: number;
+          completed_at: string | null;
+          created_at: string;
+          error_message: string | null;
+          id: string;
+          input: Json;
+          kind: Database['public']['Enums']['scout_job_kind'];
+          max_attempts: number;
+          output: Json | null;
+          priority: number;
+          prospect_id: string | null;
+          scheduled_at: string;
+          started_at: string | null;
+          status: Database['public']['Enums']['scout_job_status'];
+          updated_at: string;
+          worker_id: string | null;
+        };
+        Insert: {
+          attempts?: number;
+          completed_at?: string | null;
+          created_at?: string;
+          error_message?: string | null;
+          id?: string;
+          input?: Json;
+          kind: Database['public']['Enums']['scout_job_kind'];
+          max_attempts?: number;
+          output?: Json | null;
+          priority?: number;
+          prospect_id?: string | null;
+          scheduled_at?: string;
+          started_at?: string | null;
+          status?: Database['public']['Enums']['scout_job_status'];
+          updated_at?: string;
+          worker_id?: string | null;
+        };
+        Update: {
+          attempts?: number;
+          completed_at?: string | null;
+          created_at?: string;
+          error_message?: string | null;
+          id?: string;
+          input?: Json;
+          kind?: Database['public']['Enums']['scout_job_kind'];
+          max_attempts?: number;
+          output?: Json | null;
+          priority?: number;
+          prospect_id?: string | null;
+          scheduled_at?: string;
+          started_at?: string | null;
+          status?: Database['public']['Enums']['scout_job_status'];
+          updated_at?: string;
+          worker_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'scout_jobs_prospect_id_fkey';
+            columns: ['prospect_id'];
+            isOneToOne: false;
+            referencedRelation: 'prospects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      scout_messages: {
+        Row: {
+          cadencia_id: string | null;
+          canal: Database['public']['Enums']['scout_canal'];
+          conteudo: string;
+          created_at: string;
+          delivered_at: string | null;
+          destinatario: string;
+          error_message: string | null;
+          external_id: string | null;
+          id: string;
+          prospect_id: string;
+          read_at: string | null;
+          responded_at: string | null;
+          resposta_texto: string | null;
+          scheduled_at: string | null;
+          sent_at: string | null;
+          status: Database['public']['Enums']['scout_message_status'];
+          template_key: string | null;
+          updated_at: string;
+          variables: Json;
+        };
+        Insert: {
+          cadencia_id?: string | null;
+          canal: Database['public']['Enums']['scout_canal'];
+          conteudo: string;
+          created_at?: string;
+          delivered_at?: string | null;
+          destinatario: string;
+          error_message?: string | null;
+          external_id?: string | null;
+          id?: string;
+          prospect_id: string;
+          read_at?: string | null;
+          responded_at?: string | null;
+          resposta_texto?: string | null;
+          scheduled_at?: string | null;
+          sent_at?: string | null;
+          status?: Database['public']['Enums']['scout_message_status'];
+          template_key?: string | null;
+          updated_at?: string;
+          variables?: Json;
+        };
+        Update: {
+          cadencia_id?: string | null;
+          canal?: Database['public']['Enums']['scout_canal'];
+          conteudo?: string;
+          created_at?: string;
+          delivered_at?: string | null;
+          destinatario?: string;
+          error_message?: string | null;
+          external_id?: string | null;
+          id?: string;
+          prospect_id?: string;
+          read_at?: string | null;
+          responded_at?: string | null;
+          resposta_texto?: string | null;
+          scheduled_at?: string | null;
+          sent_at?: string | null;
+          status?: Database['public']['Enums']['scout_message_status'];
+          template_key?: string | null;
+          updated_at?: string;
+          variables?: Json;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'scout_messages_cadencia_fk';
+            columns: ['cadencia_id'];
+            isOneToOne: false;
+            referencedRelation: 'scout_cadencia';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'scout_messages_prospect_id_fkey';
+            columns: ['prospect_id'];
+            isOneToOne: false;
+            referencedRelation: 'prospects';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      sensibilidade_cenarios: {
+        Row: {
+          cenario_id: string;
+          id: string;
+          lucro_mensal: number | null;
+          margem_percentual: number | null;
+          modelo: Database['public']['Enums']['cenario_modelo'];
+          payback_meses: number | null;
+          relatorio_id: string;
+          stress_id: Database['public']['Enums']['sensibilidade_stress'];
+          stress_label: string;
+          viabilidade: Database['public']['Enums']['viabilidade_status'] | null;
+        };
+        Insert: {
+          cenario_id: string;
+          id?: string;
+          lucro_mensal?: number | null;
+          margem_percentual?: number | null;
+          modelo: Database['public']['Enums']['cenario_modelo'];
+          payback_meses?: number | null;
+          relatorio_id: string;
+          stress_id: Database['public']['Enums']['sensibilidade_stress'];
+          stress_label: string;
+          viabilidade?: Database['public']['Enums']['viabilidade_status'] | null;
+        };
+        Update: {
+          cenario_id?: string;
+          id?: string;
+          lucro_mensal?: number | null;
+          margem_percentual?: number | null;
+          modelo?: Database['public']['Enums']['cenario_modelo'];
+          payback_meses?: number | null;
+          relatorio_id?: string;
+          stress_id?: Database['public']['Enums']['sensibilidade_stress'];
+          stress_label?: string;
+          viabilidade?: Database['public']['Enums']['viabilidade_status'] | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sensibilidade_cenarios_cenario_id_fkey';
+            columns: ['cenario_id'];
+            isOneToOne: false;
+            referencedRelation: 'cenarios_financeiros';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'sensibilidade_cenarios_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'sensibilidade_cenarios_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       settings: {
         Row: {
           created_at: string | null;
@@ -6383,12 +8053,14 @@ export type Database = {
           cnpj_lookup_at: string | null;
           company_size: string | null;
           contact_context: string | null;
+          contact_enrichment_at: string | null;
           contact_name: string | null;
           cpf: string | null;
           created_at: string;
           created_by: string | null;
           efr: string | null;
           email: string | null;
+          enrichment_sources: Json | null;
           id: string;
           legal_nature: string | null;
           legal_nature_code: string | null;
@@ -6424,12 +8096,14 @@ export type Database = {
           cnpj_lookup_at?: string | null;
           company_size?: string | null;
           contact_context?: string | null;
+          contact_enrichment_at?: string | null;
           contact_name?: string | null;
           cpf?: string | null;
           created_at?: string;
           created_by?: string | null;
           efr?: string | null;
           email?: string | null;
+          enrichment_sources?: Json | null;
           id?: string;
           legal_nature?: string | null;
           legal_nature_code?: string | null;
@@ -6465,12 +8139,14 @@ export type Database = {
           cnpj_lookup_at?: string | null;
           company_size?: string | null;
           contact_context?: string | null;
+          contact_enrichment_at?: string | null;
           contact_name?: string | null;
           cpf?: string | null;
           created_at?: string;
           created_by?: string | null;
           efr?: string | null;
           email?: string | null;
+          enrichment_sources?: Json | null;
           id?: string;
           legal_nature?: string | null;
           legal_nature_code?: string | null;
@@ -7341,6 +9017,79 @@ export type Database = {
           },
         ];
       };
+      validacoes: {
+        Row: {
+          alertas: Json;
+          claims_com_alertas: number;
+          claims_verificadas: number;
+          created_at: string;
+          fontes_independentes: string[];
+          id: string;
+          org_id: string;
+          payload: Json;
+          relatorio_id: string;
+          resumo_executivo_validacao: string;
+          revisar_manual: boolean;
+          score_validacao: number;
+          status_validacao: string;
+          validacao_id: string;
+        };
+        Insert: {
+          alertas?: Json;
+          claims_com_alertas?: number;
+          claims_verificadas?: number;
+          created_at?: string;
+          fontes_independentes?: string[];
+          id?: string;
+          org_id: string;
+          payload?: Json;
+          relatorio_id: string;
+          resumo_executivo_validacao?: string;
+          revisar_manual?: boolean;
+          score_validacao?: number;
+          status_validacao: string;
+          validacao_id: string;
+        };
+        Update: {
+          alertas?: Json;
+          claims_com_alertas?: number;
+          claims_verificadas?: number;
+          created_at?: string;
+          fontes_independentes?: string[];
+          id?: string;
+          org_id?: string;
+          payload?: Json;
+          relatorio_id?: string;
+          resumo_executivo_validacao?: string;
+          revisar_manual?: boolean;
+          score_validacao?: number;
+          status_validacao?: string;
+          validacao_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'validacoes_org_id_fkey';
+            columns: ['org_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'validacoes_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'relatorios';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'validacoes_relatorio_id_fkey';
+            columns: ['relatorio_id'];
+            isOneToOne: false;
+            referencedRelation: 'v_relatorios_resumo';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       vectra_manifestos: {
         Row: {
           ciot: string | null;
@@ -7664,6 +9413,47 @@ export type Database = {
             columns: ['vehicle_type_id'];
             isOneToOne: false;
             referencedRelation: 'vehicle_types';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      webhook_claw_log: {
+        Row: {
+          created_at: string;
+          duracao_ms: number | null;
+          evento: string;
+          http_status: number | null;
+          id: string;
+          oportunidade_id: string | null;
+          payload: Json;
+          resposta: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          duracao_ms?: number | null;
+          evento: string;
+          http_status?: number | null;
+          id?: string;
+          oportunidade_id?: string | null;
+          payload?: Json;
+          resposta?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          duracao_ms?: number | null;
+          evento?: string;
+          http_status?: number | null;
+          id?: string;
+          oportunidade_id?: string | null;
+          payload?: Json;
+          resposta?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'webhook_claw_log_oportunidade_id_fkey';
+            columns: ['oportunidade_id'];
+            isOneToOne: false;
+            referencedRelation: 'oportunidades_prospeccao';
             referencedColumns: ['id'];
           },
         ];
@@ -8392,6 +10182,20 @@ export type Database = {
           },
         ];
       };
+      v_bairros_aggregate: {
+        Row: {
+          aluguel_mediana_m2_medio: number | null;
+          bairro: string | null;
+          cidade: string | null;
+          score_bairro_medio: number | null;
+          score_top1_medio: number | null;
+          total_relatorios: number | null;
+          uf: string | null;
+          ultima_execucao: string | null;
+          veredito_mais_comum: string | null;
+        };
+        Relationships: [];
+      };
       v_cash_flow_summary: {
         Row: {
           doc_count: number | null;
@@ -8401,6 +10205,40 @@ export type Database = {
           status: string | null;
           total_amount: number | null;
           type: Database['public']['Enums']['financial_doc_type'] | null;
+        };
+        Relationships: [];
+      };
+      v_dre_audit_mismatches: {
+        Row: {
+          description: string | null;
+          mismatch_type: string | null;
+          order_id: string | null;
+          os_number: string | null;
+          quote_code: string | null;
+          quote_id: string | null;
+          reference_date: string | null;
+          severity: string | null;
+        };
+        Relationships: [];
+      };
+      v_dre_regime_comparison: {
+        Row: {
+          carga_tributaria_pct: number | null;
+          cofins: number | null;
+          cot_count: number | null;
+          csll: number | null;
+          das: number | null;
+          icms: number | null;
+          irpj: number | null;
+          margem_liquida_avg: number | null;
+          month: string | null;
+          month_label: string | null;
+          os_count: number | null;
+          pis: number | null;
+          receita_bruta: number | null;
+          regime_fiscal: string | null;
+          resultado_liquido: number | null;
+          total_impostos: number | null;
         };
         Relationships: [];
       };
@@ -8486,6 +10324,53 @@ export type Database = {
           quote_id: string | null;
         };
         Relationships: [];
+      };
+      v_relatorios_resumo: {
+        Row: {
+          aluguel_mediana_m2: number | null;
+          area_m2_max: number | null;
+          area_m2_min: number | null;
+          bairro: string | null;
+          cidade: string | null;
+          created_at: string | null;
+          custo_brl: number | null;
+          data_execucao: string | null;
+          gaps_count: number | null;
+          id: string | null;
+          market_tier_qwen: string | null;
+          market_wave: string | null;
+          modelo_recomendado: string | null;
+          nivel_saturacao: string | null;
+          org_id: string | null;
+          publico_alvo: string | null;
+          score_bairro: number | null;
+          score_top1_candidato: number | null;
+          status: Database['public']['Enums']['relatorio_status'] | null;
+          tempo_execucao_segundos: number | null;
+          ticket_recomendado: number | null;
+          tipo_negocio: Database['public']['Enums']['negocio_tipo'] | null;
+          tipo_relatorio: Database['public']['Enums']['relatorio_tipo'] | null;
+          uf: string | null;
+          user_id: string | null;
+          veredito: string | null;
+          veredito_posicionamento: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'relatorios_org_id_fkey';
+            columns: ['org_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'relatorios_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'valid_users';
+            referencedColumns: ['user_id'];
+          },
+        ];
       };
       v_trip_financial_details: {
         Row: {
@@ -8802,6 +10687,7 @@ export type Database = {
         Returns: boolean;
       };
       is_admin: { Args: never; Returns: boolean };
+      is_org_admin: { Args: { org_uuid: string }; Returns: boolean };
       link_order_to_target_trip: {
         Args: { p_order_id: string; p_trip_id: string };
         Returns: string;
@@ -8852,6 +10738,10 @@ export type Database = {
           vehicle_type_id: string;
         }[];
       };
+      recover_stale_running_reports: {
+        Args: { p_orphan_minutes?: number; p_relatorio_id?: string };
+        Returns: number;
+      };
       set_user_profile: {
         Args: {
           new_profile: Database['public']['Enums']['user_profile'];
@@ -8863,6 +10753,7 @@ export type Database = {
         Args: { p_trip_id: string };
         Returns: undefined;
       };
+      user_org_ids: { Args: never; Returns: string[] };
       validate_api_key: {
         Args: { p_key: string; p_scope: string };
         Returns: boolean;
@@ -8880,6 +10771,7 @@ export type Database = {
     };
     Enums: {
       app_role: 'admin' | 'comercial' | 'operacao' | 'financeiro' | 'leitura';
+      cenario_modelo: 'low' | 'mid' | 'premium';
       collection_order_status: 'emitida' | 'cancelada';
       compliance_check_status: 'ok' | 'warning' | 'violation';
       compliance_check_type:
@@ -8906,7 +10798,8 @@ export type Database = {
         | 'comprovante_descarga'
         | 'a_vista_fat'
         | 'saldo_fat'
-        | 'a_prazo_fat';
+        | 'a_prazo_fat'
+        | 'a_vista_pag';
       driver_contract_type: 'proprio' | 'agregado' | 'terceiro';
       driver_offer_status: 'pending' | 'sent' | 'accepted' | 'declined' | 'timeout' | 'skipped';
       driver_qualification_status:
@@ -8918,6 +10811,7 @@ export type Database = {
       financial_doc_type: 'FAT' | 'PAG';
       financial_installment_status: 'pendente' | 'baixado';
       financial_source_type: 'quote' | 'order';
+      negocio_tipo: 'academia' | 'crossfit_box' | 'studio_pilates' | 'studio_funcional' | 'outro';
       occurrence_severity: 'baixa' | 'media' | 'alta' | 'critica';
       offer_sequence_status:
         | 'ranking'
@@ -8933,6 +10827,14 @@ export type Database = {
         | 'coleta_realizada'
         | 'em_transito'
         | 'entregue';
+      otimizacao_status: 'pendente' | 'aprovada' | 'rejeitada' | 'implementada' | 'cancelada';
+      otimizacao_tipo:
+        | 'MODELO_OVERPRICED'
+        | 'FLASH_PARA_LITE'
+        | 'AGENTE_VORAZ'
+        | 'ERRO_REPETIDO'
+        | 'CACHE_GEOCODING'
+        | 'OUTRO';
       pedagio_charge_type: 'VALE_PEDAGIO_EMBARCADOR' | 'PEDAGIO_DEBITADO_CTE' | 'RATEIO_FRACIONADO';
       pricing_rule_category:
         | 'taxa'
@@ -8957,11 +10859,42 @@ export type Database = {
         | 'negociacao'
         | 'ganho'
         | 'perdido';
+      relatorio_status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
+      relatorio_tipo: 'prospeccao_academia' | 'prospeccao_crossfit' | 'prospeccao_studio';
       risk_criticality: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
       risk_evaluation_status: 'pending' | 'evaluated' | 'approved' | 'rejected' | 'expired';
       rntrc_registry_type: 'TAC' | 'ETC';
       route_stop_type: 'origin' | 'stop' | 'destination';
+      scout_canal: 'whatsapp' | 'instagram_dm' | 'email' | 'telefone';
+      scout_job_kind:
+        | 'descobrir_perfil'
+        | 'triar_temperatura'
+        | 'comite_360'
+        | 'compor_mensagem'
+        | 'agendar_cadencia';
+      scout_job_status: 'pending' | 'processing' | 'done' | 'failed' | 'skipped';
+      scout_message_status:
+        | 'draft'
+        | 'scheduled'
+        | 'sent'
+        | 'delivered'
+        | 'read'
+        | 'responded'
+        | 'failed'
+        | 'cancelled';
+      scout_prospect_status:
+        | 'descoberta'
+        | 'triada'
+        | 'comite_360'
+        | 'aprovada'
+        | 'em_cadencia'
+        | 'respondida'
+        | 'convertida'
+        | 'descartada';
+      scout_temperatura: 'desconhecida' | 'quente' | 'morno' | 'frio';
+      sensibilidade_stress: 'aluguel_mais_20pct' | 'matriculas_menos_30pct' | 'ticket_menos_15pct';
       user_profile: 'admin' | 'operacional' | 'financeiro' | 'comercial';
+      viabilidade_status: 'ALTO' | 'MEDIO' | 'BAIXO' | 'INVIAVEL';
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -9085,9 +11018,13 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ['admin', 'comercial', 'operacao', 'financeiro', 'leitura'],
+      cenario_modelo: ['low', 'mid', 'premium'],
       collection_order_status: ['emitida', 'cancelada'],
       compliance_check_status: ['ok', 'warning', 'violation'],
       compliance_check_type: [
@@ -9116,6 +11053,7 @@ export const Constants = {
         'a_vista_fat',
         'saldo_fat',
         'a_prazo_fat',
+        'a_vista_pag',
       ],
       driver_contract_type: ['proprio', 'agregado', 'terceiro'],
       driver_offer_status: ['pending', 'sent', 'accepted', 'declined', 'timeout', 'skipped'],
@@ -9123,6 +11061,7 @@ export const Constants = {
       financial_doc_type: ['FAT', 'PAG'],
       financial_installment_status: ['pendente', 'baixado'],
       financial_source_type: ['quote', 'order'],
+      negocio_tipo: ['academia', 'crossfit_box', 'studio_pilates', 'studio_funcional', 'outro'],
       occurrence_severity: ['baixa', 'media', 'alta', 'critica'],
       offer_sequence_status: [
         'ranking',
@@ -9139,6 +11078,15 @@ export const Constants = {
         'coleta_realizada',
         'em_transito',
         'entregue',
+      ],
+      otimizacao_status: ['pendente', 'aprovada', 'rejeitada', 'implementada', 'cancelada'],
+      otimizacao_tipo: [
+        'MODELO_OVERPRICED',
+        'FLASH_PARA_LITE',
+        'AGENTE_VORAZ',
+        'ERRO_REPETIDO',
+        'CACHE_GEOCODING',
+        'OUTRO',
       ],
       pedagio_charge_type: ['VALE_PEDAGIO_EMBARCADOR', 'PEDAGIO_DEBITADO_CTE', 'RATEIO_FRACIONADO'],
       pricing_rule_category: [
@@ -9166,11 +11114,45 @@ export const Constants = {
         'ganho',
         'perdido',
       ],
+      relatorio_status: ['queued', 'running', 'done', 'failed', 'cancelled'],
+      relatorio_tipo: ['prospeccao_academia', 'prospeccao_crossfit', 'prospeccao_studio'],
       risk_criticality: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
       risk_evaluation_status: ['pending', 'evaluated', 'approved', 'rejected', 'expired'],
       rntrc_registry_type: ['TAC', 'ETC'],
       route_stop_type: ['origin', 'stop', 'destination'],
+      scout_canal: ['whatsapp', 'instagram_dm', 'email', 'telefone'],
+      scout_job_kind: [
+        'descobrir_perfil',
+        'triar_temperatura',
+        'comite_360',
+        'compor_mensagem',
+        'agendar_cadencia',
+      ],
+      scout_job_status: ['pending', 'processing', 'done', 'failed', 'skipped'],
+      scout_message_status: [
+        'draft',
+        'scheduled',
+        'sent',
+        'delivered',
+        'read',
+        'responded',
+        'failed',
+        'cancelled',
+      ],
+      scout_prospect_status: [
+        'descoberta',
+        'triada',
+        'comite_360',
+        'aprovada',
+        'em_cadencia',
+        'respondida',
+        'convertida',
+        'descartada',
+      ],
+      scout_temperatura: ['desconhecida', 'quente', 'morno', 'frio'],
+      sensibilidade_stress: ['aluguel_mais_20pct', 'matriculas_menos_30pct', 'ticket_menos_15pct'],
       user_profile: ['admin', 'operacional', 'financeiro', 'comercial'],
+      viabilidade_status: ['ALTO', 'MEDIO', 'BAIXO', 'INVIAVEL'],
     },
   },
 } as const;

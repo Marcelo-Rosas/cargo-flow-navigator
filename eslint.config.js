@@ -10,6 +10,8 @@ export default tseslint.config(
     ignores: [
       'dist',
       'supabase/functions',
+      'hello-ai',
+      'gentle-shape-7467',
       'scripts/render-contract-from-payload.ts',
       'scripts/smoke-contract-pdf.ts',
       'scripts/render-montagem-orcamento-pdf.ts',

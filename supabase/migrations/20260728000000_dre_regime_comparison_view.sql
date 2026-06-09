@@ -30,11 +30,10 @@ WITH monthly AS (
     AND q.pricing_breakdown <> '{}'::jsonb
   GROUP BY
     DATE_TRUNC('month', q.created_at),
-    COALESCE(
-      q.pricing_breakdown->'profitability'->>'regimeFiscal',
-      q.pricing_breakdown->'profitability'->>'regime_fiscal',
-      'simples_nacional'
-    )
+    CASE
+      WHEN q.created_at < '2026-04-01' THEN 'simples_nacional'
+      ELSE 'lucro_presumido'
+    END
 )
 SELECT
   month,

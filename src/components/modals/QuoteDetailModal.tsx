@@ -33,7 +33,14 @@ import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
 import type { Database, Json } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { usePriceTable } from '@/hooks/usePriceTables';
-import { usePricingParameter, useConditionalFees, usePaymentTerms } from '@/hooks/usePricingRules';
+import {
+  usePricingParameter,
+  useConditionalFees,
+  usePaymentTerms,
+  usePricingRulesConfig,
+} from '@/hooks/usePricingRules';
+import { resolveTaxRegimeFlags } from '@/lib/tax-regime-resolve';
+import { expectedRegimeLabel, isPricingBreakdownRegimeStale } from '@/lib/pricing-breakdown-stale';
 import { useUpdateQuote } from '@/hooks/useQuotes';
 import { useQuoteRouteStops } from '@/hooks/useQuoteRouteStops';
 import {
@@ -46,6 +53,10 @@ import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate
 import { inferAnttFlagsFromStoredMeta, resolveAnttOperationTable } from '@/lib/antt-floor-calc';
 import { resolvePisoAnttCarreteiroReais } from '@/lib/carreteiro-cost';
 import { resolveAnttRsKm, resolvePisoAnttTotalReais } from '@/lib/antt-rs-km';
+import { enrichStoredBreakdownAnttMeta } from '@/lib/enrich-breakdown-antt-meta';
+import { mergeBreakdownWithNegotiatedDiscount } from '@/lib/quote-breakdown-utils';
+import { buildQuoteFinancialStripFromBreakdown } from '@/lib/quote-financial-strip';
+import { QuoteComplianceStrip } from '@/components/forms/quote-form/FinancialDualStrip';
 import { supabase } from '@/integrations/supabase/client';
 import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import {
@@ -87,6 +98,7 @@ import {
   QuoteModalHistoryTab,
 } from '@/components/modals/quote-detail';
 import { AnttFloorBanner } from '@/components/modals/quote-detail/AnttFloorBanner';
+import { QuoteRegimeStaleBanner } from '@/components/modals/quote-detail/QuoteRegimeStaleBanner';
 import { AnttFloorAlertDialog } from '@/components/modals/quote-detail/AnttFloorAlertDialog';
 import { QuoteContractPanel } from '@/components/modals/quote-detail/QuoteContractPanel';
 import { formatCurrency } from '@/lib/formatters';
@@ -114,22 +126,6 @@ const STAGE_LABELS: Record<QuoteStage, { label: string; color: string }> = {
 
 const TARGET_MARGIN_PERCENT = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
 const PRICE_EPS_REAIS = 0.01;
-
-/** Mantém desconto comercial no breakdown quando o valor da cotação é menor que o preço de tabela. */
-function mergeBreakdownWithNegotiatedDiscount(
-  breakdown: StoredPricingBreakdown,
-  negotiatedValueReais: number,
-  formulaTotalReais: number
-): StoredPricingBreakdown {
-  const discount = Math.max(0, Math.round((formulaTotalReais - negotiatedValueReais) * 100) / 100);
-  return {
-    ...breakdown,
-    totals: {
-      ...breakdown.totals,
-      discount,
-    },
-  };
-}
 
 export function QuoteDetailModal({
   open,
@@ -173,6 +169,7 @@ export function QuoteDetailModal({
   const { data: routeStops } = useQuoteRouteStops(open && quote ? quote.id : null);
   const { data: taxRegimeParam } = usePricingParameter('tax_regime_simples');
   const { data: taxRegimeLPParam } = usePricingParameter('tax_regime_lucro_presumido');
+  const { data: pricingRules } = usePricingRulesConfig(true);
   const { data: conditionalFeesData } = useConditionalFees(true);
   const { data: paymentTermsList } = usePaymentTerms(true);
 
@@ -213,9 +210,12 @@ export function QuoteDetailModal({
     enabled: !!quote?.vehicle_type_id,
   });
 
-  const axesCount = (vehicleType as { axes_count?: number } | null)?.axes_count ?? null;
-  const kmDistance = quote?.km_distance ?? null;
   const breakdownEarly = quote?.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+  const axesCount =
+    (vehicleType as { axes_count?: number } | null)?.axes_count ??
+    breakdownEarly?.meta?.antt?.axesCount ??
+    null;
+  const kmDistance = quote?.km_distance ?? null;
   const anttFlagsDetail = inferAnttFlagsFromStoredMeta(breakdownEarly?.meta?.antt);
   const anttOperationTableDetail = resolveAnttOperationTable(anttFlagsDetail);
   const isLotacaoQuote = quote?.freight_modality === 'lotacao';
@@ -224,12 +224,24 @@ export function QuoteDetailModal({
     cargoType: 'carga_geral',
     axesCount: isLotacaoQuote ? axesCount : null,
   });
+  const anttCcdCoef =
+    anttRate?.ccd != null
+      ? Number(anttRate.ccd)
+      : breakdownEarly?.meta?.antt?.ccd != null
+        ? Number(breakdownEarly.meta.antt.ccd)
+        : null;
+  const anttCcCoef =
+    anttRate?.cc != null
+      ? Number(anttRate.cc)
+      : breakdownEarly?.meta?.antt?.cc != null
+        ? Number(breakdownEarly.meta.antt.cc)
+        : null;
   const anttCalc =
-    anttRate && kmDistance
+    kmDistance && anttCcdCoef != null && anttCcCoef != null
       ? calculateAnttMinimum({
           kmDistance: Number(kmDistance),
-          ccd: Number(anttRate.ccd),
-          cc: Number(anttRate.cc),
+          ccd: anttCcdCoef,
+          cc: anttCcCoef,
           retornoVazio: anttFlagsDetail.retornoVazio,
         })
       : null;
@@ -262,6 +274,26 @@ export function QuoteDetailModal({
   }, [paymentTerm]);
 
   const { downloadQuotePdf, loading: pdfLoading } = usePdfDownload();
+
+  const expectedTaxRegime = useMemo(
+    () =>
+      resolveTaxRegimeFlags({
+        pricingRules,
+        vehicleTypeId: quote?.vehicle_type_id ?? null,
+        taxRegimeLucroPresumidoParam:
+          taxRegimeLPParam?.value != null ? Number(taxRegimeLPParam.value) : undefined,
+      }),
+    [pricingRules, quote?.vehicle_type_id, taxRegimeLPParam?.value]
+  );
+
+  const isRegimeBreakdownStale = useMemo(() => {
+    if (!quote?.pricing_breakdown) return false;
+    const bd = quote.pricing_breakdown as unknown as StoredPricingBreakdown;
+    return isPricingBreakdownRegimeStale(bd, {
+      lucroPresumido: expectedTaxRegime.regimeLucroPresumido,
+      simplesNacional: expectedTaxRegime.regimeSimplesNacional,
+    });
+  }, [quote?.pricing_breakdown, expectedTaxRegime]);
 
   // Early return AFTER all hooks
   if (!quote) return null;
@@ -310,18 +342,7 @@ export function QuoteDetailModal({
   const receitaLiquidaView =
     receitaLiquidaSnapshot != null ? round2(receitaLiquidaSnapshot * faturamentoRatio) : null;
 
-  const pisoAnttView = resolvePisoAnttTotalReais({
-    breakdown,
-    anttLiveTotal: anttCalc?.total,
-  });
-  // Piso de compliance: usa anttCalc (taxa atual) ou breakdown meta como fallback
-  const pisoAnttCompliance = anttCalc?.total ?? breakdown?.meta?.anttPisoCarreteiro ?? 0;
   const priceTableModality = (priceTable as { modality?: string } | null)?.modality;
-  const isQuoteBelowAnttFloor =
-    priceTableModality === 'lotacao' &&
-    pisoAnttCompliance > 0 &&
-    currentQuoteValue > 0 &&
-    currentQuoteValue < pisoAnttCompliance;
   const custosCarreteiroView =
     breakdown?.profitability?.custosCarreteiro ??
     (breakdown?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
@@ -336,6 +357,19 @@ export function QuoteDetailModal({
     priceTableModality === 'lotacao' && (pisoAnttCarreteiroView > 0 || custoMotoristaContratadoView)
       ? (custoMotoristaContratadoView ?? pisoAnttCarreteiroView)
       : custoMotoristaContratadoView;
+  const pisoAnttView = resolvePisoAnttTotalReais({
+    breakdown,
+    anttLiveTotal: anttCalc?.total,
+    anttCostBaseFallback: custoMotoristaView,
+  });
+  // Piso de compliance: usa anttCalc (taxa atual) ou breakdown meta como fallback
+  const pisoAnttCompliance =
+    anttCalc?.total ?? pisoAnttView ?? breakdown?.meta?.anttPisoCarreteiro ?? 0;
+  const isQuoteBelowAnttFloor =
+    priceTableModality === 'lotacao' &&
+    pisoAnttCompliance > 0 &&
+    currentQuoteValue > 0 &&
+    currentQuoteValue < pisoAnttCompliance;
   const custoCarreteiroParaMargem =
     (custoMotoristaView ?? custosCarreteiroView) != null &&
     Number(custoMotoristaView ?? custosCarreteiroView) > 0
@@ -408,6 +442,19 @@ export function QuoteDetailModal({
         ? round2((resultadoLiquidoView / totalClienteView) * 100)
         : 0;
   const isBelowTarget = isMarginBelowTarget(margemPercentView, targetMargin) || margemBrutaView < 0;
+
+  const financialStripModel = buildQuoteFinancialStripFromBreakdown(breakdown, {
+    totalCliente: totalClienteView,
+    discount: discountView > 0 ? discountView : undefined,
+    faturamentoRatio,
+    targetMarginPercent: targetMargin,
+    modality:
+      priceTableModality === 'fracionado'
+        ? 'fracionado'
+        : priceTableModality === 'lotacao'
+          ? 'lotacao'
+          : undefined,
+  });
 
   const handleAdvancePercentChange = async (value: string) => {
     if (!quote) return;
@@ -514,11 +561,22 @@ export function QuoteDetailModal({
     };
     try {
       const response = await calculateFreightMutation.mutateAsync(payload);
-      const newBreakdown = buildStoredBreakdownFromEdgeResponse(response, bd);
-      const currentValue = Number(quote.value) || 0;
-      const newCalcValue = response.totals.total_cliente;
       const pisoFromResponse =
         (response.meta as { antt_piso_carreteiro?: number }).antt_piso_carreteiro ?? 0;
+      const newBreakdown = enrichStoredBreakdownAnttMeta(
+        buildStoredBreakdownFromEdgeResponse(response, bd),
+        {
+          axesCount,
+          kmDistance: quote.km_distance,
+          anttRate: anttRate ?? null,
+          retornoVazio: anttFlagsDetail.retornoVazio,
+          composicaoVeicular: anttFlagsDetail.composicaoVeicular,
+          altoDesempenho: anttFlagsDetail.altoDesempenho,
+          pisoFromResponse,
+        }
+      );
+      const currentValue = Number(quote.value) || 0;
+      const newCalcValue = response.totals.total_cliente;
       const floorApplied = (response.meta as { antt_floor_applied?: boolean }).antt_floor_applied;
 
       const formulaTotalFromBreakdown = Number(bd?.totals?.totalCliente ?? 0);
@@ -653,7 +711,20 @@ export function QuoteDetailModal({
       };
       const prevValue = Number(quote.value) || 0;
       const response = await calculateFreightMutation.mutateAsync(payload);
-      const newBreakdown = buildStoredBreakdownFromEdgeResponse(response, bd);
+      const pisoFromResponse =
+        (response.meta as { antt_piso_carreteiro?: number }).antt_piso_carreteiro ?? 0;
+      const newBreakdown = enrichStoredBreakdownAnttMeta(
+        buildStoredBreakdownFromEdgeResponse(response, bd),
+        {
+          axesCount,
+          kmDistance: quote.km_distance,
+          anttRate: anttRate ?? null,
+          retornoVazio: anttFlagsDetail.retornoVazio,
+          composicaoVeicular: anttFlagsDetail.composicaoVeicular,
+          altoDesempenho: anttFlagsDetail.altoDesempenho,
+          pisoFromResponse,
+        }
+      );
       const newValue = response.totals.total_cliente;
       await updateQuoteMutation.mutateAsync({
         id: quote.id,
@@ -1005,6 +1076,20 @@ export function QuoteDetailModal({
                 disabled={calculateFreightMutation.isPending || updateQuoteMutation.isPending}
               />
             )}
+            {isRegimeBreakdownStale && canManage && breakdown && (
+              <QuoteRegimeStaleBanner
+                storedRegime={breakdown.profitability?.regimeFiscal ?? 'normal'}
+                expectedLabel={expectedRegimeLabel({
+                  lucroPresumido: expectedTaxRegime.regimeLucroPresumido,
+                  simplesNacional: expectedTaxRegime.regimeSimplesNacional,
+                })}
+                onRecalculate={handleRecalcular}
+                isRecalculating={
+                  calculateFreightMutation.isPending || updateQuoteMutation.isPending
+                }
+                disabled={!quote.price_table_id || !quote.km_distance}
+              />
+            )}
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Button
                 type="button"
@@ -1055,18 +1140,14 @@ export function QuoteDetailModal({
             )}
 
             {/* RESUMO FINANCEIRO */}
-            <QuoteModalFinancialSummary
-              totalCliente={totalClienteView}
-              discount={discountView}
-              receitaLiquida={receitaLiquidaView != null ? receitaLiquidaView : undefined}
-              resultadoLiquido={resultadoLiquidoView}
-              margemPercent={margemPercentView}
-              isBelowTarget={isBelowTarget}
-              targetMarginPercent={targetMargin}
-              regimeFiscal={
-                (breakdown?.profitability as { regimeFiscal?: string } | undefined)?.regimeFiscal
-              }
-            />
+            {financialStripModel ? (
+              <QuoteModalFinancialSummary model={financialStripModel} />
+            ) : (
+              <p className="text-sm text-muted-foreground rounded-lg border p-4">
+                Sem memória de cálculo — recalcule a cotação para ver FAT, PAG e lucro alvo.
+              </p>
+            )}
+            {priceTableModality && <QuoteComplianceStrip priceTableModality={priceTableModality} />}
 
             {/* ROTA */}
             {(quote.origin || quote.destination) && (
@@ -1153,12 +1234,17 @@ export function QuoteDetailModal({
                       custoMotoristaView != null ? Number(custoMotoristaView) / km : null;
                     const custosDiretosKm =
                       custosDiretos != null && custosDiretos > 0 ? custosDiretos / km : null;
+                    const pisoTotalForAnttKm =
+                      pisoAnttView > 0
+                        ? pisoAnttView
+                        : anttCalc?.total && anttCalc.total > 0
+                          ? anttCalc.total
+                          : 0;
                     const anttRsKmView = resolveAnttRsKm({
                       kmDistance: km,
-                      pisoAnttTotal: pisoAnttView,
-                      ccd:
-                        anttRate?.ccd != null ? Number(anttRate.ccd) : breakdown?.meta?.antt?.ccd,
-                      cc: anttRate?.cc != null ? Number(anttRate.cc) : breakdown?.meta?.antt?.cc,
+                      pisoAnttTotal: pisoTotalForAnttKm,
+                      ccd: anttCcdCoef,
+                      cc: anttCcCoef,
                     });
                     return (
                       <div className="mt-2 space-y-2">

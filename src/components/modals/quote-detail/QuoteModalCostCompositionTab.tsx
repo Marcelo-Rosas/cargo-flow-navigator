@@ -87,12 +87,24 @@ export function QuoteModalCostCompositionTab({
   const receitaLiquida =
     (breakdown.profitability as { receitaLiquida?: number } | undefined)?.receitaLiquida ??
     totalCliente - (breakdown.totals.das ?? 0) - (breakdown.totals.icms ?? 0);
-  const regimeFiscal = (
-    breakdown.profitability as {
-      regimeFiscal?: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
-    }
-  )?.regimeFiscal;
-  const isLucroPresumido = regimeFiscal === 'lucro_presumido';
+  const regimeFiscal =
+    (
+      breakdown.profitability as {
+        regimeFiscal?: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
+        regime_fiscal?: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
+      }
+    )?.regimeFiscal ??
+    (
+      breakdown.profitability as {
+        regime_fiscal?: 'simples_nacional' | 'excesso_sublimite' | 'lucro_presumido' | 'normal';
+      }
+    )?.regime_fiscal;
+  const hasFederalTaxLines =
+    (breakdown.totals.pis ?? 0) > 0 ||
+    (breakdown.totals.cofins ?? 0) > 0 ||
+    (breakdown.totals.irpj ?? 0) > 0 ||
+    (breakdown.totals.csll ?? 0) > 0;
+  const isLucroPresumido = regimeFiscal === 'lucro_presumido' || hasFederalTaxLines;
   const custoEfetivoMotorista = breakdown.components?.baseFreight ?? 0;
   const custoMotoristaPisoAntt =
     breakdown.profitability?.custoMotoristaContratado ??
@@ -630,7 +642,9 @@ export function QuoteModalCostCompositionTab({
                 'mb-4',
                 regimeFiscal === 'excesso_sublimite'
                   ? 'bg-warning/10 border-warning/20'
-                  : 'bg-primary/10 border-primary/20'
+                  : regimeFiscal === 'normal' && !isLucroPresumido
+                    ? 'bg-amber-500/10 border-amber-500/20'
+                    : 'bg-primary/10 border-primary/20'
               )}
             >
               <AlertCircle className="h-4 w-4" />
@@ -642,7 +656,10 @@ export function QuoteModalCostCompositionTab({
                   'Excesso de Sublimite: ICMS calculado separadamente (Cálculo por Dentro).'}
                 {regimeFiscal === 'lucro_presumido' &&
                   'Lucro Presumido: PIS/COFINS destacados na NF. IRPJ/CSLL provisionados. ICMS por UF.'}
-                {regimeFiscal === 'normal' && 'Regime Normal: ICMS sempre separado.'}
+                {regimeFiscal === 'normal' &&
+                  (isLucroPresumido
+                    ? 'Memória com tributos federais (PIS/COFINS/IRPJ/CSLL); recalcule para alinhar o rótulo do regime.'
+                    : 'Regime Normal: ICMS separado. Se a Central de Regras está em Lucro Presumido, use Salvar memória para atualizar esta cotação.')}
               </AlertDescription>
             </Alert>
           )}

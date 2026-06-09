@@ -49,6 +49,7 @@ import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
 import { findContainer, moveItem, type ItemsState } from '@/lib/kanban-dnd';
 import { toast } from 'sonner';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import { OrderForm } from '@/components/forms/OrderForm';
 import { OrderDetailModal } from '@/components/modals/OrderDetailModal';
 import { OccurrenceForm } from '@/components/forms/OccurrenceForm';
@@ -369,6 +370,19 @@ export default function Operations() {
         return;
       }
 
+      // Validate CIOT before moving to em_transito
+      if (
+        targetStage === 'em_transito' &&
+        !(fullOrder as unknown as { ciot_number?: string | null }).ciot_number
+      ) {
+        toast.error('É necessário gerar o CIOT antes de colocar a OS em trânsito');
+        if (snapshotRef.current) {
+          setItems(snapshotRef.current);
+        }
+        snapshotRef.current = null;
+        return;
+      }
+
       try {
         await updateStageMutation.mutateAsync({
           id: fullOrder.id,
@@ -404,6 +418,33 @@ export default function Operations() {
       setCancelOrder(null);
     } catch {
       toast.error('Erro ao cancelar OS');
+    }
+  };
+
+  const handleGenerateCiot = async (order: OrderWithOccurrences) => {
+    try {
+      toast.info(`Gerando CIOT para OS ${order.os_number}...`);
+      const result = await invokeEdgeFunction<{
+        success: boolean;
+        ciotNumber?: string;
+        status?: string;
+        message?: string;
+        operationId?: string;
+        anttPisoMinimo?: number;
+        belowFloor?: boolean;
+      }>('generate-ciot', {
+        body: { orderId: order.id },
+      });
+
+      if (result.success && result.ciotNumber) {
+        toast.success(`CIOT ${result.ciotNumber} gerado com sucesso`);
+        refetch();
+      } else {
+        toast.error(result.message || 'Falha ao gerar CIOT');
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Erro ao gerar CIOT: ${msg}`);
     }
   };
 
@@ -651,6 +692,9 @@ export default function Operations() {
                           }
                           onCancelOrder={
                             canManageOperations ? () => setCancelOrder(order) : undefined
+                          }
+                          onGenerateCiot={
+                            canManageOperations ? () => handleGenerateCiot(order) : undefined
                           }
                           canManageActions={canManageOperations}
                         />

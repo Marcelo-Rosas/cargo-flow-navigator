@@ -20,7 +20,7 @@ Deno.serve(async (req: Request) => {
     const {
       entityId,
       entityType,
-      model = 'gemini-2.5-pro',
+      model = 'gemini-2.5-flash',
       previousInsights,
     }: {
       entityId: string;

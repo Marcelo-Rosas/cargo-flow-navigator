@@ -11,6 +11,11 @@ import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import type { QuoteFormData } from '../types';
 import { PAYMENT_METHOD_LABELS } from '@/types/pricing';
 import { PricingMatchAlert } from '../PricingMatchAlert';
+import { FinancialDualStrip } from '../FinancialDualStrip';
+import {
+  buildQuoteFinancialStripFromCalculation,
+  buildQuoteFinancialStripLegacy,
+} from '@/lib/quote-financial-strip';
 
 function formatDateBR(d: string | undefined): string {
   if (!d) return '—';
@@ -56,6 +61,18 @@ export function ReviewStep({
     : (calculationResult?.totals?.totalCliente ?? 0);
   const totalCliente = Math.max(0, totalBruto - discount);
   const adicionais = totalBruto - baseFreight;
+  const freightModality = values.freight_modality;
+  const financialStrip = isLegacy
+    ? buildQuoteFinancialStripLegacy(totalCliente, Number(values.carreteiro_real) || 0)
+    : buildQuoteFinancialStripFromCalculation(calculationResult, {
+        discount,
+        modality:
+          freightModality === 'fracionado'
+            ? 'fracionado'
+            : freightModality === 'lotacao'
+              ? 'lotacao'
+              : undefined,
+      });
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -172,53 +189,78 @@ export function ReviewStep({
       )}
 
       {/* Composição Financeira */}
-      <SectionBlock
-        variant="card"
-        label={isLegacy ? 'FAT + PAG (manual)' : 'Composição Financeira'}
-      >
-        {isLegacy ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="p-3 rounded-lg bg-muted/30 border border-border">
-              <p className="text-[10px] text-muted-foreground mb-1">Valor Cliente (FAT)</p>
-              <p className="text-lg font-semibold">{formatCurrency(totalCliente)}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-muted/30 border border-border">
-              <p className="text-[10px] text-muted-foreground mb-1">Valor Carreteiro (PAG)</p>
-              <p className="text-lg font-semibold">
-                {formatCurrency(Number(values.carreteiro_real) || 0)}
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
-              <p className="text-[10px] text-primary/80 mb-1 font-bold uppercase tracking-widest">
-                Margem
-              </p>
-              <p className="text-2xl font-black text-primary">
-                {formatCurrency(totalCliente - (Number(values.carreteiro_real) || 0))}
-              </p>
-            </div>
-          </div>
+      <SectionBlock variant="card" label={isLegacy ? 'FAT + PAG (manual)' : 'FAT × PAG × Lucro'}>
+        {financialStrip ? (
+          <FinancialDualStrip model={financialStrip} emphasizeFat />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="p-3 rounded-lg bg-muted/30 border border-border">
-              <p className="text-[10px] text-muted-foreground mb-1">
-                {anttCostBaseUsed ? 'Base custo (Piso ANTT)' : 'Frete Base'}
-              </p>
-              <p className="text-lg font-semibold">{formatCurrency(baseFreight)}</p>
-              {tabelaAcimaPiso && (
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Tabela ref.: {formatCurrency(freteTabelaRef)}
-                </p>
+          <p className="text-sm text-muted-foreground">
+            Aguardando cálculo de frete para exibir PAG, FAT e lucro alvo.
+          </p>
+        )}
+        {!isLegacy && adicionais > 0 && financialStrip && (
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            Adicionais e taxas no FAT (fora da base motorista): {formatCurrency(adicionais)}
+          </p>
+        )}
+
+        {!isLegacy && calculationResult?.components && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <h4 className="text-xs font-semibold mb-2">Composição de Custos e Adicionais (DRE)</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
+              {calculationResult.components.toll > 0 && (
+                <div className="flex justify-between">
+                  <span>Pedágio</span>
+                  <span>{formatCurrency(calculationResult.components.toll)}</span>
+                </div>
               )}
-            </div>
-            <div className="p-3 rounded-lg bg-muted/30 border border-border">
-              <p className="text-[10px] text-muted-foreground mb-1">Adicionais e Taxas</p>
-              <p className="text-lg font-semibold">{formatCurrency(adicionais)}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
-              <p className="text-[10px] text-primary/80 mb-1 font-bold uppercase tracking-widest">
-                Total Cliente
-              </p>
-              <p className="text-2xl font-black text-primary">{formatCurrency(totalCliente)}</p>
+              {calculationResult.components.gris > 0 && (
+                <div className="flex justify-between">
+                  <span>GRIS</span>
+                  <span>{formatCurrency(calculationResult.components.gris)}</span>
+                </div>
+              )}
+              {calculationResult.components.tso > 0 && (
+                <div className="flex justify-between">
+                  <span>TSO</span>
+                  <span>{formatCurrency(calculationResult.components.tso)}</span>
+                </div>
+              )}
+              {calculationResult.components.rctrc > 0 && (
+                <div className="flex justify-between">
+                  <span>RCTR-C</span>
+                  <span>{formatCurrency(calculationResult.components.rctrc)}</span>
+                </div>
+              )}
+              {calculationResult.components.adValorem > 0 && (
+                <div className="flex justify-between">
+                  <span>Ad Valorem</span>
+                  <span>{formatCurrency(calculationResult.components.adValorem)}</span>
+                </div>
+              )}
+              {calculationResult.components.aluguelMaquinas > 0 && (
+                <div className="flex justify-between">
+                  <span>Aluguel de Máquinas</span>
+                  <span>{formatCurrency(calculationResult.components.aluguelMaquinas)}</span>
+                </div>
+              )}
+              {calculationResult.components.dispatchFee > 0 && (
+                <div className="flex justify-between">
+                  <span>Taxa de Despacho</span>
+                  <span>{formatCurrency(calculationResult.components.dispatchFee)}</span>
+                </div>
+              )}
+              {calculationResult.components.conditionalFeesTotal > 0 && (
+                <div className="flex justify-between">
+                  <span>Taxas Condicionais</span>
+                  <span>{formatCurrency(calculationResult.components.conditionalFeesTotal)}</span>
+                </div>
+              )}
+              {calculationResult.components.waitingTimeCost > 0 && (
+                <div className="flex justify-between">
+                  <span>Estadia</span>
+                  <span>{formatCurrency(calculationResult.components.waitingTimeCost)}</span>
+                </div>
+              )}
             </div>
           </div>
         )}

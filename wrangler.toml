@@ -20,5 +20,8 @@ head_sampling_rate = 1
 # Variáveis de ambiente para Cloudflare Pages
 # NUNCA coloque valores reais aqui — use "wrangler secret put VITE_CFN_API_KEY"
 # ou configure no dashboard: Cloudflare Pages → Settings → Environment Variables
+[ai]
+binding = "AI"
+
 [vars]
 # VITE_CFN_API_KEY deve ser configurado como secret no dashboard da Cloudflare

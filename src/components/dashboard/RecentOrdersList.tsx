@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
+import { EmptyState } from '@/components/EmptyState';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -55,13 +56,11 @@ export function RecentOrdersList({ orders, onViewOrder, onViewAll }: RecentOrder
         className="bg-card rounded-xl border border-border shadow-card p-6"
       >
         <h3 className="text-lg font-semibold text-foreground mb-4">Ordens Recentes</h3>
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <Truck className="w-12 h-12 text-muted-foreground/50 mb-3" />
-          <p className="text-muted-foreground">Nenhuma ordem de serviço encontrada</p>
-          <p className="text-sm text-muted-foreground/70">
-            Crie sua primeira OS no board operacional
-          </p>
-        </div>
+        <EmptyState
+          title="Nenhuma ordem de serviço encontrada"
+          description="Crie sua primeira OS no board operacional"
+          icon={<Truck className="w-10 h-10 text-muted-foreground" />}
+        />
       </motion.div>
     );
   }

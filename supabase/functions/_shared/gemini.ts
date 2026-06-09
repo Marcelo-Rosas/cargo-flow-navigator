@@ -77,6 +77,7 @@ export async function callGemini(
 export function selectGeminiModel(analysisType: string): GeminiModel {
   switch (analysisType) {
     case 'approval_summary':
+      return 'gemini-2.5-flash';
     case 'dashboard_insights':
       return 'gemini-2.5-pro'; // análises complexas
     case 'quote_profitability':

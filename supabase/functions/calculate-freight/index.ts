@@ -209,12 +209,15 @@ Deno.serve(async (req) => {
       (resolveRule('regime_simples_nacional', vehicleTypeIdForRules) ?? 1) === 1;
     const excessoSublimite = (resolveRule('excesso_sublimite', vehicleTypeIdForRules) ?? 0) === 1;
 
-    const regimeLucroPresumido =
-      (resolveRule('regime_lucro_presumido', vehicleTypeIdForRules) ?? 0) === 1;
     const pisPercent = resolveRule('pis_percent', vehicleTypeIdForRules) ?? 0;
     const cofinsPercent = resolveRule('cofins_percent', vehicleTypeIdForRules) ?? 0;
     const irpjEffectivePercent = resolveRule('irpj_effective_percent', vehicleTypeIdForRules) ?? 0;
     const csllEffectivePercent = resolveRule('csll_effective_percent', vehicleTypeIdForRules) ?? 0;
+    let regimeLucroPresumido =
+      (resolveRule('regime_lucro_presumido', vehicleTypeIdForRules) ?? 0) === 1;
+    if (!regimeLucroPresumido && !regimeSimplesNacional && (pisPercent > 0 || cofinsPercent > 0)) {
+      regimeLucroPresumido = true;
+    }
 
     const carreteiroPercent = input.carreteiro_percent ?? 0;
     const descargaValue = input.descarga_value ?? 0;

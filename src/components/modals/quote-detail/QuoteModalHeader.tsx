@@ -70,20 +70,37 @@ export function QuoteModalHeader({
 
         <div className="flex items-center gap-1 shrink-0">
           {canManage && showRecalcular && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={onRecalcular}
-              disabled={isRecalculating}
-              title={recalcularTitle ?? 'Recalcular memória de cálculo'}
-            >
-              {isRecalculating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4" />
-              )}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRecalcular}
+                disabled={isRecalculating}
+                title={recalcularTitle ?? 'Salvar memória de cálculo no banco'}
+                className="gap-1.5 hidden sm:inline-flex"
+              >
+                {isRecalculating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" aria-hidden />
+                )}
+                Salvar memória
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 sm:hidden"
+                onClick={onRecalcular}
+                disabled={isRecalculating}
+                aria-label={recalcularTitle ?? 'Salvar memória de cálculo'}
+              >
+                {isRecalculating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+              </Button>
+            </>
           )}
           {canManage && (
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>

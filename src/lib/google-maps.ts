@@ -4,14 +4,28 @@
  * - Validation: Validar CEPs brasileiros
  */
 
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
 export interface GeocodeResult {
   valid: boolean;
   latitude?: number;
   longitude?: number;
+  coordinates?: Coordinates;
   formatted_address?: string;
   city_uf?: string;
   country?: string;
   error?: string;
+}
+
+declare global {
+  interface Window {
+    google?: {
+      maps?: unknown;
+    };
+  }
 }
 
 interface AddressComponent {
@@ -117,6 +131,10 @@ export async function validateAndGeocodeCep(cep: string): Promise<GeocodeResult>
       valid: true,
       latitude: location.lat,
       longitude: location.lng,
+      coordinates: {
+        lat: location.lat,
+        lng: location.lng,
+      },
       formatted_address: result.formatted_address,
       city_uf,
       country,

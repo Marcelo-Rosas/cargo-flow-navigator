@@ -23,15 +23,6 @@ export function ExportReports() {
     return new Date(date).toLocaleDateString('pt-BR');
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
-
   const exportToCSV = (
     data: Record<string, unknown>[],
     filename: string,

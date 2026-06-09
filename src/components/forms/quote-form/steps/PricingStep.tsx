@@ -46,6 +46,8 @@ import {
 import { AnttFloorWizardCard } from '@/components/forms/quote-form/AnttFloorWizardCard';
 import type { AnttFloorFlags } from '@/lib/antt-floor-calc';
 import { resolveAnttRsKm } from '@/lib/antt-rs-km';
+import { buildQuoteFinancialStripFromCalculation } from '@/lib/quote-financial-strip';
+import { FinancialDualStrip } from '@/components/forms/quote-form/FinancialDualStrip';
 
 interface PaymentTerm {
   id: string;
@@ -118,7 +120,13 @@ export function PricingStep({
     (anttFloorApplied ? undefined : c?.baseFreight) ??
     c?.baseFreight ??
     0;
-  const pisoAnttRaw = m?.anttPisoCarreteiro ?? pisoAnttPreview ?? 0;
+  const pisoAnttRaw =
+    (m?.anttPisoCarreteiro ??
+      pisoAnttPreview ??
+      (m?.anttCostBaseUsed || m?.anttFloorApplied
+        ? Number(p?.custoMotoristaAntt ?? 0) || Number(p?.custoMotoristaContratado ?? 0)
+        : 0)) ||
+    0;
   const pisoAnttComOver = m?.lotacaoPisoComOver ?? pisoAnttRaw;
   const pagMotoristaBase = p?.custoMotoristaContratado ?? c?.baseCost ?? 0;
   const freteTabelaReferencia = m?.fretePesoOriginal ?? m?.lotacaoFreteTabelaComOverKm ?? 0;
@@ -132,6 +140,16 @@ export function PricingStep({
   );
 
   const showAllIn = !isLegacy && calculationResult?.status === 'OK' && (t?.totalCliente ?? 0) > 0;
+
+  const financialStrip = useMemo(
+    () =>
+      buildQuoteFinancialStripFromCalculation(calculationResult, {
+        modality: (watchModality === 'fracionado' ? 'fracionado' : 'lotacao') as
+          | 'lotacao'
+          | 'fracionado',
+      }),
+    [calculationResult, watchModality]
+  );
 
   const receitaLiquida =
     p?.receitaLiquida ??
@@ -171,12 +189,13 @@ export function PricingStep({
       : null;
   const custosDiretosPerKm =
     kmForIndicators > 0 && custosDiretosPreview > 0 ? custosDiretosPreview / kmForIndicators : null;
-  const pisoAnttTotalForKm = pisoAnttComOver > 0 ? pisoAnttComOver : pisoAnttRaw;
+  const pisoAnttTotalForKm =
+    pisoAnttComOver > 0 ? pisoAnttComOver : pisoAnttRaw > 0 ? pisoAnttRaw : 0;
   const anttPerKm = resolveAnttRsKm({
     kmDistance: kmForIndicators,
     pisoAnttTotal: pisoAnttTotalForKm,
-    ccd: anttCcd,
-    cc: anttCc,
+    ccd: anttCcd ?? undefined,
+    cc: anttCc ?? undefined,
   });
 
   // Auto-fill delivery days only if fields are still empty (respects manual edits)
@@ -792,18 +811,11 @@ export function PricingStep({
 
             <Separator />
 
-            {/* Total ALL-IN */}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase text-muted-foreground">
-                  Valor Total ALL-IN
-                </p>
-                <p className="text-primary font-bold text-xl">
-                  {formatCurrency(t?.totalCliente ?? 0)}
-                </p>
-              </div>
+            {financialStrip && <FinancialDualStrip model={financialStrip} emphasizeFat />}
+
+            <div className="flex justify-end">
               <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">
-                D+{deliveryDays.min}
+                Prazo entrega D+{deliveryDays.min}
                 {deliveryDays.max !== deliveryDays.min && `–${deliveryDays.max}`}
               </Badge>
             </div>

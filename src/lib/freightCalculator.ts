@@ -204,6 +204,8 @@ export interface FreightCalculationInput {
     carreteiroValue?: number;
     carreteiroPercent?: number;
     descargaValue?: number;
+    maoDeObraValue?: number;
+    outrosCustosValue?: number;
   };
 
   // Extras: taxas condicionais e estadia
@@ -747,14 +749,22 @@ export function calculateGrossUpHibrido(
 } {
   let regimeFiscal: RegimeFiscal;
   let icmsNoDivisor: boolean;
+  let useLucroPresumido = regimeLucroPresumido;
+  let useSimples = regimeSimples;
 
-  if (regimeLucroPresumido) {
+  // Simples desligado + alíquotas LP configuradas, mas flag regime_lucro_presumido ausente no DB
+  if (!useLucroPresumido && !useSimples && (pisPercent > 0 || cofinsPercent > 0)) {
+    useLucroPresumido = true;
+    useSimples = false;
+  }
+
+  if (useLucroPresumido) {
     regimeFiscal = 'lucro_presumido';
     icmsNoDivisor = true;
-  } else if (regimeSimples && !excessoSublimite) {
+  } else if (useSimples && !excessoSublimite) {
     regimeFiscal = 'simples_nacional';
     icmsNoDivisor = false;
-  } else if (regimeSimples && excessoSublimite) {
+  } else if (useSimples && excessoSublimite) {
     regimeFiscal = 'excesso_sublimite';
     icmsNoDivisor = true;
   } else {
@@ -1448,6 +1458,10 @@ export function buildStoredBreakdown(
     rates: {
       dasPercent: output.rates.dasPercent,
       icmsPercent: output.rates.icmsPercent,
+      pisPercent: output.rates.pisPercent ?? 0,
+      cofinsPercent: output.rates.cofinsPercent ?? 0,
+      irpjPercent: output.rates.irpjPercent ?? 0,
+      csllPercent: output.rates.csllPercent ?? 0,
       grisPercent: output.rates.grisPercent,
       tsoPercent: output.rates.tsoPercent,
       costValuePercent: output.rates.costValuePercent,

@@ -1,5 +1,19 @@
 import type { StoredPricingBreakdown } from '@/lib/freightCalculator';
 
+/** Lê piso ANTT do meta (camelCase ou legado snake_case no JSONB). */
+export function readMetaAnttPisoCarreteiro(
+  meta: StoredPricingBreakdown['meta'] | null | undefined
+): number {
+  if (!meta) return 0;
+  const legacy = meta as { antt_piso_carreteiro?: number };
+  return (
+    Number(meta.antt?.total ?? 0) ||
+    Number(meta.anttPisoCarreteiro ?? 0) ||
+    Number(legacy.antt_piso_carreteiro ?? 0) ||
+    Number(meta.lotacaoPisoComOver ?? 0)
+  );
+}
+
 /**
  * Piso ANTT (carreteiro) em R$ a partir do breakdown — prioriza meta.antt (calculadora).
  * Corrige snapshots onde custoMotoristaAntt foi gravado igual ao frete peso (tabela NTC).
@@ -11,10 +25,7 @@ export function resolvePisoAnttCarreteiroReais(
 
   const m = breakdown.meta;
   const p = breakdown.profitability;
-  const fromMeta =
-    Number(m?.antt?.total ?? 0) ||
-    Number(m?.anttPisoCarreteiro ?? 0) ||
-    Number(m?.lotacaoPisoComOver ?? 0);
+  const fromMeta = readMetaAnttPisoCarreteiro(m);
   const fromProfit = Number(p?.custoMotoristaAntt ?? 0);
   const contratado =
     Number(p?.custoMotoristaContratado) ||

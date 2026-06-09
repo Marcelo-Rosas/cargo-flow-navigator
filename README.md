@@ -92,6 +92,14 @@ Acesse `http://localhost:5173`.
 | `npm run test:e2e:auth` | Playwright com autenticação         |
 | `npm run test:e2e:mocks` | Specs determinísticas com mocks    |
 
+## Database Schemas
+
+O PostgreSQL no Supabase está organizado nos seguintes schemas principais:
+
+- **`public`**: Schema principal da aplicação (cotações, motoristas, veículos).
+- **`vectraclip`**: Schema dedicado a integrações e rotinas específicas de agentes e automações (ex: `agent_execution_configs`, auditoria, workflow de enrichment).
+- **`claw` / OpenClaw**: Schema para integração e gestão de notificações (ex: WhatsApp/Meta via `notification-hub`) e operações do projeto Claw.
+
 ## Estrutura de pastas (resumida)
 
 ```

@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
+    "zod": "npm:zod@3.23.8"
+  },
+  "compilerOptions": {
+    "types": ["https://esm.sh/@supabase/functions-js@2.4.0/edge-runtime.d.ts"]
+  }
+}

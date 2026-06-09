@@ -39,6 +39,7 @@ import { AiInsightsWidget } from '@/components/dashboard/AiInsightsWidget';
 import { AutomationActivityFeed } from '@/components/dashboard/AutomationActivityFeed';
 import { AiUsageDashboard } from '@/components/dashboard/AiUsageDashboard';
 import { useUserRole } from '@/hooks/useUserRole';
+import { EmptyState } from '@/components/EmptyState';
 
 // Fallback data for empty states
 const emptyConversionData = [
@@ -114,30 +115,21 @@ export default function Dashboard() {
   if (hasError) {
     return (
       <MainLayout>
-        <div className="bg-card rounded-xl border border-border shadow-card p-6">
-          <h2 className="text-lg font-semibold text-foreground">
-            Não foi possível carregar o dashboard
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {(firstError instanceof Error && firstError.message) ||
-              'Erro inesperado ao buscar dados.'}
-          </p>
-          <div className="flex items-center gap-2 mt-4">
-            <Button
-              onClick={() => {
-                refetchStats();
-                refetchOrders();
-                refetchConversion();
-                refetchRevenue();
-              }}
-            >
-              Tentar novamente
-            </Button>
-            <Button variant="outline" onClick={handleRefresh}>
-              Recarregar
-            </Button>
-          </div>
-        </div>
+        <EmptyState
+          title="Não foi possível carregar o dashboard"
+          description={
+            (firstError instanceof Error && firstError.message) ||
+            'Erro inesperado ao buscar dados.'
+          }
+          actionLabel="Tentar novamente"
+          onAction={() => {
+            refetchStats();
+            refetchOrders();
+            refetchConversion();
+            refetchRevenue();
+          }}
+          icon={<AlertTriangle className="h-10 w-10 text-destructive" />}
+        />
       </MainLayout>
     );
   }

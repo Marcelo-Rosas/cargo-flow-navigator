@@ -5,7 +5,7 @@
 import { useNtcIndices } from '@/hooks/useNtcIndices';
 import { useLatestMarketIndex } from '@/hooks/useMarketIndices';
 import { AlertTriangle, Info, Loader2 } from 'lucide-react';
-import { formatNumber } from '@/lib/formatters';
+import { formatNumber, formatCurrency } from '@/lib/formatters';
 import {
   LineChart,
   Line,
@@ -38,7 +38,7 @@ const CustomTooltip = ({
         <p key={p.dataKey} style={{ color: p.color }}>
           {p.dataKey === 'inctl'
             ? `INCTL: ${fmtPct(p.value)}`
-            : `Diesel: R$ ${p.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/L`}
+            : `Diesel: ${formatCurrency(p.value)}/L`}
         </p>
       ))}
     </div>
@@ -82,7 +82,7 @@ export function NtcIndicesCard() {
   const cards = [
     {
       label: 'INCTF 12M',
-      mainValue: `+${data.inctf_pct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
+      mainValue: `+${formatNumber(data.inctf_pct)}%`,
       trendPct: null as string | null,
       sub: 'Carga Fracionada',
       trendColor: data.inctf_pct > 5 ? 'text-[#dc2626]' : 'text-[#16a34a]',
@@ -91,7 +91,7 @@ export function NtcIndicesCard() {
     },
     {
       label: 'INCTL 12M',
-      mainValue: `+${data.inctl_pct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
+      mainValue: `+${formatNumber(data.inctl_pct)}%`,
       trendPct: null as string | null,
       sub: 'Carga Lotação',
       trendColor: data.inctl_pct > 5 ? 'text-[#dc2626]' : 'text-[#16a34a]',
@@ -100,7 +100,7 @@ export function NtcIndicesCard() {
     },
     {
       label: 'Diesel S-10',
-      mainValue: `R$ ${data.diesel_price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/L`,
+      mainValue: `${formatCurrency(data.diesel_price)}/L`,
       trendPct: null as string | null,
       sub: 'Preço médio nacional',
       trendColor: '',
@@ -228,9 +228,7 @@ export function NtcIndicesCard() {
                 tick={{ fontSize: 11, fill: '#d97706' }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v) =>
-                  `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                }
+                tickFormatter={(v) => formatCurrency(v)}
               />
               <Tooltip content={<CustomTooltip />} />
               <Line

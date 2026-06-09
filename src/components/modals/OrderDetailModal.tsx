@@ -53,6 +53,7 @@ import { CarreteiroTab } from '@/components/modals/CarreteiroTab';
 import { DriverQualificationPanel } from '@/components/operational/DriverQualificationPanel';
 import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
 import { CollectionOrderSection } from '@/components/operational/CollectionOrderSection';
+import { CiotPanel } from '@/components/operational/CiotPanel';
 import { RiskWorkflowWizard } from '@/components/risk/RiskWorkflowWizard';
 import {
   useOrderRiskStatus,
@@ -116,6 +117,12 @@ const STAGES_WITH_DOCS_TAB: OrderStage[] = [
   'entregue',
 ];
 const STAGES_WITH_CARRETEIRO_TAB: OrderStage[] = [
+  'documentacao',
+  'coleta_realizada',
+  'em_transito',
+  'entregue',
+];
+const STAGES_WITH_CIOT_TAB: OrderStage[] = [
   'documentacao',
   'coleta_realizada',
   'em_transito',
@@ -614,6 +621,7 @@ export function OrderDetailModal({
   const showCarreteiroTab = STAGES_WITH_CARRETEIRO_TAB.includes(order.stage);
   const showDocsTab = STAGES_WITH_DOCS_TAB.includes(order.stage);
   const showRiskBadge = STAGES_WITH_DOCS_TAB.includes(order.stage); // documentacao+
+  const showCiotTab = STAGES_WITH_CIOT_TAB.includes(order.stage);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -815,6 +823,18 @@ export function OrderDetailModal({
                   <AlertCircle className="w-3.5 h-3.5 text-red-500" />
                 ) : null}
               </TabsTrigger>
+              {showCiotTab && (
+                <TabsTrigger value="ciot" className="gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  CIOT
+                  {(order as unknown as { ciot_status?: string | null }).ciot_status ===
+                  'generated' ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                  )}
+                </TabsTrigger>
+              )}
               <TabsTrigger value="occurrences" className="gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5" />
                 Ocorrências
@@ -1568,6 +1588,10 @@ export function OrderDetailModal({
               )}
 
               {/* Risco Tab */}
+              <TabsContent value="ciot" className="m-0 space-y-4">
+                <CiotPanel order={order} canManage={canManage} />
+              </TabsContent>
+
               <TabsContent value="risco" className="m-0 space-y-4">
                 <RiskWorkflowWizard
                   key={`risk-${order.id}-${wizardDriverKey}`}

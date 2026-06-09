@@ -102,7 +102,6 @@ import {
 import { resolveLotacaoKmOverPercent } from '@/lib/lotacao-freight-base';
 import { buildStoredBreakdownFromEdgeResponse } from '@/hooks/useCalculateFreight';
 import { useEdgeFreightPreview } from '@/hooks/use-edge-freight-preview';
-import { shouldPreferLocalLotacaoFreightPreview } from '@/lib/prefer-lotacao-freight-preview';
 import type { CalculateFreightInput, CalculateFreightResponse } from '@/types/freight';
 import { zodPhone } from '@/lib/validators';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -574,7 +573,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const watchedToll = form.watch('toll');
   const watchedAluguelMaquinas = form.watch('aluguel_maquinas');
   const watchedDescarga = form.watch('descarga');
-  const watchedCargoType = form.watch('cargo_type');
 
   // Dual Debounce: StableSnapshot (400ms) + CostsSnapshot (50ms)
   const stableSnapshot = JSON.stringify([
@@ -587,7 +585,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     watchedPriceTableId,
     watchedVehicleTypeId,
     watchedFreightModality,
-    watchedCargoType,
   ]);
   const costsSnapshot = JSON.stringify([watchedToll, watchedAluguelMaquinas, watchedDescarga]);
   const debouncedStable = useDebouncedValue(stableSnapshot, 400);
@@ -607,7 +604,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         priceTableId: (stable[6] as string) ?? '',
         vehicleTypeId: (stable[7] as string) ?? '',
         freightModality: (stable[8] as 'lotacao' | 'fracionado' | undefined) ?? undefined,
-        cargoType: (stable[9] as string) ?? '',
         toll: (costs[0] as number) ?? 0,
         aluguelMaquinas: (costs[1] as number) ?? 0,
         descarga: (costs[2] as number) ?? 0,
@@ -623,7 +619,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         priceTableId: '',
         vehicleTypeId: '',
         freightModality: undefined as 'lotacao' | 'fracionado' | undefined,
-        cargoType: '',
         toll: 0,
         aluguelMaquinas: 0,
         descarga: 0,
@@ -753,6 +748,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     () => extractUf(watchedDestination || '') ?? '',
     [watchedDestination]
   );
+  const watchedCargoType = form.watch('cargo_type');
   const { data: activePolicies = [], isLoading: loadingPolicies } = useActivePolicies();
   const {
     data: insuranceOptions = [],
@@ -786,36 +782,19 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     return null;
   }, [anttRate, watchedKmDistance, savedAnttMeta]);
 
-  // Piso ANTT em R$ — base de custo do gross-up em lotação (MP 1.343/2026); tabela NTC é referência.
+  // Piso ANTT em R$ — input para freightCalculator aplicar MP 1.343/2026 em lotação.
+  // Sem isso, custoMotorista cai para baseCost (= frete_peso) mesmo quando o piso é maior.
   const pisoAnttCarreteiroForCalc = useMemo<number | undefined>(() => {
-    if (!isLotacaoWizard || !axesCountForAntt) return undefined;
+    if (!isLotacaoWizard || !anttRate || !axesCountForAntt) return undefined;
     const km = Number(debouncedKmBand || 0);
     if (km <= 0) return undefined;
-    const ccd = anttRate
-      ? Number(anttRate.ccd)
-      : savedAnttMeta?.ccd != null
-        ? Number(savedAnttMeta.ccd)
-        : null;
-    const cc = anttRate
-      ? Number(anttRate.cc)
-      : savedAnttMeta?.cc != null
-        ? Number(savedAnttMeta.cc)
-        : null;
-    if (ccd == null || cc == null) return undefined;
     return calculateAnttMinimum({
       kmDistance: km,
-      ccd,
-      cc,
+      ccd: Number(anttRate.ccd),
+      cc: Number(anttRate.cc),
       retornoVazio: anttFloorFlags.retornoVazio,
     }).total;
-  }, [
-    isLotacaoWizard,
-    anttRate,
-    savedAnttMeta,
-    axesCountForAntt,
-    debouncedKmBand,
-    anttFloorFlags.retornoVazio,
-  ]);
+  }, [isLotacaoWizard, anttRate, axesCountForAntt, debouncedKmBand, anttFloorFlags.retornoVazio]);
 
   // Passo 1: calcular frete sem taxas condicionais (usa valores debounced)
   const baseCalculationResult = useMemo(() => {
@@ -914,18 +893,10 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const { data: benchmarksData } = useFreightBenchmarks({
     origin: debounced.origin || '',
     destination: debounced.destination || '',
-    cargoType: debounced.cargoType || undefined,
+    cargoType: 'Geral', // Default or from form if available
     kmDistance: debouncedKmBand,
     enabled: open && !isLegacy,
   });
-
-  const freightBenchmarksInput = useMemo(
-    () =>
-      benchmarksData?.ckanBenchmark && benchmarksData.ckanBenchmark > 0
-        ? { ckanBenchmark: benchmarksData.ckanBenchmark }
-        : undefined,
-    [benchmarksData?.ckanBenchmark]
-  );
 
   const edgeFreightInput = useMemo((): CalculateFreightInput | null => {
     if (isLegacy || !open) return null;
@@ -961,7 +932,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             antt_retorno_vazio: anttFloorFlags.retornoVazio,
           }
         : {}),
-      benchmarks: freightBenchmarksInput,
+      benchmarks: benchmarksData,
     };
   }, [
     isLegacy,
@@ -969,7 +940,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     debouncedKmBand,
     debounced,
     debouncedEffectiveWeightKg,
-    debounced.priceTableId,
     selectedVehicle?.code,
     axesCountForAntt,
     selectedPaymentTerm?.code,
@@ -979,9 +949,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     resolvedPricingParams.dasPercent,
     resolvedPricingParams.markupPercent,
     resolvedPricingParams.overheadPercent,
-    debounced.freightModality,
     anttFloorFlags,
-    freightBenchmarksInput,
+    benchmarksData,
   ]);
 
   const lastEdgeFreightResponseRef = useRef<CalculateFreightResponse | null>(null);
@@ -1027,7 +996,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         waitingTimeHours: additionalFeesSelection.waitingTimeHours,
         waitingTimeEnabled: additionalFeesSelection.waitingTimeEnabled,
       },
-      benchmarks: freightBenchmarksInput,
     });
   }, [
     debounced.origin,
@@ -1054,28 +1022,29 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     additionalFeesSelection.waitingTimeEnabled,
   ]);
 
-  /** Prévia: Edge quando paridade OK; lotação com piso usa local se Edge ainda max(tabela,piso). */
+  /** Prévia: Edge com fallback local; se Edge ignorar piso ANTT, usa motor local (paridade wizard). */
   const calculationResult: FreightCalculationOutput = useMemo(() => {
     const edge = edgeFreightPreview?.output;
     const local = localCalculationResult;
     if (!edge) return local;
 
+    const edgePiso = edgeFreightPreview?.raw?.meta?.antt_piso_carreteiro ?? 0;
     const localPiso = pisoAnttCarreteiroForCalc ?? 0;
+    const edgeBase = edge.components?.baseCost ?? 0;
+    const localBase = local.components?.baseCost ?? 0;
+
     if (
       isLotacaoWizard &&
-      shouldPreferLocalLotacaoFreightPreview({
-        local,
-        edge,
-        edgeRaw: edgeFreightPreview?.raw ?? null,
-        localPiso,
-      })
+      local.status === 'OK' &&
+      localPiso > 0 &&
+      (edgePiso <= 0 || localBase > edgeBase + 0.01)
     ) {
       return local;
     }
     return edge;
   }, [
     edgeFreightPreview?.output,
-    edgeFreightPreview?.raw,
+    edgeFreightPreview?.raw?.meta?.antt_piso_carreteiro,
     localCalculationResult,
     pisoAnttCarreteiroForCalc,
     isLotacaoWizard,
@@ -1092,11 +1061,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     // Reset user edit flags when form opens/closes
     userEditedOrigin.current = false;
     userEditedDestination.current = false;
-    if (quote) {
-      const bd = quote.pricing_breakdown as unknown as StoredPricingBreakdown | null;
-      const alreadyAnttBase = bd?.meta?.anttCostBaseUsed === true;
-      setPreserveOriginalPrice(alreadyAnttBase);
-    }
+    if (quote) setPreserveOriginalPrice(true);
 
     if (quote) {
       // Restaurar seleção de taxas condicionais do breakdown salvo
@@ -1230,7 +1195,8 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         route_stops: [],
       });
     }
-  }, [quote, form, weightUnit, open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote, form, open]);
 
   useEffect(() => {
     if (!quote || !routeStopsData || routeStopsData.length === 0) return;
@@ -1652,7 +1618,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
             ...pricingBreakdown,
             meta: {
               ...pricingBreakdown.meta,
-              anttPisoCarreteiro: anttCalcForSave.total,
               antt: {
                 operationTable: anttRate.operation_table,
                 cargoType: anttRate.cargo_type,
