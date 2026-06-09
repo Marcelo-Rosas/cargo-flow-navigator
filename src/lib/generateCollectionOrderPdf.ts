@@ -14,6 +14,8 @@ export interface CollectionOrderPdfPayload {
   issued_at: string;
   issued_by_name: string | null;
   sender: CollectionOrderPartyData;
+  /** Coleta adicional (ex.: segundo embarcador da cotação) */
+  sender_2?: CollectionOrderPartyData | null;
   recipient: CollectionOrderPartyData;
   driver: CollectionOrderDriverData;
   vehicle: CollectionOrderVehicleData;
@@ -628,6 +630,12 @@ export async function generateCollectionOrderPdf(
 
   y = drawSectionTitle(doc, 'REMETENTE', y);
   y = drawPartyBlock(doc, payload.sender, y);
+
+  if (payload.sender_2?.name?.trim()) {
+    y += 1;
+    y = drawSectionTitle(doc, 'REMETENTE 2', y);
+    y = drawPartyBlock(doc, payload.sender_2, y);
+  }
 
   y = drawSectionTitle(doc, 'DESTINATARIO', y);
   y = drawPartyBlock(doc, payload.recipient, y);

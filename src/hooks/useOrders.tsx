@@ -309,6 +309,8 @@ export function useConvertQuoteToOrder() {
             freight_modality: quote.freight_modality,
             shipper_id: quote.shipper_id,
             shipper_name: quote.shipper_name,
+            additional_shippers:
+              (quote as { additional_shippers?: unknown }).additional_shippers ?? [],
           })
         )
         .select()
