@@ -118,21 +118,28 @@ export async function invokeEdgeFunction<T>(
             return payload;
           }
 
-          try {
-            const payload = (await directRes.json()) as {
-              error?: string;
-              message?: string;
-              errors?: string[];
-            };
-            if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
-              throw new Error(payload.errors.join('; '));
+          const contentType = directRes.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            try {
+              const payload = (await directRes.json()) as {
+                error?: string;
+                message?: string;
+                errors?: string[];
+              };
+              if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+                throw new Error(payload.errors.join('; '));
+              }
+              if (payload?.error || payload?.message) {
+                throw new Error(payload.error || payload.message);
+              }
+            } catch {
+              const text = await directRes.text().catch(() => null);
+              if (text) throw new Error(text);
             }
-            if (payload?.error || payload?.message) {
-              throw new Error(payload.error || payload.message);
-            }
-          } catch {
+          } else {
             const text = await directRes.text().catch(() => null);
-            if (text) throw new Error(text);
+            if (text) throw new Error(`HTTP ${directRes.status}: ${text.slice(0, 200)}`);
+            throw new Error(`HTTP ${directRes.status}: ${directRes.statusText}`);
           }
         }
       }
@@ -141,23 +148,32 @@ export async function invokeEdgeFunction<T>(
     const parsedMessage = await (async () => {
       const context = (error as { context?: Response })?.context;
       if (!context) return null;
-      try {
-        const payload = (await context.clone().json()) as {
-          error?: string;
-          message?: string;
-          errors?: string[];
-        };
-        if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
-          return payload.errors.join('; ');
-        }
-        return payload?.error || payload?.message || null;
-      } catch {
+      const contentType = context.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
         try {
-          const text = await context.clone().text();
-          return text || null;
+          const payload = (await context.clone().json()) as {
+            error?: string;
+            message?: string;
+            errors?: string[];
+          };
+          if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+            return payload.errors.join('; ');
+          }
+          return payload?.error || payload?.message || null;
         } catch {
-          return null;
+          try {
+            const text = await context.clone().text();
+            return text || null;
+          } catch {
+            return null;
+          }
         }
+      }
+      try {
+        const text = await context.clone().text();
+        return text?.slice(0, 200) || null;
+      } catch {
+        return null;
       }
     })();
 

@@ -16,17 +16,26 @@ export interface EdgeFreightPreviewResult {
 export function useEdgeFreightPreview(input: CalculateFreightInput | null, enabled: boolean) {
   return useQuery({
     queryKey: ['edge-freight-preview', input],
-    queryFn: async (): Promise<EdgeFreightPreviewResult> => {
-      const data = await invokeEdgeFunction<CalculateFreightResponse>('calculate-freight', {
-        body: input!,
-      });
-      if (!data.success) {
-        throw new Error(data.errors?.join(', ') || data.error || 'Erro no cálculo do frete');
+    queryFn: async (): Promise<EdgeFreightPreviewResult | null> => {
+      try {
+        const data = await invokeEdgeFunction<CalculateFreightResponse>('calculate-freight', {
+          body: input!,
+        });
+        if (!data.success) {
+          console.warn(
+            '[edge-freight-preview] calculate-freight retornou erro:',
+            data.errors ?? data.error
+          );
+          return null;
+        }
+        return {
+          output: adaptToLocalFormat(data) as FreightCalculationOutput,
+          raw: data,
+        };
+      } catch (error) {
+        console.warn('[edge-freight-preview] falha na Edge Function — usando cálculo local', error);
+        return null;
       }
-      return {
-        output: adaptToLocalFormat(data) as FreightCalculationOutput,
-        raw: data,
-      };
     },
     enabled:
       enabled &&

@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 /** Production origin for auth redirects (emails); avoids preview domains. */
@@ -44,7 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      logAuthError('signIn', error, { email });
+    }
     return { error: error as Error | null };
   };
 
@@ -82,6 +85,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     >
       {children}
     </AuthContext.Provider>
+  );
+}
+
+function logAuthError(action: string, error: AuthError, context: Record<string, string>) {
+  const safeContext = { ...context };
+  delete (safeContext as Record<string, string>).password;
+  console.error(
+    `[Auth Error] action=${action} status=${error.status} code=${error.code} message="${error.message}"`,
+    safeContext
   );
 }
 

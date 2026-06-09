@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildQuoteFinancialStripFromBreakdown,
   buildQuoteFinancialStripFromCalculation,
   buildQuoteFinancialStripLegacy,
 } from '@/lib/quote-financial-strip';
-import type { FreightCalculationOutput } from '@/lib/freightCalculator';
+import type { FreightCalculationOutput, StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 function minimalOkCalculation(
   overrides: Partial<FreightCalculationOutput> = {}
@@ -113,5 +114,89 @@ describe('quote-financial-strip', () => {
     expect(strip.fat.totalCliente).toBe(10000);
     expect(strip.pag.motorista).toBe(7000);
     expect(strip.lucro.alvo).toBe(3000);
+  });
+
+  it('PAG lotação usa piso carreteiro, não frete contratado com over', () => {
+    const strip = buildQuoteFinancialStripFromCalculation(
+      minimalOkCalculation({
+        meta: {
+          ...minimalOkCalculation().meta!,
+          anttPisoCarreteiro: 17831.67,
+          lotacaoPisoComOver: 19614.84,
+          antt: { total: 17831.67 },
+        },
+        profitability: {
+          ...minimalOkCalculation().profitability!,
+          custoMotoristaContratado: 19614.84,
+          custoMotoristaAntt: 17831.67,
+        },
+      }),
+      { modality: 'lotacao' }
+    );
+    expect(strip!.pag.motorista).toBeCloseTo(17831.67, 2);
+  });
+
+  it('PAG no breakdown não escala com faturamentoRatio (desconto comercial)', () => {
+    const breakdown: StoredPricingBreakdown = {
+      status: 'OK',
+      meta: {
+        anttCostBaseUsed: true,
+        anttFloorApplied: true,
+        antt: { total: 17831.67 },
+        anttPisoCarreteiro: 17831.67,
+        lotacaoPisoComOver: 19614.84,
+      },
+      components: {
+        baseCost: 19614.84,
+        baseFreight: 19614.84,
+        toll: 871.92,
+        gris: 0,
+        tso: 0,
+        rctrc: 124.5,
+        adValorem: 124.5,
+        tde: 0,
+        tear: 0,
+        dispatchFee: 0,
+        aluguelMaquinas: 0,
+        waitingTimeCost: 0,
+        conditionalFeesTotal: 0,
+        dasProvision: 0,
+      },
+      totals: {
+        totalCliente: 42929.75,
+        totalImpostos: 3005.08,
+        discount: 17929.75,
+        das: 0,
+        icms: 3005.08,
+        pis: 0,
+        cofins: 0,
+        irpj: 0,
+        csll: 0,
+        receitaBruta: 42929.75,
+      },
+      profitability: {
+        custoMotoristaContratado: 19614.84,
+        custoMotoristaAntt: 17831.67,
+        custosCarreteiro: 19614.84,
+        custoServicos: 1120.92,
+        custosDiretos: 20486.76,
+        receitaLiquida: 39924.67,
+        margemBruta: 15232.38,
+        overhead: 5988.7,
+        resultadoLiquido: 6146.03,
+        profitMarginTarget: 30,
+      },
+      rates: { profitMarginPercent: 30 },
+    };
+    const ratio = 25000 / 42929.75;
+    const strip = buildQuoteFinancialStripFromBreakdown(breakdown, {
+      totalCliente: 25000,
+      discount: 17929.75,
+      faturamentoRatio: ratio,
+      modality: 'lotacao',
+    });
+    expect(strip!.pag.motorista).toBeCloseTo(17831.67, 2);
+    expect(strip!.pag.pedagio).toBeCloseTo(871.92, 2);
+    expect(strip!.fat.totalCliente).toBe(25000);
   });
 });

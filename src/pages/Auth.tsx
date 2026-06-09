@@ -69,10 +69,19 @@ export default function Auth() {
     setIsLoading(false);
 
     if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        toast.error('E-mail ou senha incorretos');
-      } else if (error.message.includes('Email not confirmed')) {
+      const message = error.message || '';
+      if (message.includes('Invalid login credentials')) {
+        toast.error('E-mail ou senha incorretos. Use "Esqueceu a senha?" para redefinir.');
+      } else if (message.includes('Email not confirmed')) {
         toast.error('E-mail não confirmado. Verifique sua caixa de entrada.');
+      } else if (
+        message.includes('network') ||
+        message.includes('fetch') ||
+        message.includes('Failed to fetch')
+      ) {
+        toast.error('Erro de rede. Verifique sua conexão.');
+      } else if (message.includes('Unexpected token') || message.includes('Unexpected end')) {
+        toast.error('Erro de comunicação com o servidor. Tente recarregar a página.');
       } else {
         toast.error('Erro ao fazer login. Tente novamente.');
       }

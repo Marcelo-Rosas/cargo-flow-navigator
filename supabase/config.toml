@@ -39,7 +39,7 @@ verify_jwt = false  # utilitário público (distância CEP→CEP), sem dados sen
 verify_jwt = true
 
 [functions.generate-ciot]
-verify_jwt = true  # geração de CIOT requer autenticação e RLS
+verify_jwt = false  # Gateway bloqueia preflight CORS; função valida Authorization manualmente
 
 [functions.ensure-financial-document]
 verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente

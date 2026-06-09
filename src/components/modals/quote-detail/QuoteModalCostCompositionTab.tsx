@@ -33,6 +33,9 @@ interface QuoteModalCostCompositionTabProps {
   resultadoLiquido: number;
   margemPercent: number;
   isBelowTarget: boolean;
+  /** Receita líquida já ajustada (ex.: desconto comercial / faturamento negociado) */
+  receitaLiquidaDisplay?: number;
+  discountDisplay?: number;
   /** Margem alvo % usada no cálculo (ex.: pricing_rules_config.profit_margin_percent) */
   targetMarginPercent?: number;
   canManage: boolean;
@@ -60,6 +63,8 @@ export function QuoteModalCostCompositionTab({
   resultadoLiquido,
   margemPercent,
   isBelowTarget,
+  receitaLiquidaDisplay,
+  discountDisplay,
   targetMarginPercent = 15,
   canManage,
   axesCount,
@@ -81,10 +86,11 @@ export function QuoteModalCostCompositionTab({
       (k) => (breakdown.conditionalFeesBreakdown as Record<string, number>)[k] > 0
     ).length > 0 || (breakdown.components?.waitingTimeCost ?? 0) > 0;
 
-  const discountValue = breakdown.totals.discount ?? 0;
+  const discountValue = discountDisplay ?? breakdown.totals.discount ?? 0;
   const totalClienteBruto = breakdown.totals.totalCliente ?? breakdown.totals.receitaBruta ?? 0;
   const totalCliente = Math.max(0, totalClienteBruto - discountValue);
   const receitaLiquida =
+    receitaLiquidaDisplay ??
     (breakdown.profitability as { receitaLiquida?: number } | undefined)?.receitaLiquida ??
     totalCliente - (breakdown.totals.das ?? 0) - (breakdown.totals.icms ?? 0);
   const regimeFiscal =
@@ -107,9 +113,10 @@ export function QuoteModalCostCompositionTab({
   const isLucroPresumido = regimeFiscal === 'lucro_presumido' || hasFederalTaxLines;
   const custoEfetivoMotorista = breakdown.components?.baseFreight ?? 0;
   const custoMotoristaPisoAntt =
-    breakdown.profitability?.custoMotoristaContratado ??
-    breakdown.profitability?.custoMotorista ??
-    (resolvePisoAnttCarreteiroReais(breakdown) || pisoAnttTotal);
+    resolvePisoAnttCarreteiroReais(breakdown) ||
+    pisoAnttTotal ||
+    breakdown.profitability?.custoMotoristaAntt ||
+    0;
   const pedagio = breakdown.components?.toll ?? 0;
   const grisValue = breakdown.components?.gris ?? 0;
   const tsoValue = breakdown.components?.tso ?? 0;
@@ -1115,6 +1122,12 @@ export function QuoteModalCostCompositionTab({
             contribuição e margem operacional usam a mesma base (frete golden + serviços NTC).
           </p>
           <div className="space-y-2 text-sm">
+            {discountValue > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>(−) Desconto comercial</span>
+                <span className="tabular-nums">−{formatCurrency(discountValue)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Receita líquida</span>
               <span className="font-medium tabular-nums">{formatCurrency(receitaLiquida)}</span>

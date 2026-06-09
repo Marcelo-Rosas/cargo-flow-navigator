@@ -6,11 +6,11 @@ export function readMetaAnttPisoCarreteiro(
 ): number {
   if (!meta) return 0;
   const legacy = meta as { antt_piso_carreteiro?: number };
+  // Não usar lotacaoPisoComOver aqui — inclui over % sobre o piso, não é o carreteiro base.
   return (
     Number(meta.antt?.total ?? 0) ||
     Number(meta.anttPisoCarreteiro ?? 0) ||
-    Number(legacy.antt_piso_carreteiro ?? 0) ||
-    Number(meta.lotacaoPisoComOver ?? 0)
+    Number(legacy.antt_piso_carreteiro ?? 0)
   );
 }
 
