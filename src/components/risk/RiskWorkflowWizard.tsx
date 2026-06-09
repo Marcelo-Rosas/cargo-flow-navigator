@@ -18,6 +18,7 @@ import {
   Clock,
   AlertTriangle,
   ChevronRight,
+  ChevronLeft,
   Loader2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -706,8 +707,24 @@ export function RiskWorkflowWizard({
 
   const stepIndex = STEPS.findIndex((s) => s.key === currentStep);
 
-  // Terminal state display
-  if (isTerminal && evaluation) {
+  const isStepComplete = (index: number) =>
+    (index === 0 && anttStepComplete) ||
+    (index === 1 && buonnyStepComplete) ||
+    (index === 2 && evalStepComplete) ||
+    (index === 3 && evidenceStepComplete) ||
+    (index === 4 && (evaluation?.status === 'evaluated' || evaluation?.status === 'approved'));
+
+  const canNavigateToStep = (targetIndex: number) => {
+    if (!isBuonnyEditable) return false;
+    if (targetIndex <= stepIndex) return true;
+    for (let i = 0; i < targetIndex; i++) {
+      if (!isStepComplete(i)) return false;
+    }
+    return true;
+  };
+
+  // Resumo somente leitura quando a OS já saiu de busca_motorista/documentação
+  if (isTerminal && !isBuonnyEditable && evaluation) {
     const approved = evaluation.status === 'approved';
     return (
       <Card className={cn('border-2', approved ? 'border-green-500/30' : 'border-red-500/30')}>
@@ -742,35 +759,75 @@ export function RiskWorkflowWizard({
 
   return (
     <div className="space-y-4">
-      {/* Stepper — read-only indicators, not clickable */}
-      <div className="flex items-center gap-1">
+      {isTerminal && evaluation && (
+        <div
+          className={cn(
+            'rounded-lg border p-3 flex items-center gap-2 text-sm',
+            evaluation.status === 'approved'
+              ? 'border-green-200 bg-green-50 dark:bg-green-950/20'
+              : 'border-red-200 bg-red-50 dark:bg-red-950/20'
+          )}
+        >
+          {evaluation.status === 'approved' ? (
+            <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+          ) : (
+            <XCircle className="h-4 w-4 text-red-600 shrink-0" />
+          )}
+          <span>
+            Avaliação de risco {evaluation.status === 'approved' ? 'aprovada' : 'rejeitada'} — você
+            pode revisar etapas anteriores enquanto a OS estiver em busca de motorista ou
+            documentação.
+          </span>
+        </div>
+      )}
+
+      <div
+        className="flex items-center gap-1"
+        role="tablist"
+        aria-label="Etapas da avaliação de risco"
+      >
         {STEPS.map((step, i) => {
           const isActive = step.key === currentStep;
           const isPast = i < stepIndex;
-          const isComplete =
-            (i === 0 && anttStepComplete) ||
-            (i === 1 && buonnyStepComplete) ||
-            (i === 2 && evalStepComplete) ||
-            (i === 3 && evidenceStepComplete) ||
-            (i === 4 && (evaluation?.status === 'evaluated' || evaluation?.status === 'approved'));
+          const isComplete = isStepComplete(i);
+          const navigable = canNavigateToStep(i);
+          const stepClassName = cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+            isActive && 'bg-primary text-primary-foreground',
+            isPast && !isActive && 'bg-primary/20 text-primary',
+            !isActive && !isPast && 'bg-muted text-muted-foreground',
+            navigable && !isActive && 'hover:bg-primary/30 cursor-pointer',
+            !navigable && 'cursor-default'
+          );
           return (
             <div key={step.key} className="flex items-center gap-1">
-              <div
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
-                  isActive && 'bg-primary text-primary-foreground',
-                  isPast && !isActive && 'bg-primary/20 text-primary',
-                  !isActive && !isPast && 'bg-muted text-muted-foreground'
-                )}
-                data-testid={`risk-wizard-step-${step.key}`}
-              >
-                {isComplete && !isActive ? (
-                  <CheckCircle2 className="h-3 w-3" />
-                ) : (
-                  <span>{step.short}</span>
-                )}
-                <span className="hidden sm:inline">{step.label}</span>
-              </div>
+              {navigable ? (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-label={`Etapa ${step.short}: ${step.label}`}
+                  className={stepClassName}
+                  data-testid={`risk-wizard-step-${step.key}`}
+                  onClick={() => setCurrentStep(step.key)}
+                >
+                  {isComplete && !isActive ? (
+                    <CheckCircle2 className="h-3 w-3" />
+                  ) : (
+                    <span>{step.short}</span>
+                  )}
+                  <span className="hidden sm:inline">{step.label}</span>
+                </button>
+              ) : (
+                <div className={stepClassName} data-testid={`risk-wizard-step-${step.key}`}>
+                  {isComplete && !isActive ? (
+                    <CheckCircle2 className="h-3 w-3" />
+                  ) : (
+                    <span>{step.short}</span>
+                  )}
+                  <span className="hidden sm:inline">{step.label}</span>
+                </div>
+              )}
               {i < STEPS.length - 1 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
             </div>
           );
@@ -816,6 +873,7 @@ export function RiskWorkflowWizard({
                 autoCheckError={buonnyCheck.isError ? (buonnyCheck.error?.message ?? 'Erro') : null}
                 canAdvance={buonnyStepComplete}
                 onNext={() => setCurrentStep('rules')}
+                onBack={() => setCurrentStep('antt')}
               />
               <BuonnyRegistrationModal
                 open={buonnyModalOpen}
@@ -840,6 +898,7 @@ export function RiskWorkflowWizard({
               isEditable={isEditable}
               canAdvance={evalStepComplete}
               onNext={() => setCurrentStep('evidence')}
+              onBack={() => setCurrentStep('buonny')}
             />
           )}
           {currentStep === 'evidence' && (
@@ -852,6 +911,7 @@ export function RiskWorkflowWizard({
               totalEstimatedCost={totalEstimatedCost}
               canAdvance={evidenceStepComplete}
               onNext={() => setCurrentStep('submit')}
+              onBack={() => setCurrentStep('rules')}
             />
           )}
           {currentStep === 'submit' && (
@@ -871,6 +931,7 @@ export function RiskWorkflowWizard({
               isEditable={isEditable}
               onSubmit={handleSubmit}
               isLoading={updateEvaluation.isPending}
+              onBack={() => setCurrentStep('evidence')}
             />
           )}
         </CardContent>
@@ -1108,15 +1169,16 @@ function StepAntt({
       )}
 
       <div className="flex justify-between items-center flex-wrap gap-2">
-        {isEditable && !anttValid && (
+        {isEditable && (
           <Button
             size="sm"
+            variant={anttValid ? 'outline' : 'default'}
             onClick={onConsult}
             disabled={isConsulting}
             aria-label="Consultar situação ANTT RNTRC"
           >
             {isConsulting && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-            {isConsulting ? consultLabel : 'Consultar ANTT'}
+            {isConsulting ? consultLabel : anttValid ? 'Reconsultar ANTT' : 'Consultar ANTT'}
           </Button>
         )}
         <Button size="sm" onClick={onNext} disabled={!canAdvance} className="ml-auto">
@@ -1150,6 +1212,7 @@ function StepBuonny({
   autoCheckError,
   canAdvance,
   onNext,
+  onBack,
 }: {
   driverName?: string | null;
   driverCpf?: string | null;
@@ -1164,6 +1227,7 @@ function StepBuonny({
   autoCheckError?: string | null;
   canAdvance: boolean;
   onNext: () => void;
+  onBack: () => void;
 }) {
   const payload = (buonnyEvidence as { payload?: Record<string, unknown> })?.payload;
   const statusLabel = payload?.status_buonny
@@ -1242,6 +1306,9 @@ function StepBuonny({
 
       <div className="flex justify-between items-center flex-wrap gap-2">
         <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={onBack} aria-label="Voltar para consulta ANTT">
+            <ChevronLeft className="h-4 w-4" /> ANTT
+          </Button>
           {isEditable && !buonnyValid && (
             <>
               <Button size="sm" onClick={onAutoCheck} disabled={isAutoChecking}>
@@ -1259,7 +1326,7 @@ function StepBuonny({
             </>
           )}
         </div>
-        <Button size="sm" onClick={onNext} disabled={!canAdvance} className="ml-auto">
+        <Button size="sm" onClick={onNext} disabled={!canAdvance}>
           Próximo <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -1292,6 +1359,7 @@ function StepRules({
   isEditable,
   canAdvance,
   onNext,
+  onBack,
 }: {
   critResult: ReturnType<typeof evaluateCriticality> | null;
   cargoValue: number;
@@ -1309,6 +1377,7 @@ function StepRules({
   isEditable: boolean;
   canAdvance: boolean;
   onNext: () => void;
+  onBack: () => void;
 }) {
   return (
     <div className="space-y-4" data-testid="risk-step-rules">
@@ -1438,7 +1507,10 @@ function StepRules({
         </p>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ChevronLeft className="h-4 w-4" /> Voltar
+        </Button>
         <Button size="sm" onClick={onNext} disabled={!canAdvance}>
           Próximo <ChevronRight className="h-4 w-4" />
         </Button>
@@ -1457,6 +1529,7 @@ function StepEvidence({
   totalEstimatedCost,
   canAdvance,
   onNext,
+  onBack,
 }: {
   requirements: string[];
   requirementsMet: Record<string, boolean>;
@@ -1466,6 +1539,7 @@ function StepEvidence({
   totalEstimatedCost: number;
   canAdvance: boolean;
   onNext: () => void;
+  onBack: () => void;
 }) {
   return (
     <div className="space-y-4" data-testid="risk-step-evidence">
@@ -1522,7 +1596,10 @@ function StepEvidence({
         <p className="text-xs text-muted-foreground">Marque todas as exigências para avançar.</p>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ChevronLeft className="h-4 w-4" /> Voltar
+        </Button>
         <Button size="sm" onClick={onNext} disabled={!canAdvance}>
           Próximo <ChevronRight className="h-4 w-4" />
         </Button>
@@ -1548,6 +1625,7 @@ function StepSubmit({
   isEditable,
   onSubmit,
   isLoading,
+  onBack,
 }: {
   evaluation: unknown;
   critResult: ReturnType<typeof evaluateCriticality> | null;
@@ -1569,6 +1647,7 @@ function StepSubmit({
   isEditable: boolean;
   onSubmit: () => void;
   isLoading: boolean;
+  onBack: () => void;
 }) {
   const eval_ = evaluation as { status?: string; criticality?: RiskCriticality } | null;
   const canSubmit =
@@ -1711,7 +1790,10 @@ function StepSubmit({
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ChevronLeft className="h-4 w-4" /> Voltar
+        </Button>
         {!isSubmitted && !isAutoApproved && (
           <Button size="sm" onClick={onSubmit} disabled={!canSubmit || isLoading}>
             {isLoading ? (
