@@ -62,3 +62,22 @@
 - Novos registros inseridos com `valid_from = 2026-03-13`
 - Query `getAnttFloorRate()` usa `ORDER BY valid_from DESC LIMIT 1` — pega automaticamente o mais recente
 - Tabela: `antt_floor_rates` (operation_table='A', cargo_type='carga_geral')
+
+---
+
+## Atualização SUROC Nº 4 — 20/03/2026 (substitui Nº 3 para Tabela A)
+
+**Fonte**: [DOU - Portaria SUROC N.4](https://www.in.gov.br/web/dou/-/portaria-suroc-n-4-de-20-de-marco-de-2026-694437180)
+
+| Eixos | CCD Novo (R$/km) | CC (R$) — inalterado |
+|-------|------------------|----------------------|
+| 6     | **7,4124**       | 648,95               |
+| 9     | **9,2466**       | 872,44               |
+
+Exemplo calculadora oficial: `2756 × 7,4124 + 648,95 = R$ 21.077,52` (6 eixos, Tabela A).
+
+**Script**: `npx tsx scripts/apply-antt-suroc-n4-2026.ts --apply`
+
+**Mapeamento tabela (paridade calculadorafrete.antt.gov.br)**:
+- Composição veicular = Sim → **Tabela A** (não B)
+- Apenas unidade de tração → **Tabela B**
