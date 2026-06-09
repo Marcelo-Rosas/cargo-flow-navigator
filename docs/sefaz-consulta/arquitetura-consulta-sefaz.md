@@ -140,11 +140,14 @@ O certificado A1 da Vectra Cargo está **instalado no Windows** mas a **chave pr
 - Extração de metadados (UF, CNPJ, modelo, série, número)
 - Parsing de XML (emitente, destinatário, valor, status)
 
-### Fase 2 — Curto prazo (esta semana)
-🔄 **Servidor Proxy Local (.NET)** rodando no computador do operacional:
-- Recebe requisições do frontend via `localhost:3333`
-- Consulta SEFAZ usando o certificado A1 do Windows
-- Retorna JSON simples para o frontend
+### Fase 2 — Implementado (2026-06)
+✅ **Consulta SEFAZ integrada** em `validate-document`:
+- Módulo `supabase/functions/_shared/sefaz-consult.ts` (proxy + Focus NFe)
+- Proxy local: `tools/sefaz-proxy/` (.NET 8, certificado A1 no Windows)
+- Scripts: `scripts/start-sefaz-proxy.ps1`, `scripts/start-sefaz-stack.ps1` (proxy + tunnel)
+- Hostname sugerido: `https://sefaz-proxy.vectracargo.com.br` (Cloudflare Tunnel)
+- Guia: `tools/sefaz-proxy/README.md`
+- Secrets Supabase: `scripts/set-sefaz-supabase-secrets.ps1` ou dashboard manual
 
 ### Fase 3 — Médio prazo
 📤 **Exportar certificado** quando for possível (computador original ou reemissão):

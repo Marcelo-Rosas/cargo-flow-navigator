@@ -42,6 +42,8 @@ interface DocumentUploadProps {
   docMotContext?: boolean;
   /** Quando true, filtra CNH/CRLV/comp.res./ANTT do seletor (docs herdados da viagem) */
   driverDocsInherited?: boolean;
+  /** Página Documentos (sem OS/cotação): NF-e, CT-e, MDF-e, POD */
+  standaloneFiscalContext?: boolean;
   allowComprovanteDescarga?: boolean;
   onSuccess?: () => void;
   /** Called after upload when type is adiantamento_carreteiro or saldo_carreteiro (to trigger process-payment-proof) */
@@ -50,7 +52,19 @@ interface DocumentUploadProps {
   onQuotePaymentDocCreated?: (documentId: string, type: DocumentType) => void;
   /** Called after any successful upload with the document type */
   onDocumentUploaded?: (type: DocumentType) => void;
+  /** Called after registro criado (id + tipo) — ex.: validação automática de NF-e */
+  onDocumentCreated?: (documentId: string, type: DocumentType, file: File) => void;
 }
+
+const STANDALONE_FISCAL_DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
+  { value: 'nfe', label: 'NF-e' },
+  { value: 'cte', label: 'CT-e' },
+  { value: 'mdfe', label: 'MDF-e' },
+  { value: 'pod', label: 'Comprovante (POD)' },
+  { value: 'outros', label: 'Outros' },
+];
+
+const FISCAL_TYPES_FOR_AUTO_VALIDATE: DocumentType[] = ['nfe', 'cte', 'mdfe'];
 
 interface UploadingFile {
   file: File;
@@ -186,6 +200,8 @@ export function DocumentUpload({
   onCarrierPaymentDocCreated,
   onQuotePaymentDocCreated,
   onDocumentUploaded,
+  onDocumentCreated,
+  standaloneFiscalContext,
 }: DocumentUploadProps) {
   const { user } = useAuth();
   const createDocumentMutation = useCreateDocument();
@@ -207,17 +223,19 @@ export function DocumentUpload({
       ]
     : CARRIER_PAYMENT_BASE_DOCUMENT_TYPES;
 
-  let availableTypes = docMotContext
-    ? DOC_MOT_TYPES
-    : financialContext === 'carrier_payment'
-      ? carrierPaymentTypes
-      : financialContext === 'quote_receivable'
-        ? QUOTE_RECEIVABLE_DOCUMENT_TYPES
-        : quoteId && !orderId
-          ? QUOTE_DOCUMENT_TYPES
-          : orderStage
-            ? DOCUMENT_TYPES_BY_STAGE[orderStage]
-            : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
+  let availableTypes = standaloneFiscalContext
+    ? STANDALONE_FISCAL_DOCUMENT_TYPES
+    : docMotContext
+      ? DOC_MOT_TYPES
+      : financialContext === 'carrier_payment'
+        ? carrierPaymentTypes
+        : financialContext === 'quote_receivable'
+          ? QUOTE_RECEIVABLE_DOCUMENT_TYPES
+          : quoteId && !orderId
+            ? QUOTE_DOCUMENT_TYPES
+            : orderStage
+              ? DOCUMENT_TYPES_BY_STAGE[orderStage]
+              : DOCUMENT_TYPES_BY_STAGE['ordem_criada'];
 
   // Na aba Docs, remover tipos Doc-Mot (CNH, CRLV, etc.) — estão na aba Doc-Mot
   if (!docMotContext && !financialContext && orderId) {
@@ -229,7 +247,7 @@ export function DocumentUpload({
   }
 
   const [selectedType, setSelectedType] = useState<DocumentType>(
-    availableTypes[0]?.value ?? 'outros'
+    standaloneFiscalContext ? 'nfe' : (availableTypes[0]?.value ?? 'outros')
   );
 
   // Atualiza o tipo selecionado quando o estágio muda
@@ -302,6 +320,15 @@ export function DocumentUpload({
 
       onDocumentUploaded?.(type);
 
+      const isXml = file.name.toLowerCase().endsWith('.xml');
+      if (
+        created?.id &&
+        onDocumentCreated &&
+        (FISCAL_TYPES_FOR_AUTO_VALIDATE.includes(type) || isXml)
+      ) {
+        onDocumentCreated(created.id, type, file);
+      }
+
       setUploadingFiles((prev) =>
         prev.map((f) => (f.file === file ? { ...f, progress: 100, status: 'success' } : f))
       );
@@ -315,6 +342,7 @@ export function DocumentUpload({
       onCarrierPaymentDocCreated,
       onQuotePaymentDocCreated,
       onDocumentUploaded,
+      onDocumentCreated,
     ]
   );
 

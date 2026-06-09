@@ -1,5 +1,10 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import {
+  consultSefaz,
+  mapSefazStatusToValidationStatus,
+  type SefazConsultMetadata,
+} from '../_shared/sefaz-consult.ts';
 
 /**
  * Edge Function: validate-document
@@ -8,6 +13,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
  * 2. Dígito verificador (mod11)
  * 3. Parsing de XML (quando há arquivo anexado)
  * 4. Extrai metadados da chave (UF, CNPJ emitente, data, modelo, série, número)
+ * 5. Consulta SEFAZ (proxy A1 ou Focus NFe) quando consult_sefaz=true e provider configurado
  */
 
 const corsHeaders = {
@@ -16,9 +22,10 @@ const corsHeaders = {
 };
 
 interface ValidationResult {
-  status: 'pending' | 'valid' | 'invalid' | 'xml_parsed';
+  status: 'pending' | 'valid' | 'invalid' | 'xml_parsed' | 'sefaz_authorized' | 'sefaz_cancelled';
   document_type: 'nfe' | 'cte' | 'mdfe' | 'unknown';
   validation_errors: string[];
+  sefaz?: SefazConsultMetadata | null;
   metadata: {
     uf_code?: string;
     uf_name?: string;
@@ -270,6 +277,37 @@ function parseXml(xmlContent: string): ValidationResult['xml_data'] {
   return data;
 }
 
+/** Extrai chave de 44 dígitos embutida em DANFE/DACTE PDF (texto no stream). */
+function extractChaveFromPdfBytes(bytes: Uint8Array): string | null {
+  const raw = new TextDecoder('latin1').decode(bytes);
+  const candidates = new Set<string>();
+
+  const compact = raw.replace(/\s/g, '');
+  const re44 = /\d{44}/g;
+  let match: RegExpExecArray | null;
+  while ((match = re44.exec(compact)) !== null) {
+    candidates.add(match[0]);
+  }
+
+  const spaced = raw.match(/(?:\d{4}\s){10}\d{1,4}/);
+  if (spaced) {
+    const clean = spaced[0].replace(/\s/g, '');
+    if (clean.length === 44) candidates.add(clean);
+  }
+
+  for (const candidate of candidates) {
+    const check = validarChaveAcesso(candidate);
+    if (check.status === 'valid') return candidate;
+  }
+
+  return null;
+}
+
+function isPdfPath(path: string, fileName?: string | null): boolean {
+  const lower = `${path} ${fileName ?? ''}`.toLowerCase();
+  return lower.includes('.pdf');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -286,7 +324,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const body = await req.json().catch(() => ({}));
 
-    const { documentId, nfe_key, xml_content, auto_update = true } = body;
+    const { documentId, nfe_key, xml_content, auto_update = true, consult_sefaz = true } = body;
 
     if (!documentId && !nfe_key) {
       return new Response(JSON.stringify({ error: 'Informe documentId ou nfe_key' }), {
@@ -303,7 +341,7 @@ serve(async (req) => {
     if (documentId) {
       const { data, error } = await supabase
         .from('documents')
-        .select('id, nfe_key, type, file_path, file_name, order_id')
+        .select('id, nfe_key, type, file_url, file_name, order_id')
         .eq('id', documentId)
         .single();
 
@@ -317,17 +355,24 @@ serve(async (req) => {
       documento = data;
       chaveParaValidar = chaveParaValidar || data.nfe_key;
 
+      // file_url = path no bucket (ex.: userId/timestamp-random.xml), não URL pública
+      const storagePath = data.file_url?.trim() ?? '';
+
       // Se tem arquivo e ainda não tem XML parseado, tenta baixar
-      if (data.file_path && !xmlParaParse) {
+      if (storagePath && !xmlParaParse) {
         try {
           const { data: fileData, error: fileError } = await supabase.storage
             .from('documents')
-            .download(data.file_path);
+            .download(storagePath);
 
           if (!fileError && fileData) {
-            const text = await fileData.text();
-            if (text.trim().startsWith('<?xml') || text.trim().startsWith('<')) {
-              xmlParaParse = text;
+            const bytes = new Uint8Array(await fileData.arrayBuffer());
+            const head = new TextDecoder('utf-8').decode(bytes.slice(0, 512)).trim();
+            if (head.startsWith('<?xml') || head.startsWith('<')) {
+              xmlParaParse = new TextDecoder('utf-8').decode(bytes);
+            } else if (!chaveParaValidar && isPdfPath(storagePath, data.file_name)) {
+              const fromPdf = extractChaveFromPdfBytes(bytes);
+              if (fromPdf) chaveParaValidar = fromPdf;
             }
           }
         } catch (e) {
@@ -355,10 +400,17 @@ serve(async (req) => {
         };
       }
     } else {
+      const isPdf =
+        documento?.file_name?.toLowerCase().endsWith('.pdf') ||
+        documento?.file_url?.toLowerCase().includes('.pdf');
       result = {
         status: 'pending',
         document_type: 'unknown',
-        validation_errors: ['Chave de acesso não informada e XML não disponível'],
+        validation_errors: [
+          isPdf
+            ? 'PDF sem chave legível. Cole a chave de 44 dígitos da DANFE ou envie o XML.'
+            : 'Chave de acesso não informada e XML não disponível',
+        ],
         metadata: {},
       };
     }
@@ -371,6 +423,51 @@ serve(async (req) => {
       }
     }
 
+    const chaveFinal =
+      chaveParaValidar?.replace(/\D/g, '') || result.xml_data?.chave?.replace(/\D/g, '') || '';
+
+    const podeConsultarSefaz =
+      consult_sefaz &&
+      chaveFinal.length === 44 &&
+      (result.status === 'valid' || result.status === 'xml_parsed');
+
+    if (podeConsultarSefaz) {
+      const sefazResult = await consultSefaz(chaveFinal, {
+        proxyUrl: Deno.env.get('SEFAZ_PROXY_URL'),
+        proxySecret: Deno.env.get('SEFAZ_PROXY_SECRET'),
+        focusToken: Deno.env.get('FOCUS_NFE_TOKEN'),
+        vectraCnpj: Deno.env.get('VECTRA_CNPJ') ?? '59650913000104',
+      });
+
+      if (sefazResult.metadata) {
+        result.sefaz = sefazResult.metadata;
+        result.metadata = {
+          ...result.metadata,
+          sefaz: sefazResult.metadata,
+        };
+        result.status = mapSefazStatusToValidationStatus(sefazResult.metadata.c_stat);
+
+        if (result.status === 'sefaz_authorized') {
+          result.validation_errors = [];
+        } else if (result.status === 'sefaz_cancelled') {
+          result.validation_errors = [
+            sefazResult.metadata.x_motivo || 'Documento cancelado na SEFAZ',
+          ];
+        } else if (result.status === 'invalid') {
+          result.validation_errors = [
+            sefazResult.metadata.x_motivo || 'Documento rejeitado ou inválido na SEFAZ',
+          ];
+        } else if (result.status === 'pending') {
+          result.validation_errors = [
+            sefazResult.metadata.x_motivo || 'Documento não localizado na base SEFAZ',
+          ];
+        }
+      } else if (sefazResult.error) {
+        result.sefaz = null;
+        result.validation_errors = [...result.validation_errors, `SEFAZ: ${sefazResult.error}`];
+      }
+    }
+
     // Atualiza o documento no banco
     if (auto_update && documentId) {
       const updateData: any = {
@@ -379,8 +476,16 @@ serve(async (req) => {
         validation_metadata: result.metadata,
       };
 
-      // Se parseou XML, atualiza nfe_key se estava vazio
-      if (result.xml_data?.chave && !documento?.nfe_key) {
+      const chaveLimpa = chaveParaValidar?.replace(/\D/g, '') ?? '';
+      if (
+        chaveLimpa.length === 44 &&
+        (result.status === 'valid' ||
+          result.status === 'xml_parsed' ||
+          result.status === 'sefaz_authorized' ||
+          result.status === 'sefaz_cancelled')
+      ) {
+        updateData.nfe_key = chaveLimpa;
+      } else if (result.xml_data?.chave && !documento?.nfe_key) {
         updateData.nfe_key = result.xml_data.chave;
       }
 
