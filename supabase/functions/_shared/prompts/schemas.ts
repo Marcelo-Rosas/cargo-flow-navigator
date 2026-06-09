@@ -1,3 +1,5 @@
+import { parseJsonFromLlmText } from '../llm-json-parse.ts';
+
 interface AnalysisMeta {
   _model?: string;
   _cost_usd?: number;
@@ -182,15 +184,6 @@ export interface RegulatoryUpdateResult {
 
 const VALID_RISKS = ['baixo', 'medio', 'alto'];
 
-function parseJsonFromText(text: string): Record<string, unknown> | null {
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-  } catch {
-    return null;
-  }
-}
-
 function ensureRisk(obj: Record<string, unknown>): Record<string, unknown> {
   if (!obj.risk || !VALID_RISKS.includes(String(obj.risk))) {
     obj.risk = 'medio';
@@ -209,7 +202,7 @@ export function validateAndParse<T extends Record<string, unknown>>(
   rawText: string,
   analysisType: string
 ): T {
-  let parsed = parseJsonFromText(rawText);
+  let parsed = parseJsonFromLlmText(rawText);
 
   if (!parsed) {
     parsed = { raw: rawText, risk: 'medio', summary: rawText.substring(0, 300) };

@@ -28,6 +28,13 @@ export interface DriverQualificationWorkerResult {
   driver_qualification_data: Record<string, unknown>;
 }
 
+function formatDateBr(value: unknown): string {
+  if (!value || typeof value !== 'string') return 'Não informada';
+  const d = value.slice(0, 10);
+  const [y, m, day] = d.split('-');
+  return y && m && day ? `${day}/${m}/${y}` : value;
+}
+
 function buildPrompt(order: any, previousInsights?: string): string {
   const boolLabel = (v: unknown) => (v ? 'Sim' : 'Não');
 
@@ -37,18 +44,38 @@ function buildPrompt(order: any, previousInsights?: string): string {
 
 **Dados do Motorista**:
 - Nome: ${order.driver_name || 'Não informado'}
+- CPF: ${order.driver_cpf || 'Não informado'}
 - Telefone: ${order.driver_phone || 'Não informado'}
 - CNH: ${order.driver_cnh || 'Não informado'}
+- Categoria CNH: ${order.driver_cnh_category || 'Não informada'}
+- Validade CNH: ${formatDateBr(order.driver_cnh_expiry)}
 - ANTT/RNTRC: ${order.driver_antt || 'Não informado'}
+- Tipo contrato: ${order.driver_contract_type || 'Não informado'}
+- Registro RNTRC: ${order.driver_rntrc_registry_type || 'Não informado'}
 
-**Dados do Veículo**:
+**Dados do Veículo (OS)**:
 - Placa: ${order.vehicle_plate || 'Não informada'}
 - Marca: ${order.vehicle_brand || 'N/A'}
 - Modelo: ${order.vehicle_model || 'N/A'}
-- Tipo: ${order.vehicle_type_name || 'N/A'}
+- Tipo: ${order.vehicle_type_name || 'N/A'}`;
+
+  if (order.fleet_matched) {
+    prompt += `
+
+**Cadastro Frota (vehicles — placa ${order.vehicle_plate})**:
+- Placa carreta: ${order.vehicle_plate_2 || 'Não informada'}
+- RENAVAM: ${order.vehicle_renavam || 'Não informado'}
+- Marca/Modelo: ${order.fleet_brand || 'N/A'} / ${order.fleet_model || 'N/A'}
+- Ano/Cor: ${order.fleet_year ?? 'N/A'} / ${order.fleet_color || 'N/A'}
+- TAG pedágio no cadastro: não informada (não deduza TAG ausente só por isso)`;
+  }
+
+  prompt += `
 
 **Proprietário**:
 - Nome: ${order.owner_name || 'Não informado'}
+- CPF/CNPJ: ${order.owner_cpf_cnpj || 'Não informado'}
+- Município/UF: ${[order.owner_city, order.owner_state].filter(Boolean).join('/') || 'Não informado'}
 - Telefone: ${order.owner_phone || 'Não informado'}
 
 **Documentos apresentados**:
@@ -102,6 +129,7 @@ export async function executeDriverQualificationWorker(
 
   const driver_qualification_data = {
     order_id: orderData.id,
+    driver_cpf: orderData.driver_cpf || null,
     driver_name: orderData.driver_name || null,
     status: dbStatus,
     checklist: analysis.checklist || {},
