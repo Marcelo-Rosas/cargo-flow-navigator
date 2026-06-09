@@ -18,6 +18,8 @@ Parta de 100 pontos e aplique as deduções cumulativas:
 - CRLV vencido ou ausente: −25 pontos (critical)
 - Comprovante de residência ausente: −10 pontos (warning)
 
+**TAG de pedágio:** só deduza −30 se houver evidência explícita de ausência. Se o cadastro não informar TAG, marque tag_pedagio como indeterminado e **não deduza** por falta de dado no sistema.
+
 ## Classificação
 - risk_score >= 70: qualification_status = "aprovado", risk = "baixo"
 - risk_score >= 40 e < 70: qualification_status = "em_analise", risk = "medio"

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   ANTT_FLOOR_DEFAULT_FLAGS,
   calculateAnttPisoBrl,
+  computeAnttPisoCarreteiroReais,
   inferAnttFlagsFromStoredMeta,
+  resolveAnttKmForPiso,
   resolveAnttOperationTable,
 } from '@/lib/antt-floor-calc';
 
@@ -29,6 +31,35 @@ describe('resolveAnttOperationTable', () => {
         retornoVazio: false,
       })
     ).toBe('C');
+  });
+});
+
+describe('resolveAnttKmForPiso', () => {
+  it('usa ceil(km) como calculadora ANTT', () => {
+    expect(resolveAnttKmForPiso(2847.5)).toBe(2848);
+    expect(resolveAnttKmForPiso(2756)).toBe(2756);
+  });
+});
+
+describe('computeAnttPisoCarreteiroReais', () => {
+  it('SUROC N4 tabela A 6 eixos — paridade calculadora', () => {
+    const r = computeAnttPisoCarreteiroReais({
+      kmDistance: 2756,
+      ccd: 7.4124,
+      cc: 648.95,
+    });
+    expect(r.kmUsed).toBe(2756);
+    expect(r.total).toBe(21077.52);
+  });
+
+  it('arredonda km para cima antes da fórmula', () => {
+    const r = computeAnttPisoCarreteiroReais({
+      kmDistance: 2755.1,
+      ccd: 7.4124,
+      cc: 648.95,
+    });
+    expect(r.kmUsed).toBe(2756);
+    expect(r.total).toBe(21077.52);
   });
 });
 

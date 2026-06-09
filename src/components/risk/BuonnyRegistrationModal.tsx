@@ -94,7 +94,7 @@ export function BuonnyRegistrationModal({
     if (ownerName && !proprietario) {
       setProprietario(ownerName);
     }
-  }, [ownerName]);
+  }, [ownerName, proprietario]);
 
   const statusOption = STATUS_OPTIONS.find((s) => s.value === statusBuonny);
   const canSubmit = codigoLiberacao.trim() && statusBuonny && !isLoading;

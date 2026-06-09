@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { calculateAnttPisoBrl } from '@/lib/antt-floor-calc';
+import { computeAnttPisoCarreteiroReais } from '@/lib/antt-floor-calc';
 import { asDb } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -24,7 +24,7 @@ interface UseAnttFloorRateParams {
  * Tabela A–D conforme flags em `resolveAnttOperationTable` (calculadora ANTT).
  */
 export function useAnttFloorRate(params: UseAnttFloorRateParams) {
-  const operationTable = params.operationTable ?? 'B';
+  const operationTable = params.operationTable ?? 'A';
   const cargoType = params.cargoType ?? 'carga_geral';
   const axesCount = params.axesCount;
 
@@ -57,7 +57,7 @@ export function calculateAnttMinimum(input: {
   cc: number;
   retornoVazio?: boolean;
 }) {
-  const { ida, retornoVazio, total } = calculateAnttPisoBrl({
+  const { kmUsed, ida, retornoVazio, total } = computeAnttPisoCarreteiroReais({
     kmDistance: input.kmDistance,
     ccd: input.ccd,
     cc: input.cc,
@@ -68,7 +68,7 @@ export function calculateAnttMinimum(input: {
     retornoVazio,
     total,
     formula: {
-      kmDistance: input.kmDistance,
+      kmDistance: kmUsed,
       ccd: input.ccd,
       cc: input.cc,
       retornoVazio: input.retornoVazio ?? false,

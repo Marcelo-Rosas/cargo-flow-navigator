@@ -1,5 +1,5 @@
 /**
- * Lotação (FTL): base de custo carreteiro para gross-up = Piso ANTT (+ over mínimo), quando calculado.
+ * Lotação (FTL): base de custo carreteiro para gross-up = Piso ANTT bruto, quando calculado.
  * Paridade obrigatória com src/lib/lotacao-freight-base.ts
  */
 
@@ -50,15 +50,15 @@ export function resolveLotacaoFretePeso(params: {
   const freteTabela = round(Math.max(0, params.freteTabela));
   const pisoAntt = round(Math.max(0, params.pisoAntt));
   const freteTabelaComOverKm = round(freteTabela * (1 + params.overKmPercent / 100));
-  const pisoComOverAntt = pisoAntt > 0 ? round(pisoAntt * (1 + params.overAnttPercent / 100)) : 0;
-  const fretePesoReferenciaMax = round(Math.max(freteTabelaComOverKm, pisoComOverAntt));
-  const anttCostBaseUsed = pisoComOverAntt > 0;
-  const fretePeso = anttCostBaseUsed ? pisoComOverAntt : freteTabelaComOverKm;
+  const pisoComOverAntt = pisoAntt;
+  const fretePesoReferenciaMax = round(Math.max(freteTabelaComOverKm, pisoAntt));
+  const anttCostBaseUsed = pisoAntt > 0;
+  const fretePeso = anttCostBaseUsed ? pisoAntt : freteTabelaComOverKm;
   const pisoAplicado = anttCostBaseUsed;
   const anttFloorApplied =
     anttCostBaseUsed ||
     (pisoAntt > 0 && pisoAntt > freteTabela) ||
-    pisoComOverAntt >= freteTabelaComOverKm;
+    pisoAntt >= freteTabelaComOverKm;
 
   return {
     fretePeso,

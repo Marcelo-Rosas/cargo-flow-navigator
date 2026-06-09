@@ -1,0 +1,120 @@
+#!/usr/bin/env node
+/**
+ * Remove Cloudflare Access (Zero Trust) das URLs do TMS para login público via Supabase.
+ *
+ * Uso:
+ *   CLOUDFLARE_API_TOKEN=<token com Account.Zero Trust Write> node scripts/disable-cloudflare-access-public.mjs
+ *   CLOUDFLARE_API_TOKEN=... node scripts/disable-cloudflare-access-public.mjs --apply
+ *
+ * Token: Cloudflare Dashboard → My Profile → API Tokens → Create Token
+ *   Template: "Edit Cloudflare Zero Trust" ou permissões Account → Access: Apps and Policies → Edit
+ *
+ * Sem --apply: apenas lista apps que seriam removidos (dry-run).
+ */
+const DEFAULT_ACCOUNT_ID = '361e9e1383bfa8e95e1db54e6c2a3bba';
+
+const API = 'https://api.cloudflare.com/client/v4';
+const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
+const apply = process.argv.includes('--apply');
+
+/** Hosts que devem ficar públicos (login Supabase na aplicação). */
+const PUBLIC_HOST_PATTERNS = [
+  'app.vectracargo.com.br',
+  'cargo-flow-navigator.pages.dev',
+  'cargo-flow-navigator.marcelo-rosas.workers.dev',
+];
+
+function matchesPublicHost(app) {
+  const hay = [app.domain, app.name, app.aud, ...(app.destinations?.map((d) => d.uri) ?? [])]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return PUBLIC_HOST_PATTERNS.some((p) => hay.includes(p.toLowerCase()));
+}
+
+async function cf(path, init = {}) {
+  const res = await fetch(`${API}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(init.headers ?? {}),
+    },
+  });
+  const body = await res.json();
+  if (!res.ok || body.success === false) {
+    const msg = body.errors?.map((e) => `${e.code}: ${e.message}`).join('; ') || res.statusText;
+    throw new Error(msg);
+  }
+  return body.result;
+}
+
+async function main() {
+  if (!token) {
+    console.error(
+      'Defina CLOUDFLARE_API_TOKEN (Zero Trust Write).\n' +
+        'Alternativa manual: Zero Trust → Access → Applications → excluir apps de app.vectracargo.com.br'
+    );
+    process.exit(1);
+  }
+
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID ?? DEFAULT_ACCOUNT_ID;
+  const apps = await cf(`/accounts/${accountId}/access/apps?per_page=100`);
+  const targets = (apps ?? []).filter(matchesPublicHost);
+
+  if (targets.length === 0) {
+    console.log(
+      JSON.stringify(
+        {
+          status: 'no_matching_apps',
+          message:
+            'Nenhum Access app encontrado para os hosts do TMS. Domínio já pode estar público.',
+          patterns: PUBLIC_HOST_PATTERNS,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        status: apply ? 'deleting' : 'dry_run',
+        account_id: accountId,
+        targets: targets.map((a) => ({ id: a.id, name: a.name, domain: a.domain, type: a.type })),
+      },
+      null,
+      2
+    )
+  );
+
+  if (!apply) {
+    console.log('\nReexecute com --apply para remover os apps listados.');
+    return;
+  }
+
+  for (const app of targets) {
+    await cf(`/accounts/${accountId}/access/apps/${app.id}`, { method: 'DELETE' });
+    console.log(`Removido: ${app.name} (${app.domain ?? app.id})`);
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        status: 'done',
+        removed: targets.length,
+        verify:
+          'curl -sI https://app.vectracargo.com.br/auth | findstr /i "HTTP Cloudflare-Access Location"',
+      },
+      null,
+      2
+    )
+  );
+}
+
+main().catch((err) => {
+  console.error(err instanceof Error ? err.message : err);
+  process.exit(2);
+});

@@ -26,6 +26,10 @@ export function resolveAnttOperationTable(flags: AnttFloorFlags): AnttOperationT
   return flags.altoDesempenho ? 'D' : 'B';
 }
 
+export function resolveAnttKmForPiso(kmDistance: number): number {
+  return Math.ceil(Math.max(0, kmDistance));
+}
+
 export function calculateAnttPisoBrl(params: {
   kmDistance: number;
   ccd: number;
@@ -39,5 +43,28 @@ export function calculateAnttPisoBrl(params: {
     ida,
     retornoVazio: retorno,
     total: ida + retorno,
+  };
+}
+
+export function computeAnttPisoCarreteiroReais(params: {
+  kmDistance: number;
+  ccd: number;
+  cc: number;
+  retornoVazio?: boolean;
+  round?: (n: number) => number;
+}): { kmUsed: number; ida: number; retornoVazio: number; total: number } {
+  const kmUsed = resolveAnttKmForPiso(params.kmDistance);
+  const round = params.round ?? ((n: number) => Math.round((n + Number.EPSILON) * 100) / 100);
+  const raw = calculateAnttPisoBrl({
+    kmDistance: kmUsed,
+    ccd: params.ccd,
+    cc: params.cc,
+    retornoVazio: params.retornoVazio ?? false,
+  });
+  return {
+    kmUsed,
+    ida: round(raw.ida),
+    retornoVazio: round(raw.retornoVazio),
+    total: round(raw.total),
   };
 }

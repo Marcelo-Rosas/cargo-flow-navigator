@@ -5,6 +5,7 @@ import { type DriverQualificationWorkerResult } from '../_shared/workers/driverQ
 import { type OperationalReportData } from '../_shared/workers/operationalReportWorker.ts';
 import { type ParsedArticle } from '../_shared/workers/regulatoryUpdateWorker.ts';
 import { type OperationalInsightsData } from '../_shared/workers/operationalInsightsWorker.ts';
+import { enrichOrderForDriverQualification } from '../_shared/driver-qualification-order.ts';
 
 // callWorker delegates to shared callEdgeFunction (workers are edge functions)
 function callWorker(workerName: string, body: Record<string, unknown>) {
@@ -183,7 +184,7 @@ async function fetchOrderForDriverQual(sb: any, orderId: string) {
     .eq('id', orderId)
     .single();
   if (error || !order) throw new Error(`Order not found: ${orderId}`);
-  return order;
+  return enrichOrderForDriverQualification(sb, order);
 }
 
 async function fetchOrderForStageGate(sb: any, orderId: string) {

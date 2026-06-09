@@ -72,6 +72,11 @@ export function inferAnttFlagsFromStoredMeta(
  * - Ida: km × CCD + CC
  * - Retorno vazio: acrescenta km × CCD (deslocamento de volta sem novo CC fixo)
  */
+/** KM da fórmula oficial (calculadorafrete.antt.gov.br): arredonda para cima. */
+export function resolveAnttKmForPiso(kmDistance: number): number {
+  return Math.ceil(Math.max(0, kmDistance));
+}
+
 export function calculateAnttPisoBrl(params: {
   kmDistance: number;
   ccd: number;
@@ -85,5 +90,32 @@ export function calculateAnttPisoBrl(params: {
     ida,
     retornoVazio: retorno,
     total: ida + retorno,
+  };
+}
+
+/**
+ * Piso carreteiro (R$) com paridade calculadora ANTT: ceil(km)×CCD + CC (+ retorno vazio).
+ * Valor retornado em `total` é a base seca do gross-up em lotação.
+ */
+export function computeAnttPisoCarreteiroReais(params: {
+  kmDistance: number;
+  ccd: number;
+  cc: number;
+  retornoVazio?: boolean;
+  round?: (n: number) => number;
+}): { kmUsed: number; ida: number; retornoVazio: number; total: number } {
+  const kmUsed = resolveAnttKmForPiso(params.kmDistance);
+  const round = params.round ?? ((n: number) => Math.round((n + Number.EPSILON) * 100) / 100);
+  const raw = calculateAnttPisoBrl({
+    kmDistance: kmUsed,
+    ccd: params.ccd,
+    cc: params.cc,
+    retornoVazio: params.retornoVazio ?? false,
+  });
+  return {
+    kmUsed,
+    ida: round(raw.ida),
+    retornoVazio: round(raw.retornoVazio),
+    total: round(raw.total),
   };
 }
