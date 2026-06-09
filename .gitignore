@@ -15,6 +15,7 @@ dist-ssr
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
 .cursor/
 .cursorrules
@@ -42,6 +43,12 @@ audit-report.json
 .claude/settings.local.json
 
 # Sensitive / local-only
+docs/certificados/
+*.pfx
+.serena/
+.tmp/
+openai-cookbook/
+
 APIs/
 *.env
 *.env.*
@@ -60,8 +67,13 @@ CON
 !.dev.vars.example
 .env*
 !.env.example
+!.env.e2e.example
 
 dist/wrangler.json
 
 # Bun (projeto usa npm; lockfile faz ferramentas como update-browserslist-db chamarem `bun` sem ele instalado)
 bun.lockb
+
+# Smoke / setup gerados localmente
+scripts/smoke-run-metrics.json
+scripts/SETUP_REPORT.md

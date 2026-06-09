@@ -3,7 +3,7 @@
  *
  * Regras cobertas:
  * - 1 cliente => botão "Adicionar parada" NÃO visível
- * - 2+ clientes => botão "Adicionar parada" visível
+ * - 2+ clientes => botão "Adicionar entrega" visível
  * - remover cliente extra e voltar para 1 => botão desaparece
  *
  * Requer build com a correção. Rodar contra build local:
@@ -75,31 +75,39 @@ test.describe('quote paradas gating (round 1)', () => {
     await expect(page.getByRole('heading', { name: /Bem-vindo de volta/i })).toHaveCount(0);
   });
 
-  test('1 cliente => não exibe botão Adicionar parada', async ({ page }) => {
+  test('passo 1 exibe Adicionar destinatário e Adicionar embarcador no cabeçalho', async ({
+    page,
+  }) => {
     await openNovaCotacaoStep1(page);
-    await expect(page.getByRole('button', { name: /Adicionar parada/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Adicionar destinatário/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Adicionar embarcador/i })).toBeVisible();
+  });
+
+  test('1 cliente => não exibe botão Adicionar entrega', async ({ page }) => {
+    await openNovaCotacaoStep1(page);
+    await expect(page.getByRole('button', { name: /Adicionar entrega/i })).toHaveCount(0);
   });
 
   test('2 clientes => exibe botão Adicionar parada', async ({ page }) => {
     await openNovaCotacaoStep1(page);
-    await page.getByRole('button', { name: /Adicionar cliente/i }).click();
-    await expect(page.getByRole('button', { name: /Adicionar parada/i })).toBeVisible();
+    await page.getByRole('button', { name: /Adicionar destinatário/i }).click();
+    await expect(page.getByRole('button', { name: /Adicionar entrega/i })).toBeVisible();
   });
 
   test('3+ clientes => continua exibindo botão Adicionar parada', async ({ page }) => {
     await openNovaCotacaoStep1(page);
-    await page.getByRole('button', { name: /Adicionar cliente/i }).click();
-    await page.getByRole('button', { name: /Adicionar cliente/i }).click();
-    await expect(page.getByRole('button', { name: /Adicionar parada/i })).toBeVisible();
+    await page.getByRole('button', { name: /Adicionar destinatário/i }).click();
+    await page.getByRole('button', { name: /Adicionar destinatário/i }).click();
+    await expect(page.getByRole('button', { name: /Adicionar entrega/i })).toBeVisible();
   });
 
   test('remover cliente extra e voltar para 1 => botão Adicionar parada desaparece', async ({
     page,
   }) => {
     await openNovaCotacaoStep1(page);
-    await page.getByRole('button', { name: /Adicionar cliente/i }).click();
-    await expect(page.getByRole('button', { name: /Adicionar parada/i })).toBeVisible();
+    await page.getByRole('button', { name: /Adicionar destinatário/i }).click();
+    await expect(page.getByRole('button', { name: /Adicionar entrega/i })).toBeVisible();
     await page.getByTitle('Remover destinatário').click();
-    await expect(page.getByRole('button', { name: /Adicionar parada/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Adicionar entrega/i })).toHaveCount(0);
   });
 });

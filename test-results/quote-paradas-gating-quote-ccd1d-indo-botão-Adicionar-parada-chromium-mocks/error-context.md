@@ -1,0 +1,302 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - list
+    - region "Notifications alt+T"
+    - generic:
+      - complementary:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - img
+                - generic: Vectra Cargo
+        - navigation:
+          - link:
+            - /url: /
+            - generic:
+              - img
+              - generic: Dashboard
+          - link:
+            - /url: /comercial
+            - generic:
+              - img
+              - generic: Comercial
+          - link:
+            - /url: /operacional
+            - generic:
+              - img
+              - generic: Operação
+          - link:
+            - /url: /documentos
+            - generic:
+              - img
+              - generic: Documentos
+          - link:
+            - /url: /relatorios
+            - generic:
+              - img
+              - generic: Relatórios
+          - link:
+            - /url: /monitoramento-seguros
+            - generic:
+              - img
+              - generic: Monit. Seguros
+          - link:
+            - /url: /clientes
+            - generic:
+              - img
+              - generic: Clientes
+          - link:
+            - /url: /embarcadores
+            - generic:
+              - img
+              - generic: Embarcadores
+          - link:
+            - /url: /veiculos
+            - generic:
+              - img
+              - generic: Veículos
+          - link:
+            - /url: /tabelas-preco
+            - generic:
+              - img
+              - generic: Tabelas de Preço
+          - link:
+            - /url: /financeiro
+            - generic:
+              - img
+              - generic: Financeiro
+        - generic:
+          - button:
+            - img
+            - generic: Sair
+        - button:
+          - img
+      - generic:
+        - banner:
+          - button:
+            - generic:
+              - img
+              - generic: Buscar cotações, OS, clientes...
+              - generic: ⌘K
+          - generic:
+            - button:
+              - img
+              - generic: Novo
+            - button:
+              - img
+              - generic: "3"
+            - button:
+              - generic:
+                - img
+        - main:
+          - generic:
+            - generic:
+              - heading [level=1]: Comercial
+              - paragraph: "Pipeline total: R$ 0,00"
+            - generic:
+              - generic:
+                - img
+                - textbox:
+                  - /placeholder: Buscar cotações...
+              - button:
+                - img
+              - button:
+                - img
+                - generic: Consolidação
+              - button:
+                - img
+              - button:
+                - img
+                - text: Nova Cotação
+          - generic:
+            - button: Kanban Comercial
+            - button: Inteligência NTC
+            - button: Notícias NTC
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Novo Pedido
+                  - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Qualificação
+                  - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Precificação
+                  - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Enviado
+                  - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Negociação
+                  - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Ganho
+                  - generic: "1"
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - button:
+                            - img
+                          - generic:
+                            - heading [level=4]: QT-TEST
+                            - paragraph: Cliente Teste
+                        - generic:
+                          - generic:
+                            - img
+                            - text: 0%
+                          - button:
+                            - img
+                      - generic:
+                        - img
+                        - generic: São Paulo, SP
+                        - generic: →
+                        - generic: Rio de Janeiro, RJ
+                    - generic:
+                      - generic: R$ 10.000,00
+                      - generic:
+                        - img
+                        - text: 05 de mar.
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Perdido
+                  - generic: "0"
+          - status
+  - dialog "Nova Cotação" [active] [ref=e2]:
+    - generic [ref=e3]:
+      - heading "Nova Cotação" [level=2] [ref=e5]
+      - paragraph [ref=e6]: Configure os dados da cotação, rota, carga e custos antes de salvar.
+    - generic [ref=e8]:
+      - alert [ref=e9]:
+        - img [ref=e10]
+        - generic [ref=e12]: Tabela de preços não selecionada
+      - alert [ref=e13]:
+        - img [ref=e14]
+        - generic [ref=e16]: Margem operacional de 0.0% abaixo da meta de 15%
+      - generic [ref=e18]:
+        - navigation "Etapas da cotação" [ref=e19]:
+          - generic [ref=e20]:
+            - button "1 Identificação" [disabled] [ref=e21]:
+              - generic [ref=e22]: "1"
+              - generic [ref=e23]: Identificação
+            - button "2 Carga" [disabled] [ref=e24]:
+              - generic [ref=e25]: "2"
+              - generic [ref=e26]: Carga
+            - button "3 Financeiro" [disabled] [ref=e27]:
+              - generic [ref=e28]: "3"
+              - generic [ref=e29]: Financeiro
+            - button "4 Seguro" [disabled] [ref=e30]:
+              - generic [ref=e31]: "4"
+              - generic [ref=e32]: Seguro
+            - button "5 Revisão" [disabled] [ref=e33]:
+              - generic [ref=e34]: "5"
+              - generic [ref=e35]: Revisão
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - text: Dados do Cliente
+            - generic [ref=e41]:
+              - generic [ref=e42]:
+                - generic [ref=e43]:
+                  - text: Cliente Existente
+                  - combobox "Cliente Existente" [ref=e44] [cursor=pointer]:
+                    - generic: Selecionar cliente...
+                    - img [ref=e45]
+                  - combobox [ref=e47]
+                - generic [ref=e48]:
+                  - text: E-mail
+                  - textbox "E-mail" [ref=e49]:
+                    - /placeholder: cliente@email.com
+              - generic [ref=e50]:
+                - text: Nome do Cliente *
+                - textbox "Nome do Cliente *" [ref=e51]:
+                  - /placeholder: Nome ou razão social
+              - generic [ref=e53]:
+                - generic [ref=e54]: Destinatários adicionais
+                - button "Adicionar cliente" [ref=e55] [cursor=pointer]:
+                  - img
+                  - text: Adicionar cliente
+          - generic [ref=e56]:
+            - text: Embarcador
+            - generic [ref=e57]:
+              - generic [ref=e58]:
+                - generic [ref=e59]:
+                  - text: Embarcador Existente
+                  - combobox "Embarcador Existente" [ref=e60] [cursor=pointer]:
+                    - generic: Selecionar embarcador...
+                    - img [ref=e61]
+                  - combobox [ref=e63]
+                - generic [ref=e64]:
+                  - text: E-mail Embarcador
+                  - textbox "E-mail Embarcador" [ref=e65]:
+                    - /placeholder: embarcador@email.com
+              - generic [ref=e66]:
+                - generic [ref=e67]:
+                  - text: Nome do Embarcador
+                  - textbox "Nome do Embarcador" [ref=e68]:
+                    - /placeholder: Nome ou razão social
+                - generic [ref=e69]:
+                  - text: Tipo de Frete *
+                  - combobox "Tipo de Frete *" [ref=e70] [cursor=pointer]:
+                    - generic: FOB
+                    - img [ref=e71]
+                  - combobox [ref=e73]
+              - generic [ref=e75]:
+                - generic [ref=e76]: Embarcadores adicionais
+                - button "Adicionar embarcador" [ref=e77] [cursor=pointer]:
+                  - img
+                  - text: Adicionar embarcador
+          - generic [ref=e78]:
+            - text: Rota
+            - generic [ref=e79]:
+              - generic [ref=e80]:
+                - text: Tipo de Veículo
+                - combobox "Tipo de Veículo" [ref=e81] [cursor=pointer]:
+                  - generic: Selecionar veículo...
+                  - img [ref=e82]
+                - combobox [ref=e84]
+              - generic [ref=e85]:
+                - generic [ref=e86]:
+                  - text: CEP Origem
+                  - textbox "00000-000" [ref=e88]
+                - generic [ref=e89]:
+                  - text: CEP Destino
+                  - textbox "00000-000" [ref=e91]
+              - generic [ref=e92]:
+                - generic [ref=e93]:
+                  - text: Origem *
+                  - textbox "Origem *" [ref=e94]:
+                    - /placeholder: Cidade - UF
+                - generic [ref=e95]:
+                  - text: Destino *
+                  - textbox "Destino *" [ref=e96]:
+                    - /placeholder: Cidade - UF
+              - generic [ref=e97]:
+                - button "Calcular KM" [disabled]
+        - generic [ref=e100]:
+          - button "Cancelar" [ref=e101] [cursor=pointer]
+          - button "Próximo" [ref=e102] [cursor=pointer]:
+            - text: Próximo
+            - img
+    - button "Close" [ref=e103] [cursor=pointer]:
+      - img [ref=e104]
+      - generic [ref=e107]: Close
+```

@@ -8,6 +8,8 @@ export interface CalculateFreightInput {
   toll_value?: number;
   price_table_id?: string;
   vehicle_type_code?: string;
+  /** Fallback quando lookup por code falhar (wizard envia eixos do veículo selecionado). */
+  vehicle_axes_count?: number;
   payment_term_code?: string;
   tde_enabled?: boolean;
   tear_enabled?: boolean;
@@ -22,6 +24,14 @@ export interface CalculateFreightInput {
   aluguel_maquinas_value?: number;
   /** Forçar piso ANTT no cálculo: recalcula gross-up partindo de pisoAnttCarreteiro como frete_peso */
   enforce_antt_floor?: boolean;
+  /** Piso ANTT — paridade calculadorafrete.antt.gov.br (lotação) */
+  antt_composicao_veicular?: boolean;
+  antt_alto_desempenho?: boolean;
+  antt_retorno_vazio?: boolean;
+  benchmarks?: {
+    historyBenchmark2025?: number;
+    ckanBenchmark?: number;
+  };
 }
 
 export interface FreightMeta {
@@ -30,6 +40,15 @@ export interface FreightMeta {
   km_status: 'OK' | 'OUT_OF_RANGE';
   margin_status: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
   margin_percent: number;
+  match_status?: {
+    status: 'WIN' | 'LOSS' | 'WARNING';
+    /** @deprecated */
+    history2025Value?: number;
+    ckan_benchmark_liquido?: number;
+    ckanBenchmarkLiquido?: number;
+    ckanGrossValue?: number;
+    ckan_gross_value?: number;
+  };
   cubage_factor: number;
   cubage_weight_kg: number;
   billable_weight_kg: number;
@@ -53,6 +72,10 @@ export interface FreightMeta {
   ltl_min_weight_applied?: boolean;
   /** peso real informado antes da trava 1t LTL */
   original_weight_kg?: number;
+  lotacao_over_km_percent?: number;
+  lotacao_over_antt_percent?: number;
+  lotacao_piso_com_over?: number;
+  lotacao_frete_tabela_com_over_km?: number;
 }
 
 export interface FreightComponents {

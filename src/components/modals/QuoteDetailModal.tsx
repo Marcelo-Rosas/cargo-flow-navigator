@@ -43,6 +43,9 @@ import {
 import type { CalculateFreightInput } from '@/types/freight';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
+import { inferAnttFlagsFromStoredMeta, resolveAnttOperationTable } from '@/lib/antt-floor-calc';
+import { resolvePisoAnttCarreteiroReais } from '@/lib/carreteiro-cost';
+import { resolveAnttRsKm, resolvePisoAnttTotalReais } from '@/lib/antt-rs-km';
 import { supabase } from '@/integrations/supabase/client';
 import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import {
@@ -50,6 +53,10 @@ import {
   StoredPricingBreakdown,
   TollPlaza,
   FREIGHT_CONSTANTS,
+  isMarginBelowTarget,
+  resolveMargemBrutaDisplay,
+  resolveResultadoLiquidoDisplay,
+  round2,
 } from '@/lib/freightCalculator';
 import {
   Table,
@@ -106,6 +113,23 @@ const STAGE_LABELS: Record<QuoteStage, { label: string; color: string }> = {
 };
 
 const TARGET_MARGIN_PERCENT = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
+const PRICE_EPS_REAIS = 0.01;
+
+/** Mantém desconto comercial no breakdown quando o valor da cotação é menor que o preço de tabela. */
+function mergeBreakdownWithNegotiatedDiscount(
+  breakdown: StoredPricingBreakdown,
+  negotiatedValueReais: number,
+  formulaTotalReais: number
+): StoredPricingBreakdown {
+  const discount = Math.max(0, Math.round((formulaTotalReais - negotiatedValueReais) * 100) / 100);
+  return {
+    ...breakdown,
+    totals: {
+      ...breakdown.totals,
+      discount,
+    },
+  };
+}
 
 export function QuoteDetailModal({
   open,
@@ -191,10 +215,14 @@ export function QuoteDetailModal({
 
   const axesCount = (vehicleType as { axes_count?: number } | null)?.axes_count ?? null;
   const kmDistance = quote?.km_distance ?? null;
+  const breakdownEarly = quote?.pricing_breakdown as unknown as StoredPricingBreakdown | null;
+  const anttFlagsDetail = inferAnttFlagsFromStoredMeta(breakdownEarly?.meta?.antt);
+  const anttOperationTableDetail = resolveAnttOperationTable(anttFlagsDetail);
+  const isLotacaoQuote = quote?.freight_modality === 'lotacao';
   const { data: anttRate } = useAnttFloorRate({
-    operationTable: 'A',
+    operationTable: anttOperationTableDetail,
     cargoType: 'carga_geral',
-    axesCount,
+    axesCount: isLotacaoQuote ? axesCount : null,
   });
   const anttCalc =
     anttRate && kmDistance
@@ -202,6 +230,7 @@ export function QuoteDetailModal({
           kmDistance: Number(kmDistance),
           ccd: Number(anttRate.ccd),
           cc: Number(anttRate.cc),
+          retornoVazio: anttFlagsDetail.retornoVazio,
         })
       : null;
 
@@ -251,24 +280,42 @@ export function QuoteDetailModal({
   const kmBandLabel = breakdown?.meta?.kmBandLabel;
   const kmStatus = breakdown?.meta?.kmStatus || 'OK';
 
-  // Cálculo original de margem (meta) ainda usado para alertas gerais
-  const originalMarginPercent =
-    breakdown?.meta?.marginPercent ?? breakdown?.profitability?.margemPercent;
-  const marginStatus = breakdown?.meta?.marginStatus || 'UNKNOWN';
-
   // Visão contábil (DRE Asset-Light):
   // Total Cliente = Faturamento Bruto - Desconto | Receita Líquida = Total - Impostos
   // Resultado Líquido e Margem % vêm do breakdown quando disponível
-  const discountView = breakdown?.totals?.discount ?? 0;
   const totalClienteBruto = breakdown?.totals?.totalCliente ?? 0;
-  const totalClienteView = Math.max(0, totalClienteBruto - discountView);
-  const receitaLiquidaView =
-    (breakdown?.profitability as { receitaLiquida?: number } | undefined)?.receitaLiquida ?? null;
+  const currentQuoteValue = Number(quote?.value ?? 0);
+  const discountFromBreakdown = breakdown?.totals?.discount ?? 0;
+  const discountImplicit =
+    totalClienteBruto > 0 && currentQuoteValue > 0
+      ? Math.max(0, round2(totalClienteBruto - currentQuoteValue))
+      : 0;
+  const discountView =
+    discountImplicit > discountFromBreakdown + PRICE_EPS_REAIS
+      ? discountImplicit
+      : discountFromBreakdown;
+  /** Faturamento exibido: valor negociado (quote.value) quando existir */
+  const totalClienteView =
+    currentQuoteValue > 0 ? currentQuoteValue : Math.max(0, totalClienteBruto - discountView);
+  const hasNegotiatedFaturamento =
+    totalClienteBruto > 0 &&
+    totalClienteView > 0 &&
+    Math.abs(totalClienteView - totalClienteBruto) > PRICE_EPS_REAIS;
+  const faturamentoRatio =
+    hasNegotiatedFaturamento && totalClienteBruto > 0 ? totalClienteView / totalClienteBruto : 1;
 
-  const pisoAnttView = Number(breakdown?.meta?.antt?.total ?? anttCalc?.total ?? 0);
+  const receitaLiquidaSnapshot =
+    (breakdown?.profitability as { receitaLiquida?: number } | undefined)?.receitaLiquida ??
+    (totalClienteBruto > 0 ? totalClienteBruto - (breakdown?.totals?.totalImpostos ?? 0) : null);
+  const receitaLiquidaView =
+    receitaLiquidaSnapshot != null ? round2(receitaLiquidaSnapshot * faturamentoRatio) : null;
+
+  const pisoAnttView = resolvePisoAnttTotalReais({
+    breakdown,
+    anttLiveTotal: anttCalc?.total,
+  });
   // Piso de compliance: usa anttCalc (taxa atual) ou breakdown meta como fallback
   const pisoAnttCompliance = anttCalc?.total ?? breakdown?.meta?.anttPisoCarreteiro ?? 0;
-  const currentQuoteValue = Number(quote?.value ?? 0);
   const priceTableModality = (priceTable as { modality?: string } | null)?.modality;
   const isQuoteBelowAnttFloor =
     priceTableModality === 'lotacao' &&
@@ -279,48 +326,88 @@ export function QuoteDetailModal({
     breakdown?.profitability?.custosCarreteiro ??
     (breakdown?.profitability as { custos_carreteiro?: number } | undefined)?.custos_carreteiro ??
     null;
-  const custoMotoristaView =
+  const pisoAnttCarreteiroView = resolvePisoAnttCarreteiroReais(breakdown);
+  const custoMotoristaContratadoView =
+    breakdown?.profitability?.custoMotoristaContratado ??
+    breakdown?.profitability?.custosCarreteiro ??
     (breakdown?.profitability as { custoMotorista?: number } | undefined)?.custoMotorista ??
     custosCarreteiroView;
+  const custoMotoristaView =
+    priceTableModality === 'lotacao' && (pisoAnttCarreteiroView > 0 || custoMotoristaContratadoView)
+      ? (custoMotoristaContratadoView ?? pisoAnttCarreteiroView)
+      : custoMotoristaContratadoView;
   const custoCarreteiroParaMargem =
     (custoMotoristaView ?? custosCarreteiroView) != null &&
     Number(custoMotoristaView ?? custosCarreteiroView) > 0
       ? Number(custoMotoristaView ?? custosCarreteiroView)
       : pisoAnttView;
   const cargaDescargaView = breakdown?.profitability?.custosDescarga ?? 0;
-  const provisaoDasView = breakdown?.totals?.das ?? 0;
-  const margemBrutaView =
-    totalClienteView -
-    custoCarreteiroParaMargem -
-    cargaDescargaView -
-    provisaoDasView -
-    (breakdown?.totals?.icms ?? 0);
-
   const overheadView = breakdown?.profitability?.overhead ?? 0;
-  const resultadoLiquidoView = (
-    breakdown?.profitability?.resultadoLiquido != null
-      ? breakdown.profitability.resultadoLiquido
-      : margemBrutaView - overheadView
-  ) as number;
-  const margemPercentView = (
-    breakdown?.profitability?.margemPercent != null
-      ? breakdown.profitability.margemPercent
-      : totalClienteView > 0
-        ? (resultadoLiquidoView / totalClienteView) * 100
-        : 0
-  ) as number;
-  const targetMargin =
-    (breakdown?.profitability as { profitMarginTarget?: number; profit_margin_target?: number })
-      ?.profitMarginTarget ??
-    (breakdown?.profitability as { profit_margin_target?: number })?.profit_margin_target ??
-    TARGET_MARGIN_PERCENT;
-  const isBelowTargetView = margemPercentView < targetMargin;
 
-  // Mantém compatibilidade com o alerta de margem existente
-  const marginPercent = originalMarginPercent;
-  const isBelowTarget =
-    marginStatus === 'BELOW_TARGET' ||
-    (originalMarginPercent !== undefined && originalMarginPercent < targetMargin);
+  // Rentabilidade: sempre usar o snapshot do calculate-freight (profitability.*).
+  // A fórmula antiga (totalCliente − custoMotorista − ICMS) ignorava custoServicos e
+  // misturava piso ANTT com frete contratado — ex.: COT-2026-06-0002 mostrava ~R$ 13,5k
+  // de margem bruta vs ~R$ 5,8k gravados no motor.
+  const c = breakdown?.components;
+  const custoServicosView =
+    breakdown?.profitability?.custoServicos ??
+    (c?.toll ?? 0) +
+      (c?.aluguelMaquinas ?? 0) +
+      (c?.gris ?? 0) +
+      (c?.tso ?? 0) +
+      (c?.rctrc ?? 0) +
+      (c?.adValorem ?? 0) +
+      (c?.tde ?? 0) +
+      (c?.tear ?? 0) +
+      (c?.dispatchFee ?? 0) +
+      (c?.conditionalFeesTotal ?? 0) +
+      (c?.waitingTimeCost ?? 0);
+  const receitaLiquidaFromBreakdown =
+    receitaLiquidaView ??
+    (totalClienteView > 0
+      ? totalClienteView - (breakdown?.totals?.totalImpostos ?? 0) * faturamentoRatio
+      : null);
+
+  const custoMotoristaGoldenView = round2(
+    (breakdown?.components?.baseCost ?? breakdown?.components?.baseFreight ?? 0) * faturamentoRatio
+  );
+  const custoServicosScaled = round2(custoServicosView * faturamentoRatio);
+  const overheadScaled = round2(overheadView * faturamentoRatio);
+
+  const margemBrutaView =
+    receitaLiquidaFromBreakdown != null
+      ? resolveMargemBrutaDisplay(
+          breakdown?.profitability?.margemBruta,
+          receitaLiquidaFromBreakdown,
+          overheadScaled,
+          custoMotoristaGoldenView,
+          custoServicosScaled
+        )
+      : (breakdown?.profitability?.margemBruta ?? 0);
+
+  const targetMargin =
+    breakdown?.profitability?.profitMarginTarget ??
+    breakdown?.rates?.targetMarginPercent ??
+    breakdown?.rates?.profitMarginPercent ??
+    TARGET_MARGIN_PERCENT;
+  const custosDiretosScaled = round2(
+    (breakdown?.profitability?.custosDiretos ?? 0) * faturamentoRatio
+  );
+  const resultadoSnapshot = breakdown?.profitability?.resultadoLiquido;
+  const resultadoLiquidoView = resolveResultadoLiquidoDisplay(
+    resultadoSnapshot != null ? round2(resultadoSnapshot * faturamentoRatio) : null,
+    custosDiretosScaled,
+    targetMargin,
+    margemBrutaView
+  );
+  /** Lotação: lucro alvo % sobre custos diretos; fracionado: % sobre faturamento */
+  const margemPercentView =
+    priceTableModality === 'lotacao' && custosDiretosScaled > 0
+      ? round2((resultadoLiquidoView / custosDiretosScaled) * 100)
+      : totalClienteView > 0
+        ? round2((resultadoLiquidoView / totalClienteView) * 100)
+        : 0;
+  const isBelowTarget = isMarginBelowTarget(margemPercentView, targetMargin) || margemBrutaView < 0;
 
   const handleAdvancePercentChange = async (value: string) => {
     if (!quote) return;
@@ -417,6 +504,13 @@ export function QuoteDetailModal({
       aluguel_maquinas_value: bd?.components?.aluguelMaquinas ?? 0,
       // v5: conditional_fees handled locally, not sent to Edge function
       waiting_hours: bd?.meta?.waitingTimeHours ?? undefined,
+      ...(quote.freight_modality === 'lotacao'
+        ? {
+            antt_composicao_veicular: anttFlagsDetail.composicaoVeicular,
+            antt_alto_desempenho: anttFlagsDetail.altoDesempenho,
+            antt_retorno_vazio: anttFlagsDetail.retornoVazio,
+          }
+        : {}),
     };
     try {
       const response = await calculateFreightMutation.mutateAsync(payload);
@@ -427,6 +521,11 @@ export function QuoteDetailModal({
         (response.meta as { antt_piso_carreteiro?: number }).antt_piso_carreteiro ?? 0;
       const floorApplied = (response.meta as { antt_floor_applied?: boolean }).antt_floor_applied;
 
+      const formulaTotalFromBreakdown = Number(bd?.totals?.totalCliente ?? 0);
+      const formulaPriceUnchanged =
+        formulaTotalFromBreakdown > 0 &&
+        Math.abs(newCalcValue - formulaTotalFromBreakdown) <= PRICE_EPS_REAIS;
+
       if (floorApplied && pisoFromResponse > 0 && currentValue < pisoFromResponse) {
         // Valor abaixo do piso ANTT — salva breakdown e abre dialog de conformidade
         await updateQuoteMutation.mutateAsync({
@@ -435,11 +534,26 @@ export function QuoteDetailModal({
         });
         queryClient.invalidateQueries({ queryKey: ['quotes'] });
         setAnttDialog({ open: true, suggestedValue: newCalcValue, piso: pisoFromResponse });
-      } else if (currentValue > 0 && Math.abs(newCalcValue - currentValue) > 0.01) {
-        // Recálculo divergiu do valor negociado (maior ou menor) — apresentar escolha
+      } else if (formulaPriceUnchanged && currentValue > 0) {
+        // Preço de tabela igual ao anterior — só atualiza DRE; preserva valor negociado/desconto
+        const patched = mergeBreakdownWithNegotiatedDiscount(
+          newBreakdown,
+          currentValue,
+          newCalcValue
+        );
+        await updateQuoteMutation.mutateAsync({
+          id: quote.id,
+          updates: {
+            pricing_breakdown: patched as unknown as Json,
+            discount_value: patched.totals.discount ?? 0,
+          },
+        });
+        queryClient.invalidateQueries({ queryKey: ['quotes'] });
+        toast.success('Memória de cálculo atualizada. Valor negociado mantido.');
+      } else if (currentValue > 0 && Math.abs(newCalcValue - currentValue) > PRICE_EPS_REAIS) {
+        // Preço de tabela mudou e difere do valor negociado — apresentar escolha
         setSuggestedValueDialog({ open: true, newBreakdown, newCalcValue });
       } else {
-        // Sem divergência — atualiza apenas a memória de cálculo
         await updateQuoteMutation.mutateAsync({
           id: quote.id,
           updates: { pricing_breakdown: newBreakdown as unknown as Json },
@@ -458,11 +572,16 @@ export function QuoteDetailModal({
     if (!quote || !suggestedValueDialog.newBreakdown) return;
     setIsApplyingSuggestedValue(true);
     try {
+      const breakdownNoDiscount: StoredPricingBreakdown = {
+        ...suggestedValueDialog.newBreakdown,
+        totals: { ...suggestedValueDialog.newBreakdown.totals, discount: 0 },
+      };
       await updateQuoteMutation.mutateAsync({
         id: quote.id,
         updates: {
           value: suggestedValueDialog.newCalcValue,
-          pricing_breakdown: suggestedValueDialog.newBreakdown as unknown as Json,
+          discount_value: 0,
+          pricing_breakdown: breakdownNoDiscount as unknown as Json,
         },
       });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
@@ -479,9 +598,18 @@ export function QuoteDetailModal({
     if (!quote || !suggestedValueDialog.newBreakdown) return;
     setIsApplyingSuggestedValue(true);
     try {
+      const negotiated = Number(quote.value) || 0;
+      const patched = mergeBreakdownWithNegotiatedDiscount(
+        suggestedValueDialog.newBreakdown,
+        negotiated,
+        suggestedValueDialog.newCalcValue
+      );
       await updateQuoteMutation.mutateAsync({
         id: quote.id,
-        updates: { pricing_breakdown: suggestedValueDialog.newBreakdown as unknown as Json },
+        updates: {
+          pricing_breakdown: patched as unknown as Json,
+          discount_value: patched.totals.discount ?? 0,
+        },
       });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       setSuggestedValueDialog({ open: false, newBreakdown: null, newCalcValue: 0 });
@@ -515,6 +643,13 @@ export function QuoteDetailModal({
         aluguel_maquinas_value: bd?.components?.aluguelMaquinas ?? 0,
         waiting_hours: bd?.meta?.waitingTimeHours ?? undefined,
         enforce_antt_floor: true,
+        ...(quote.freight_modality === 'lotacao'
+          ? {
+              antt_composicao_veicular: anttFlagsDetail.composicaoVeicular,
+              antt_alto_desempenho: anttFlagsDetail.altoDesempenho,
+              antt_retorno_vazio: anttFlagsDetail.retornoVazio,
+            }
+          : {}),
       };
       const prevValue = Number(quote.value) || 0;
       const response = await calculateFreightMutation.mutateAsync(payload);
@@ -732,16 +867,18 @@ export function QuoteDetailModal({
           marginPercent: 0,
         }),
         antt: {
-          operationTable: 'A',
+          operationTable: anttRate.operation_table,
           cargoType: 'carga_geral',
           axesCount: Number(axesCount),
           kmDistance: Number(kmDistance),
           ccd: Number(anttRate.ccd || 0),
           cc: Number(anttRate.cc || 0),
           ida: Number(anttCalc.ida),
-          retornoVazio: 0,
+          retornoVazio: Number(anttCalc.retornoVazio ?? 0),
           total: Number(anttCalc.total),
           calculatedAt: new Date().toISOString(),
+          composicaoVeicular: anttFlagsDetail.composicaoVeicular,
+          altoDesempenho: anttFlagsDetail.altoDesempenho,
         },
       },
       weights: current?.weights || { cubageWeight: 0, billableWeight: 0, tonBillable: 0 },
@@ -926,7 +1063,6 @@ export function QuoteDetailModal({
               margemPercent={margemPercentView}
               isBelowTarget={isBelowTarget}
               targetMarginPercent={targetMargin}
-              marginPercentForAlert={marginPercent}
               regimeFiscal={
                 (breakdown?.profitability as { regimeFiscal?: string } | undefined)?.regimeFiscal
               }
@@ -989,7 +1125,11 @@ export function QuoteDetailModal({
                   )}
                   {custoMotoristaView != null && (
                     <DataCard
-                      label="Custo Motorista"
+                      label={
+                        priceTableModality === 'lotacao'
+                          ? 'Custo Motorista (Piso ANTT)'
+                          : 'Custo Motorista'
+                      }
                       value={formatCurrency(Number(custoMotoristaView))}
                       icon={Truck}
                       variant="warning"
@@ -997,47 +1137,102 @@ export function QuoteDetailModal({
                   )}
                 </div>
 
-                {/* Spread R$/KM */}
+                {/* Indicadores R$/km — margem líquida e custos diretos (não só motorista) */}
                 {quote.km_distance != null &&
                   Number(quote.km_distance) > 0 &&
-                  custoMotoristaView != null &&
                   totalClienteView > 0 &&
                   (() => {
                     const km = Number(quote.km_distance);
-                    const custo = Number(custoMotoristaView);
-                    const spread = (totalClienteView - custo) / km;
+                    const custosDiretos =
+                      breakdown?.profitability?.custosDiretos != null
+                        ? round2(breakdown.profitability.custosDiretos * faturamentoRatio)
+                        : null;
+                    const margemKm = resultadoLiquidoView / km;
+                    const vendaKm = totalClienteView / km;
+                    const custoMotoristaKm =
+                      custoMotoristaView != null ? Number(custoMotoristaView) / km : null;
+                    const custosDiretosKm =
+                      custosDiretos != null && custosDiretos > 0 ? custosDiretos / km : null;
+                    const anttRsKmView = resolveAnttRsKm({
+                      kmDistance: km,
+                      pisoAnttTotal: pisoAnttView,
+                      ccd:
+                        anttRate?.ccd != null ? Number(anttRate.ccd) : breakdown?.meta?.antt?.ccd,
+                      cc: anttRate?.cc != null ? Number(anttRate.cc) : breakdown?.meta?.antt?.cc,
+                    });
                     return (
-                      <div className="mt-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
-                            <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-0.5">
-                              Spread (Venda — Custo)
-                            </p>
-                            <p className="text-lg font-bold text-primary tabular-nums">
-                              R${' '}
-                              {spread.toLocaleString('pt-BR', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                              /km
+                      <div className="mt-2 space-y-2">
+                        <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider mb-0.5">
+                                Lucro alvo / km
+                              </p>
+                              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                                R${' '}
+                                {margemKm.toLocaleString('pt-BR', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                                /km
+                              </p>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground max-w-[140px] text-right leading-snug">
+                              Lucro alvo (margem s/ custos diretos) ÷ km
                             </p>
                           </div>
-                          <div className="text-right space-y-0.5">
-                            <p className="text-xs text-destructive tabular-nums font-medium">
-                              Custo: R${' '}
-                              {(custo / km).toLocaleString('pt-BR', {
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/30 p-3 text-xs tabular-nums">
+                          <div>
+                            <p className="text-muted-foreground mb-0.5">Venda/km</p>
+                            <p className="font-semibold text-foreground">
+                              R${' '}
+                              {vendaKm.toLocaleString('pt-BR', {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })}
-                              /km
                             </p>
-                            <p className="text-xs text-success tabular-nums font-medium">
-                              Venda: R${' '}
-                              {(totalClienteView / km).toLocaleString('pt-BR', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                              /km
+                          </div>
+                          {custosDiretosKm != null ? (
+                            <div>
+                              <p className="text-muted-foreground mb-0.5">Custos diretos/km</p>
+                              <p className="font-semibold text-destructive">
+                                R${' '}
+                                {custosDiretosKm.toLocaleString('pt-BR', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </p>
+                            </div>
+                          ) : custoMotoristaKm != null ? (
+                            <div>
+                              <p className="text-muted-foreground mb-0.5">Motorista/km</p>
+                              <p className="font-semibold text-destructive">
+                                R${' '}
+                                {custoMotoristaKm.toLocaleString('pt-BR', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </p>
+                            </div>
+                          ) : null}
+                          <div>
+                            <p className="text-muted-foreground mb-0.5">Piso ANTT ref.</p>
+                            <p className="font-semibold">
+                              {anttRsKmView != null ? (
+                                <>
+                                  R${' '}
+                                  {anttRsKmView.toLocaleString('pt-BR', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                  /km
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground text-[10px]">
+                                  Calcule o piso (eixos + km)
+                                </span>
+                              )}
                             </p>
                           </div>
                         </div>
@@ -1114,7 +1309,7 @@ export function QuoteDetailModal({
                   custosDescarga={cargaDescargaView}
                   conditionalFeesData={conditionalFeesData ?? undefined}
                   margemBruta={margemBrutaView}
-                  overhead={overheadView}
+                  overhead={overheadScaled}
                   resultadoLiquido={resultadoLiquidoView}
                   margemPercent={margemPercentView}
                   isBelowTarget={isBelowTarget}
@@ -1349,21 +1544,38 @@ export function QuoteDetailModal({
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm">
                 <p>
-                  O recálculo resultou em{' '}
+                  O preço de tabela recalculado é{' '}
                   <span className="font-semibold text-foreground">
                     {formatCurrency(suggestedValueDialog.newCalcValue)}
                   </span>
-                  ,{' '}
-                  {suggestedValueDialog.newCalcValue > currentQuoteValue ? 'superior' : 'inferior'}{' '}
-                  ao valor negociado atual de{' '}
-                  <span className="font-semibold text-foreground">
-                    {formatCurrency(currentQuoteValue)}
-                  </span>
+                  {currentQuoteValue > 0 && (
+                    <>
+                      ,{' '}
+                      {suggestedValueDialog.newCalcValue > currentQuoteValue
+                        ? 'superior'
+                        : 'inferior'}{' '}
+                      ao valor negociado de{' '}
+                      <span className="font-semibold text-foreground">
+                        {formatCurrency(currentQuoteValue)}
+                      </span>
+                    </>
+                  )}
                   .
                 </p>
+                {currentQuoteValue > 0 &&
+                  suggestedValueDialog.newCalcValue > currentQuoteValue + PRICE_EPS_REAIS && (
+                    <p>
+                      Desconto comercial implícito:{' '}
+                      <span className="font-semibold text-foreground">
+                        {formatCurrency(suggestedValueDialog.newCalcValue - currentQuoteValue)}
+                      </span>
+                      .
+                    </p>
+                  )}
                 <p className="text-muted-foreground">
-                  Deseja aplicar o valor sugerido ou manter o valor negociado e apenas atualizar a
-                  memória de cálculo?
+                  <strong>Aplicar valor sugerido</strong> — alinha a cotação ao preço de tabela
+                  (zera desconto). <strong>Manter valor atual</strong> — atualiza margem, impostos e
+                  composição no breakdown, sem alterar o valor ao cliente.
                 </p>
               </div>
             </AlertDialogDescription>

@@ -83,7 +83,9 @@ export function DreTableBlock({ table }: { table: DreTable }) {
             <span className="ml-2 text-xs text-muted-foreground">(sem OS vinculada)</span>
           )}
           {table.status_detail === 'legacy_quote_breakdown' && (
-            <span className="ml-2 text-xs text-muted-foreground">(COT legacy: presumido indisponível)</span>
+            <span className="ml-2 text-xs text-muted-foreground">
+              (COT legacy: presumido indisponível)
+            </span>
           )}
           {table.status_detail === 'os_without_quote' && (
             <span className="ml-2 text-xs text-muted-foreground">(OS sem quote vinculada)</span>
@@ -93,26 +95,26 @@ export function DreTableBlock({ table }: { table: DreTable }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[220px]">Item</TableHead>
-            <TableHead className="text-right">Presumido</TableHead>
-            <TableHead className="text-right">Real</TableHead>
-            <TableHead className="text-right">Var. R$</TableHead>
-            <TableHead className="text-right w-[100px]">Var. %</TableHead>
-            <TableHead className="w-[90px]">Badge</TableHead>
+            <TableHead className="w-[260px]">Item</TableHead>
+            <TableHead className="text-right whitespace-nowrap w-[110px]">Presumido</TableHead>
+            <TableHead className="text-right whitespace-nowrap w-[110px]">Real</TableHead>
+            <TableHead className="text-right whitespace-nowrap w-[110px]">Var. R$</TableHead>
+            <TableHead className="text-right whitespace-nowrap w-[90px]">Var. %</TableHead>
+            <TableHead className="w-[100px]">Badge</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {table.rows.map((row) => {
             const prefix =
               row.line_code === 'faturamento_bruto'
-                ? '(+) '
+                ? '(+)'
                 : row.line_code === 'impostos' ||
                     row.line_code === 'overhead' ||
                     row.line_code === 'custos_diretos'
-                  ? '(-) '
+                  ? '(-)'
                   : row.line_code === 'receita_liquida' || row.line_code === 'resultado_liquido'
-                    ? '(=) '
-                    : '';
+                    ? '(=)'
+                    : null;
             const indent = row.indent_level === 1 ? 'pl-4' : '';
             const isPercent = row.line_code === 'margem_liquida';
 
@@ -127,37 +129,49 @@ export function DreTableBlock({ table }: { table: DreTable }) {
                     'bg-muted/20 font-medium'
                 )}
               >
-                <TableCell className={cn('py-2', indent)}>
-                  <span
-                    className={cn(row.has_formula_warning && 'text-amber-600 dark:text-amber-500')}
-                  >
-                    {prefix}
-                    {row.line_label}
-                  </span>
-                  {row.missing_real_cost_flag && (
+                <TableCell className={cn('py-2 whitespace-nowrap', indent)}>
+                  <span className="inline-flex items-center">
+                    {prefix && (
+                      <span className="inline-block w-7 shrink-0 text-muted-foreground text-xs tabular-nums">
+                        {prefix}
+                      </span>
+                    )}
                     <span
-                      className="ml-1 text-[10px] text-muted-foreground"
-                      title="Sem lançamento real"
+                      className={cn(
+                        row.has_formula_warning && 'text-amber-600 dark:text-amber-500'
+                      )}
                     >
-                      (*)
+                      {row.line_label}
                     </span>
-                  )}
+                    {row.missing_real_cost_flag && (
+                      <span
+                        className="ml-1 text-[10px] text-muted-foreground"
+                        title="Sem lançamento real"
+                      >
+                        (*)
+                      </span>
+                    )}
+                  </span>
                 </TableCell>
-                <TableCell className="text-right tabular-nums py-2">
+                <TableCell className="text-right tabular-nums py-2 whitespace-nowrap">
                   {hidePresumedColumn ? '—' : formatValue(row.presumed_value, isPercent)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums py-2">
+                <TableCell className="text-right tabular-nums py-2 whitespace-nowrap">
                   {formatValue(row.real_value, isPercent)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums py-2">
+                <TableCell className="text-right tabular-nums py-2 whitespace-nowrap">
                   {hidePresumedColumn
                     ? '—'
                     : !isPercent
                       ? formatCurrency(row.variance_value)
                       : `${row.variance_value >= 0 ? '+' : ''}${row.variance_value.toFixed(1)} pp`}
                 </TableCell>
-                <TableCell className="text-right py-2">
-                  {hidePresumedColumn ? '—' : !isPercent ? formatPercent(row.variance_percent) : '—'}
+                <TableCell className="text-right tabular-nums py-2 whitespace-nowrap">
+                  {hidePresumedColumn
+                    ? '—'
+                    : !isPercent
+                      ? formatPercent(row.variance_percent)
+                      : '—'}
                 </TableCell>
                 <TableCell className="py-2">
                   <LineBadge row={row} />

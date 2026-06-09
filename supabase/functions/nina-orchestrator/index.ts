@@ -57,8 +57,11 @@ interface GeminiMessage {
 
 async function callGeminiWithTools(
   messages: GeminiMessage[],
-  model = 'gemini-2.0-flash'
-): Promise<{ candidates: Array<{ content: { parts: Array<Record<string, unknown>> } }>; usageMetadata?: Record<string, unknown> }> {
+  model = 'gemini-2.5-flash'
+): Promise<{
+  candidates: Array<{ content: { parts: Array<Record<string, unknown>> } }>;
+  usageMetadata?: Record<string, unknown>;
+}> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
@@ -174,10 +177,10 @@ Deno.serve(async (req) => {
     };
 
     if (!message) {
-      return new Response(
-        JSON.stringify({ error: 'Campo "message" é obrigatório' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Campo "message" é obrigatório' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Rebuild conversation from session or start fresh
@@ -203,12 +206,9 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error('[nina-orchestrator] Error:', err);
-    return new Response(
-      JSON.stringify({ error: String(err) }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

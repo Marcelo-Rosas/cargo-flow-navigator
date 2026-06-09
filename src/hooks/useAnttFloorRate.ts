@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { calculateAnttPisoBrl } from '@/lib/antt-floor-calc';
 import { asDb } from '@/lib/supabase-utils';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -19,11 +20,11 @@ interface UseAnttFloorRateParams {
 }
 
 /**
- * Busca coeficientes CCD/CC para cálculo do piso mínimo ANTT.
- * No cenário atual do Marcelo: Tabela A + Carga Geral + sem retorno vazio.
+ * Busca coeficientes CCD/CC para cálculo do piso mínimo ANTT (carga geral).
+ * Tabela A–D conforme flags em `resolveAnttOperationTable` (calculadora ANTT).
  */
 export function useAnttFloorRate(params: UseAnttFloorRateParams) {
-  const operationTable = params.operationTable ?? 'A';
+  const operationTable = params.operationTable ?? 'B';
   const cargoType = params.cargoType ?? 'carga_geral';
   const axesCount = params.axesCount;
 
@@ -50,15 +51,27 @@ export function useAnttFloorRate(params: UseAnttFloorRateParams) {
   });
 }
 
-export function calculateAnttMinimum(input: { kmDistance: number; ccd: number; cc: number }) {
-  const ida = input.kmDistance * input.ccd + input.cc;
+export function calculateAnttMinimum(input: {
+  kmDistance: number;
+  ccd: number;
+  cc: number;
+  retornoVazio?: boolean;
+}) {
+  const { ida, retornoVazio, total } = calculateAnttPisoBrl({
+    kmDistance: input.kmDistance,
+    ccd: input.ccd,
+    cc: input.cc,
+    retornoVazio: input.retornoVazio ?? false,
+  });
   return {
     ida,
-    total: ida,
+    retornoVazio,
+    total,
     formula: {
       kmDistance: input.kmDistance,
       ccd: input.ccd,
       cc: input.cc,
+      retornoVazio: input.retornoVazio ?? false,
     },
   };
 }

@@ -219,7 +219,7 @@ async function callGeminiLLM(params: CallLLMParams): Promise<CallLLMResult> {
   const apiKey = getEnv('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
-  const model = getEnv('GEMINI_MODEL') || 'gemini-2.0-flash';
+  const model = getEnv('GEMINI_MODEL') || 'gemini-2.5-flash';
   const maxTokens = params.maxTokens ?? 1024;
   const temperature = params.temperature ?? 0.2;
 

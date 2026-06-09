@@ -19,6 +19,18 @@ export interface DreComparativoRow {
   icmsPresumido: number;
   icmsReal: number;
 
+  pisPresumido: number;
+  pisReal: number;
+
+  cofinsPresumido: number;
+  cofinsReal: number;
+
+  csllPresumido: number;
+  csllReal: number;
+
+  irpjPresumido: number;
+  irpjReal: number;
+
   receitaLiquidaPresumida: number;
   receitaLiquidaReal: number;
 
@@ -94,6 +106,8 @@ export interface OrderDreInput {
   carreteiro_real: number | null;
   pedagio_real: number | null;
   descarga_real: number | null;
+  aluguel_maquinas_real?: number | null;
+  mao_de_obra_real?: number | null;
   quote_code?: string | null;
   trip_number?: string | null;
 }

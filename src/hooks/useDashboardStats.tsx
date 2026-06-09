@@ -39,16 +39,20 @@ export function useDashboardStats() {
       const lastMonth = getMonthRange(1);
 
       // Get pipeline value (quotes not lost or won)
-      const { data: quotes } = await supabase
+      const { data: quotes, error: quotesError } = await supabase
         .from('quotes')
         .select('value, stage')
         .not('stage', 'in', '("perdido","ganho")');
+      if (quotesError) throw quotesError;
 
       const validQuotes = filterSupabaseRows<{ value: number; stage: string }>(quotes);
       const pipelineValue = validQuotes.reduce((acc, q) => acc + Number(q.value), 0);
 
       // Get conversion rate for all time
-      const { data: allQuotes } = await supabase.from('quotes').select('stage, created_at');
+      const { data: allQuotes, error: allQuotesError } = await supabase
+        .from('quotes')
+        .select('stage, created_at');
+      if (allQuotesError) throw allQuotesError;
       const validAllQuotes = filterSupabaseRows<{ stage: string; created_at: string }>(allQuotes);
 
       const totalQuotes = validAllQuotes.length;
@@ -56,19 +60,21 @@ export function useDashboardStats() {
       const conversionRate = calcConversionRate(wonQuotes, totalQuotes);
 
       // Calculate pipeline trend (current month quotes vs last month)
-      const { data: currentMonthQuotes } = await supabase
+      const { data: currentMonthQuotes, error: cmqError } = await supabase
         .from('quotes')
         .select('value')
         .gte('created_at', currentMonth.start.toISOString())
         .lte('created_at', currentMonth.end.toISOString())
         .not('stage', 'in', '("perdido","ganho")');
+      if (cmqError) throw cmqError;
 
-      const { data: lastMonthQuotes } = await supabase
+      const { data: lastMonthQuotes, error: lmqError } = await supabase
         .from('quotes')
         .select('value')
         .gte('created_at', lastMonth.start.toISOString())
         .lte('created_at', lastMonth.end.toISOString())
         .not('stage', 'in', '("perdido","ganho")');
+      if (lmqError) throw lmqError;
 
       const validCurrentMonth = filterSupabaseRows<{ value: number }>(currentMonthQuotes);
       const validLastMonth = filterSupabaseRows<{ value: number }>(lastMonthQuotes);
@@ -121,10 +127,11 @@ export function useDashboardStats() {
       }
 
       // Get active orders (not delivered)
-      const { data: activeOrdersData } = await supabase
+      const { data: activeOrdersData, error: aoError } = await supabase
         .from('orders')
         .select('id')
         .neq('stage', asDb('entregue'));
+      if (aoError) throw aoError;
 
       const activeOrders = activeOrdersData?.length || 0;
 
@@ -134,29 +141,32 @@ export function useDashboardStats() {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      const { data: deliveriesTodayData } = await supabase
+      const { data: deliveriesTodayData, error: dtError } = await supabase
         .from('orders')
         .select('id')
         .gte('eta', today.toISOString())
         .lt('eta', tomorrow.toISOString());
+      if (dtError) throw dtError;
 
       const deliveriesToday = deliveriesTodayData?.length || 0;
 
       // Get pending documents (orders without all docs)
-      const { data: ordersWithoutDocs } = await supabase
+      const { data: ordersWithoutDocs, error: owdError } = await supabase
         .from('orders')
         .select('id')
         .or('has_nfe.eq.false,has_cte.eq.false,has_pod.eq.false')
         .neq('stage', asDb('entregue'));
+      if (owdError) throw owdError;
 
       const pendingDocuments = ordersWithoutDocs?.length || 0;
 
       // Get critical alerts (unresolved critical occurrences)
-      const { data: criticalOccurrences } = await supabase
+      const { data: criticalOccurrences, error: coError } = await supabase
         .from('occurrences')
         .select('id')
         .eq('severity', asDb('critica'))
         .is('resolved_at', null);
+      if (coError) throw coError;
 
       const criticalAlerts = criticalOccurrences?.length || 0;
 
@@ -203,39 +213,41 @@ export function useConversionChartData() {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-      const { data: quotes } = await supabase
+      const { data: quotes, error } = await supabase
         .from('quotes')
         .select('stage, created_at')
         .gte('created_at', sixMonthsAgo.toISOString());
+      if (error) throw error;
 
       const validQuotesConv = filterSupabaseRows<{ stage: string; created_at: string }>(quotes);
 
       // Group by month (keep stable ordering for the last 6 months)
       const monthKeys: string[] = [];
+      const monthLabels: Record<string, string> = {};
       const monthlyData: Record<string, { total: number; won: number }> = {};
 
       for (let i = 5; i >= 0; i--) {
         const d = new Date();
         d.setMonth(d.getMonth() - i);
-        const key = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
         monthKeys.push(key);
+        monthLabels[key] = label;
         monthlyData[key] = { total: 0, won: 0 };
       }
 
       validQuotesConv.forEach((quote) => {
-        const key = new Date(quote.created_at).toLocaleDateString('pt-BR', {
-          month: 'short',
-          year: '2-digit',
-        });
+        const qd = new Date(quote.created_at);
+        const key = `${qd.getFullYear()}-${String(qd.getMonth() + 1).padStart(2, '0')}`;
         if (!monthlyData[key]) return;
         monthlyData[key].total++;
         if (quote.stage === 'ganho') monthlyData[key].won++;
       });
 
-      return monthKeys.map((name) => {
-        const data = monthlyData[name];
+      return monthKeys.map((key) => {
+        const data = monthlyData[key];
         return {
-          name,
+          name: monthLabels[key],
           value: data && data.total > 0 ? Math.round((data.won / data.total) * 100) : 0,
         };
       });
@@ -247,10 +259,11 @@ export function useRevenueByClientData() {
   return useQuery({
     queryKey: ['revenue-by-client'],
     queryFn: async () => {
-      const { data: orders } = await supabase
+      const { data: orders, error } = await supabase
         .from('orders')
         .select('client_name, value')
         .eq('stage', asDb('entregue'));
+      if (error) throw error;
 
       const validOrdersRev = filterSupabaseRows<{ client_name: string | null; value: number }>(
         orders

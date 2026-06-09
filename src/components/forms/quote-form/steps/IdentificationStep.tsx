@@ -1,5 +1,8 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { fetchCepData } from '@/hooks/useCepLookup';
+import { formatCityUfFromCep, sanitizeCep } from '@/lib/cep-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MaskedInput } from '@/components/ui/masked-input';
@@ -79,22 +82,60 @@ export function IdentificationStep({
   });
 
   const clientCount = 1 + recipientFields.length;
-  const showParadas = clientCount > 1;
+  const showEntregasIntermediarias = clientCount > 1;
 
   useEffect(() => {
-    if (!showParadas) {
+    if (!showEntregasIntermediarias) {
       const stops = form.getValues('route_stops') ?? [];
       if (stops.length > 0) {
         form.setValue('route_stops', [], { shouldDirty: true });
       }
     }
-  }, [showParadas, form]);
+  }, [showEntregasIntermediarias, form]);
+
+  const fillPickupCityFromCep = useCallback(
+    async (index: number, cepRaw?: string) => {
+      const cep = sanitizeCep(cepRaw ?? form.getValues(`additional_shippers.${index}.cep`) ?? '');
+      if (cep.length !== 8) return;
+      try {
+        const data = await fetchCepData(cep);
+        if (!data) {
+          toast.error('CEP da coleta não encontrado');
+          return;
+        }
+        const cityUf = formatCityUfFromCep(data);
+        if (cityUf.length >= 2) {
+          form.setValue(`additional_shippers.${index}.city_uf`, cityUf, {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+        }
+      } catch {
+        toast.error('Erro ao buscar CEP da coleta');
+      }
+    },
+    [form]
+  );
 
   return (
     <div className="space-y-6">
-      <SectionBlock label="Dados do Cliente">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
+      <SectionBlock
+        variant="card"
+        label="Dados do Cliente"
+        action={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => appendRecipient({ client_id: '', name: '' })}
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Adicionar destinatário
+          </Button>
+        }
+      >
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
             <FormField
               control={form.control}
               name="client_id"
@@ -146,21 +187,17 @@ export function IdentificationStep({
               </FormItem>
             )}
           />
+          {recipientFields.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Com mais de um destinatário, informe as entregas intermediárias na seção Rota.
+            </p>
+          )}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            {recipientFields.length > 0 && (
               <span className="text-sm font-medium text-muted-foreground">
                 Destinatários adicionais
               </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => appendRecipient({ client_id: '', name: '' })}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Adicionar cliente
-              </Button>
-            </div>
+            )}
             {recipientFields.map((rf, idx) => {
               const mainClientId = form.watch('client_id');
               const otherRecipientIds = (form.watch('additional_recipients') ?? [])
@@ -225,9 +262,25 @@ export function IdentificationStep({
         </div>
       </SectionBlock>
 
-      <SectionBlock label="Embarcador">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <SectionBlock
+        variant="card"
+        label="Embarcador"
+        action={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              appendShipper({ shipper_id: '', name: '', email: '', cep: '', city_uf: '' })
+            }
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Adicionar embarcador
+          </Button>
+        }
+      >
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
               name="shipper_id"
@@ -266,7 +319,7 @@ export function IdentificationStep({
               )}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
               name="shipper_name"
@@ -306,21 +359,17 @@ export function IdentificationStep({
               )}
             />
           </div>
+          {shipperFields.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Informe o CEP de cada coleta adicional para incluir no cálculo de km.
+            </p>
+          )}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            {shipperFields.length > 0 && (
               <span className="text-sm font-medium text-muted-foreground">
-                Embarcadores adicionais
+                Coletas em outros embarcadores
               </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => appendShipper({ shipper_id: '', name: '', email: '' })}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Adicionar embarcador
-              </Button>
-            </div>
+            )}
             {shipperFields.map((sf, idx) => {
               const mainShipperId = form.watch('shipper_id');
               const otherShipperIds = (form.watch('additional_shippers') ?? [])
@@ -331,13 +380,13 @@ export function IdentificationStep({
               return (
                 <div
                   key={sf.id}
-                  className="flex items-center gap-2 rounded-lg border border-border p-3 bg-muted/20"
+                  className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3 bg-muted/20"
                 >
                   <FormField
                     control={form.control}
                     name={`additional_shippers.${idx}.shipper_id`}
                     render={({ field: f }) => (
-                      <FormItem className="flex-1 min-w-0">
+                      <FormItem className="flex-1 min-w-[160px]">
                         <FormLabel className="text-xs text-muted-foreground">Embarcador</FormLabel>
                         <Select
                           value={f.value || ''}
@@ -353,6 +402,13 @@ export function IdentificationStep({
                                 selected.email || '',
                                 { shouldDirty: true }
                               );
+                              if (selected.zip_code) {
+                                const cep = sanitizeCep(selected.zip_code);
+                                form.setValue(`additional_shippers.${idx}.cep`, cep, {
+                                  shouldDirty: true,
+                                });
+                                void fillPickupCityFromCep(idx, cep);
+                              }
                             }
                           }}
                         >
@@ -373,12 +429,55 @@ export function IdentificationStep({
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name={`additional_shippers.${idx}.cep`}
+                    render={({ field: f }) => (
+                      <FormItem className="w-[120px] shrink-0">
+                        <FormLabel className="text-xs text-muted-foreground">CEP coleta</FormLabel>
+                        <FormControl>
+                          <MaskedInput
+                            mask="cep"
+                            placeholder="00000-000"
+                            value={f.value || ''}
+                            onValueChange={(rawValue) => {
+                              const digits = String(rawValue ?? '');
+                              f.onChange(digits);
+                              if (digits.replace(/\D/g, '').length === 8) {
+                                void fillPickupCityFromCep(idx, digits);
+                              }
+                            }}
+                            onBlur={() => {
+                              f.onBlur();
+                              void fillPickupCityFromCep(idx);
+                            }}
+                            className="h-9"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={`additional_shippers.${idx}.city_uf`}
+                    render={({ field: f }) => (
+                      <FormItem className="flex-1 min-w-[140px]">
+                        <FormLabel className="text-xs text-muted-foreground">Cidade - UF</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Cidade - UF" {...f} className="h-9" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive self-end"
+                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
                     onClick={() => removeShipper(idx)}
+                    aria-label="Remover embarcador"
                     title="Remover embarcador"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -390,8 +489,8 @@ export function IdentificationStep({
         </div>
       </SectionBlock>
 
-      <SectionBlock label="Rota">
-        <div className="space-y-4">
+      <SectionBlock variant="card" label="Rota">
+        <div className="space-y-6">
           {!isLegacy && (
             <FormField
               control={form.control}
@@ -418,7 +517,7 @@ export function IdentificationStep({
               )}
             />
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 min-w-0">
             <FormField
               control={form.control}
               name="origin_cep"
@@ -431,10 +530,16 @@ export function IdentificationStep({
                         mask="cep"
                         placeholder="00000-000"
                         value={field.value || ''}
-                        onValueChange={(rawValue) => field.onChange(String(rawValue ?? ''))}
+                        onValueChange={(rawValue) => {
+                          const digits = String(rawValue ?? '');
+                          field.onChange(digits);
+                          if (digits.replace(/\D/g, '').length === 8) {
+                            void onOriginCepBlur();
+                          }
+                        }}
                         onBlur={() => {
                           field.onBlur();
-                          onOriginCepBlur();
+                          void onOriginCepBlur();
                         }}
                         disabled={isLoadingOriginCep}
                       />
@@ -459,10 +564,16 @@ export function IdentificationStep({
                         mask="cep"
                         placeholder="00000-000"
                         value={field.value || ''}
-                        onValueChange={(rawValue) => field.onChange(String(rawValue ?? ''))}
+                        onValueChange={(rawValue) => {
+                          const digits = String(rawValue ?? '');
+                          field.onChange(digits);
+                          if (digits.replace(/\D/g, '').length === 8) {
+                            void onDestinationCepBlur();
+                          }
+                        }}
                         onBlur={() => {
                           field.onBlur();
-                          onDestinationCepBlur();
+                          void onDestinationCepBlur();
                         }}
                         disabled={isLoadingDestinationCep}
                       />
@@ -476,7 +587,7 @@ export function IdentificationStep({
               )}
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 min-w-0">
             <FormField
               control={form.control}
               name="origin"
@@ -519,12 +630,12 @@ export function IdentificationStep({
             />
           </div>
 
-          {/* Paradas intermediárias — só exibe quando há 2+ clientes/destinatários */}
-          {showParadas && (
+          {/* Entregas intermediárias — só quando há 2+ destinatários */}
+          {showEntregasIntermediarias && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-medium text-muted-foreground">
-                  Paradas intermediárias
+                  Entregas intermediárias
                 </span>
                 <Button
                   type="button"
@@ -533,7 +644,7 @@ export function IdentificationStep({
                   onClick={() => append({ sequence: fields.length + 1, cep: '', city_uf: '' })}
                 >
                   <Plus className="w-4 h-4 mr-1" />
-                  Adicionar parada
+                  Adicionar entrega
                 </Button>
               </div>
               {fields.map((field, index) => (
@@ -588,11 +699,16 @@ export function IdentificationStep({
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg bg-muted/30 border border-dashed px-4 py-3">
+            <p className="text-xs text-muted-foreground leading-snug">
+              Preencha origem e destino, selecione o veículo e calcule a distância para liberar a
+              precificação.
+            </p>
             <Button
               type="button"
-              variant="outline"
+              variant="default"
               size="sm"
+              className="shrink-0"
               onClick={onCalculateKm}
               disabled={
                 isCalculatingKm ||

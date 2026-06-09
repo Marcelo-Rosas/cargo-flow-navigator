@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
+import { inferAnttFlagsFromStoredMeta, resolveAnttOperationTable } from '@/lib/antt-floor-calc';
 import type { StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 export type AnttFloorStatus = 'loading' | 'not_applicable' | 'compliant' | 'below_floor' | 'stale';
@@ -43,9 +44,11 @@ export function useAnttFloorStatus(
   }, [quote, bd]);
 
   const axesCount = quote?.vehicle_type?.axes_count ?? null;
+  const anttFlags = inferAnttFlagsFromStoredMeta(bd?.meta?.antt);
+  const operationTable = resolveAnttOperationTable(anttFlags);
 
   const { data: anttRate, isLoading } = useAnttFloorRate({
-    operationTable: 'A',
+    operationTable,
     cargoType: 'carga_geral',
     axesCount: modality === 'lotacao' ? axesCount : null,
   });
@@ -99,6 +102,7 @@ export function useAnttFloorStatus(
       kmDistance: quote.km_distance,
       ccd: anttRate.ccd,
       cc: anttRate.cc,
+      retornoVazio: anttFlags.retornoVazio,
     });
 
     const currentValue = quote.value ?? 0;
@@ -119,5 +123,5 @@ export function useAnttFloorStatus(
     }
 
     return { status: 'compliant', piso, currentValue, gap: 0, modality, isStale: false };
-  }, [quote, modality, anttRate, isLoading, bd]);
+  }, [quote, modality, anttRate, isLoading, bd, anttFlags.retornoVazio]);
 }

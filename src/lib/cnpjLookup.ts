@@ -58,6 +58,11 @@ export interface CnpjLookupResult {
   // QSA
   share_capital: number | null;
   partners: CnpjPartner[];
+
+  /** Optante pelo Simples Nacional (quando informado pela Receita). */
+  simples_optant: boolean | null;
+  /** Optante pelo MEI (quando informado pela Receita). */
+  mei_optant: boolean | null;
 }
 
 const sanitizeCnpj = (v: string) => v.replace(/\D/g, '');
@@ -79,6 +84,12 @@ const safeNum = (v: unknown): number | null => {
             .replace(',', '.')
         );
   return Number.isFinite(n) ? n : null;
+};
+
+const safeBool = (v: unknown): boolean | null => {
+  if (v === true || v === 'true' || v === 'S' || v === 'SIM') return true;
+  if (v === false || v === 'false' || v === 'N' || v === 'NAO' || v === 'NÃO') return false;
+  return null;
 };
 
 const ymd = (v: unknown): string | null => {
@@ -135,6 +146,8 @@ interface BrasilApiCnpj {
   cnaes_secundarios?: BrasilApiCnpjCnaeSecundario[];
   capital_social?: number | string;
   qsa?: BrasilApiCnpjPartner[];
+  opcao_pelo_simples?: boolean | string | null;
+  opcao_pelo_mei?: boolean | string | null;
 }
 
 function mapPartner(p: BrasilApiCnpjPartner): CnpjPartner {
@@ -194,6 +207,40 @@ function normalize(data: BrasilApiCnpj): CnpjLookupResult {
 
     share_capital: safeNum(data.capital_social),
     partners,
+
+    simples_optant: safeBool(data.opcao_pelo_simples),
+    mei_optant: safeBool(data.opcao_pelo_mei),
+  };
+}
+
+export interface TaxRegistrationSuggestion {
+  state_registration: string | null;
+  municipal_registration: string | null;
+  /** Mensagem curta para o usuário (IE/IM não vêm na Receita Federal). */
+  note: string;
+}
+
+/**
+ * Sugestão conservadora de IE/IM a partir do cartão CNPJ (BrasilAPI).
+ * A Receita não publica inscrições estadual/municipal — só preenchemos quando há
+ * indício forte (ex.: MEI costuma usar "ISENTO" na IE em contratos).
+ */
+export function suggestTaxRegistrations(result: CnpjLookupResult): TaxRegistrationSuggestion {
+  const note =
+    'Inscrição Estadual e Municipal não constam na consulta CNPJ da Receita. Confira no portal da SEFAZ e da prefeitura.';
+
+  if (result.mei_optant === true) {
+    return {
+      state_registration: 'ISENTO',
+      municipal_registration: null,
+      note: `${note} Para MEI, a IE costuma ser "ISENTO" — confirme com seu contador.`,
+    };
+  }
+
+  return {
+    state_registration: null,
+    municipal_registration: null,
+    note,
   };
 }
 
@@ -208,7 +255,21 @@ export class CnpjLookupError extends Error {
 }
 
 /**
- * Consulta CNPJ na BrasilAPI e retorna o shape normalizado.
+ * Fallback para minhareceita.org quando a BrasilAPI nao encontra o CNPJ.
+ * O formato de resposta eh compativel com o shape BrasilApiCnpj.
+ */
+async function fetchMinhaReceita(cnpj: string): Promise<BrasilApiCnpj> {
+  const res = await fetch(`https://minhareceita.org/${cnpj}`, {
+    headers: { 'User-Agent': 'vectra-cargo (cnpj-lookup; +https://vectracargo.com.br)' },
+  });
+  if (!res.ok) {
+    throw new CnpjLookupError(`Erro ao consultar CNPJ (status ${res.status})`, 'STATUS');
+  }
+  return (await res.json()) as BrasilApiCnpj;
+}
+
+/**
+ * Consulta CNPJ na BrasilAPI (com fallback para minhareceita.org) e retorna o shape normalizado.
  * @throws CnpjLookupError quando CNPJ invalido, nao encontrado, ou erro de rede.
  */
 export async function lookupCnpj(rawCnpj: string): Promise<CnpjLookupResult> {
@@ -226,14 +287,26 @@ export async function lookupCnpj(rawCnpj: string): Promise<CnpjLookupResult> {
       headers: { 'User-Agent': 'vectra-cargo (cnpj-lookup; +https://vectracargo.com.br)' },
     });
   } catch (e) {
-    throw new CnpjLookupError(
-      e instanceof Error ? e.message : 'Falha de rede ao consultar CNPJ',
-      'NETWORK'
-    );
+    // Erro de rede na BrasilAPI -> tenta fallback
+    try {
+      const data = await fetchMinhaReceita(cnpj);
+      return normalize(data);
+    } catch {
+      throw new CnpjLookupError(
+        e instanceof Error ? e.message : 'Falha de rede ao consultar CNPJ',
+        'NETWORK'
+      );
+    }
   }
 
   if (res.status === 404) {
-    throw new CnpjLookupError('CNPJ nao encontrado na base da Receita Federal', 'NOT_FOUND');
+    // CNPJ nao encontrado na BrasilAPI -> tenta fallback
+    try {
+      const data = await fetchMinhaReceita(cnpj);
+      return normalize(data);
+    } catch {
+      throw new CnpjLookupError('CNPJ nao encontrado na base da Receita Federal', 'NOT_FOUND');
+    }
   }
   if (!res.ok) {
     throw new CnpjLookupError(`Erro ao consultar CNPJ (status ${res.status})`, 'STATUS');

@@ -17,7 +17,7 @@ function get(rows: DreCanonicalRow[], code: DreCanonicalRow['line_code']): DreCa
  * - custos_diretos = soma das sublinhas
  * - resultado_liquido = receita_liquida - overhead - custos_diretos
  * - margem_liquida (presumido) = resultado_liquido / faturamento_bruto
- * - margem_liquida (real) = resultado_liquido / receita_liquida_real
+ * - margem_liquida (real) = resultado_liquido / faturamento_bruto
  */
 export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
   const custoMotorista = get(rows, 'custo_motorista');
@@ -25,6 +25,8 @@ export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
   const cargaDescarga = get(rows, 'carga_descarga');
   const espera = get(rows, 'espera');
   const taxasCondicionais = get(rows, 'taxas_condicionais');
+  const aluguelMaquinas = get(rows, 'aluguel_maquinas');
+  const maoDeObra = get(rows, 'mao_de_obra');
   const outrosCustos = get(rows, 'outros_custos');
   const custosDiretos = get(rows, 'custos_diretos');
   const receitaLiquida = get(rows, 'receita_liquida');
@@ -39,6 +41,8 @@ export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
       cargaDescarga.presumed_value +
       espera.presumed_value +
       taxasCondicionais.presumed_value +
+      aluguelMaquinas.presumed_value +
+      maoDeObra.presumed_value +
       outrosCustos.presumed_value
   );
   const expectedCustosDiretosReal = round2(
@@ -47,6 +51,8 @@ export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
       cargaDescarga.real_value +
       espera.real_value +
       taxasCondicionais.real_value +
+      aluguelMaquinas.real_value +
+      maoDeObra.real_value +
       outrosCustos.real_value
   );
 
@@ -60,8 +66,8 @@ export function validateDreRows(rows: DreCanonicalRow[]): DreCanonicalRow[] {
   const expectedMargem = faturamento.presumed_value
     ? round2((resultadoLiquido.presumed_value / faturamento.presumed_value) * 100)
     : 0;
-  const expectedMargemReal = receitaLiquida.real_value
-    ? round2((resultadoLiquido.real_value / receitaLiquida.real_value) * 100)
+  const expectedMargemReal = faturamento.real_value
+    ? round2((resultadoLiquido.real_value / faturamento.real_value) * 100)
     : 0;
 
   const hasMismatch =

@@ -177,12 +177,11 @@ Deno.serve(async (req) => {
       source_name: string;
       source_url: string;
       relevance_score: number;
-      raw_snippet: string;
     }> = [];
 
     for (const article of articles) {
       try {
-        const { summary, relevance_score, raw_snippet } = await summarizeArticle(article);
+        const { summary, relevance_score } = await summarizeArticle(article);
         rows.push({
           title: article.title.substring(0, 500),
           summary,
@@ -190,7 +189,6 @@ Deno.serve(async (req) => {
           source_name: article.source,
           source_url: article.url,
           relevance_score,
-          raw_snippet,
         });
       } catch (e) {
         console.warn('Skip article:', article.title, e);
@@ -212,7 +210,9 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     console.error('news-agent error:', e);
-    return new Response(JSON.stringify({ error: String(e) }), {
+    const errorDetail =
+      e instanceof Error ? { message: e.message, stack: e.stack, name: e.name } : e;
+    return new Response(JSON.stringify({ error: errorDetail }), {
       status: 500,
       headers: { ...corsHeaders, 'content-type': 'application/json' },
     });

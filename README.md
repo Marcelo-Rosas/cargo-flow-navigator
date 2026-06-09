@@ -38,6 +38,21 @@ Edite `.env` e preencha com as credenciais do Supabase:
 
 > As credenciais estão no painel Supabase em **Settings > API**.
 
+#### Arquivos de ambiente do projeto
+
+| Arquivo | Propósito | Commitado |
+|---------|-----------|-----------|
+| `.env` | Variáveis base do frontend (Vite + Playwright) | Não (gitignored) |
+| `.env.local` | Secrets locais de dev (Postgres, Vercel, Cloudflare, Supabase) | Não (gitignored) |
+| `.env.e2e` | Credenciais de teste E2E (Playwright) | Não (gitignored) |
+| `.env.e2e.example` | Template para criar `.env.e2e` | **Sim** |
+| `supabase/.env.local` | OpenAI key para Supabase CLI local | Não (gitignored) |
+| `supabase/functions/.env.local.functions.txt` | Secrets das Edge Functions (Supabase local) | Não (gitignored) |
+
+> Para mais detalhes técnicos, veja [`docs/environment-files.md`](docs/environment-files.md).
+
+**WhatsApp:** integração **Meta** via `notification-hub` (Edge Function) → OpenClaw. Não usamos Evolution API; a pasta [`.docker/`](.docker/) é legado documentado.
+
 ### 3. Supabase local (opcional)
 
 Para rodar o backend localmente:

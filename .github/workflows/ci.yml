@@ -6,6 +6,7 @@ on:
     branches: [main, master, develop, feat/*]
   pull_request:
     branches: [main, master, develop, feat/*]
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

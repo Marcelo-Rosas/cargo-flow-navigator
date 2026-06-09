@@ -62,9 +62,10 @@ export function AiInsightsWidget() {
     action_item?: string;
   };
   type InsightItem = string | InsightObject;
-  const insights: InsightItem[] = (analysis?.insights as InsightItem[]) ?? [];
-  const summary = (analysis?.summary as string) ?? null;
-  const risk = (analysis?.risk as string) ?? null;
+  const rawInsights = analysis?.insights;
+  const insights: InsightItem[] = Array.isArray(rawInsights) ? (rawInsights as InsightItem[]) : [];
+  const summary = typeof analysis?.summary === 'string' ? analysis.summary : null;
+  const risk = typeof analysis?.risk === 'string' ? analysis.risk : null;
   const metrics = analysis?.metrics as Record<string, unknown> | null;
   const forecast = analysis?.forecast as Record<string, unknown> | null;
   const trendDirection = (metrics?.trend_direction as string) ?? null;
@@ -79,8 +80,8 @@ export function AiInsightsWidget() {
       {
         onSuccess: () => {
           toast({
-            title: 'Analysis generated',
-            description: 'The insights have been updated successfully.',
+            title: 'Análise gerada',
+            description: 'Os insights foram atualizados com sucesso.',
           });
         },
         onError: (error) => {
@@ -224,10 +225,13 @@ export function AiInsightsWidget() {
             const priority = isStr ? null : (obj?.priority ?? null);
             const IconComponent = typeIcons[type] || Lightbulb;
             const colorClass = typeColors[type] || typeColors.opportunity;
+            const stableKey = isStr
+              ? `str-${title.slice(0, 30)}-${i}`
+              : `obj-${obj?.title?.slice(0, 30) || obj?.description?.slice(0, 30) || i}-${i}`;
 
             return (
               <motion.div
-                key={i}
+                key={stableKey}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.1 }}

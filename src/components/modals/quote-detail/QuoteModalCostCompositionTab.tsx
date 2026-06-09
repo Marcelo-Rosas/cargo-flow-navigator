@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import type { StoredPricingBreakdown } from '@/lib/freightCalculator';
+import { resolvePisoAnttCarreteiroReais } from '@/lib/carreteiro-cost';
 
 interface ConditionalFee {
   id: string;
@@ -93,6 +94,10 @@ export function QuoteModalCostCompositionTab({
   )?.regimeFiscal;
   const isLucroPresumido = regimeFiscal === 'lucro_presumido';
   const custoEfetivoMotorista = breakdown.components?.baseFreight ?? 0;
+  const custoMotoristaPisoAntt =
+    breakdown.profitability?.custoMotoristaContratado ??
+    breakdown.profitability?.custoMotorista ??
+    (resolvePisoAnttCarreteiroReais(breakdown) || pisoAnttTotal);
   const pedagio = breakdown.components?.toll ?? 0;
   const grisValue = breakdown.components?.gris ?? 0;
   const tsoValue = breakdown.components?.tso ?? 0;
@@ -153,7 +158,75 @@ export function QuoteModalCostCompositionTab({
         value: breakdown.components.tear ?? 0,
         field: 'tear',
       });
+    if (dispatchFeeValue > 0)
+      composicaoRows.push({
+        label: 'Taxa de Despacho (NTC)',
+        value: dispatchFeeValue,
+        field: 'dispatch_fee',
+      });
+    if ((breakdown.components.conditionalFeesTotal ?? 0) > 0)
+      composicaoRows.push({
+        label: 'Taxas condicionais',
+        value: breakdown.components.conditionalFeesTotal ?? 0,
+        field: 'conditional_fees',
+      });
+    if ((breakdown.components.waitingTimeCost ?? 0) > 0)
+      composicaoRows.push({
+        label: 'Estadia / hora parada',
+        value: breakdown.components.waitingTimeCost ?? 0,
+        field: 'waiting_time',
+      });
   }
+
+  const tacAdjustment = breakdown.totals?.tacAdjustment ?? 0;
+  const paymentAdjustment = breakdown.totals?.paymentAdjustment ?? 0;
+  const tacPercent = (breakdown.rates as { tacPercent?: number } | undefined)?.tacPercent;
+  const paymentPercent = (breakdown.rates as { paymentAdjustmentPercent?: number } | undefined)
+    ?.paymentAdjustmentPercent;
+  if (tacAdjustment > 0)
+    composicaoRows.push({
+      label: `TAC${tacPercent != null ? ` (${tacPercent.toFixed(2)}%)` : ''}`,
+      value: tacAdjustment,
+      field: 'tac',
+    });
+  if (paymentAdjustment > 0)
+    composicaoRows.push({
+      label: `Ajuste prazo${paymentPercent != null ? ` (${paymentPercent.toFixed(2)}%)` : ''}`,
+      value: paymentAdjustment,
+      field: 'payment_adjustment',
+    });
+  const custosDescargaMemoria = breakdown.profitability?.custosDescarga ?? custosDescarga;
+  if (custosDescargaMemoria > 0)
+    composicaoRows.push({
+      label: 'Carga / descarga',
+      value: custosDescargaMemoria,
+      field: 'custos_descarga',
+    });
+
+  const custoServicosPb = breakdown.profitability?.custoServicos;
+  const custosDiretos =
+    breakdown.profitability?.custosDiretos ??
+    (custoServicosPb != null
+      ? baseFreight + custoServicosPb + custosDescargaMemoria
+      : baseFreight +
+        pedagioMemoria +
+        rctrcValue +
+        grisValue +
+        tsoValue +
+        adValoremValue +
+        tdeValue +
+        tearValue +
+        dispatchFeeValue +
+        aluguelMaquinasValue +
+        tacAdjustment +
+        paymentAdjustment +
+        (breakdown.components?.conditionalFeesTotal ?? 0) +
+        (breakdown.components?.waitingTimeCost ?? 0) +
+        custosDescargaMemoria);
+  const formacaoAllIn = Math.max(0, totalClienteBruto - custosDiretos);
+  const receitaLiquidaMemoria =
+    breakdown.profitability?.receitaLiquida ??
+    totalClienteBruto - (breakdown.totals.totalImpostos ?? 0);
 
   const breakdownVersion = breakdown.version ?? 'legacy';
   const isV5 = breakdownVersion.startsWith('5.');
@@ -283,7 +356,10 @@ export function QuoteModalCostCompositionTab({
                     data-testid="row-subtotal-motorista-label"
                     className="font-semibold text-primary"
                   >
-                    Subtotal Motorista (Base de Negociação)
+                    <span className="block">Subtotal Motorista (Base de Negociação)</span>
+                    <span className="block text-[10px] font-normal text-muted-foreground">
+                      Frete + pedágio — referência com motorista, não soma ao ALL-IN
+                    </span>
                   </TableCell>
                   <TableCell
                     data-field="subtotal_motorista_valor"
@@ -311,20 +387,62 @@ export function QuoteModalCostCompositionTab({
                     </TableCell>
                   </TableRow>
                 ))}
-                <TableRow>
+                <TableRow className="border-t bg-muted/30">
                   <TableCell
-                    data-field="receita_bruta"
-                    data-testid="row-receita-bruta-label"
+                    data-field="custos_diretos"
+                    data-testid="row-custos-diretos-label"
                     className="font-semibold"
                   >
-                    Receita Bruta
+                    Custos diretos (base do gross-up)
                   </TableCell>
                   <TableCell
-                    data-field="receita_bruta_valor"
-                    data-testid="row-receita-bruta-value"
-                    className="text-right font-medium tabular-nums"
+                    data-field="custos_diretos_valor"
+                    data-testid="row-custos-diretos-value"
+                    className="text-right font-semibold tabular-nums"
                   >
-                    {formatCurrency(breakdown.totals.receitaBruta || 0)}
+                    {formatCurrency(custosDiretos)}
+                  </TableCell>
+                </TableRow>
+                {formacaoAllIn > 0.01 && (
+                  <TableRow>
+                    <TableCell
+                      data-field="formacao_all_in"
+                      data-testid="row-formacao-all-in-label"
+                      className="text-muted-foreground"
+                    >
+                      <span className="block">(+) Formação ALL-IN</span>
+                      <span className="block text-[10px]">
+                        Overhead, margem alvo e impostos no divisor — não é segunda vez o frete
+                      </span>
+                    </TableCell>
+                    <TableCell
+                      data-field="formacao_all_in_valor"
+                      data-testid="row-formacao-all-in-value"
+                      className="text-right font-medium tabular-nums"
+                    >
+                      {formatCurrency(formacaoAllIn)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                <TableRow className="bg-primary/5">
+                  <TableCell
+                    data-field="faturamento_bruto"
+                    data-testid="row-faturamento-bruto-label"
+                    className="font-semibold text-primary"
+                  >
+                    Faturamento bruto (Total Cliente ALL-IN)
+                  </TableCell>
+                  <TableCell
+                    data-field="faturamento_bruto_valor"
+                    data-testid="row-faturamento-bruto-value"
+                    className="text-right font-bold tabular-nums text-primary"
+                  >
+                    {formatCurrency(totalClienteBruto)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={2} className="py-1 text-[10px] text-muted-foreground">
+                    Destaque tributário (valores já embutidos no ALL-IN por gross-up)
                   </TableCell>
                 </TableRow>
                 {isLucroPresumido ? (
@@ -448,6 +566,22 @@ export function QuoteModalCostCompositionTab({
                     </TableRow>
                   </>
                 )}
+                <TableRow>
+                  <TableCell
+                    data-field="receita_liquida"
+                    data-testid="row-receita-liquida-label"
+                    className="font-medium"
+                  >
+                    Receita líquida (após impostos)
+                  </TableCell>
+                  <TableCell
+                    data-field="receita_liquida_valor"
+                    data-testid="row-receita-liquida-value"
+                    className="text-right font-medium tabular-nums"
+                  >
+                    {formatCurrency(receitaLiquidaMemoria)}
+                  </TableCell>
+                </TableRow>
                 {discountValue > 0 && (
                   <TableRow className="bg-orange-50/50 dark:bg-orange-900/10">
                     <TableCell
@@ -466,22 +600,24 @@ export function QuoteModalCostCompositionTab({
                     </TableCell>
                   </TableRow>
                 )}
-                <TableRow className="bg-primary/5">
-                  <TableCell
-                    data-field="total_cliente"
-                    data-testid="row-total-cliente-label"
-                    className="font-semibold text-primary"
-                  >
-                    Total Cliente{discountValue > 0 ? ' (com desconto)' : ''}
-                  </TableCell>
-                  <TableCell
-                    data-field="total_cliente_valor"
-                    data-testid="row-total-cliente-value"
-                    className="text-right font-bold text-primary tabular-nums"
-                  >
-                    {formatCurrency(totalCliente)}
-                  </TableCell>
-                </TableRow>
+                {discountValue > 0 && (
+                  <TableRow className="bg-primary/5">
+                    <TableCell
+                      data-field="total_cliente"
+                      data-testid="row-total-cliente-label"
+                      className="font-semibold text-primary"
+                    >
+                      Total Cliente (com desconto)
+                    </TableCell>
+                    <TableCell
+                      data-field="total_cliente_valor"
+                      data-testid="row-total-cliente-value"
+                      className="text-right font-bold text-primary tabular-nums"
+                    >
+                      {formatCurrency(totalCliente)}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -675,12 +811,22 @@ export function QuoteModalCostCompositionTab({
                 </TableRow>
                 <TableRow>
                   <TableCell className="pl-8 text-muted-foreground">
-                    • Custo Motorista (Frete Base)
+                    • Custo Motorista (Piso ANTT / carreteiro)
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-destructive">
-                    -{formatCurrency(custoEfetivoMotorista)}
+                    -{formatCurrency(custoMotoristaPisoAntt)}
                   </TableCell>
                 </TableRow>
+                {custoEfetivoMotorista > custoMotoristaPisoAntt + 0.01 && (
+                  <TableRow>
+                    <TableCell className="pl-8 text-muted-foreground text-xs">
+                      • Frete peso contratado (NTC, ref. gross-up)
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
+                      {formatCurrency(custoEfetivoMotorista)}
+                    </TableCell>
+                  </TableRow>
+                )}
                 {pedagio > 0 && (
                   <TableRow>
                     <TableCell className="pl-8 text-muted-foreground">• Pedágio</TableCell>
@@ -942,21 +1088,33 @@ export function QuoteModalCostCompositionTab({
               : 'rounded-lg p-4 border bg-success/5 border-success/20'
           }
         >
-          <h5 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
+          <h5 className="font-semibold text-foreground mb-1 flex items-center gap-2 text-sm">
             <TrendingUp className="w-3.5 h-3.5" />
-            Rentabilidade
+            Indicadores de rentabilidade
           </h5>
+          <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
+            Lotação: frete peso = max(tabela NTC + over km, piso ANTT + over mínimo). Overhead é{' '}
+            <span className="font-medium">custo estrutural</span> (% da receita líquida). Margem de
+            contribuição e margem operacional usam a mesma base (frete golden + serviços NTC).
+          </p>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Margem Bruta (R$)</span>
-              <span className="font-medium tabular-nums">{formatCurrency(margemBruta)}</span>
+              <span className="text-muted-foreground">Receita líquida</span>
+              <span className="font-medium tabular-nums">{formatCurrency(receitaLiquida)}</span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>(−) Overhead ({breakdown.rates?.overheadPercent?.toFixed(0) ?? '—'}%)</span>
+              <span className="tabular-nums">−{formatCurrency(overhead)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Overhead</span>
-              <span className="font-medium tabular-nums">{formatCurrency(overhead)}</span>
+              <span className="text-muted-foreground">Margem de contribuição</span>
+              <span className="font-medium tabular-nums">{formatCurrency(margemBruta)}</span>
             </div>
-            <div className="flex justify-between items-center gap-2">
-              <span className="font-semibold">Resultado Líquido</span>
+            <p className="text-[10px] text-muted-foreground -mt-1">
+              Receita líquida − overhead − frete peso (golden) − custos de serviço NTC
+            </p>
+            <div className="flex justify-between items-center gap-2 pt-1 border-t border-border/60">
+              <span className="font-semibold">Resultado líquido</span>
               <Badge
                 variant={resultadoLiquido >= 0 ? 'default' : 'destructive'}
                 className={resultadoLiquido >= 0 ? 'bg-success text-success-foreground' : ''}
@@ -964,8 +1122,11 @@ export function QuoteModalCostCompositionTab({
                 {formatCurrency(resultadoLiquido)}
               </Badge>
             </div>
+            <p className="text-[10px] text-muted-foreground -mt-1">
+              Igual à margem de contribuição (resultado líquido ÷ faturamento ALL-IN)
+            </p>
             <div className="flex justify-between items-center gap-2">
-              <span className="font-semibold">Margem Operacional</span>
+              <span className="font-semibold">Margem operacional</span>
               <Badge
                 variant={isBelowTarget ? 'destructive' : 'default'}
                 className={!isBelowTarget ? 'bg-success text-success-foreground' : ''}

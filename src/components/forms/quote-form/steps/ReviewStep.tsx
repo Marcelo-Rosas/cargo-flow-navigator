@@ -1,5 +1,6 @@
 import type { UseFormReturn } from 'react-hook-form';
-import { CheckCircle2, Tag } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Tag } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { SectionBlock } from '@/components/ui/section-block';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
@@ -9,6 +10,7 @@ import { formatCurrency } from '@/lib/formatters';
 import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import type { QuoteFormData } from '../types';
 import { PAYMENT_METHOD_LABELS } from '@/types/pricing';
+import { PricingMatchAlert } from '../PricingMatchAlert';
 
 function formatDateBR(d: string | undefined): string {
   if (!d) return '—';
@@ -40,7 +42,15 @@ export function ReviewStep({
 }: ReviewStepProps) {
   const values = form.getValues();
   const discount = form.watch('discount') ?? 0;
-  const baseFreight = calculationResult?.components?.baseFreight ?? 0;
+  const meta = calculationResult?.meta;
+  const anttCostBaseUsed = meta?.anttCostBaseUsed === true;
+  const pisoAntt = meta?.lotacaoPisoComOver ?? meta?.anttPisoCarreteiro ?? 0;
+  const freteTabelaRef = meta?.fretePesoOriginal ?? meta?.lotacaoFreteTabelaComOverKm ?? 0;
+  const baseFreight =
+    calculationResult?.profitability?.custoMotoristaContratado ??
+    calculationResult?.components?.baseFreight ??
+    0;
+  const tabelaAcimaPiso = !isLegacy && anttCostBaseUsed && freteTabelaRef > baseFreight * 1.05;
   const totalBruto = isLegacy
     ? Number(values.value) || 0
     : (calculationResult?.totals?.totalCliente ?? 0);
@@ -64,8 +74,8 @@ export function ReviewStep({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-        <SectionBlock label="Rota e Cliente">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
+        <SectionBlock variant="card" label="Rota e Cliente">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Cliente</span>
@@ -109,7 +119,7 @@ export function ReviewStep({
           </div>
         </SectionBlock>
 
-        <SectionBlock label="Carga e Transporte">
+        <SectionBlock variant="card" label="Carga e Transporte">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tipo de Carga</span>
@@ -137,8 +147,35 @@ export function ReviewStep({
         </SectionBlock>
       </div>
 
+      {tabelaAcimaPiso && (
+        <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+          <AlertTriangle className="h-4 w-4 text-amber-700" />
+          <AlertDescription className="text-sm text-amber-900 dark:text-amber-200">
+            Base de custo: Piso ANTT {formatCurrency(baseFreight)}. Tabela NTC (referência):{' '}
+            {formatCurrency(freteTabelaRef)} — não compõe o total.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Semáforo de Precificação */}
+      {meta?.matchStatus && !isLegacy && (
+        <SectionBlock variant="card" label="Análise de Competitividade (Semáforo)">
+          <PricingMatchAlert
+            nossoPreco={totalCliente}
+            ckanBenchmarkLiquido={
+              meta.matchStatus.ckanBenchmarkLiquido ?? meta.matchStatus.history2025Value
+            }
+            ckanGrossValue={meta.matchStatus.ckanGrossValue}
+            status={meta.matchStatus.status}
+          />
+        </SectionBlock>
+      )}
+
       {/* Composição Financeira */}
-      <SectionBlock label={isLegacy ? 'FAT + PAG (manual)' : 'Composição Financeira'}>
+      <SectionBlock
+        variant="card"
+        label={isLegacy ? 'FAT + PAG (manual)' : 'Composição Financeira'}
+      >
         {isLegacy ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-3 rounded-lg bg-muted/30 border border-border">
@@ -163,8 +200,15 @@ export function ReviewStep({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-3 rounded-lg bg-muted/30 border border-border">
-              <p className="text-[10px] text-muted-foreground mb-1">Frete Base</p>
+              <p className="text-[10px] text-muted-foreground mb-1">
+                {anttCostBaseUsed ? 'Base custo (Piso ANTT)' : 'Frete Base'}
+              </p>
               <p className="text-lg font-semibold">{formatCurrency(baseFreight)}</p>
+              {tabelaAcimaPiso && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Tabela ref.: {formatCurrency(freteTabelaRef)}
+                </p>
+              )}
             </div>
             <div className="p-3 rounded-lg bg-muted/30 border border-border">
               <p className="text-[10px] text-muted-foreground mb-1">Adicionais e Taxas</p>
@@ -219,7 +263,7 @@ export function ReviewStep({
         values.advance_due_date ||
         values.balance_due_date ||
         values.estimated_loading_date) && (
-        <SectionBlock label="Pagamento e Datas">
+        <SectionBlock variant="card" label="Pagamento e Datas">
           <div className="space-y-2 text-sm">
             {values.payment_method && (
               <div className="flex justify-between">
@@ -260,7 +304,7 @@ export function ReviewStep({
 
       {/* Observações */}
       {values.notes && (
-        <SectionBlock label="Observações">
+        <SectionBlock variant="card" label="Observações">
           <p className="text-sm italic text-muted-foreground/80 leading-relaxed">
             &ldquo;{values.notes}&rdquo;
           </p>

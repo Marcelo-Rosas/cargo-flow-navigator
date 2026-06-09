@@ -1,6 +1,6 @@
 // supabase/functions/_shared/gemini.ts
 
-export type GeminiModel = 'gemini-2.0-flash' | 'gemini-2.5-pro';
+export type GeminiModel = 'gemini-2.5-flash' | 'gemini-2.5-pro';
 
 export interface GeminiUsage {
   input_tokens: number;
@@ -52,7 +52,7 @@ async function callGeminiModel(
 
 export async function callGemini(
   prompt: string,
-  model: GeminiModel = 'gemini-2.0-flash',
+  model: GeminiModel = 'gemini-2.5-flash',
   temperature = 0.4
 ): Promise<GeminiResult> {
   const apiKey = (globalThis as any).Deno.env.get('GEMINI_API_KEY');
@@ -62,12 +62,12 @@ export async function callGemini(
     return await callGeminiModel(prompt, model, temperature, apiKey);
   } catch (primaryErr) {
     // Fallback to flash if a non-flash model fails (model not found, quota, etc.)
-    if (model !== 'gemini-2.0-flash') {
+    if (model !== 'gemini-2.5-flash') {
       console.warn(
-        `[gemini] primary model ${model} failed, falling back to gemini-2.0-flash:`,
+        `[gemini] primary model ${model} failed, falling back to gemini-2.5-flash:`,
         primaryErr
       );
-      return await callGeminiModel(prompt, 'gemini-2.0-flash', temperature, apiKey);
+      return await callGeminiModel(prompt, 'gemini-2.5-flash', temperature, apiKey);
     }
     throw primaryErr;
   }
@@ -82,6 +82,6 @@ export function selectGeminiModel(analysisType: string): GeminiModel {
     case 'quote_profitability':
     case 'financial_anomaly':
     default:
-      return 'gemini-2.0-flash'; // análises rápidas/baratas
+      return 'gemini-2.5-flash'; // análises rápidas/baratas
   }
 }

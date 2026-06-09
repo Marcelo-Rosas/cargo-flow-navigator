@@ -1,4 +1,12 @@
-import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { LOGO_BASE64 } from '../_shared/logo-base64.ts';
+import {
+  buildClause52IncludedItems,
+  buildPaymentTermsDescription,
+  formatBrlReais,
+  formatCnpjForContract,
+  fmtTodayBr,
+} from './contract-clause-helpers.ts';
 
 // Paleta Vectra
 const NAVY = rgb(0.106, 0.165, 0.29);
@@ -6,6 +14,8 @@ const ORANGE = rgb(0.91, 0.459, 0.102);
 const TEXT = rgb(0.118, 0.137, 0.176);
 const MUTED = rgb(0.392, 0.431, 0.51);
 const WHITE = rgb(1, 1, 1);
+const LIGHT_FILL = rgb(0.965, 0.972, 0.98);
+const GOVBR_SIGN_AREA_H = 52;
 
 const PW = 595; // A4 width in pt
 const PH = 842; // A4 height in pt
@@ -13,16 +23,6 @@ const ML = 50;
 const MR = 50;
 const CW = PW - ML - MR;
 const LINE_H = 14;
-
-function fmtCurrency(cents: number): string {
-  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return '___/___/______';
-  const d = new Date(iso + 'T12:00:00Z');
-  return d.toLocaleDateString('pt-BR');
-}
 
 function buildAddress(client: Record<string, unknown>): string {
   const parts: string[] = [];
@@ -142,6 +142,27 @@ class PdfWriter {
     this.y -= pts;
   }
 
+  setY(y: number) {
+    this.y = y;
+  }
+
+  /** Desenha texto em coordenada fixa sem mover o cursor vertical. */
+  drawTextAt(
+    content: string,
+    x: number,
+    y: number,
+    opts: {
+      size?: number;
+      bold?: boolean;
+      italic?: boolean;
+      color?: ReturnType<typeof rgb>;
+    } = {}
+  ) {
+    const { size = 9, bold = false, italic = false, color = TEXT } = opts;
+    const font = bold ? this.fonts.bold : italic ? this.fonts.italic : this.fonts.regular;
+    this.page.drawText(content, { x, y, size, font, color });
+  }
+
   rule(color = NAVY, thickness = 0.5) {
     this.page.drawLine({
       start: { x: ML, y: this.y },
@@ -180,21 +201,117 @@ class PdfWriter {
     this.text(label, { x: ML + 12, size: 8.5, maxWidth: CW - 12 });
   }
 
-  async drawLogo(_logoBase64?: string) {
-    if (!_logoBase64) return;
+  /** Logo no canto superior esquerdo; retorna dimensões ou null. */
+  async drawLogo(
+    logoBase64: string | undefined,
+    anchorTopY: number
+  ): Promise<{ width: number; height: number } | null> {
+    if (!logoBase64) return null;
     try {
-      const logoBytes = Uint8Array.from(atob(_logoBase64), (c) => c.charCodeAt(0));
+      const raw = logoBase64.includes(',') ? (logoBase64.split(',')[1] ?? '') : logoBase64;
+      if (!raw) return null;
+      const logoBytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
       const logoImage = await this.doc.embedPng(logoBytes);
-      const logoDims = logoImage.scale(0.13);
+      const maxHeight = 52;
+      const scale = maxHeight / logoImage.height;
+      const width = logoImage.width * scale;
+      const height = logoImage.height * scale;
       this.page.drawImage(logoImage, {
         x: ML,
-        y: PH - 50,
-        width: logoDims.width,
-        height: logoDims.height,
+        y: anchorTopY - height,
+        width,
+        height,
       });
+      return { width, height };
     } catch {
-      // logo embed failed, skip silently
+      return null;
     }
+  }
+
+  /** Cabeçalho: faixa da logo → título/referência centralizados → linha separadora. */
+  async drawContractHeader(title: string, subtitle: string, logoBase64?: string) {
+    const topMargin = 36;
+    const anchorTop = PH - topMargin;
+    const logo = await this.drawLogo(logoBase64, anchorTop);
+    const logoBottom = logo ? anchorTop - logo.height : anchorTop;
+
+    // Cursor abaixo da logo (título ocupa largura total, sem colidir com a marca)
+    this.setY(logoBottom - 18);
+
+    this.text(title, { align: 'center', bold: true, size: 11, color: NAVY, maxWidth: CW });
+    this.gap(6);
+    this.text(subtitle, { align: 'center', size: 8, color: MUTED });
+    this.gap(10);
+    this.rule(ORANGE, 0.75);
+    this.gap(8);
+  }
+
+  /**
+   * Coluna de assinatura (topo → base): área GOV.br → linha → papel → nome/representante.
+   */
+  drawSignatureColumn(
+    x: number,
+    width: number,
+    topY: number,
+    role: string,
+    name: string,
+    representative?: string | null
+  ): number {
+    const areaBottom = topY - GOVBR_SIGN_AREA_H;
+
+    this.page.drawRectangle({
+      x,
+      y: areaBottom,
+      width,
+      height: GOVBR_SIGN_AREA_H,
+      color: LIGHT_FILL,
+      borderColor: MUTED,
+      borderWidth: 0.5,
+      borderDashArray: [4, 3],
+    });
+
+    const wmSize = 7;
+    const wm1 = 'Assinatura digital';
+    const wm2 = 'GOV.br';
+    const cx = x + width / 2;
+    const w1 = this.fonts.italic.widthOfTextAtSize(wm1, wmSize);
+    const w2 = this.fonts.bold.widthOfTextAtSize(wm2, wmSize);
+    this.page.drawText(wm1, {
+      x: cx - w1 / 2,
+      y: areaBottom + GOVBR_SIGN_AREA_H / 2 + 2,
+      size: wmSize,
+      font: this.fonts.italic,
+      color: MUTED,
+    });
+    this.page.drawText(wm2, {
+      x: cx - w2 / 2,
+      y: areaBottom + GOVBR_SIGN_AREA_H / 2 - 8,
+      size: wmSize,
+      font: this.fonts.bold,
+      color: MUTED,
+    });
+
+    const lineY = areaBottom - 10;
+    this.page.drawLine({
+      start: { x, y: lineY },
+      end: { x: x + width, y: lineY },
+      thickness: 0.5,
+      color: TEXT,
+    });
+
+    const labelY = lineY - 14;
+    this.drawTextAt(role, x, labelY, { bold: true, size: 8 });
+
+    const nameY = labelY - 12;
+    this.drawTextAt(name, x, nameY, { size: 8, color: MUTED });
+
+    let bottomY = nameY - 14;
+    if (representative) {
+      const repY = nameY - 12;
+      this.drawTextAt(representative, x, repY, { size: 7.5, italic: true, color: MUTED });
+      bottomY = repY - 14;
+    }
+    return bottomY;
   }
 
   drawFooter(pageIndex: number, total: number) {
@@ -208,8 +325,10 @@ class PdfWriter {
       font: footerFont,
       color: WHITE,
     });
-    p.drawText('Proposta comercial — documento sujeito a conferência das partes', {
-      x: PW / 2 - 130,
+    const footerCenter = 'Contrato de prestação de serviços — sujeito a conferência das partes';
+    const footerCenterW = footerFont.widthOfTextAtSize(footerCenter, 7);
+    p.drawText(footerCenter, {
+      x: PW / 2 - footerCenterW / 2,
       y: 7,
       size: 7,
       font: footerFont,
@@ -241,28 +360,11 @@ export async function renderContractPdf(ctx: {
   await w.init();
 
   // ── Header ───────────────────────────────────────────────────────────────────
-  await w.drawLogo(); // logo omitted (loaded separately if needed)
-  w.gap(45);
-
-  // Orange bar
-  w.drawRect(ML, w['y'], CW, 4, ORANGE);
-  w.gap(8);
-
-  w.text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE TRANSPORTE RODOVIÁRIO DE CARGAS', {
-    align: 'center',
-    bold: true,
-    size: 11,
-    color: NAVY,
-  });
-  w.gap(4);
-  w.text(`Referência: ${String(quote.quote_code ?? '')}  —  Versão ${version}`, {
-    align: 'center',
-    size: 8,
-    color: MUTED,
-  });
-  w.gap(6);
-  w.rule(ORANGE, 1);
-  w.gap(4);
+  await w.drawContractHeader(
+    'CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE TRANSPORTE RODOVIÁRIO DE CARGAS',
+    `Referência: ${String(quote.quote_code ?? '')}  —  Versão ${version}`,
+    LOGO_BASE64
+  );
 
   w.text('Pelo presente instrumento particular, de um lado:', {
     italic: true,
@@ -274,7 +376,7 @@ export async function renderContractPdf(ctx: {
   // ── CONTRATADA ────────────────────────────────────────────────────────────────
   w.heading('CONTRATADA');
   w.text(
-    `${String(company.legal_name ?? '')}, pessoa jurídica de direito privado, inscrita no CNPJ nº ${String(company.cnpj ?? '')}, ` +
+    `${String(company.legal_name ?? '')}, pessoa jurídica de direito privado, inscrita no CNPJ nº ${formatCnpjForContract(company.cnpj as string)}, ` +
       `com sede na ${buildCompanyAddress(company)}, doravante denominada CONTRATADA.`,
     { size: 8.5 }
   );
@@ -283,7 +385,7 @@ export async function renderContractPdf(ctx: {
   // ── CONTRATANTE ───────────────────────────────────────────────────────────────
   w.heading('CONTRATANTE');
   const clientName = String(client.name ?? quote.client_name ?? '[cliente não informado]');
-  const clientCnpj = String(client.cnpj ?? '');
+  const clientCnpj = formatCnpjForContract(client.cnpj as string);
   const clientAddr = buildAddress(client);
   w.text(
     `${clientName}, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº ${clientCnpj || '[CNPJ não informado]'}, ` +
@@ -349,23 +451,24 @@ export async function renderContractPdf(ctx: {
 
   // Cláusula 5 — Pagamento (com dados dinâmicos)
   const freightValue =
-    typeof quote.value === 'number' ? fmtCurrency(quote.value) : '[valor não informado]';
-  const paymentName = String(paymentTerm.name ?? '[condição de pagamento não informada]');
+    typeof quote.value === 'number' ? formatBrlReais(quote.value) : '[valor não informado]';
+  const paymentDescription = buildPaymentTermsDescription(quote, paymentTerm);
+  const clause52 = buildClause52IncludedItems(quote);
 
   w.clause(
     'CLÁUSULA 5ª',
     'DO PAGAMENTO',
     `5.1. O pagamento do frete deverá ser realizado exclusivamente em conta bancária de titularidade jurídica da CONTRATADA, no valor total de ${freightValue}.`
   );
+  w.subItem(clause52.text);
   w.subItem(
-    '5.2. O valor do frete informado contempla os seguintes itens inclusos: Impostos, Pedágio, Carga, Descarga, Seguro.'
+    `5.3. O pagamento será realizado conforme a condição negociada: ${paymentDescription}.`
   );
-  w.subItem(`5.3. O pagamento será realizado conforme a condição negociada: ${paymentName}.`);
   w.subItem(
     `5.4. O pagamento deverá ser efetuado através dos seguintes dados bancários da ${String(company.legal_name ?? 'CONTRATADA')}:`
   );
   w.gap(2);
-  w.text(`CNPJ: ${String(company.cnpj ?? '')}`, { x: ML + 24, size: 8.5 });
+  w.text(`CNPJ: ${formatCnpjForContract(company.cnpj as string)}`, { x: ML + 24, size: 8.5 });
   w.text(`Banco: ${String(company.bank_name ?? '')}`, { x: ML + 24, size: 8.5 });
   w.text(`Agência: ${String(company.bank_agency ?? '')}`, { x: ML + 24, size: 8.5 });
   w.text(`Conta Corrente: ${String(company.bank_account ?? '')}`, { x: ML + 24, size: 8.5 });
@@ -424,61 +527,50 @@ export async function renderContractPdf(ctx: {
   );
 
   // ── Assinaturas ───────────────────────────────────────────────────────────────
-  w['ensureSpace'](120);
+  w['ensureSpace'](160);
   w.gap(16);
-  w.text(`${signatureCity}, ${fmtDate(new Date().toISOString())}`, {
+  w.text(`${signatureCity}, ${fmtTodayBr()}`, {
     align: 'center',
     size: 9,
     color: MUTED,
   });
-  w.gap(20);
+  w.gap(24);
 
-  // Left: CONTRATANTE
-  const midX = ML + CW / 2;
-  const lineWidth = 180;
-  w['page'].drawLine({
-    start: { x: ML, y: w['y'] },
-    end: { x: ML + lineWidth, y: w['y'] },
-    thickness: 0.5,
-    color: TEXT,
-  });
-  w['page'].drawLine({
-    start: { x: midX + 15, y: w['y'] },
-    end: { x: midX + 15 + lineWidth, y: w['y'] },
-    thickness: 0.5,
-    color: TEXT,
-  });
-  w.gap(5);
-  w.text('CONTRATANTE', { x: ML, bold: true, size: 8 });
-  w.text('CONTRATADA', { x: midX + 15, bold: true, size: 8 });
-  w.gap(2);
-  w.text(clientName, { x: ML, size: 8, color: MUTED });
-  w.text(String(company.legal_name ?? ''), { x: midX + 15, size: 8, color: MUTED });
+  const colGap = 36;
+  const colW = (CW - colGap) / 2;
+  const leftX = ML;
+  const rightX = ML + colW + colGap;
+  const lineW = colW - 8;
+  const blockTop = w['y'];
 
-  if (client.legal_representative_name) {
-    w.gap(1);
-    w.text(String(client.legal_representative_name), {
-      x: ML,
-      size: 7.5,
-      italic: true,
-      color: MUTED,
-    });
-  }
-  if (company.legal_representative_name) {
-    w.gap(1);
-    w.text(String(company.legal_representative_name), {
-      x: midX + 15,
-      size: 7.5,
-      italic: true,
-      color: MUTED,
-    });
-  }
+  const clientRep = client.legal_representative_name
+    ? String(client.legal_representative_name)
+    : null;
+  const companyRep = company.legal_representative_name
+    ? String(company.legal_representative_name)
+    : null;
 
-  w.gap(10);
-  w.rule(MUTED, 0.3);
-  w.gap(2);
+  const leftBottom = w.drawSignatureColumn(
+    leftX,
+    lineW,
+    blockTop,
+    'CONTRATANTE',
+    clientName,
+    clientRep
+  );
+  const rightBottom = w.drawSignatureColumn(
+    rightX,
+    lineW,
+    blockTop,
+    'CONTRATADA',
+    String(company.legal_name ?? ''),
+    companyRep
+  );
+
+  w['y'] = Math.min(leftBottom, rightBottom);
+  w.gap(8);
   w.text(
-    `Contrato gerado automaticamente em ${new Date().toLocaleString('pt-BR')} — Ref. ${String(quote.quote_code ?? '')} v${version}`,
+    `Documento gerado em ${new Date().toLocaleString('pt-BR')} — Ref. ${String(quote.quote_code ?? '')} v${version}`,
     {
       align: 'center',
       size: 7,

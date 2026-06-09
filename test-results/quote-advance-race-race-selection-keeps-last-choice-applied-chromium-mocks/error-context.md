@@ -1,0 +1,293 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - list
+    - region "Notifications alt+T"
+    - generic:
+      - complementary:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - img
+                - generic: Vectra Cargo
+        - navigation:
+          - link:
+            - /url: /
+            - generic:
+              - img
+              - generic: Dashboard
+          - link:
+            - /url: /comercial
+            - generic:
+              - img
+              - generic: Comercial
+          - link:
+            - /url: /operacional
+            - generic:
+              - img
+              - generic: Operação
+          - link:
+            - /url: /documentos
+            - generic:
+              - img
+              - generic: Documentos
+          - link:
+            - /url: /relatorios
+            - generic:
+              - img
+              - generic: Relatórios
+          - link:
+            - /url: /monitoramento-seguros
+            - generic:
+              - img
+              - generic: Monit. Seguros
+          - link:
+            - /url: /clientes
+            - generic:
+              - img
+              - generic: Clientes
+          - link:
+            - /url: /embarcadores
+            - generic:
+              - img
+              - generic: Embarcadores
+          - link:
+            - /url: /veiculos
+            - generic:
+              - img
+              - generic: Veículos
+          - link:
+            - /url: /tabelas-preco
+            - generic:
+              - img
+              - generic: Tabelas de Preço
+          - link:
+            - /url: /financeiro
+            - generic:
+              - img
+              - generic: Financeiro
+        - generic:
+          - button:
+            - img
+            - generic: Sair
+        - button:
+          - img
+      - generic:
+        - banner:
+          - button:
+            - generic:
+              - img
+              - generic: Buscar cotações, OS, clientes...
+              - generic: ⌘K
+          - generic:
+            - button:
+              - img
+              - generic: Novo
+            - button:
+              - img
+              - generic: "3"
+            - button:
+              - generic:
+                - img
+        - main:
+          - generic:
+            - generic:
+              - heading [level=1]: Comercial
+              - paragraph: "Pipeline total: R$ 0,00"
+            - generic:
+              - generic:
+                - img
+                - textbox:
+                  - /placeholder: Buscar cotações...
+              - button:
+                - img
+              - button:
+                - img
+                - generic: Consolidação
+              - button:
+                - img
+              - button:
+                - img
+                - text: Nova Cotação
+          - generic:
+            - button: Kanban Comercial
+            - button: Inteligência NTC
+            - button: Notícias NTC
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Novo Pedido
+                  - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Qualificação
+                  - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Precificação
+                  - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Enviado
+                  - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Negociação
+                  - generic: "0"
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Ganho
+                  - generic: "1"
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - button:
+                            - img
+                          - generic:
+                            - heading [level=4]: QT-TEST
+                            - paragraph: Cliente Teste
+                        - generic:
+                          - generic:
+                            - img
+                            - text: 0%
+                          - button:
+                            - img
+                      - generic:
+                        - img
+                        - generic: São Paulo, SP
+                        - generic: →
+                        - generic: Rio de Janeiro, RJ
+                    - generic:
+                      - generic: R$ 10.000,00
+                      - generic:
+                        - img
+                        - text: 05 de mar.
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Perdido
+                  - generic: "0"
+          - status
+  - dialog "Detalhes da cotação QT-TEST" [ref=e2]:
+    - heading "Detalhes da cotação QT-TEST" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Visualize resumo financeiro, rota, operação e abas de composição da cotação.
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - generic [ref=e8]:
+            - generic [ref=e9]: QT-TEST
+            - generic [ref=e10]: Ganho
+            - generic [ref=e11]:
+              - img [ref=e12]
+              - text: SP / RJ
+            - generic [ref=e16]: 0-500 km
+          - paragraph [ref=e17]: Cliente Teste
+        - button [ref=e19] [cursor=pointer]:
+          - img
+      - generic [ref=e20]:
+        - button "Converter para OS" [ref=e21] [cursor=pointer]:
+          - img
+          - text: Converter para OS
+        - button "Converter para FAT" [ref=e22] [cursor=pointer]:
+          - img
+          - text: Converter para FAT
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - button "Baixar PDF simplificado para cliente" [ref=e25] [cursor=pointer]:
+          - img
+          - text: PDF Simplificado (Cliente)
+        - button "Baixar PDF detalhado interno" [ref=e26] [cursor=pointer]:
+          - img
+          - text: PDF Detalhado (Interno)
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - paragraph [ref=e31]: Faturamento Bruto
+            - paragraph [ref=e32]: R$ 10.000,00
+          - generic [ref=e33]: Margem Op. 90.0%
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - paragraph [ref=e36]: Resultado Líquido
+            - paragraph [ref=e37]: R$ 9.000,00
+          - generic [ref=e38]:
+            - paragraph [ref=e39]: Receita Líquida
+            - paragraph [ref=e40]: R$ 10.000,00
+            - paragraph [ref=e41]: Após DAS e ICMS
+      - generic [ref=e42]:
+        - text: Rota
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - generic [ref=e46]:
+              - img [ref=e47]
+              - generic [ref=e50]: Origem
+            - paragraph [ref=e51]: São Paulo, SP
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - img [ref=e54]
+              - generic [ref=e57]: Destino
+            - paragraph [ref=e58]: Rio de Janeiro, RJ
+      - generic [ref=e59]:
+        - text: Operação
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - img [ref=e63]
+            - generic [ref=e68]: Veículo
+          - generic [ref=e69]: VUC Teste (VUC)
+      - generic [ref=e70]:
+        - tablist [ref=e71]:
+          - tab "Composição" [ref=e72] [cursor=pointer]:
+            - img [ref=e73]
+            - text: Composição
+          - tab "Itens" [ref=e76] [cursor=pointer]
+          - tab "Histórico" [ref=e77] [cursor=pointer]
+          - tab "Pedágios" [ref=e78] [cursor=pointer]:
+            - img [ref=e79]
+            - text: Pedágios
+          - tab "Doc Fat" [active] [selected] [ref=e81] [cursor=pointer]:
+            - img [ref=e82]
+            - text: Doc Fat
+        - tabpanel [ref=e85]:
+          - generic [ref=e86]:
+            - generic [ref=e87]:
+              - generic [ref=e88]: Contrato
+              - generic [ref=e89]:
+                - generic [ref=e90]:
+                  - img [ref=e91]
+                  - generic [ref=e93]: Nenhum contrato gerado ainda.
+                - button "Gerar Contrato" [ref=e94] [cursor=pointer]:
+                  - img
+                  - text: Gerar Contrato
+            - generic [ref=e95]:
+              - generic [ref=e96]: Condição de recebimento
+              - combobox [ref=e97] [cursor=pointer]:
+                - generic: 50% Adiantamento / 50% Saldo
+                - img [ref=e98]
+            - generic [ref=e100]:
+              - generic [ref=e101]:
+                - generic [ref=e102]: "Tipo de documento:"
+                - combobox [ref=e103] [cursor=pointer]:
+                  - generic: À vista
+                  - img [ref=e104]
+              - generic [ref=e106] [cursor=pointer]:
+                - button "Choose File" [ref=e107]
+                - img [ref=e108]
+                - paragraph [ref=e111]: Arraste arquivos ou clique para selecionar
+                - paragraph [ref=e112]: PDF, imagens, XML ou vídeos (MP4, MOV, AVI, WebM) • Máximo 500MB
+            - paragraph [ref=e113]: Nenhum comprovante enviado ainda.
+    - button "Close" [ref=e114] [cursor=pointer]:
+      - img [ref=e115]
+      - generic [ref=e118]: Close
+```

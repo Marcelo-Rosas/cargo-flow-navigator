@@ -1,0 +1,9 @@
+{
+  "npm.packageManager": "npm",
+  "npm.scriptRunner": "npm",
+  "npm.exclude": [
+    "**/cargo-flow-navigator/**",
+    "**/supabase/functions/**",
+    "**/mcp-debugger/**"
+  ]
+}

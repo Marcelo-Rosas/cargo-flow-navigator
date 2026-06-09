@@ -414,11 +414,12 @@ export function ShipperForm({ open, onClose, shipper, onSelectExisting }: Shippe
                           mask="cnpj"
                           placeholder="00.000.000/0000-00"
                           value={field.value || ''}
-                          onValueChange={(raw) => field.onChange(raw ?? '')}
-                          onBlur={async () => {
-                            field.onBlur();
-                            await handleCnpjLookup();
+                          onValueChange={(raw) => {
+                            field.onChange(raw ?? '');
+                            const d = (raw ?? '').replace(/\D/g, '');
+                            if (d.length === 14) handleCnpjLookup(d);
                           }}
+                          onBlur={field.onBlur}
                           className="pr-10"
                         />
                         {isLookingUp && (

@@ -1,0 +1,85 @@
+/**
+ * Piso mínimo ANTT (Lei 13.703/2018) — paridade com calculadorafrete.antt.gov.br
+ * Carga geral; tabela A/B/C/D conforme flags da calculadora.
+ * Paridade obrigatória com supabase/functions/_shared/antt-floor-calc.ts
+ */
+
+export type AnttOperationTable = 'A' | 'B' | 'C' | 'D';
+
+export const ANTT_CARGO_TYPE_DEFAULT = 'carga_geral' as const;
+
+export interface AnttFloorFlags {
+  /** Veículo automotor + implemento (ou caminhão simples se false) */
+  composicaoVeicular: boolean;
+  altoDesempenho: boolean;
+  retornoVazio: boolean;
+}
+
+export const ANTT_FLOOR_DEFAULT_FLAGS: AnttFloorFlags = {
+  composicaoVeicular: true,
+  altoDesempenho: false,
+  retornoVazio: false,
+};
+
+/** Tabela ANTT conforme calculadora oficial (lotacao vs automotor × alto desempenho). */
+export function resolveAnttOperationTable(flags: AnttFloorFlags): AnttOperationTable {
+  if (flags.composicaoVeicular) {
+    return flags.altoDesempenho ? 'D' : 'B';
+  }
+  return flags.altoDesempenho ? 'C' : 'A';
+}
+
+export function getAnttOperationTableLabel(table: AnttOperationTable): string {
+  const labels: Record<AnttOperationTable, string> = {
+    A: 'Tabela A — Lotação (caminhão simples)',
+    B: 'Tabela B — Veículo automotor + implemento',
+    C: 'Tabela C — Lotação alto desempenho',
+    D: 'Tabela D — Automotor alto desempenho',
+  };
+  return labels[table];
+}
+
+export function inferAnttFlagsFromStoredMeta(
+  meta?: {
+    operationTable?: AnttOperationTable;
+    retornoVazio?: number;
+    composicaoVeicular?: boolean;
+    altoDesempenho?: boolean;
+  } | null
+): AnttFloorFlags {
+  if (!meta) return { ...ANTT_FLOOR_DEFAULT_FLAGS };
+  if (meta.composicaoVeicular != null || meta.altoDesempenho != null) {
+    return {
+      composicaoVeicular: meta.composicaoVeicular ?? ANTT_FLOOR_DEFAULT_FLAGS.composicaoVeicular,
+      altoDesempenho: meta.altoDesempenho ?? false,
+      retornoVazio: (meta.retornoVazio ?? 0) > 0.01,
+    };
+  }
+  const table = meta.operationTable ?? 'B';
+  return {
+    composicaoVeicular: table === 'B' || table === 'D',
+    altoDesempenho: table === 'C' || table === 'D',
+    retornoVazio: (meta.retornoVazio ?? 0) > 0.01,
+  };
+}
+
+/**
+ * Piso em R$ (mesma base da calculadora ANTT):
+ * - Ida: km × CCD + CC
+ * - Retorno vazio: acrescenta km × CCD (deslocamento de volta sem novo CC fixo)
+ */
+export function calculateAnttPisoBrl(params: {
+  kmDistance: number;
+  ccd: number;
+  cc: number;
+  retornoVazio: boolean;
+}): { ida: number; retornoVazio: number; total: number } {
+  const km = Math.max(0, params.kmDistance);
+  const ida = km * params.ccd + params.cc;
+  const retorno = params.retornoVazio ? km * params.ccd : 0;
+  return {
+    ida,
+    retornoVazio: retorno,
+    total: ida + retorno,
+  };
+}

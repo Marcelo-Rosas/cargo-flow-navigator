@@ -17,6 +17,8 @@ export interface OrderForDreReal {
   pedagio_real: number | null;
   descarga_real: number | null;
   waiting_time_cost: number | null;
+  aluguel_maquinas_real: number | null;
+  mao_de_obra_real: number | null;
 }
 
 export interface TripCostItemForDre {
@@ -47,12 +49,7 @@ export interface RealValues {
  * Computa DRE Real a partir da OS e itens de custo.
  */
 export function computeRealFromOrder(input: DreRealInput): RealValues {
-  const {
-    order,
-    tripCostItems = [],
-    tripScopedItems = [],
-    apportionFactor = 1,
-  } = input;
+  const { order, tripCostItems = [], tripScopedItems = [], apportionFactor = 1 } = input;
   const values = new Map<DreLineCode, number>();
   const absentFields = new Set<DreLineCode>();
 
@@ -63,16 +60,36 @@ export function computeRealFromOrder(input: DreRealInput): RealValues {
     .filter((t) => (t.category || '').toLowerCase() === 'das')
     .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   const dasReal = round2(orderDas);
-  const icmsReal = 0;
+  // Impostos reais: não temos fonte de dados real (NFe/CTe ainda não integrados para impostos).
+  // Usamos o presumido do pricing_breakdown como aproximação, ou 0 se não houver.
+  const totals =
+    typeof order.pricing_breakdown?.totals === 'object' && order.pricing_breakdown.totals !== null
+      ? (order.pricing_breakdown.totals as Record<string, unknown>)
+      : {};
+  const icmsReal = round2(Number(totals.icms ?? 0));
+  const pisReal = round2(Number(totals.pis ?? 0));
+  const cofinsReal = round2(Number(totals.cofins ?? 0));
+  const csllReal = round2(Number(totals.csll ?? 0));
+  const irpjReal = round2(Number(totals.irpj ?? 0));
 
   values.set('das', round2(dasReal));
   values.set('icms', round2(icmsReal));
-  values.set('impostos', round2(dasReal + icmsReal));
+  values.set('pis', round2(pisReal));
+  values.set('cofins', round2(cofinsReal));
+  values.set('csll', round2(csllReal));
+  values.set('irpj', round2(irpjReal));
+  values.set('impostos', round2(dasReal + icmsReal + pisReal + cofinsReal + csllReal + irpjReal));
 
-  const receitaLiquida = round2(faturamento - dasReal);
+  const receitaLiquida = round2(faturamento - dasReal - icmsReal);
   values.set('receita_liquida', receitaLiquida);
 
-  const overheadReal = 0;
+  // Overhead real: usa o overhead presumido como proxy (não há tracking real de overhead por OS).
+  const overheadFromBreakdown =
+    typeof order.pricing_breakdown?.profitability === 'object' &&
+    order.pricing_breakdown.profitability !== null
+      ? Number((order.pricing_breakdown.profitability as Record<string, unknown>).overhead ?? 0)
+      : 0;
+  const overheadReal = round2(overheadFromBreakdown);
   values.set('overhead', overheadReal);
 
   const tripCarreteiroRateado = round2(
@@ -90,22 +107,52 @@ export function computeRealFromOrder(input: DreRealInput): RealValues {
       .filter((t) => (t.category || '').toLowerCase() === 'descarga')
       .reduce((sum, t) => sum + Number(t.amount || 0), 0)
   );
+  const aluguelMaquinasFromItems = round2(
+    tripCostItems
+      .filter((t) => (t.category || '').toLowerCase() === 'aluguel')
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+  );
+  const maoDeObraFromItems = round2(
+    tripCostItems
+      .filter((t) => (t.category || '').toLowerCase() === 'mao_de_obra')
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+  );
 
   const carreteiro = order.carreteiro_real ?? tripCarreteiroRateado ?? 0;
   const pedagio = order.pedagio_real ?? tripPedagioRateado ?? 0;
   const descarga = order.descarga_real ?? descargaFallbackOs ?? 0;
-  const espera = 0;
+  const aluguelMaquinas = order.aluguel_maquinas_real ?? aluguelMaquinasFromItems ?? 0;
+  const maoDeObra = order.mao_de_obra_real ?? maoDeObraFromItems ?? 0;
+  // Usa waiting_time_cost da OS quando disponível; senão procura em trip_cost_items
+  const esperaFromItems = tripCostItems
+    .filter((t) => (t.category || '').toLowerCase() === 'espera')
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const espera = order.waiting_time_cost ?? esperaFromItems ?? 0;
   if (order.carreteiro_real == null) absentFields.add('custo_motorista');
   if (order.pedagio_real == null) absentFields.add('pedagio');
   if (order.descarga_real == null) absentFields.add('carga_descarga');
-  absentFields.add('espera');
+  if (order.waiting_time_cost == null && esperaFromItems === 0) absentFields.add('espera');
+  if (order.aluguel_maquinas_real == null && aluguelMaquinasFromItems === 0)
+    absentFields.add('aluguel_maquinas');
+  if (order.mao_de_obra_real == null && maoDeObraFromItems === 0) absentFields.add('mao_de_obra');
 
   values.set('custo_motorista', round2(carreteiro));
   values.set('pedagio', round2(pedagio));
   values.set('carga_descarga', round2(descarga));
   values.set('espera', round2(espera));
+  values.set('aluguel_maquinas', round2(aluguelMaquinas));
+  values.set('mao_de_obra', round2(maoDeObra));
 
-  const taxasCondicionais = 0;
+  // Taxas condicionais reais: procura em trip_cost_items com categoria 'condicional' ou 'taxa_condicional'
+  const taxasCondicionaisFromItems = tripCostItems
+    .filter(
+      (t) =>
+        (t.category || '').toLowerCase() === 'condicional' ||
+        (t.category || '').toLowerCase() === 'taxa_condicional'
+    )
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const taxasCondicionais = taxasCondicionaisFromItems;
+  if (taxasCondicionaisFromItems === 0) absentFields.add('taxas_condicionais');
   values.set('taxas_condicionais', round2(taxasCondicionais));
 
   const grisReal = round2(
@@ -122,13 +169,23 @@ export function computeRealFromOrder(input: DreRealInput): RealValues {
   const outros = round2(grisReal + tsoReal);
   values.set('outros_custos', outros);
 
-  const custosDiretos = round2(carreteiro + pedagio + descarga + grisReal + tsoReal);
+  const custosDiretos = round2(
+    carreteiro +
+      pedagio +
+      descarga +
+      espera +
+      taxasCondicionais +
+      aluguelMaquinas +
+      maoDeObra +
+      outros
+  );
   values.set('custos_diretos', custosDiretos);
 
   const resultadoLiquido = round2(receitaLiquida - overheadReal - custosDiretos);
   values.set('resultado_liquido', resultadoLiquido);
 
-  const margemPercent = receitaLiquida > 0 ? round2((resultadoLiquido / receitaLiquida) * 100) : 0;
+  // Margem sobre faturamento bruto (mesma base do DRE presumido para comparabilidade)
+  const margemPercent = faturamento > 0 ? round2((resultadoLiquido / faturamento) * 100) : 0;
   values.set('margem_liquida', margemPercent);
 
   return { values, absentFields };

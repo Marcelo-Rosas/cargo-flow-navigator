@@ -1,8 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { asDb, asInsert, filterSupabaseRows, filterSupabaseSingle } from '@/lib/supabase-utils';
 import { cardQueryKey } from '@/lib/card-mapping';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
+import { buildQuoteCloneInsert } from '@/lib/quote-clone';
+import { syncQuoteRouteStops, type RouteStopFormItem } from '@/hooks/useQuoteRouteStops';
+import { useAuth } from '@/hooks/useAuth';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type QuoteInsert = Database['public']['Tables']['quotes']['Insert'];
@@ -125,6 +129,81 @@ export function useDeleteQuote() {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
       queryClient.invalidateQueries({ queryKey: cardQueryKey(id, null) });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erro ao excluir cotação');
+    },
+  });
+}
+
+function routeStopsToFormItems(
+  stops: Database['public']['Tables']['quote_route_stops']['Row'][]
+): RouteStopFormItem[] {
+  return stops.map((stop) => {
+    const metadata =
+      stop.metadata && typeof stop.metadata === 'object' && !Array.isArray(stop.metadata)
+        ? (stop.metadata as { client_id?: string })
+        : null;
+    return {
+      sequence: stop.sequence,
+      cep: stop.cep ?? '',
+      city_uf: stop.city_uf ?? '',
+      name: stop.name,
+      client_id: metadata?.client_id ?? null,
+    };
+  });
+}
+
+export function useCloneQuote() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (sourceId: string) => {
+      if (!user?.id) throw new Error('Faça login para clonar cotações');
+
+      const { data: source, error: loadErr } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', asDb(sourceId))
+        .single();
+
+      if (loadErr) throw loadErr;
+      if (!source) throw new Error('Cotação não encontrada');
+
+      const { data: stops, error: stopsErr } = await supabase
+        .from('quote_route_stops')
+        .select('*')
+        .eq('quote_id', asDb(sourceId))
+        .order('sequence', { ascending: true });
+
+      if (stopsErr) throw stopsErr;
+
+      const { data: created, error: insertErr } = await supabase
+        .from('quotes')
+        .insert(asInsert(buildQuoteCloneInsert(source as Quote, user.id)))
+        .select()
+        .single();
+
+      if (insertErr) {
+        const extra = [insertErr.details, insertErr.hint, insertErr.code]
+          .filter(Boolean)
+          .join(' | ');
+        throw new Error(extra ? `${insertErr.message} — ${extra}` : insertErr.message);
+      }
+
+      if (stops?.length) {
+        await syncQuoteRouteStops(created.id, routeStopsToFormItems(stops));
+      }
+
+      return created as Quote;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erro ao clonar cotação');
     },
   });
 }

@@ -12,7 +12,6 @@ interface QuoteModalFinancialSummaryProps {
   margemPercent: number;
   isBelowTarget: boolean;
   targetMarginPercent: number;
-  marginPercentForAlert?: number;
   regimeFiscal?: string;
 }
 
@@ -24,7 +23,6 @@ export function QuoteModalFinancialSummary({
   margemPercent,
   isBelowTarget,
   targetMarginPercent,
-  marginPercentForAlert,
   regimeFiscal,
 }: QuoteModalFinancialSummaryProps) {
   return (
@@ -52,13 +50,13 @@ export function QuoteModalFinancialSummary({
                 : ''
             }
           >
-            Margem Op. {(margemPercent || 0).toFixed(1)}%
+            Lucro s/ custos diretos {(margemPercent || 0).toFixed(1)}%
           </Badge>
         </div>
 
         <div className="mt-3 pt-3 border-t border-primary/10 grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[10px] text-primary/60 mb-0.5">Resultado Líquido</p>
+            <p className="text-[10px] text-primary/60 mb-0.5">Lucro alvo (margem s/ CD)</p>
             <p
               className={cn(
                 'text-sm font-semibold tabular-nums',
@@ -86,9 +84,8 @@ export function QuoteModalFinancialSummary({
         <Alert variant="destructive" className="bg-destructive/10 border-destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>Abaixo do Mínimo Viável.</strong> Margem de{' '}
-            {(marginPercentForAlert ?? margemPercent).toFixed(1)}% está abaixo da meta de{' '}
-            {targetMarginPercent}%
+            <strong>Abaixo do Mínimo Viável.</strong> Lucro de {margemPercent.toFixed(1)}% sobre
+            custos diretos está abaixo da meta de {targetMarginPercent}%
           </AlertDescription>
         </Alert>
       )}

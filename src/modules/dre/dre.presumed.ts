@@ -58,14 +58,22 @@ export function computePresumedFromBreakdown(
     numFallback(breakdown, ['totals', 'totalCliente'], ['totals', 'total_cliente']) || quoteValue;
   const das = numFallback(breakdown, ['totals', 'das'], ['totals', 'das']) ?? 0;
   const icms = numFallback(breakdown, ['totals', 'icms'], ['totals', 'icms']) ?? 0;
+  const pis = numFallback(breakdown, ['totals', 'pis'], ['totals', 'pis']) ?? 0;
+  const cofins = numFallback(breakdown, ['totals', 'cofins'], ['totals', 'cofins']) ?? 0;
+  const csll = numFallback(breakdown, ['totals', 'csll'], ['totals', 'csll']) ?? 0;
+  const irpj = numFallback(breakdown, ['totals', 'irpj'], ['totals', 'irpj']) ?? 0;
 
   values.set('faturamento_bruto', round2(faturamento));
-  values.set('impostos', round2(das + icms));
+  values.set('impostos', round2(das + icms + pis + cofins + csll + irpj));
   values.set('das', round2(das));
   values.set('icms', round2(icms));
+  values.set('pis', round2(pis));
+  values.set('cofins', round2(cofins));
+  values.set('csll', round2(csll));
+  values.set('irpj', round2(irpj));
 
   // Receita líquida sempre derivada da fórmula contábil.
-  const receitaLiquida = round2(faturamento - das - icms);
+  const receitaLiquida = round2(faturamento - das - icms - pis - cofins - csll - irpj);
   values.set('receita_liquida', round2(receitaLiquida));
 
   const overhead =
@@ -107,6 +115,10 @@ export function computePresumedFromBreakdown(
   const aluguelMaquinas =
     numFallback(breakdown, ['components', 'aluguelMaquinas'], ['components', 'aluguel_maquinas']) ??
     0;
+  const maoDeObra =
+    numFallback(breakdown, ['components', 'laborCost'], ['components', 'labor_cost']) ??
+    numFallback(breakdown, ['components', 'maoDeObra'], ['components', 'mao_de_obra']) ??
+    0;
   const riskTotal = num(breakdown?.riskCosts, 'total') ?? 0;
   const custoServicos =
     numFallback(
@@ -114,22 +126,47 @@ export function computePresumedFromBreakdown(
       ['profitability', 'custoServicos'],
       ['profitability', 'custo_servicos']
     ) ?? 0;
-  // Custos sem linha dedicada (ex.: aluguel de máquinas) são agregados em "outros custos".
-  const outrosCustos = round2(riskTotal + custoServicos + aluguelMaquinas);
+  // Outros custos: apenas itens sem linha dedicada (risk, serviços diversos).
+  const outrosCustos = round2(riskTotal + custoServicos);
 
   values.set('custo_motorista', round2(custoMotorista));
   values.set('pedagio', round2(toll));
   values.set('carga_descarga', round2(custosDescarga));
   values.set('espera', round2(waitingTimeCost));
   values.set('taxas_condicionais', round2(conditionalFeesTotal));
+  values.set('aluguel_maquinas', round2(aluguelMaquinas));
+  values.set('mao_de_obra', round2(maoDeObra));
   values.set('outros_custos', outrosCustos);
 
   const custosDiretos = round2(
-    custoMotorista + toll + custosDescarga + waitingTimeCost + conditionalFeesTotal + outrosCustos
+    custoMotorista +
+      toll +
+      custosDescarga +
+      waitingTimeCost +
+      conditionalFeesTotal +
+      aluguelMaquinas +
+      maoDeObra +
+      outrosCustos
   );
   values.set('custos_diretos', custosDiretos);
 
-  const resultadoRecomputado = round2(receitaLiquida - overhead - custosDiretos);
+  const profitMarginTarget =
+    numFallback(
+      breakdown,
+      ['profitability', 'profitMarginTarget'],
+      ['profitability', 'profit_margin_target']
+    ) ||
+    numFallback(breakdown, ['rates', 'profitMarginPercent'], ['rates', 'profit_margin_percent']) ||
+    0;
+  const isLotacaoSnapshot =
+    breakdown?.meta != null &&
+    (numOrUndef(breakdown.meta as object, 'anttFloorApplied') != null ||
+      numOrUndef(breakdown.meta as object, 'lotacaoPisoComOver') != null ||
+      numOrUndef(breakdown.meta as object, 'lotacao_piso_com_over') != null);
+  const resultadoRecomputado =
+    isLotacaoSnapshot && custosDiretos > 0 && profitMarginTarget > 0
+      ? round2(custosDiretos * (profitMarginTarget / 100))
+      : round2(receitaLiquida - overhead - custosDiretos);
   values.set('resultado_liquido', resultadoRecomputado);
 
   const margemPercent = faturamento > 0 ? round2((resultadoRecomputado / faturamento) * 100) : 0;

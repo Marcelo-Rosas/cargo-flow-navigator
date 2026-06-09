@@ -71,6 +71,13 @@ export interface CalculateFreightInput {
   aluguel_maquinas_value?: number;
   /** Forçar piso ANTT no cálculo: recalcula gross-up partindo de pisoAnttCarreteiro como frete_peso */
   enforce_antt_floor?: boolean;
+  antt_composicao_veicular?: boolean;
+  antt_alto_desempenho?: boolean;
+  antt_retorno_vazio?: boolean;
+  benchmarks?: {
+    historyBenchmark2025?: number;
+    ckanBenchmark?: number;
+  };
 }
 
 // ============================================
@@ -83,6 +90,11 @@ export interface FreightMeta {
   km_status: 'OK' | 'OUT_OF_RANGE';
   margin_status: 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET';
   margin_percent: number;
+  match_status?: {
+    status: 'WIN' | 'LOSS' | 'WARNING';
+    ckanBenchmarkLiquido?: number;
+    ckanGrossValue?: number;
+  };
   cubage_factor: number;
   cubage_weight_kg: number;
   billable_weight_kg: number;
@@ -320,14 +332,105 @@ export function roundCurrency(value: number): number {
 }
 
 /**
- * Determina status da margem vs target
+ * Determina status da margem vs meta (pricing_rules / profit_margin_percent da cotação).
+ * @param targetMarginPercent — meta da tabela/regra; default 15% só quando não informada.
  */
 export function getMarginStatus(
-  marginPercent: number
+  marginPercent: number,
+  targetMarginPercent: number = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT
 ): 'ABOVE_TARGET' | 'BELOW_TARGET' | 'AT_TARGET' {
-  const target = FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
+  const target = targetMarginPercent;
 
   if (marginPercent > target + 0.5) return 'ABOVE_TARGET';
   if (marginPercent < target - 0.5) return 'BELOW_TARGET';
   return 'AT_TARGET';
+}
+
+export function sumRiskRepasse(components: {
+  gris?: number;
+  tso?: number;
+  rctrc?: number;
+  adValorem?: number;
+}): number {
+  return roundCurrency(
+    (components.gris ?? 0) +
+      (components.tso ?? 0) +
+      (components.rctrc ?? 0) +
+      (components.adValorem ?? 0)
+  );
+}
+
+export function calculateGrossUpHibrido(
+  custosDiretos: number,
+  overheadPercent: number,
+  profitMarginPercent: number,
+  isSimples: boolean,
+  dasPercent = 0,
+  icmsPercent = 0,
+  pisPercent = 0,
+  cofinsPercent = 0,
+  irpjPercent = 0,
+  csllPercent = 0,
+  repasseRisco = 0
+): {
+  totalCliente: number;
+  receitaBruta: number;
+  das: number;
+  icms: number;
+  pis: number;
+  cofins: number;
+  irpj: number;
+  csll: number;
+  totalImpostos: number;
+} {
+  const taxBase = overheadPercent + profitMarginPercent;
+  let impostosPercent = 0;
+
+  if (isSimples) {
+    impostosPercent = dasPercent;
+  } else {
+    impostosPercent = icmsPercent + pisPercent + cofinsPercent + irpjPercent + csllPercent;
+  }
+
+  const taxaBruta = (taxBase + impostosPercent) / 100;
+
+  if (taxaBruta >= 0.99) {
+    throw new Error(
+      `Soma de taxas (Overhead + Margem + Impostos) é >= 99% (${(taxaBruta * 100).toFixed(2)}%). Isso inviabiliza o mark-up.`
+    );
+  }
+
+  const totalClienteCore = roundCurrency(custosDiretos / (1 - taxaBruta));
+  const totalCliente = roundCurrency(totalClienteCore + Math.max(0, repasseRisco));
+
+  let das = 0;
+  let icms = 0;
+  let pis = 0;
+  let cofins = 0;
+  let irpj = 0;
+  let csll = 0;
+
+  if (isSimples) {
+    das = roundCurrency(totalCliente * (dasPercent / 100));
+  } else {
+    icms = roundCurrency(totalCliente * (icmsPercent / 100));
+    pis = roundCurrency(totalCliente * (pisPercent / 100));
+    cofins = roundCurrency(totalCliente * (cofinsPercent / 100));
+    irpj = roundCurrency(totalCliente * (irpjPercent / 100));
+    csll = roundCurrency(totalCliente * (csllPercent / 100));
+  }
+
+  const totalImpostos = roundCurrency(das + icms + pis + cofins + irpj + csll);
+
+  return {
+    totalCliente,
+    receitaBruta: totalCliente,
+    das,
+    icms,
+    pis,
+    cofins,
+    irpj,
+    csll,
+    totalImpostos,
+  };
 }

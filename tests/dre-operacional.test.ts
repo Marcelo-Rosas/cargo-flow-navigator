@@ -145,7 +145,7 @@ test('gera detalhe com COT/OS e COT sem OS', () => {
   expect(withoutOs?.status).toBe('sem_os_vinculada');
 });
 
-test('mantém ordem obrigatória das 15 linhas', () => {
+test('mantém ordem obrigatória das 21 linhas', () => {
   const withOs = tables.find((t) => t.os_number === 'OS-2026-03-0001');
   const order = withOs!.rows.map((r) => r.line_code);
   expect(order.join(',')).toBe(
@@ -154,6 +154,10 @@ test('mantém ordem obrigatória das 15 linhas', () => {
       'impostos',
       'das',
       'icms',
+      'pis',
+      'cofins',
+      'csll',
+      'irpj',
       'receita_liquida',
       'overhead',
       'custos_diretos',
@@ -162,6 +166,8 @@ test('mantém ordem obrigatória das 15 linhas', () => {
       'carga_descarga',
       'espera',
       'taxas_condicionais',
+      'aluguel_maquinas',
+      'mao_de_obra',
       'outros_custos',
       'resultado_liquido',
       'margem_liquida',
@@ -178,6 +184,20 @@ test('resultado e margem seguem fórmula contábil', () => {
   const resultado = rowByCode(withOs.rows, 'resultado_liquido');
   const margem = rowByCode(withOs.rows, 'margem_liquida');
 
+  console.log('DRE DEBUG:', {
+    real_margem: margem.real_value,
+    real_faturamento: faturamento.real_value,
+    real_resultado: resultado.real_value,
+    real_receita: receita.real_value,
+    real_overhead: overhead.real_value,
+    real_custos: custosDiretos.real_value,
+    presumed_margem: margem.presumed_value,
+    pres_faturamento: faturamento.presumed_value,
+    pres_resultado: resultado.presumed_value,
+    pres_receita: receita.presumed_value,
+    pres_overhead: overhead.presumed_value,
+    pres_custos: custosDiretos.presumed_value,
+  });
   expect(resultado.presumed_value).toBeCloseTo(
     receita.presumed_value - overhead.presumed_value - custosDiretos.presumed_value
   );
@@ -199,6 +219,8 @@ test('custos diretos batem com soma das sublinhas', () => {
     rowByCode(withOs.rows, 'carga_descarga').presumed_value +
     rowByCode(withOs.rows, 'espera').presumed_value +
     rowByCode(withOs.rows, 'taxas_condicionais').presumed_value +
+    rowByCode(withOs.rows, 'aluguel_maquinas').presumed_value +
+    rowByCode(withOs.rows, 'mao_de_obra').presumed_value +
     rowByCode(withOs.rows, 'outros_custos').presumed_value;
   const sumReal =
     rowByCode(withOs.rows, 'custo_motorista').real_value +
@@ -206,6 +228,8 @@ test('custos diretos batem com soma das sublinhas', () => {
     rowByCode(withOs.rows, 'carga_descarga').real_value +
     rowByCode(withOs.rows, 'espera').real_value +
     rowByCode(withOs.rows, 'taxas_condicionais').real_value +
+    rowByCode(withOs.rows, 'aluguel_maquinas').real_value +
+    rowByCode(withOs.rows, 'mao_de_obra').real_value +
     rowByCode(withOs.rows, 'outros_custos').real_value;
   expect(custosDiretos.presumed_value).toBeCloseTo(sumPresumed);
   expect(custosDiretos.real_value).toBeCloseTo(sumReal);
@@ -222,9 +246,9 @@ test('badge respeita semântica de linha negativa (pedágio maior = vermelho ↑
 test('consolidado mensal preserva a mesma estrutura de linhas', () => {
   const monthly = consolidateDreTables(tables, 'month');
   expect(monthly.length).toBe(1);
-  expect(monthly[0]!.rows.length).toBe(15);
+  expect(monthly[0]!.rows.length).toBe(21);
   expect(monthly[0]!.rows[0]!.line_code).toBe('faturamento_bruto');
-  expect(monthly[0]!.rows[14]!.line_code).toBe('margem_liquida');
+  expect(monthly[0]!.rows[20]!.line_code).toBe('margem_liquida');
 });
 
 const sharedTripTables = buildDreTables({
@@ -334,14 +358,8 @@ const sharedTripTables = buildDreTables({
         { order_id: 'o-shared-1', scope: 'OS', category: 'tso', amount: 10 },
       ],
     ],
-    [
-      'o-shared-2',
-      [{ order_id: 'o-shared-2', scope: 'OS', category: 'das', amount: 30 }],
-    ],
-    [
-      'o-no-quote',
-      [{ order_id: 'o-no-quote', scope: 'OS', category: 'das', amount: 10 }],
-    ],
+    ['o-shared-2', [{ order_id: 'o-shared-2', scope: 'OS', category: 'das', amount: 30 }]],
+    ['o-no-quote', [{ order_id: 'o-no-quote', scope: 'OS', category: 'das', amount: 10 }]],
   ]),
   tripScopedItemsByTripId: new Map([
     [
@@ -351,10 +369,7 @@ const sharedTripTables = buildDreTables({
         { order_id: null, scope: 'TRIP', category: 'pedagio', amount: 200 },
       ],
     ],
-    [
-      'trip-2',
-      [{ order_id: null, scope: 'TRIP', category: 'carreteiro', amount: 250 }],
-    ],
+    ['trip-2', [{ order_id: null, scope: 'TRIP', category: 'carreteiro', amount: 250 }]],
   ]),
   apportionByOrderId: new Map([
     ['o-shared-1', 0.4],
@@ -385,7 +400,7 @@ test('usa fallback OS para descarga/GRIS/TSO e recalcula margens pelo real', () 
   expect(outros.real_value).toBeCloseTo(30);
   expect(custosDiretos.real_value).toBeCloseTo(380);
   expect(resultado.real_value).toBeCloseTo(570);
-  expect(margem.real_value).toBeCloseTo(60);
+  expect(margem.real_value).toBeCloseTo(57);
 });
 
 test('quando *_real e fallback estão ausentes, aplica zero após fallback', () => {

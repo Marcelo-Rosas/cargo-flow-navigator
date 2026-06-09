@@ -70,12 +70,14 @@ export default function Dashboard() {
   } = useRecentOrders(5);
   const {
     data: conversionData,
+    isLoading: conversionLoading,
     isError: conversionIsError,
     error: conversionError,
     refetch: refetchConversion,
   } = useConversionChartData();
   const {
     data: revenueData,
+    isLoading: revenueLoading,
     isError: revenueIsError,
     error: revenueError,
     refetch: refetchRevenue,
@@ -291,6 +293,7 @@ export default function Dashboard() {
           <OverviewTab
             chartConversionData={chartConversionData}
             chartRevenueData={chartRevenueData}
+            chartsLoading={conversionLoading || revenueLoading}
             ordersLoading={ordersLoading}
             recentOrders={recentOrders || []}
             onViewAllOrders={() => navigate('/operacional')}
@@ -302,6 +305,7 @@ export default function Dashboard() {
           <CommercialTab
             chartConversionData={chartConversionData}
             chartRevenueData={chartRevenueData}
+            chartsLoading={conversionLoading || revenueLoading}
           />
         </TabsContent>
 

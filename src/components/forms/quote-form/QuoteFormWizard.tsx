@@ -1,19 +1,5 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
-import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import type { QuoteFormData } from './types';
 import { IdentificationStep } from './steps/IdentificationStep';
@@ -21,6 +7,10 @@ import { CargoLogisticsStep } from './steps/CargoLogisticsStep';
 import { PricingStep } from './steps/PricingStep';
 import { InsuranceStep } from './steps/InsuranceStep';
 import { ReviewStep } from './steps/ReviewStep';
+import { QUOTE_WIZARD_STEPS } from './quote-wizard-steps';
+import { QuoteWizardStepper } from './QuoteWizardStepper';
+import { QuoteWizardStepHeader } from './QuoteWizardStepHeader';
+import { QuoteWizardFooter } from './QuoteWizardFooter';
 import type { FreightCalculationOutput } from '@/lib/freightCalculator';
 import type { AdditionalFeesSelection } from '@/components/quotes/AdditionalFeesSection';
 import type { EquipmentRentalItem } from '@/components/quotes/EquipmentRentalSection';
@@ -29,14 +19,9 @@ import type { Database } from '@/integrations/supabase/types';
 import type { RiskPolicy } from '@/hooks/useRiskPolicies';
 import type { InsuranceOption } from '@/hooks/useInsuranceOptionsRefactored';
 import type { BuonnyError } from '@/lib/errors/BuonnyError';
+import type { AnttFloorFlags } from '@/lib/antt-floor-calc';
 
-const STEPS = [
-  { id: 'identification', label: 'Identificação' },
-  { id: 'cargo', label: 'Carga e Logística' },
-  { id: 'pricing', label: 'Composição Financeira' },
-  { id: 'insurance', label: 'Seguro' },
-  { id: 'review', label: 'Revisão' },
-] as const;
+const STEP_COUNT = QUOTE_WIZARD_STEPS.length;
 
 const STEP_FIELDS: (keyof QuoteFormData)[][] = [
   ['client_name', 'origin', 'destination', 'vehicle_type_id'],
@@ -50,7 +35,7 @@ const STEP_FIELDS: (keyof QuoteFormData)[][] = [
     'km_distance',
   ],
   ['toll', 'cargo_value', 'notes', 'validity_date'],
-  ['insurance_coverage_type'], // Insurance step fields
+  ['insurance_coverage_type'],
   [],
 ];
 
@@ -58,7 +43,7 @@ const STEP_FIELDS_LEGACY: (keyof QuoteFormData)[][] = [
   ['client_name', 'origin', 'destination'],
   ['cargo_type', 'weight', 'volume', 'km_distance', 'payment_term_id'],
   ['value', 'carreteiro_real', 'carrier_payment_term_id', 'advance_due_date', 'balance_due_date'],
-  ['insurance_coverage_type'], // Insurance step fields
+  ['insurance_coverage_type'],
   [],
 ];
 
@@ -70,7 +55,6 @@ interface QuoteFormWizardProps {
   isEditing: boolean;
   isLoading: boolean;
   isLegacy?: boolean;
-  // Identification step handlers
   clients: { id: string; name: string; email?: string | null; zip_code?: string | null }[];
   shippers: { id: string; name: string; email?: string | null; zip_code?: string | null }[];
   onClientSelect: (clientId: string) => void;
@@ -83,7 +67,6 @@ interface QuoteFormWizardProps {
   isLoadingOriginCep: boolean;
   isLoadingDestinationCep: boolean;
   isCalculatingKm: boolean;
-  // Cargo & Logistics step
   priceTablesFiltered: { id: string; name: string; modality: string | null }[];
   vehicleTypes: { id: string; name: string; code: string }[];
   paymentTerms: {
@@ -95,7 +78,6 @@ interface QuoteFormWizardProps {
   }[];
   weightUnit: 'kg' | 'ton';
   setWeightUnit: (unit: 'kg' | 'ton') => void;
-  // Pricing step
   isCalculationStale: boolean;
   additionalFeesSelection: AdditionalFeesSelection;
   setAdditionalFeesSelection: (s: AdditionalFeesSelection) => void;
@@ -103,7 +85,6 @@ interface QuoteFormWizardProps {
   onEquipmentRentalChange: (total: number, items: EquipmentRentalItem[]) => void;
   unloadingCostItems: UnloadingCostItem[];
   onUnloadingCostChange: (total: number, items: UnloadingCostItem[]) => void;
-  // Review step
   calculationResult: FreightCalculationOutput | null;
   vehicleTypeName: string;
   clientName: string;
@@ -112,7 +93,6 @@ interface QuoteFormWizardProps {
   isLoadingPriceRow: boolean;
   preserveOriginalPrice?: boolean;
   onPreserveOriginalPriceChange?: (value: boolean) => void;
-  // Insurance data (lifted to QuoteForm so queries survive step navigation)
   activePolicies: RiskPolicy[];
   loadingPolicies: boolean;
   insuranceOptions: InsuranceOption[];
@@ -122,6 +102,13 @@ interface QuoteFormWizardProps {
   setSelectedInsuranceOption: (option: InsuranceOption | null) => void;
   insuranceOriginUf: string;
   insuranceDestinationUf: string;
+  anttFloorFlags: AnttFloorFlags;
+  onAnttFloorFlagsChange: (patch: Partial<AnttFloorFlags>) => void;
+  pisoAnttPreview: number | null;
+  anttAxesCount: number | null;
+  anttCcd: number | null;
+  anttCc: number | null;
+  anttKmDistance: number;
 }
 
 export function QuoteFormWizard({
@@ -173,10 +160,34 @@ export function QuoteFormWizard({
   setSelectedInsuranceOption,
   insuranceOriginUf,
   insuranceDestinationUf,
+  anttFloorFlags,
+  onAnttFloorFlagsChange,
+  pisoAnttPreview,
+  anttAxesCount,
+  anttCcd,
+  anttCc,
+  anttKmDistance,
 }: QuoteFormWizardProps) {
   const [step, setStep] = useState(0);
-  const canNext = step < STEPS.length - 1;
+  const canNext = step < STEP_COUNT - 1;
   const canPrev = step > 0;
+  const currentStepConfig = QUOTE_WIZARD_STEPS[step];
+
+  const watchedOrigin = form.watch('origin');
+  const watchedDestination = form.watch('destination');
+  const watchedKm = form.watch('km_distance');
+
+  const routeHint = useMemo(() => {
+    const o = (watchedOrigin || '').trim();
+    const d = (watchedDestination || '').trim();
+    if (!o && !d) return null;
+    const km =
+      watchedKm != null && Number.isFinite(Number(watchedKm)) && Number(watchedKm) > 0
+        ? ` · ${Math.round(Number(watchedKm))} km`
+        : '';
+    if (o && d) return `${o} → ${d}${km}`;
+    return o || d ? `${o || '—'} → ${d || '—'}${km}` : null;
+  }, [watchedOrigin, watchedDestination, watchedKm]);
 
   const stepFields = isLegacy ? STEP_FIELDS_LEGACY : STEP_FIELDS;
 
@@ -227,67 +238,17 @@ export function QuoteFormWizard({
     blockedReason =
       calculationResult?.error || 'Selecione a tabela de preços e verifique suas faixas.';
   } else if (isCalculationStale) {
-    blockedReason = 'Há alterações pendentes de cálculo. Execute novamente antes de salvar.';
+    blockedReason = 'Há alterações pendentes. Aguarde o recálculo antes de salvar.';
   } else if (isLoadingPriceRow) {
     blockedReason = 'Aguardando carregamento da tabela de preços...';
   } else if (!priceTableRow) {
-    blockedReason = 'Escolha a faixa correta de km para habilitar o envio.';
+    blockedReason = 'Escolha a faixa de km correta na etapa Carga.';
   }
 
-  const shortLabels = ['Identificação', 'Carga', 'Financeiro', 'Seguro', 'Revisão'];
-
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      {/* Stepper */}
-      <nav className="shrink-0 pb-4" aria-label="Etapas da cotação">
-        <div className="flex items-center justify-between gap-1">
-          {STEPS.map((s, i) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => i < step && setStep(i)}
-              className={cn(
-                'flex flex-col sm:flex-row items-center gap-1 sm:gap-2 min-w-0 flex-1 last:flex-initial',
-                i < step && 'cursor-pointer'
-              )}
-              disabled={i >= step}
-              aria-current={i === step ? 'step' : undefined}
-            >
-              <div
-                className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors',
-                  i < step
-                    ? 'bg-primary text-primary-foreground'
-                    : i === step
-                      ? 'border-2 border-primary bg-primary/5 text-primary'
-                      : 'bg-muted text-muted-foreground'
-                )}
-              >
-                {i < step ? '✓' : i + 1}
-              </div>
-              <span
-                className={cn(
-                  'text-xs sm:text-sm truncate',
-                  i === step ? 'font-medium text-foreground' : 'text-muted-foreground'
-                )}
-              >
-                {shortLabels[i]}
-              </span>
-            </button>
-          ))}
-        </div>
-        {/* Progress bar */}
-        <div className="mt-2 h-0.5 bg-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${((step + 0.5) / STEPS.length) * 100}%` }}
-          />
-        </div>
-      </nav>
-
-      {/* Step content - scrollable */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
-        {step === 0 && (
+  const renderStepContent = () => {
+    switch (step) {
+      case 0:
+        return (
           <IdentificationStep
             form={form}
             clients={clients}
@@ -305,8 +266,9 @@ export function QuoteFormWizard({
             isLoadingDestinationCep={isLoadingDestinationCep}
             isCalculatingKm={isCalculatingKm}
           />
-        )}
-        {step === 1 && (
+        );
+      case 1:
+        return (
           <CargoLogisticsStep
             form={form}
             priceTablesFiltered={priceTablesFiltered}
@@ -315,8 +277,9 @@ export function QuoteFormWizard({
             setWeightUnit={setWeightUnit}
             isLegacy={isLegacy}
           />
-        )}
-        {step === 2 && (
+        );
+      case 2:
+        return (
           <PricingStep
             form={form}
             calculationResult={calculationResult}
@@ -329,9 +292,17 @@ export function QuoteFormWizard({
             onEquipmentRentalChange={onEquipmentRentalChange}
             unloadingCostItems={unloadingCostItems}
             onUnloadingCostChange={onUnloadingCostChange}
+            anttFloorFlags={anttFloorFlags}
+            onAnttFloorFlagsChange={onAnttFloorFlagsChange}
+            pisoAnttPreview={pisoAnttPreview}
+            anttAxesCount={anttAxesCount}
+            anttCcd={anttCcd}
+            anttCc={anttCc}
+            anttKmDistance={anttKmDistance}
           />
-        )}
-        {step === 3 && (
+        );
+      case 3:
+        return (
           <InsuranceStep
             form={form}
             activePolicies={activePolicies}
@@ -344,8 +315,9 @@ export function QuoteFormWizard({
             originUf={insuranceOriginUf}
             destinationUf={insuranceDestinationUf}
           />
-        )}
-        {step === 4 && (
+        );
+      case 4:
+        return (
           <ReviewStep
             form={form}
             calculationResult={calculationResult}
@@ -355,89 +327,53 @@ export function QuoteFormWizard({
             shipperName={shipperName}
             isLegacy={isLegacy}
           />
-        )}
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 gap-0">
+      <QuoteWizardStepper
+        steps={QUOTE_WIZARD_STEPS}
+        currentStep={step}
+        onStepClick={(index) => setStep(index)}
+      />
+
+      <div
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-4 pr-2 -mr-2 scroll-smooth"
+        key={step}
+      >
+        <div
+          className={cn(
+            'animate-in fade-in duration-300',
+            step > 0 ? 'slide-in-from-right-3' : 'slide-in-from-left-3'
+          )}
+        >
+          <QuoteWizardStepHeader
+            step={currentStepConfig}
+            routeHint={step > 0 ? routeHint : undefined}
+          />
+          {renderStepContent()}
+        </div>
       </div>
 
-      {/* Footer */}
-      <div className="shrink-0 flex justify-between items-center gap-4 pt-4 mt-4 border-t">
-        {!canNext && blockedReason && (
-          <p
-            role="status"
-            aria-live="polite"
-            data-testid="wizard-blocked-reason"
-            className="text-xs text-warning-foreground max-w-[360px] leading-tight"
-          >
-            {blockedReason}
-          </p>
-        )}
-        <div>
-          {isEditing && onDelete && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button type="button" variant="destructive" size="sm">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Excluir
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir cotação?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tem certeza que deseja excluir esta cotação? Esta ação não pode ser desfeita.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={onDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {isEditing && onPreserveOriginalPriceChange && (
-            <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-              <Checkbox
-                checked={preserveOriginalPrice}
-                onCheckedChange={(c) => onPreserveOriginalPriceChange(!!c)}
-              />
-              Manter valor original (não recalcular com regras atuais)
-            </label>
-          )}
-          <div className="flex gap-3 ml-auto">
-            {canPrev ? (
-              <Button type="button" variant="outline" onClick={handlePrev}>
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Voltar
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancelar
-              </Button>
-            )}
-            {canNext ? (
-              <Button type="button" onClick={handleNext}>
-                Próximo
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                data-testid="wizard-submit"
-                onClick={handleSubmitClick}
-                disabled={!canSubmit}
-              >
-                {isLoading ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar Cotação'}
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
+      <QuoteWizardFooter
+        canPrev={canPrev}
+        canNext={canNext}
+        canSubmit={canSubmit}
+        isLoading={isLoading}
+        isEditing={isEditing}
+        onPrev={handlePrev}
+        onNext={handleNext}
+        onClose={onClose}
+        onSubmit={handleSubmitClick}
+        onDelete={onDelete}
+        blockedReason={blockedReason}
+        preserveOriginalPrice={preserveOriginalPrice}
+        onPreserveOriginalPriceChange={onPreserveOriginalPriceChange}
+      />
     </div>
   );
 }

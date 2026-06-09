@@ -31,7 +31,7 @@ export function RevenueByClientChart({
     >
       <h3 className="text-lg font-semibold text-foreground mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={data} layout="vertical">
+        <BarChart data={data} layout="vertical" margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis
             type="number"
@@ -43,6 +43,7 @@ export function RevenueByClientChart({
             dataKey="name"
             width={yAxisWidth}
             tick={{ fill: 'hsl(210, 15%, 46.9%)' }}
+            interval={0}
           />
           <Tooltip
             contentStyle={{
