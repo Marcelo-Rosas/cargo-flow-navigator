@@ -21,20 +21,24 @@ export const ANTT_FLOOR_DEFAULT_FLAGS: AnttFloorFlags = {
   retornoVazio: false,
 };
 
-/** Tabela ANTT conforme calculadora oficial (lotacao vs automotor × alto desempenho). */
+/**
+ * Tabela ANTT — paridade calculadorafrete.antt.gov.br (Res. 6.076/2026 Anexo II):
+ * - Composição veicular / lotação (§1) → Tabela A ou C (alto desempenho)
+ * - Apenas unidade de tração (§2) → Tabela B ou D
+ */
 export function resolveAnttOperationTable(flags: AnttFloorFlags): AnttOperationTable {
   if (flags.composicaoVeicular) {
-    return flags.altoDesempenho ? 'D' : 'B';
+    return flags.altoDesempenho ? 'C' : 'A';
   }
-  return flags.altoDesempenho ? 'C' : 'A';
+  return flags.altoDesempenho ? 'D' : 'B';
 }
 
 export function getAnttOperationTableLabel(table: AnttOperationTable): string {
   const labels: Record<AnttOperationTable, string> = {
-    A: 'Tabela A — Lotação (caminhão simples)',
-    B: 'Tabela B — Veículo automotor + implemento',
+    A: 'Tabela A — Lotação (composição veicular)',
+    B: 'Tabela B — Apenas unidade de tração',
     C: 'Tabela C — Lotação alto desempenho',
-    D: 'Tabela D — Automotor alto desempenho',
+    D: 'Tabela D — Tração alto desempenho',
   };
   return labels[table];
 }
@@ -55,9 +59,9 @@ export function inferAnttFlagsFromStoredMeta(
       retornoVazio: (meta.retornoVazio ?? 0) > 0.01,
     };
   }
-  const table = meta.operationTable ?? 'B';
+  const table = meta.operationTable ?? 'A';
   return {
-    composicaoVeicular: table === 'B' || table === 'D',
+    composicaoVeicular: table === 'A' || table === 'C',
     altoDesempenho: table === 'C' || table === 'D',
     retornoVazio: (meta.retornoVazio ?? 0) > 0.01,
   };

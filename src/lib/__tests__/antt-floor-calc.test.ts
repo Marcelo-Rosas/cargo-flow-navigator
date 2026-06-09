@@ -7,28 +7,28 @@ import {
 } from '@/lib/antt-floor-calc';
 
 describe('resolveAnttOperationTable', () => {
-  it('defaults Vectra: composição veicular sem alto desempenho → B', () => {
-    expect(resolveAnttOperationTable(ANTT_FLOOR_DEFAULT_FLAGS)).toBe('B');
+  it('defaults Vectra: composição veicular sem alto desempenho → A (calculadora ANTT)', () => {
+    expect(resolveAnttOperationTable(ANTT_FLOOR_DEFAULT_FLAGS)).toBe('A');
   });
 
-  it('caminhão simples lotação → A', () => {
+  it('apenas unidade de tração → B', () => {
     expect(
       resolveAnttOperationTable({
         composicaoVeicular: false,
         altoDesempenho: false,
         retornoVazio: false,
       })
-    ).toBe('A');
+    ).toBe('B');
   });
 
-  it('composição + alto desempenho → D', () => {
+  it('composição + alto desempenho → C', () => {
     expect(
       resolveAnttOperationTable({
         composicaoVeicular: true,
         altoDesempenho: true,
         retornoVazio: false,
       })
-    ).toBe('D');
+    ).toBe('C');
   });
 });
 
@@ -48,7 +48,7 @@ describe('calculateAnttPisoBrl', () => {
 
 describe('inferAnttFlagsFromStoredMeta', () => {
   it('infere flags a partir da tabela salva', () => {
-    expect(inferAnttFlagsFromStoredMeta({ operationTable: 'B', retornoVazio: 0 })).toMatchObject({
+    expect(inferAnttFlagsFromStoredMeta({ operationTable: 'A', retornoVazio: 0 })).toMatchObject({
       composicaoVeicular: true,
       altoDesempenho: false,
     });

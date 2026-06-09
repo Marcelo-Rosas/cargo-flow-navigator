@@ -5,6 +5,10 @@ import {
   resolveFirstAdditionalShipperEntry,
   shipperRecordToPartyData,
 } from '@/lib/collection-order-parties';
+import {
+  anttEvidenceToCollectionOrderSnapshot,
+  resolveAnttEvidenceForOrder,
+} from '@/lib/risk-antt-evidence';
 import { generateCollectionOrderPdf } from '@/lib/generateCollectionOrderPdf';
 import type {
   CollectionOrder,
@@ -166,68 +170,22 @@ export function useCreateCollectionOrder(orderId: string | undefined) {
         };
       }
 
-      // 2b. Buscar ultimo resultado ANTT/RNTRC da OS via risk_evidence
+      // 2b. ANTT/RNTRC — mesma fonte e matching do RiskWorkflowWizard (risk_evidence)
       let anttSnapshot: import('@/types/collectionOrder').CollectionOrderAnttData | null = null;
       try {
-        const { data: evals } = await supabase
-          .from('risk_evaluations')
-          .select('id')
-          .eq('entity_type', 'order')
-          .eq('entity_id', oid)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        const evalId = evals?.[0]?.id;
-        if (evalId) {
-          const { data: evidence } = await supabase
-            .from('risk_evidence')
-            .select('payload, created_at')
-            .eq('evaluation_id', evalId)
-            .eq('evidence_type', 'antt_rntrc_check')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (evidence?.payload) {
-            const p = evidence.payload as Record<string, unknown>;
-            // Portal ANTT devolve transportador como "TAC - Nome" ou "ETC - Nome".
-            // Extrai o tipo do prefixo (preenche rntrc_registry_type quando portal nao
-            // retorna esse campo direto) e limpa o nome para o PDF.
-            const rawTransportador = (p.transportador as string) ?? null;
-            let parsedType: 'TAC' | 'ETC' | null = null;
-            let cleanTransportador = rawTransportador;
-            if (rawTransportador) {
-              const m = rawTransportador.match(/^\s*(TAC|ETC)\s*[-–—]\s*(.+)$/i);
-              if (m) {
-                parsedType = m[1].toUpperCase() as 'TAC' | 'ETC';
-                cleanTransportador = m[2].trim();
-              }
-            }
-            // Fallback de municipio/uf e cadastrado_desde: portal raramente devolve.
-            // Usa dados do proprietario do veiculo (owners) para preencher no PDF.
-            const ownerMunicipioUf =
-              ownerInfo?.city || ownerInfo?.state
-                ? [ownerInfo?.city, ownerInfo?.state].filter(Boolean).join('/')
-                : null;
-            anttSnapshot = {
-              situacao: (p.situacao as string) ?? null,
-              situacao_raw: (p.situacao_raw as string) ?? null,
-              rntrc_registry_type:
-                ((p.rntrc_registry_type as 'TAC' | 'ETC' | null) ?? null) || parsedType,
-              rntrc: (p.rntrc as string) ?? null,
-              transportador: cleanTransportador,
-              // CPF/CNPJ e MUNICIPIO/UF: fallback para o cadastro do proprietario quando
-              // o portal nao devolve (caminho "Por Veiculo" raramente preenche).
-              cpf_cnpj_mask: ((p.cpf_cnpj_mask as string) ?? null) || ownerInfo?.cpf_cnpj || null,
-              municipio_uf: ((p.municipio_uf as string) ?? null) || ownerMunicipioUf,
-              // CADASTRADO DESDE: vem APENAS do registro ANTT (data de inscricao no
-              // RNTRC). NAO usar owner.created_at (data cadastro no nosso sistema).
-              cadastrado_desde: (p.cadastrado_desde as string) ?? null,
-              apto: (p.apto as boolean | null) ?? null,
-              veiculo_na_frota: (p.veiculo_na_frota as boolean | null) ?? null,
-              comprovante_url: (p.comprovante_url as string) ?? null,
-              comprovante_storage_path: (p.comprovante_storage_path as string) ?? null,
-              checked_at: evidence.created_at ?? null,
-            };
-          }
+        const driver = (order as unknown as { driver: Record<string, unknown> | null }).driver;
+        const driverCpf = (driver?.cpf as string) ?? null;
+        const anttEvidence = await resolveAnttEvidenceForOrder(supabase, {
+          orderId: oid,
+          driverCpf,
+          vehiclePlate: order.vehicle_plate,
+        });
+        if (anttEvidence) {
+          anttSnapshot = anttEvidenceToCollectionOrderSnapshot(anttEvidence, {
+            cpf_cnpj: ownerInfo?.cpf_cnpj,
+            city: ownerInfo?.city,
+            state: ownerInfo?.state,
+          });
         }
       } catch {
         // se a busca falhar a OC ainda emite — antt_data fica null

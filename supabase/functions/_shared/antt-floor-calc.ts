@@ -21,9 +21,9 @@ export const ANTT_FLOOR_DEFAULT_FLAGS: AnttFloorFlags = {
 
 export function resolveAnttOperationTable(flags: AnttFloorFlags): AnttOperationTable {
   if (flags.composicaoVeicular) {
-    return flags.altoDesempenho ? 'D' : 'B';
+    return flags.altoDesempenho ? 'C' : 'A';
   }
-  return flags.altoDesempenho ? 'C' : 'A';
+  return flags.altoDesempenho ? 'D' : 'B';
 }
 
 export function calculateAnttPisoBrl(params: {

@@ -18,7 +18,6 @@ import {
   Clock,
   AlertTriangle,
   ChevronRight,
-  ChevronLeft,
   Loader2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -572,6 +571,9 @@ export function RiskWorkflowWizard({
           rntrc: firstResp?.rntrc ?? null,
           transportador: firstResp?.transportador ?? null,
           apto: firstResp?.apto ?? null,
+          cpf_cnpj_mask: firstResp?.cpf_cnpj_mask ?? null,
+          municipio_uf: firstResp?.municipio_uf ?? null,
+          cadastrado_desde: firstResp?.cadastrado_desde ?? null,
           renavam: vehicleRenavam ?? null,
           cpf_cnpj: digits || null,
           vehicle_plate: normalizePlate(resolvedVehiclePlate),
@@ -814,7 +816,6 @@ export function RiskWorkflowWizard({
                 autoCheckError={buonnyCheck.isError ? (buonnyCheck.error?.message ?? 'Erro') : null}
                 canAdvance={buonnyStepComplete}
                 onNext={() => setCurrentStep('rules')}
-                onBack={() => setCurrentStep('antt')}
               />
               <BuonnyRegistrationModal
                 open={buonnyModalOpen}
@@ -839,7 +840,6 @@ export function RiskWorkflowWizard({
               isEditable={isEditable}
               canAdvance={evalStepComplete}
               onNext={() => setCurrentStep('evidence')}
-              onBack={() => setCurrentStep('buonny')}
             />
           )}
           {currentStep === 'evidence' && (
@@ -852,7 +852,6 @@ export function RiskWorkflowWizard({
               totalEstimatedCost={totalEstimatedCost}
               canAdvance={evidenceStepComplete}
               onNext={() => setCurrentStep('submit')}
-              onBack={() => setCurrentStep('rules')}
             />
           )}
           {currentStep === 'submit' && (
@@ -872,7 +871,6 @@ export function RiskWorkflowWizard({
               isEditable={isEditable}
               onSubmit={handleSubmit}
               isLoading={updateEvaluation.isPending}
-              onBack={() => setCurrentStep('evidence')}
             />
           )}
         </CardContent>
@@ -1152,7 +1150,6 @@ function StepBuonny({
   autoCheckError,
   canAdvance,
   onNext,
-  onBack,
 }: {
   driverName?: string | null;
   driverCpf?: string | null;
@@ -1167,7 +1164,6 @@ function StepBuonny({
   autoCheckError?: string | null;
   canAdvance: boolean;
   onNext: () => void;
-  onBack: () => void;
 }) {
   const payload = (buonnyEvidence as { payload?: Record<string, unknown> })?.payload;
   const statusLabel = payload?.status_buonny
@@ -1246,9 +1242,6 @@ function StepBuonny({
 
       <div className="flex justify-between items-center flex-wrap gap-2">
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={onBack} aria-label="Voltar para consulta ANTT">
-            <ChevronLeft className="h-4 w-4" /> ANTT
-          </Button>
           {isEditable && !buonnyValid && (
             <>
               <Button size="sm" onClick={onAutoCheck} disabled={isAutoChecking}>
@@ -1299,7 +1292,6 @@ function StepRules({
   isEditable,
   canAdvance,
   onNext,
-  onBack,
 }: {
   critResult: ReturnType<typeof evaluateCriticality> | null;
   cargoValue: number;
@@ -1317,7 +1309,6 @@ function StepRules({
   isEditable: boolean;
   canAdvance: boolean;
   onNext: () => void;
-  onBack: () => void;
 }) {
   return (
     <div className="space-y-4" data-testid="risk-step-rules">
@@ -1447,10 +1438,7 @@ function StepRules({
         </p>
       )}
 
-      <div className="flex justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ChevronLeft className="h-4 w-4" /> Voltar
-        </Button>
+      <div className="flex justify-end">
         <Button size="sm" onClick={onNext} disabled={!canAdvance}>
           Próximo <ChevronRight className="h-4 w-4" />
         </Button>
@@ -1469,7 +1457,6 @@ function StepEvidence({
   totalEstimatedCost,
   canAdvance,
   onNext,
-  onBack,
 }: {
   requirements: string[];
   requirementsMet: Record<string, boolean>;
@@ -1479,7 +1466,6 @@ function StepEvidence({
   totalEstimatedCost: number;
   canAdvance: boolean;
   onNext: () => void;
-  onBack: () => void;
 }) {
   return (
     <div className="space-y-4" data-testid="risk-step-evidence">
@@ -1536,10 +1522,7 @@ function StepEvidence({
         <p className="text-xs text-muted-foreground">Marque todas as exigências para avançar.</p>
       )}
 
-      <div className="flex justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ChevronLeft className="h-4 w-4" /> Voltar
-        </Button>
+      <div className="flex justify-end">
         <Button size="sm" onClick={onNext} disabled={!canAdvance}>
           Próximo <ChevronRight className="h-4 w-4" />
         </Button>
@@ -1565,7 +1548,6 @@ function StepSubmit({
   isEditable,
   onSubmit,
   isLoading,
-  onBack,
 }: {
   evaluation: unknown;
   critResult: ReturnType<typeof evaluateCriticality> | null;
@@ -1587,7 +1569,6 @@ function StepSubmit({
   isEditable: boolean;
   onSubmit: () => void;
   isLoading: boolean;
-  onBack: () => void;
 }) {
   const eval_ = evaluation as { status?: string; criticality?: RiskCriticality } | null;
   const canSubmit =
@@ -1730,10 +1711,7 @@ function StepSubmit({
         </div>
       )}
 
-      <div className="flex justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ChevronLeft className="h-4 w-4" /> Voltar
-        </Button>
+      <div className="flex justify-end">
         {!isSubmitted && !isAutoApproved && (
           <Button size="sm" onClick={onSubmit} disabled={!canSubmit || isLoading}>
             {isLoading ? (
