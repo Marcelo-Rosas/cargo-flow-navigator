@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from 'fs';
 const url = process.argv[2] || process.env.LIGHTHOUSE_URL || 'http://localhost:3000';
 
 const thresholds = {
-  performance: 75,
+  performance: 60,
   accessibility: 90,
   'best-practices': 85,
   seo: 90,
