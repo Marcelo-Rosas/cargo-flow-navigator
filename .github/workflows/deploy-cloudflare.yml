@@ -233,9 +233,11 @@ jobs:
       # TMS usa login Supabase — Cloudflare Access nas URLs públicas bloqueia preview/produção.
       - name: Remove Cloudflare Access from public TMS URLs
         if: success()
+        id: remove-access
         continue-on-error: true
         run: node scripts/disable-cloudflare-access-public.mjs --apply
         env:
+          CLOUDFLARE_ZERO_TRUST_API_TOKEN: ${{ secrets.CLOUDFLARE_ZERO_TRUST_API_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -253,10 +255,20 @@ jobs:
           HEADERS=$(curl -sI -L --max-redirs 3 "$URL" || true)
           echo "$HEADERS" | head -20
           if echo "$HEADERS" | grep -qi 'cloudflareaccess.com'; then
-            echo "::warning::URL ainda redireciona para Cloudflare Access. Atualize CLOUDFLARE_API_TOKEN com Zero Trust Write ou remova o app manualmente."
+            echo "::error::URL ainda redireciona para Cloudflare Access. Adicione o secret CLOUDFLARE_ZERO_TRUST_API_TOKEN (template Edit Cloudflare Zero Trust) em GitHub Actions, ou remova o app em Zero Trust → Access → Applications."
             exit 1
           fi
           echo "OK: sem redirect para Cloudflare Access"
+
+      - name: Access removal summary
+        if: always()
+        run: |
+          echo "## Cloudflare Access" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.remove-access.outcome }}" = "success" ]; then
+            echo "✅ Apps de Access removidos (ou já estavam públicos)." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Falha ao remover Access via API. Configure \`CLOUDFLARE_ZERO_TRUST_API_TOKEN\` ou remova manualmente em [Zero Trust → Access](https://one.dash.cloudflare.com/)." >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Comment PR with preview URL
         if: github.event_name == 'pull_request'
