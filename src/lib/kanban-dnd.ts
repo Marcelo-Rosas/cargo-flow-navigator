@@ -36,6 +36,30 @@ export function findContainer<T extends ItemWithId>(
 }
 
 /**
+ * Resolves source and target columns on drag end.
+ * `current` may lag when onDragOver throttles; `overId` is the drop target from dnd-kit.
+ */
+export function resolveDropContainer<T extends ItemWithId>(
+  previous: ItemsState<T>,
+  current: ItemsState<T>,
+  activeId: UniqueIdentifier,
+  overId: UniqueIdentifier | undefined
+): { from: ColumnId | null; to: ColumnId | null } {
+  const from = findContainer(previous, activeId);
+  let to = findContainer(current, activeId);
+
+  if (overId != null) {
+    const overContainer = overId in current ? (overId as ColumnId) : findContainer(current, overId);
+
+    if (overContainer && overContainer !== from) {
+      to = overContainer;
+    }
+  }
+
+  return { from, to };
+}
+
+/**
  * Moves `activeId` relative to `overId`.
  *
  * - Same column  → reorder with `arrayMove` based on indices.
