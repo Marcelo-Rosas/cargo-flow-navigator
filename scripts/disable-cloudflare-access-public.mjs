@@ -10,14 +10,21 @@
  *   Template: "Edit Cloudflare Zero Trust" ou permissões Account → Access: Apps and Policies → Edit
  *
  * Sem --apply: apenas lista apps que seriam removidos (dry-run).
+ *
+ * CI: em deploy-cloudflare.yml roda com --apply após Pages deploy.
+ * O token CLOUDFLARE_API_TOKEN precisa permissão Account → Access: Apps and Policies → Edit.
  */
 const DEFAULT_ACCOUNT_ID = '361e9e1383bfa8e95e1db54e6c2a3bba';
+const isCi = Boolean(process.env.CI || process.env.GITHUB_ACTIONS);
 
 const API = 'https://api.cloudflare.com/client/v4';
 const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
 const apply = process.argv.includes('--apply');
 
-/** Hosts que devem ficar públicos (login Supabase na aplicação). */
+/**
+ * Hosts que devem ficar públicos (login Supabase na aplicação).
+ * Inclui previews PR: pr-123.cargo-flow-navigator.pages.dev
+ */
 const PUBLIC_HOST_PATTERNS = [
   'app.vectracargo.com.br',
   'cargo-flow-navigator.pages.dev',
@@ -114,7 +121,19 @@ async function main() {
   );
 }
 
+function isAuthOrPermissionError(err) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /auth|permission|forbidden|10000|9109|9103/i.test(msg);
+}
+
 main().catch((err) => {
-  console.error(err instanceof Error ? err.message : err);
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error(msg);
+  if (isCi && isAuthOrPermissionError(err)) {
+    console.warn(
+      '::warning::CLOUDFLARE_API_TOKEN sem permissão Zero Trust Write — remova Access manualmente em Zero Trust → Access → Applications'
+    );
+    process.exit(0);
+  }
   process.exit(2);
 });

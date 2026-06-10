@@ -37,6 +37,8 @@
     "montagem:pdf": "deno run -A --config supabase/functions/generate-contract-pdf/deno.json scripts/render-montagem-orcamento-pdf.ts",
     "montagem:email-pdf": "npx tsx scripts/render-montagem-orcamento-email-pdf.ts",
     "montagem:all": "npm run montagem:pdf && npm run montagem:email-pdf",
+    "cf:access-public": "node scripts/disable-cloudflare-access-public.mjs",
+    "cf:access-public:apply": "node scripts/disable-cloudflare-access-public.mjs --apply",
     "cf:log-explorer": "npx tsx scripts/cloudflare-log-explorer/provision-log-explorer.ts",
     "cf:log-explorer:dry-run": "npm run cf:log-explorer -- --dry-run",
     "cf:log-explorer:apply": "npm run cf:log-explorer -- --apply",
