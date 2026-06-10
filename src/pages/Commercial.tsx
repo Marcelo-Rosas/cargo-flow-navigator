@@ -25,7 +25,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
-import { findContainer, moveItem, type ItemsState } from '@/lib/kanban-dnd';
+import { findContainer, moveItem, resolveDropContainer, type ItemsState } from '@/lib/kanban-dnd';
 import { toast } from 'sonner';
 import { QuoteForm } from '@/components/forms/QuoteForm';
 import { ConvertQuoteModal } from '@/components/modals/ConvertQuoteModal';
@@ -206,13 +206,19 @@ export default function Commercial() {
 
       const activeIdStr = String(active.id);
       const previous = snapshotRef.current ?? items;
-      const fromContainer = findContainer(previous, activeIdStr) as QuoteStage | null;
-      const toContainer = findContainer(items, activeIdStr) as QuoteStage | null;
+      const { from: fromContainer, to: toContainer } = resolveDropContainer(
+        previous,
+        items,
+        activeIdStr,
+        over.id
+      );
 
       if (!fromContainer || !toContainer || fromContainer === toContainer) {
         snapshotRef.current = null;
         return;
       }
+
+      setItems((prev) => moveItem(prev, active.id, over.id) ?? prev);
 
       const fullQuote = quotes?.find((q) => q.id === activeIdStr);
       if (!fullQuote) {

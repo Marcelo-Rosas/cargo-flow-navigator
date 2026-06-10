@@ -55,7 +55,7 @@ function expect<T>(actual: T) {
 // ---------------------------------------------------------------------------
 // NOTE: These are inlined here so the file can run with `npx tsx` without
 // needing path-alias resolution.  The canonical source is src/lib/kanban-dnd.ts.
-import { findContainer, moveItem } from '../src/lib/kanban-dnd';
+import { findContainer, moveItem, resolveDropContainer } from '../src/lib/kanban-dnd';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -128,6 +128,17 @@ test('moves item into an empty column (over the column id)', () => {
   const result = moveItem(INITIAL, 'a', 'blocked');
   expect(result?.blocked.map((i) => i.id)).toEqual(['a']);
   expect(result?.todo.map((i) => i.id)).toEqual(['b', 'c']);
+});
+
+// ---------------------------------------------------------------------------
+// resolveDropContainer
+// ---------------------------------------------------------------------------
+console.log('\nresolveDropContainer');
+
+test('uses over column when current state still shows source column', () => {
+  const result = resolveDropContainer(INITIAL, INITIAL, 'a', 'done');
+  expect(result.from).toBe('todo');
+  expect(result.to).toBe('done');
 });
 
 // ---------------------------------------------------------------------------

@@ -47,7 +47,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Database } from '@/integrations/supabase/types';
-import { findContainer, moveItem, type ItemsState } from '@/lib/kanban-dnd';
+import { findContainer, moveItem, resolveDropContainer, type ItemsState } from '@/lib/kanban-dnd';
 import { toast } from 'sonner';
 import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import { OrderForm } from '@/components/forms/OrderForm';
@@ -334,13 +334,19 @@ export default function Operations() {
 
       const activeIdStr = String(active.id);
       const previous = snapshotRef.current ?? items;
-      const fromContainer = findContainer(previous, activeIdStr) as OrderStage | null;
-      const toContainer = findContainer(items, activeIdStr) as OrderStage | null;
+      const { from: fromContainer, to: toContainer } = resolveDropContainer(
+        previous,
+        items,
+        activeIdStr,
+        over.id
+      );
 
       if (!fromContainer || !toContainer || fromContainer === toContainer) {
         snapshotRef.current = null;
         return;
       }
+
+      setItems((prev) => moveItem(prev, active.id, over.id) ?? prev);
 
       const fullOrder = orders?.find((o) => o.id === activeIdStr);
       if (!fullOrder) {
@@ -363,19 +369,6 @@ export default function Operations() {
       // Validate stage transition (can't skip to entregue without POD)
       if (targetStage === 'entregue' && !fullOrder.has_pod) {
         toast.error('É necessário anexar o comprovante de entrega (POD) antes de finalizar');
-        if (snapshotRef.current) {
-          setItems(snapshotRef.current);
-        }
-        snapshotRef.current = null;
-        return;
-      }
-
-      // Validate CIOT before moving to em_transito
-      if (
-        targetStage === 'em_transito' &&
-        !(fullOrder as unknown as { ciot_number?: string | null }).ciot_number
-      ) {
-        toast.error('É necessário gerar o CIOT antes de colocar a OS em trânsito');
         if (snapshotRef.current) {
           setItems(snapshotRef.current);
         }
