@@ -230,6 +230,34 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=cargo-flow-navigator --branch=pr-${{ github.event.pull_request.number }}
 
+      # TMS usa login Supabase — Cloudflare Access nas URLs públicas bloqueia preview/produção.
+      - name: Remove Cloudflare Access from public TMS URLs
+        if: success()
+        continue-on-error: true
+        run: node scripts/disable-cloudflare-access-public.mjs --apply
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify Pages URL is not behind Cloudflare Access
+        if: success()
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            URL="https://pr-${{ github.event.pull_request.number }}.cargo-flow-navigator.pages.dev"
+          else
+            URL="https://app.vectracargo.com.br"
+          fi
+          echo "Checking $URL"
+          HEADERS=$(curl -sI -L --max-redirs 3 "$URL" || true)
+          echo "$HEADERS" | head -20
+          if echo "$HEADERS" | grep -qi 'cloudflareaccess.com'; then
+            echo "::warning::URL ainda redireciona para Cloudflare Access. Atualize CLOUDFLARE_API_TOKEN com Zero Trust Write ou remova o app manualmente."
+            exit 1
+          fi
+          echo "OK: sem redirect para Cloudflare Access"
+
       - name: Comment PR with preview URL
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -239,7 +267,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '🚀 **Preview deploy pronto!**\n\nURL: https://pr-${{ github.event.pull_request.number }}.cargo-flow-navigator.pages.dev\n\nCommit: `' + context.sha.substring(0, 7) + '`'
+              body: '🚀 **Preview deploy pronto!**\n\nURL: https://pr-${{ github.event.pull_request.number }}.cargo-flow-navigator.pages.dev\n\nLogin via Supabase (sem Cloudflare Access). Commit: `' + context.sha.substring(0, 7) + '`'
             })
 
   # ─── Notificação final ───
