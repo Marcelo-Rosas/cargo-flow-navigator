@@ -1,0 +1,32 @@
+name: Cloudflare Access — tornar URLs públicas
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  remove-access:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove Cloudflare Access from TMS URLs
+        run: node scripts/disable-cloudflare-access-public.mjs --apply
+        env:
+          CLOUDFLARE_ZERO_TRUST_API_TOKEN: ${{ secrets.CLOUDFLARE_ZERO_TRUST_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify production URL
+        run: |
+          set -euo pipefail
+          URL="https://app.vectracargo.com.br"
+          HEADERS=$(curl -sI -L --max-redirs 3 "$URL" || true)
+          echo "$HEADERS" | head -20
+          if echo "$HEADERS" | grep -qi 'cloudflareaccess.com'; then
+            echo "::error::Ainda redireciona para Cloudflare Access."
+            exit 1
+          fi
+          echo "OK: $URL público (login Supabase)"

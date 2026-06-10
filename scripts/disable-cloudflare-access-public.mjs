@@ -3,8 +3,8 @@
  * Remove Cloudflare Access (Zero Trust) das URLs do TMS para login público via Supabase.
  *
  * Uso:
- *   CLOUDFLARE_API_TOKEN=<token com Account.Zero Trust Write> node scripts/disable-cloudflare-access-public.mjs
- *   CLOUDFLARE_API_TOKEN=... node scripts/disable-cloudflare-access-public.mjs --apply
+ *   CLOUDFLARE_ZERO_TRUST_API_TOKEN=<token Zero Trust Write> node scripts/disable-cloudflare-access-public.mjs --apply
+ *   (fallback: CLOUDFLARE_API_TOKEN se tiver permissão Access)
  *
  * Token: Cloudflare Dashboard → My Profile → API Tokens → Create Token
  *   Template: "Edit Cloudflare Zero Trust" ou permissões Account → Access: Apps and Policies → Edit
@@ -12,13 +12,16 @@
  * Sem --apply: apenas lista apps que seriam removidos (dry-run).
  *
  * CI: em deploy-cloudflare.yml roda com --apply após Pages deploy.
- * O token CLOUDFLARE_API_TOKEN precisa permissão Account → Access: Apps and Policies → Edit.
+ * GitHub: secret CLOUDFLARE_ZERO_TRUST_API_TOKEN (template Edit Cloudflare Zero Trust).
+ * O CLOUDFLARE_API_TOKEN do Pages deploy normalmente NÃO tem essa permissão.
  */
 const DEFAULT_ACCOUNT_ID = '361e9e1383bfa8e95e1db54e6c2a3bba';
 const isCi = Boolean(process.env.CI || process.env.GITHUB_ACTIONS);
 
 const API = 'https://api.cloudflare.com/client/v4';
-const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
+const token = (
+  process.env.CLOUDFLARE_ZERO_TRUST_API_TOKEN ?? process.env.CLOUDFLARE_API_TOKEN
+)?.trim();
 const apply = process.argv.includes('--apply');
 
 /**
@@ -59,7 +62,7 @@ async function cf(path, init = {}) {
 async function main() {
   if (!token) {
     console.error(
-      'Defina CLOUDFLARE_API_TOKEN (Zero Trust Write).\n' +
+      'Defina CLOUDFLARE_ZERO_TRUST_API_TOKEN (template Edit Cloudflare Zero Trust).\n' +
         'Alternativa manual: Zero Trust → Access → Applications → excluir apps de app.vectracargo.com.br'
     );
     process.exit(1);
@@ -131,7 +134,7 @@ main().catch((err) => {
   console.error(msg);
   if (isCi && isAuthOrPermissionError(err)) {
     console.warn(
-      '::warning::CLOUDFLARE_API_TOKEN sem permissão Zero Trust Write — remova Access manualmente em Zero Trust → Access → Applications'
+      '::warning::Configure o secret CLOUDFLARE_ZERO_TRUST_API_TOKEN (Edit Cloudflare Zero Trust) ou remova Access manualmente em Zero Trust → Access → Applications'
     );
     process.exit(0);
   }
