@@ -42,14 +42,6 @@ export const QUOTE_WIZARD_STEPS: QuoteWizardStepConfig[] = [
     icon: Receipt,
   },
   {
-    id: 'insurance',
-    label: 'Seguro',
-    shortLabel: 'Seguro',
-    title: 'Seguro e gerenciamento de risco',
-    description: 'Cobertura Buonny conforme políticas da rota e valor da carga.',
-    icon: ShieldCheck,
-  },
-  {
     id: 'review',
     label: 'Revisão',
     shortLabel: 'Revisão',
