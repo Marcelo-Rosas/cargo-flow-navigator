@@ -5,7 +5,6 @@ import type { QuoteFormData } from './types';
 import { IdentificationStep } from './steps/IdentificationStep';
 import { CargoLogisticsStep } from './steps/CargoLogisticsStep';
 import { PricingStep } from './steps/PricingStep';
-import { InsuranceStep } from './steps/InsuranceStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { QUOTE_WIZARD_STEPS } from './quote-wizard-steps';
 import { QuoteWizardStepper } from './QuoteWizardStepper';
@@ -35,7 +34,6 @@ const STEP_FIELDS: (keyof QuoteFormData)[][] = [
     'km_distance',
   ],
   ['toll', 'cargo_value', 'notes', 'validity_date'],
-  ['insurance_coverage_type'],
   [],
 ];
 
@@ -43,7 +41,6 @@ const STEP_FIELDS_LEGACY: (keyof QuoteFormData)[][] = [
   ['client_name', 'origin', 'destination'],
   ['cargo_type', 'weight', 'volume', 'km_distance', 'payment_term_id'],
   ['value', 'carreteiro_real', 'carrier_payment_term_id', 'advance_due_date', 'balance_due_date'],
-  ['insurance_coverage_type'],
   [],
 ];
 
@@ -302,21 +299,6 @@ export function QuoteFormWizard({
           />
         );
       case 3:
-        return (
-          <InsuranceStep
-            form={form}
-            activePolicies={activePolicies}
-            loadingPolicies={loadingPolicies}
-            insuranceOptions={insuranceOptions}
-            isLoadingOptions={isLoadingInsuranceOptions}
-            optionsError={insuranceOptionsError}
-            selectedOption={selectedInsuranceOption}
-            setSelectedOption={setSelectedInsuranceOption}
-            originUf={insuranceOriginUf}
-            destinationUf={insuranceDestinationUf}
-          />
-        );
-      case 4:
         return (
           <ReviewStep
             form={form}
