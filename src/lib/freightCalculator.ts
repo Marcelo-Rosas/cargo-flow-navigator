@@ -795,8 +795,20 @@ export function calculateGrossUpHibrido(
     );
   }
 
+  // Descobre apenas a taxa de impostos para fazer o gross-up exclusivo no repasseRisco
+  let taxaImpostos = 0;
+  if (regimeFiscal === 'lucro_presumido') {
+    taxaImpostos = (pisPercent + cofinsPercent + irpjPercent + csllPercent + icmsPercent) / 100;
+  } else if (icmsNoDivisor) {
+    taxaImpostos = (dasPercent + icmsPercent) / 100;
+  } else {
+    taxaImpostos = dasPercent / 100;
+  }
+
+  const repasseRiscoComImpostos = repasseRisco > 0 ? repasseRisco / (1 - taxaImpostos) : 0;
+
   const totalClienteCore = round2(custosDiretos / (1 - taxaBruta));
-  const totalCliente = round2(totalClienteCore + Math.max(0, repasseRisco));
+  const totalCliente = round2(totalClienteCore + repasseRiscoComImpostos);
 
   let das: number;
   let icms: number;
@@ -1315,8 +1327,8 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
       matchStatus,
     },
     components: {
-      baseCost: custoMotorista,
-      baseFreight: custoMotorista,
+      baseCost,
+      baseFreight,
       toll: round2(input.tollValue),
       aluguelMaquinas,
       gris,
@@ -1361,7 +1373,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
     profitability: {
       // Legados (compat com leitores antigos da UI/PDF/DRE)
       custoMotorista,
-      custosCarreteiro: custoMotorista,
+      custosCarreteiro: !isLtl ? round2(custoMotorista + input.tollValue) : custoMotorista,
       // VEC-121: campos semânticos novos
       // - Antt: piso legal mínimo (= piso ANTT quando aplicado, senão = baseCost/frete_peso)
       // - Contratado: NTC base (frete_peso) — o que o motorista recebe em condição padrão

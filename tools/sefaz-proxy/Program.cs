@@ -68,7 +68,8 @@ app.MapPost("/v1/consult", async (HttpContext ctx) =>
         }
 
         var modelo = chave.Substring(20, 2);
-        var endpoint = ResolveEndpoint(modelo);
+        var ufCode = chave.Substring(0, 2);
+        var endpoint = ResolveEndpoint(modelo, ufCode, tpAmb);
         var soapBody = BuildSoapEnvelope(modelo, chave, tpAmb);
         var soapResponse = await PostSoapAsync(endpoint, soapBody, cert);
         var parsed = ParseSoapResponse(soapResponse);
@@ -112,12 +113,32 @@ static string FormatCnpj(string digits)
     return $"{digits[..2]}.{digits[2..5]}.{digits[5..8]}/{digits[8..12]}-{digits[12..14]}";
 }
 
-static string ResolveEndpoint(string modelo) => modelo switch
+static string ResolveEndpoint(string modelo, string ufCode, string tpAmb)
 {
-    "57" => "https://cte.svrs.rs.gov.br/ws/cteConsultaV4/cteConsultaV4.asmx",
-    "58" => "https://mdfe.svrs.rs.gov.br/ws/MDFeConsulta/MDFeConsulta.asmx",
-    _ => "https://nfe.svrs.rs.gov.br/ws/NFeConsultaProtocolo4/NFeConsultaProtocolo4.asmx",
-};
+    if (modelo == "57")
+        return "https://cte.svrs.rs.gov.br/ws/cteConsultaV4/cteConsultaV4.asmx";
+    if (modelo == "58")
+        return "https://mdfe.svrs.rs.gov.br/ws/MDFeConsulta/MDFeConsulta.asmx";
+
+    var homolog = tpAmb == "2";
+
+    // NF-e: endpoint da SEFAZ autorizadora (2 primeiros dígitos da chave = UF)
+    return ufCode switch
+    {
+        "35" => homolog
+            ? "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx"
+            : "https://nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx",
+        "31" => homolog
+            ? "https://hnfe.fazenda.mg.gov.br/nfe2/services/NFeConsultaProtocolo4"
+            : "https://nfe.fazenda.mg.gov.br/nfe2/services/NFeConsultaProtocolo4",
+        "41" or "42" or "43" or "50" or "51" or "52" or "12" or "27" or "16" or "53" or "32" or "25" or "33"
+            or "24" or "11" or "14" or "28" or "17" or "21" or "15" or "22" or "13" =>
+            "https://nfe.svrs.rs.gov.br/ws/NFeConsultaProtocolo4/NFeConsultaProtocolo4.asmx",
+        _ => homolog
+            ? "https://hom.sefazvirtual.fazenda.gov.br/NFeConsultaProtocolo4/NFeConsultaProtocolo4.asmx"
+            : "https://www.sefazvirtual.fazenda.gov.br/NFeConsultaProtocolo4/NFeConsultaProtocolo4.asmx",
+    };
+}
 
 static string MapTipo(string modelo) => modelo switch
 {
@@ -128,56 +149,33 @@ static string MapTipo(string modelo) => modelo switch
 
 static string BuildSoapEnvelope(string modelo, string chave, string tpAmb)
 {
+    // SEFAZ rejeita cStat 588 se houver whitespace/quebras entre tags — XML compacto, uma linha.
     if (modelo == "57")
     {
-        return $"""
-            <?xml version="1.0" encoding="utf-8"?>
-            <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-              <soap12:Body>
-                <cteDadosMsg xmlns="http://www.portalfiscal.inf.br/cte/wsdl/CteConsultaV4">
-                  <consSitCTe xmlns="http://www.portalfiscal.inf.br/cte" versao="4.00">
-                    <tpAmb>{tpAmb}</tpAmb>
-                    <xServ>CONSULTAR</xServ>
-                    <chCTe>{chave}</chCTe>
-                  </consSitCTe>
-                </cteDadosMsg>
-              </soap12:Body>
-            </soap12:Envelope>
-            """;
+        var consSit = $"<consSitCTe xmlns=\"http://www.portalfiscal.inf.br/cte\" versao=\"4.00\"><tpAmb>{tpAmb}</tpAmb><xServ>CONSULTAR</xServ><chCTe>{chave}</chCTe></consSitCTe>";
+        return "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+            + "<soap12:Envelope xmlns:soap12=\"http://www.w3.org/2003/05/soap-envelope\"><soap12:Body>"
+            + "<cteDadosMsg xmlns=\"http://www.portalfiscal.inf.br/cte/wsdl/CteConsultaV4\">"
+            + consSit
+            + "</cteDadosMsg></soap12:Body></soap12:Envelope>";
     }
 
     if (modelo == "58")
     {
-        return $"""
-            <?xml version="1.0" encoding="utf-8"?>
-            <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-              <soap12:Body>
-                <mdfeDadosMsg xmlns="http://www.portalfiscal.inf.br/mdfe/wsdl/MDFeConsulta">
-                  <consSitMDFe xmlns="http://www.portalfiscal.inf.br/mdfe" versao="3.00">
-                    <tpAmb>{tpAmb}</tpAmb>
-                    <xServ>CONSULTAR</xServ>
-                    <chMDFe>{chave}</chMDFe>
-                  </consSitMDFe>
-                </mdfeDadosMsg>
-              </soap12:Body>
-            </soap12:Envelope>
-            """;
+        var consSit = $"<consSitMDFe xmlns=\"http://www.portalfiscal.inf.br/mdfe\" versao=\"3.00\"><tpAmb>{tpAmb}</tpAmb><xServ>CONSULTAR</xServ><chMDFe>{chave}</chMDFe></consSitMDFe>";
+        return "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+            + "<soap12:Envelope xmlns:soap12=\"http://www.w3.org/2003/05/soap-envelope\"><soap12:Body>"
+            + "<mdfeDadosMsg xmlns=\"http://www.portalfiscal.inf.br/mdfe/wsdl/MDFeConsulta\">"
+            + consSit
+            + "</mdfeDadosMsg></soap12:Body></soap12:Envelope>";
     }
 
-    return $"""
-        <?xml version="1.0" encoding="utf-8"?>
-        <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-          <soap12:Body>
-            <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeConsultaProtocolo4">
-              <consSitNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
-                <tpAmb>{tpAmb}</tpAmb>
-                <xServ>CONSULTAR</xServ>
-                <chNFe>{chave}</chNFe>
-              </consSitNFe>
-            </nfeDadosMsg>
-          </soap12:Body>
-        </soap12:Envelope>
-        """;
+    var consSitNFe = $"<consSitNFe xmlns=\"http://www.portalfiscal.inf.br/nfe\" versao=\"4.00\"><tpAmb>{tpAmb}</tpAmb><xServ>CONSULTAR</xServ><chNFe>{chave}</chNFe></consSitNFe>";
+    return "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+        + "<soap12:Envelope xmlns:soap12=\"http://www.w3.org/2003/05/soap-envelope\"><soap12:Body>"
+        + "<nfeDadosMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeConsultaProtocolo4\">"
+        + consSitNFe
+        + "</nfeDadosMsg></soap12:Body></soap12:Envelope>";
 }
 
 static async Task<string> PostSoapAsync(string endpoint, string soapXml, X509Certificate2 cert)

@@ -51,6 +51,7 @@ import type { CalculateFreightInput } from '@/types/freight';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnttFloorRate, calculateAnttMinimum } from '@/hooks/useAnttFloorRate';
 import { inferAnttFlagsFromStoredMeta, resolveAnttOperationTable } from '@/lib/antt-floor-calc';
+import { resolveAnttCargoTypeForPiso } from '@/lib/antt-cargo-type-map';
 import { resolvePisoAnttCarreteiroReais } from '@/lib/carreteiro-cost';
 import { resolveAnttRsKm, resolvePisoAnttTotalReais } from '@/lib/antt-rs-km';
 import { enrichStoredBreakdownAnttMeta } from '@/lib/enrich-breakdown-antt-meta';
@@ -218,10 +219,18 @@ export function QuoteDetailModal({
   const kmDistance = quote?.km_distance ?? null;
   const anttFlagsDetail = inferAnttFlagsFromStoredMeta(breakdownEarly?.meta?.antt);
   const anttOperationTableDetail = resolveAnttOperationTable(anttFlagsDetail);
+  const anttCargoTypeDetail = useMemo(
+    () =>
+      resolveAnttCargoTypeForPiso({
+        storedAnttCargoType: breakdownEarly?.meta?.antt?.cargoType,
+        cargoTypeLabel: quote?.cargo_type,
+      }),
+    [breakdownEarly?.meta?.antt?.cargoType, quote?.cargo_type]
+  );
   const isLotacaoQuote = quote?.freight_modality === 'lotacao';
   const { data: anttRate } = useAnttFloorRate({
     operationTable: anttOperationTableDetail,
-    cargoType: 'carga_geral',
+    cargoType: anttCargoTypeDetail,
     axesCount: isLotacaoQuote ? axesCount : null,
   });
   const anttCcdCoef =
@@ -552,6 +561,7 @@ export function QuoteDetailModal({
       payment_term_code: (paymentTerm as { code?: string } | null)?.code ?? 'D30',
       descarga_value: bd?.profitability?.custosDescarga ?? 0,
       aluguel_maquinas_value: bd?.components?.aluguelMaquinas ?? 0,
+      cargo_type: quote.cargo_type ?? undefined,
       // v5: conditional_fees handled locally, not sent to Edge function
       waiting_hours: bd?.meta?.waitingTimeHours ?? undefined,
       ...(quote.freight_modality === 'lotacao'
@@ -702,6 +712,7 @@ export function QuoteDetailModal({
         payment_term_code: (paymentTerm as { code?: string } | null)?.code ?? 'D30',
         descarga_value: bd?.profitability?.custosDescarga ?? 0,
         aluguel_maquinas_value: bd?.components?.aluguelMaquinas ?? 0,
+        cargo_type: quote.cargo_type ?? undefined,
         waiting_hours: bd?.meta?.waitingTimeHours ?? undefined,
         enforce_antt_floor: true,
         ...(quote.freight_modality === 'lotacao'

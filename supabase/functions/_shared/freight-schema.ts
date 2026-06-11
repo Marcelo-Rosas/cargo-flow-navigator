@@ -39,6 +39,10 @@ export const calculateFreightInputSchema = z
     excesso_sublimite: z.boolean().optional(),
     regime_lucro_presumido: z.boolean().optional(),
     enforce_antt_floor: z.boolean().optional(),
+    /** Texto livre do campo tipo de carga (cotação/OS) — mapeado para categoria ANTT no piso */
+    cargo_type: z.string().optional(),
+    /** Override explícito da chave antt_floor_rates.cargo_type */
+    antt_cargo_type: z.string().optional(),
     antt_composicao_veicular: z.boolean().optional(),
     antt_alto_desempenho: z.boolean().optional(),
     antt_retorno_vazio: z.boolean().optional(),

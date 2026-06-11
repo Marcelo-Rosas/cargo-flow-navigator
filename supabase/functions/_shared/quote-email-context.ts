@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { fetchCompanySettings } from './company-settings.ts';
 import type { PaymentTerm, RouteStop } from './quote-email-types.ts';
 
 export async function fetchQuoteEmailContext(
@@ -37,7 +38,7 @@ export async function fetchQuoteEmailContext(
     paymentTerm = data;
   }
 
-  const { data: company } = await supabase.from('company_settings').select('*').maybeSingle();
+  const company = await fetchCompanySettings(supabase);
 
   return {
     quote: quote as Record<string, unknown>,

@@ -36,8 +36,9 @@ export function findContainer<T extends ItemWithId>(
 }
 
 /**
- * Resolves source and target columns on drag end.
- * `current` may lag when onDragOver throttles; `overId` is the drop target from dnd-kit.
+ *
+ * `current` may lag behind the pointer when `onDragOver` throttles updates;
+ * `overId` is the authoritative drop target from dnd-kit.
  */
 export function resolveDropContainer<T extends ItemWithId>(
   previous: ItemsState<T>,

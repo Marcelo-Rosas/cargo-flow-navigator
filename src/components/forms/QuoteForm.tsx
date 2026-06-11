@@ -113,6 +113,7 @@ import {
   resolveAnttOperationTable,
   ANTT_FLOOR_DEFAULT_FLAGS,
 } from '@/lib/antt-floor-calc';
+import { getAnttCargoTypeLabel, resolveAnttCargoTypeForPiso } from '@/lib/antt-cargo-type-map';
 
 type Quote = Database['public']['Tables']['quotes']['Row'];
 type PriceTableRow = Database['public']['Tables']['price_tables']['Row'];
@@ -697,7 +698,20 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const resolvedPricingParams = useMemo(() => {
     const vtId = debounced.vehicleTypeId || undefined;
     const regimeSimplesVal = resolvePricingRule(pricingRules, 'regime_simples_nacional', vtId, 1);
+    const regimeSimplesNacional = (regimeSimplesVal ?? 1) === 1;
     const excessoVal = resolvePricingRule(pricingRules, 'excesso_sublimite', vtId, 0);
+    const pisPercent = resolvePricingRule(pricingRules, 'pis_percent', vtId, 0);
+    const cofinsPercent = resolvePricingRule(pricingRules, 'cofins_percent', vtId, 0);
+    let regimeLucroPresumido =
+      resolvePricingRule(pricingRules, 'regime_lucro_presumido', vtId, 0) === 1;
+    if (
+      !regimeLucroPresumido &&
+      !regimeSimplesNacional &&
+      ((pisPercent ?? 0) > 0 || (cofinsPercent ?? 0) > 0)
+    ) {
+      regimeLucroPresumido = true;
+    }
+
     return {
       taxRegimeSimples,
       dasPercent: resolvePricingRule(pricingRules, 'das_percent', vtId, 14),
@@ -705,8 +719,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       overheadPercent: resolvePricingRule(pricingRules, 'overhead_percent', vtId, 15),
       profitMarginPercent: resolvePricingRule(pricingRules, 'profit_margin_percent', vtId, 15),
       targetMarginPercent: resolvePricingRule(pricingRules, 'profit_margin_percent', vtId, 15),
-      regimeSimplesNacional: (regimeSimplesVal ?? 1) === 1,
+      regimeSimplesNacional,
       excessoSublimite: (excessoVal ?? 0) === 1,
+      regimeLucroPresumido,
+      pisPercent,
+      cofinsPercent,
+      irpjEffectivePercent: resolvePricingRule(pricingRules, 'irpj_effective_percent', vtId, 0),
+      csllEffectivePercent: resolvePricingRule(pricingRules, 'csll_effective_percent', vtId, 0),
       grisPercent: resolvePricingRule(pricingRules, 'gris_percent', vtId, 0.3),
       tsoPercent: resolvePricingRule(pricingRules, 'tso_percent', vtId, 0.15),
       costValuePercent: resolvePricingRule(pricingRules, 'cost_value_percent', vtId, 0.3),
@@ -715,6 +734,12 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       overLotacaoPercent: resolvePricingRule(pricingRules, 'over_lotacao_percent', vtId, 0),
       overLotacaoKmPercent: resolveLotacaoKmOverPercent(debouncedKmBand, (key) =>
         resolvePricingRule(pricingRules, key, vtId)
+      ),
+      adValoremLotacaoPercent: resolvePricingRule(
+        pricingRules,
+        'ad_valorem_lotacao_percent',
+        vtId,
+        0.03
       ),
     };
   }, [pricingRules, debounced.vehicleTypeId, debouncedKmBand, taxRegimeSimples]);
@@ -729,9 +754,20 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
   const kmDistanceForAntt = Number(watchedKmDistance || 0);
 
   const isLotacaoWizard = watchedFreightModality === 'lotacao';
+  const savedAnttMeta =
+    (quote?.pricing_breakdown as unknown as StoredPricingBreakdown | null)?.meta?.antt ?? null;
+  const watchedCargoType = form.watch('cargo_type');
+  const anttCargoTypeResolved = useMemo(
+    () =>
+      resolveAnttCargoTypeForPiso({
+        storedAnttCargoType: savedAnttMeta?.cargoType,
+        cargoTypeLabel: watchedCargoType,
+      }),
+    [savedAnttMeta?.cargoType, watchedCargoType]
+  );
   const { data: anttRate } = useAnttFloorRate({
     operationTable: anttOperationTable,
-    cargoType: 'carga_geral',
+    cargoType: anttCargoTypeResolved,
     axesCount: isLotacaoWizard ? (axesCountForAntt ?? undefined) : undefined,
   });
 
@@ -748,7 +784,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
     () => extractUf(watchedDestination || '') ?? '',
     [watchedDestination]
   );
-  const watchedCargoType = form.watch('cargo_type');
   const { data: activePolicies = [], isLoading: loadingPolicies } = useActivePolicies();
   const {
     data: insuranceOptions = [],
@@ -765,8 +800,6 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
 
   // R$/KM — custo ANTT por km (referência ao vivo)
   // Prioridade: 1) rate do banco (mais atualizado) 2) coeficientes salvos no breakdown
-  const savedAnttMeta =
-    (quote?.pricing_breakdown as unknown as StoredPricingBreakdown | null)?.meta?.antt ?? null;
   const anttRsKm = useMemo(() => {
     const km = Number(watchedKmDistance || 0);
     if (km <= 0) return null;
@@ -2288,8 +2321,16 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                             <FormItem>
                               <FormLabel>Tipo de Carga</FormLabel>
                               <FormControl>
-                                <Input placeholder="Ex: Eletrônicos" {...field} />
+                                <Input placeholder="Ex: Equipamentos, soja em granel" {...field} />
                               </FormControl>
+                              {isLotacaoWizard && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  Piso ANTT: {getAnttCargoTypeLabel(anttCargoTypeResolved)}
+                                  {selectedVehicle?.name
+                                    ? ` · ${selectedVehicle.axes_count ?? '—'} eixos (${selectedVehicle.name})`
+                                    : ''}
+                                </p>
+                              )}
                               <FormMessage />
                             </FormItem>
                           )}
@@ -2513,6 +2554,7 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
                         {isLotacaoWizard && (
                           <AnttFloorWizardCard
                             flags={anttFloorFlags}
+                            cargoTypeLabel={getAnttCargoTypeLabel(anttCargoTypeResolved)}
                             onChange={(patch) => {
                               if (patch.composicaoVeicular !== undefined) {
                                 form.setValue('antt_composicao_veicular', patch.composicaoVeicular);

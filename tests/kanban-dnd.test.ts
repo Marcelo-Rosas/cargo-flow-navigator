@@ -131,7 +131,7 @@ test('moves item into an empty column (over the column id)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// resolveDropContainer
+// resolveDropContainer — drag end when onDragOver lagged
 // ---------------------------------------------------------------------------
 console.log('\nresolveDropContainer');
 
@@ -141,6 +141,17 @@ test('uses over column when current state still shows source column', () => {
   expect(result.to).toBe('done');
 });
 
+test('uses over item column when dropped on a card in another column', () => {
+  const result = resolveDropContainer(INITIAL, INITIAL, 'b', 'd');
+  expect(result.from).toBe('todo');
+  expect(result.to).toBe('done');
+});
+
+test('keeps same column when reordering within column', () => {
+  const result = resolveDropContainer(INITIAL, INITIAL, 'a', 'c');
+  expect(result.from).toBe('todo');
+  expect(result.to).toBe('todo');
+});
 // ---------------------------------------------------------------------------
 // moveItem — null / no-op cases
 // ---------------------------------------------------------------------------
