@@ -1,5 +1,6 @@
 import type { CalculateFreightResponse } from '@/types/freight';
 import type { StoredPricingBreakdown } from '@/lib/freightCalculator';
+import { mapEdgeAnttMetaToStored } from '@/lib/map-edge-antt-meta';
 
 /** Build StoredPricingBreakdown from Edge Function response, preserving meta.antt/tollPlazas from existing */
 export function buildStoredBreakdownFromEdgeResponse(
@@ -25,6 +26,11 @@ export function buildStoredBreakdownFromEdgeResponse(
   const wKg = response.meta.billable_weight_kg ?? 0;
   const cubKg = response.meta.cubage_weight_kg ?? 0;
   const tonBillable = Math.round((wKg / 1000) * 100) / 100;
+  const responseMeta = response.meta as {
+    antt?: import('@/lib/map-edge-antt-meta').EdgeAnttMetaSnapshot;
+    antt_calculated_at?: string;
+  };
+  const anttFromEdge = mapEdgeAnttMetaToStored(responseMeta.antt, responseMeta.antt_calculated_at);
   return {
     calculatedAt: new Date().toISOString(),
     version: '5.0-risk-aware',
@@ -38,7 +44,7 @@ export function buildStoredBreakdownFromEdgeResponse(
       marginPercent: response.meta.margin_percent,
       kmBandUsed: response.meta.km_band_used,
       selectedConditionalFeeIds: existingBreakdown?.meta?.selectedConditionalFeeIds,
-      antt: existingBreakdown?.meta?.antt,
+      antt: anttFromEdge ?? existingBreakdown?.meta?.antt,
       tollPlazas: existingBreakdown?.meta?.tollPlazas,
       unloadingCost: existingBreakdown?.meta?.unloadingCost,
       equipmentRental: existingBreakdown?.meta?.equipmentRental,

@@ -8,6 +8,7 @@ import 'dotenv/config';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
+import { fetchLatestCompanySettings } from '../src/lib/company-settings-query.ts';
 import { resolveServiceRoleKey } from './integration-health.ts';
 
 const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
@@ -21,12 +22,7 @@ if (!url || !key) {
 }
 
 const sb = createClient(url, key);
-const { data, error } = await sb.from('company_settings').select('*').maybeSingle();
-
-if (error) {
-  console.error('[fetch-company]', error.message);
-  process.exit(1);
-}
+const data = await fetchLatestCompanySettings(sb);
 if (!data) {
   console.error('[fetch-company] Nenhum registro em company_settings');
   process.exit(1);

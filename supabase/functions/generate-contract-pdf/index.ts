@@ -1,6 +1,7 @@
 /// <reference path="../_shared/deno.d.ts" />
 import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { fetchCompanySettings } from '../_shared/company-settings.ts';
 import { renderContractPdf } from './contract-renderer.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -95,7 +96,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Load company settings
-    const { data: company } = await sb.from('company_settings').select('*').maybeSingle();
+    const company = await fetchCompanySettings(sb);
     if (!company) {
       return new Response(JSON.stringify({ error: 'company_settings not configured' }), {
         status: 409,

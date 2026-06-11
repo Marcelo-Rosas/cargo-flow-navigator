@@ -32,6 +32,10 @@ export interface CalculateFreightInput {
   regime_simples_nacional?: boolean;
   excesso_sublimite?: boolean;
   regime_lucro_presumido?: boolean;
+  /** Texto livre do campo tipo de carga (cotação/OS) */
+  cargo_type?: string;
+  /** Override explícito da chave antt_floor_rates.cargo_type */
+  antt_cargo_type?: string;
   /** Forçar piso ANTT no cálculo: recalcula gross-up partindo de pisoAnttCarreteiro como frete_peso */
   enforce_antt_floor?: boolean;
   /** Piso ANTT — paridade calculadorafrete.antt.gov.br (lotação) */
@@ -86,6 +90,20 @@ export interface FreightMeta {
   lotacao_over_antt_percent?: number;
   lotacao_piso_com_over?: number;
   lotacao_frete_tabela_com_over_km?: number;
+  /** Coeficientes ANTT usados no piso (atualizado a cada recálculo via Edge) */
+  antt?: {
+    operation_table: 'A' | 'B' | 'C' | 'D';
+    cargo_type: string;
+    axes_count: number;
+    km_distance: number;
+    ccd: number;
+    cc: number;
+    ida: number;
+    retorno_vazio: number;
+    total: number;
+    composicao_veicular: boolean;
+    alto_desempenho: boolean;
+  };
 }
 
 export interface FreightComponents {

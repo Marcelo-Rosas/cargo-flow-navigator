@@ -123,12 +123,22 @@ if (localOnly) {
     process.exit(1);
   }
 
-  const { data: company, error: companyErr } = await sb
+  const { data: companyRows, error: companyErr } = await sb
     .from('company_settings')
     .select('*')
-    .maybeSingle();
-  if (companyErr || !company) {
-    console.error('[contract] company_settings:', companyErr?.message ?? 'não configurado');
+    .order('updated_at', { ascending: false })
+    .limit(20);
+  if (companyErr) {
+    console.error('[contract] company_settings:', companyErr.message);
+    process.exit(1);
+  }
+  const company =
+    companyRows?.find((row) => {
+      const d = String(row.cnpj ?? '').replace(/\D/g, '');
+      return d.length === 14 && !/^0+$/.test(d);
+    }) ?? companyRows?.[0];
+  if (!company) {
+    console.error('[contract] company_settings: não configurado');
     process.exit(1);
   }
 

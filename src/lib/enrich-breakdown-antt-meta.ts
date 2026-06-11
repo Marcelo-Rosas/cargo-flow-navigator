@@ -11,6 +11,8 @@ export interface EnrichBreakdownAnttMetaInput {
   composicaoVeicular?: boolean;
   altoDesempenho?: boolean;
   pisoFromResponse?: number;
+  /** Sobrescreve meta.antt mesmo quando ccd/cc já existem (fallback local). */
+  forceRefresh?: boolean;
 }
 
 /** Persiste bloco `meta.antt` quando o edge só devolveu `anttPisoCarreteiro` sem coeficientes. */
@@ -19,7 +21,7 @@ export function enrichStoredBreakdownAnttMeta(
   input: EnrichBreakdownAnttMetaInput
 ): StoredPricingBreakdown {
   const base = breakdown as StoredPricingBreakdown;
-  if (base.meta?.antt?.ccd != null && base.meta?.antt?.cc != null) {
+  if (!input.forceRefresh && base.meta?.antt?.ccd != null && base.meta?.antt?.cc != null) {
     return base;
   }
   const km = Number(input.kmDistance ?? 0);

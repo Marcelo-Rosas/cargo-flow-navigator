@@ -12,6 +12,8 @@ import { formatCurrency } from '@/lib/formatters';
 
 interface AnttFloorWizardCardProps {
   flags: AnttFloorFlags;
+  /** Categoria ANTT resolvida a partir do tipo de carga (não da carroceria). */
+  cargoTypeLabel?: string;
   onChange: (patch: Partial<AnttFloorFlags>) => void;
   pisoPreview: number | null;
   axesCount: number | null;
@@ -22,6 +24,7 @@ interface AnttFloorWizardCardProps {
 
 export const AnttFloorWizardCard: FC<AnttFloorWizardCardProps> = ({
   flags,
+  cargoTypeLabel = 'Carga geral',
   onChange,
   pisoPreview,
   axesCount,
@@ -47,7 +50,7 @@ export const AnttFloorWizardCard: FC<AnttFloorWizardCardProps> = ({
         </Badge>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Carga geral — mesmos critérios da{' '}
+        {cargoTypeLabel} — mesmos critérios da{' '}
         <a
           href="https://calculadorafrete.antt.gov.br/"
           target="_blank"

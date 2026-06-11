@@ -94,7 +94,7 @@ async function main() {
   let query = supabase
     .from('quotes')
     .select(
-      `id, quote_code, stage, value, origin, destination, km_distance, weight, volume, cargo_value, toll_value,
+      `id, quote_code, stage, value, origin, destination, km_distance, weight, volume, cargo_value, toll_value, cargo_type,
        vehicle_type_id, payment_term_id, price_table_id, freight_modality, pricing_breakdown,
        vehicle_types ( code ),
        payment_terms ( code )`

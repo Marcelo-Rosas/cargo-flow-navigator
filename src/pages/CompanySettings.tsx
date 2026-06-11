@@ -17,7 +17,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { useCompanySettings, useUpdateCompanySettings } from '@/hooks/useCompanySettings';
+import {
+  useCompanySettings,
+  useCreateCompanySettings,
+  useUpdateCompanySettings,
+} from '@/hooks/useCompanySettings';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { MaskedInput } from '@/components/ui/masked-input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -68,6 +72,8 @@ type FormData = z.infer<typeof schema>;
 export default function CompanySettings() {
   const { data: settings, isLoading } = useCompanySettings();
   const updateMutation = useUpdateCompanySettings();
+  const createMutation = useCreateCompanySettings();
+  const isFirstSetup = !settings?.id;
   const [isLookingUp, setIsLookingUp] = useState(false);
   const cnpjTouchedForLookup = useRef(false);
 
@@ -179,44 +185,35 @@ export default function CompanySettings() {
   };
 
   const onSubmit = (data: FormData) => {
-    if (!settings?.id) {
-      toast.error('Configurações não encontradas');
+    if (settings?.id) {
+      updateMutation.mutate(
+        { id: settings.id, ...data },
+        {
+          onSuccess: () => {
+            toast.success('Configurações salvas');
+            cnpjTouchedForLookup.current = false;
+          },
+        }
+      );
       return;
     }
-    updateMutation.mutate(
-      { id: settings.id, ...data },
-      {
-        onSuccess: () => {
-          toast.success('Configurações salvas');
-          cnpjTouchedForLookup.current = false;
-        },
-      }
-    );
+
+    createMutation.mutate(data, {
+      onSuccess: () => {
+        toast.success('Cadastro da empresa criado');
+        cnpjTouchedForLookup.current = false;
+      },
+    });
   };
 
-  const canSave = Boolean(settings?.id) && !updateMutation.isPending && !isLookingUp;
+  const isSaving = updateMutation.isPending || createMutation.isPending;
+  const canSave = !isSaving && !isLookingUp;
 
   if (isLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-        </div>
-      </MainLayout>
-    );
-  }
-
-  if (!settings) {
-    return (
-      <MainLayout>
-        <div className="max-w-3xl mx-auto py-8 px-4">
-          <Alert variant="destructive">
-            <AlertTitle>Configurações não encontradas</AlertTitle>
-            <AlertDescription>
-              Não há registro em company_settings. Peça ao suporte para criar a linha inicial da
-              empresa antes de editar este formulário.
-            </AlertDescription>
-          </Alert>
         </div>
       </MainLayout>
     );
@@ -230,10 +227,20 @@ export default function CompanySettings() {
           <div>
             <h1 className="text-2xl font-bold">Dados da Empresa</h1>
             <p className="text-sm text-muted-foreground">
-              Informações usadas na geração automática de contratos
+              Informações usadas na geração automática de contratos e VPO (WebRouter)
             </p>
           </div>
         </div>
+
+        {isFirstSetup && (
+          <Alert>
+            <AlertTitle>Primeiro cadastro</AlertTitle>
+            <AlertDescription>
+              Não há registro em company_settings. Preencha CNPJ e razão social e salve — requer
+              usuário com role admin ou super_admin em user_roles.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -648,12 +655,12 @@ export default function CompanySettings() {
 
             <div className="flex justify-end">
               <Button type="submit" disabled={!canSave}>
-                {updateMutation.isPending ? (
+                {isSaving ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Save className="w-4 h-4 mr-2" />
                 )}
-                Salvar Configurações
+                {isFirstSetup ? 'Criar cadastro da empresa' : 'Salvar Configurações'}
               </Button>
             </div>
           </form>

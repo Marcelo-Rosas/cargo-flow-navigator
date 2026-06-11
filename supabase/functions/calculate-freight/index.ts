@@ -23,11 +23,11 @@ import {
   calculateGrossUpHibrido,
 } from '../_shared/freight-types.ts';
 import {
-  ANTT_CARGO_TYPE_DEFAULT,
   ANTT_FLOOR_DEFAULT_FLAGS,
   computeAnttPisoCarreteiroReais,
   resolveAnttOperationTable,
 } from '../_shared/antt-floor-calc.ts';
+import { resolveAnttCargoTypeForPiso } from '../_shared/antt-cargo-type-map.ts';
 import {
   calculateLotacaoProfitability,
   LOTACAO_OVER_ANTT_KEY,
@@ -536,6 +536,21 @@ Deno.serve(async (req) => {
     let pisoAnttCarreteiro = 0;
     let anttFloorRateId: string | undefined;
     let lotacaoFreteMeta: ReturnType<typeof resolveLotacaoFretePeso> | null = null;
+    let anttMetaForResponse:
+      | {
+          operation_table: ReturnType<typeof resolveAnttOperationTable>;
+          cargo_type: string;
+          axes_count: number;
+          km_distance: number;
+          ccd: number;
+          cc: number;
+          ida: number;
+          retorno_vazio: number;
+          total: number;
+          composicao_veicular: boolean;
+          alto_desempenho: boolean;
+        }
+      | undefined;
 
     if (axesCount != null && axesCount > 0 && input.km_distance != null && input.km_distance > 0) {
       const anttFlags = {
@@ -545,26 +560,44 @@ Deno.serve(async (req) => {
         retornoVazio: input.antt_retorno_vazio ?? ANTT_FLOOR_DEFAULT_FLAGS.retornoVazio,
       };
       const operationTable = resolveAnttOperationTable(anttFlags);
+      const anttCargoType = resolveAnttCargoTypeForPiso({
+        anttCargoType: input.antt_cargo_type,
+        cargoTypeLabel: input.cargo_type,
+      });
 
       const { data: anttRate } = await supabase
         .from('antt_floor_rates')
-        .select('id, ccd, cc')
+        .select('id, ccd, cc, cargo_type')
         .eq('operation_table', operationTable)
-        .eq('cargo_type', ANTT_CARGO_TYPE_DEFAULT)
+        .eq('cargo_type', anttCargoType)
         .eq('axes_count', axesCount)
         .order('valid_from', { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
 
       if (anttRate?.ccd != null && anttRate?.cc != null) {
-        pisoAnttCarreteiro = computeAnttPisoCarreteiroReais({
+        const pisoCalc = computeAnttPisoCarreteiroReais({
           kmDistance: Number(input.km_distance),
           ccd: Number(anttRate.ccd),
           cc: Number(anttRate.cc),
           retornoVazio: anttFlags.retornoVazio,
           round: roundCurrency,
-        }).total;
+        });
+        pisoAnttCarreteiro = pisoCalc.total;
         anttFloorRateId = (anttRate as { id?: string }).id ?? undefined;
+        anttMetaForResponse = {
+          operation_table: operationTable,
+          cargo_type: anttCargoType,
+          axes_count: axesCount,
+          km_distance: Number(input.km_distance),
+          ccd: Number(anttRate.ccd),
+          cc: Number(anttRate.cc),
+          ida: pisoCalc.ida,
+          retorno_vazio: pisoCalc.retornoVazio,
+          total: pisoCalc.total,
+          composicao_veicular: anttFlags.composicaoVeicular,
+          alto_desempenho: anttFlags.altoDesempenho,
+        };
       }
     }
 
@@ -1099,6 +1132,7 @@ Deno.serve(async (req) => {
       }),
       ...(anttFloorRateId && { antt_floor_rate_id: anttFloorRateId }),
       antt_calculated_at: new Date().toISOString(),
+      ...(anttMetaForResponse && { antt: anttMetaForResponse }),
       ...(anttFloorForced && { antt_floor_forced: true }),
       ...(ltlMinWeightApplied && { ltl_min_weight_applied: true }),
       ...(ltlMinWeightApplied && { original_weight_kg: roundCurrency(originalWeightKg) }),

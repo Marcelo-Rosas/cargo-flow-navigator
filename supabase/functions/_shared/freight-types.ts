@@ -79,6 +79,10 @@ export interface CalculateFreightInput {
   regime_simples_nacional?: boolean;
   excesso_sublimite?: boolean;
   regime_lucro_presumido?: boolean;
+  /** Texto livre do campo tipo de carga (cotação/OS) */
+  cargo_type?: string;
+  /** Override explícito da chave antt_floor_rates.cargo_type */
+  antt_cargo_type?: string;
   /** Forçar piso ANTT no cálculo: recalcula gross-up partindo de pisoAnttCarreteiro como frete_peso */
   enforce_antt_floor?: boolean;
   antt_composicao_veicular?: boolean;
@@ -128,6 +132,26 @@ export interface FreightMeta {
   antt_calculated_at?: string;
   /** true quando enforce_antt_floor forçou gross-up a partir do piso */
   antt_floor_forced?: boolean;
+  lotacao_over_km_percent?: number;
+  lotacao_over_antt_percent?: number;
+  lotacao_piso_com_over?: number;
+  lotacao_frete_tabela_com_over_km?: number;
+  lotacao_frete_referencia_max?: number;
+  antt_cost_base_used?: boolean;
+  /** Coeficientes ANTT usados no piso (atualizado a cada recálculo) */
+  antt?: {
+    operation_table: 'A' | 'B' | 'C' | 'D';
+    cargo_type: string;
+    axes_count: number;
+    km_distance: number;
+    ccd: number;
+    cc: number;
+    ida: number;
+    retorno_vazio: number;
+    total: number;
+    composicao_veicular: boolean;
+    alto_desempenho: boolean;
+  };
 }
 
 export interface FreightComponents {
@@ -410,8 +434,12 @@ export function calculateGrossUpHibrido(
     );
   }
 
+  // Descobre apenas a taxa de impostos para fazer o gross-up exclusivo no repasseRisco
+  const taxaImpostos = impostosPercent / 100;
+  const repasseRiscoComImpostos = repasseRisco > 0 ? repasseRisco / (1 - taxaImpostos) : 0;
+
   const totalClienteCore = roundCurrency(custosDiretos / (1 - taxaBruta));
-  const totalCliente = roundCurrency(totalClienteCore + Math.max(0, repasseRisco));
+  const totalCliente = roundCurrency(totalClienteCore + repasseRiscoComImpostos);
 
   let das = 0;
   let icms = 0;

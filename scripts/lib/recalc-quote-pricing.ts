@@ -3,6 +3,7 @@ import { buildStoredBreakdownFromEdgeResponse } from '../../src/lib/build-stored
 import { mergeBreakdownWithNegotiatedDiscount } from '../../src/lib/quote-breakdown-utils';
 import type { StoredPricingBreakdown } from '../../src/lib/freightCalculator';
 import { inferAnttFlagsFromStoredMeta } from '../../src/lib/antt-floor-calc';
+import { resolveAnttCargoTypeForPiso } from '../../src/lib/antt-cargo-type-map';
 import {
   isPricingBreakdownRegimeStale,
   type ExpectedTaxRegime,
@@ -36,6 +37,7 @@ export interface QuoteRecalcRow {
   payment_terms?: { code: string } | null;
   price_table_id: string | null;
   freight_modality: string | null;
+  cargo_type: string | null;
   pricing_breakdown: Record<string, unknown> | null;
 }
 
@@ -49,6 +51,10 @@ export function buildCalculateFreightPayload(quote: QuoteRecalcRow): CalculateFr
   if (weightKg <= 0 && volumeM3 <= 0) return null;
 
   const anttFlags = inferAnttFlagsFromStoredMeta(bd?.meta?.antt);
+  const anttCargoType = resolveAnttCargoTypeForPiso({
+    storedAnttCargoType: bd?.meta?.antt?.cargoType,
+    cargoTypeLabel: quote.cargo_type,
+  });
   const base: CalculateFreightInput = {
     origin: quote.origin,
     destination: quote.destination,
@@ -63,6 +69,8 @@ export function buildCalculateFreightPayload(quote: QuoteRecalcRow): CalculateFr
     descarga_value: bd?.profitability?.custosDescarga ?? 0,
     aluguel_maquinas_value: bd?.components?.aluguelMaquinas ?? 0,
     waiting_hours: bd?.meta?.waitingTimeHours ?? undefined,
+    cargo_type: quote.cargo_type ?? undefined,
+    antt_cargo_type: anttCargoType,
   };
 
   if (quote.freight_modality === 'lotacao') {

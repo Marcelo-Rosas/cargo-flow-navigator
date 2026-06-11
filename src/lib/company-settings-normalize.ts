@@ -5,6 +5,14 @@ type CompanySettingsUpdate = Database['public']['Tables']['company_settings']['U
 
 const digits = (v: string) => v.replace(/\D/g, '');
 
+/** CNPJ persistido: 14 dígitos, não placeholder (ex. zeros). */
+export function isValidCompanyCnpj(value: string | null | undefined): boolean {
+  const d = digits(String(value ?? ''));
+  if (d.length !== 14) return false;
+  if (/^0+$/.test(d)) return false;
+  return true;
+}
+
 const text = (v: string | null | undefined) => fixMojibake(v ?? '').trim();
 
 /** CPF opcional: vazio OK; mascarado da Receita (≠11 dígitos) persiste dígitos visíveis. */
@@ -58,6 +66,9 @@ export function mapCompanySettingsSaveError(error: { code?: string; message?: st
   }
   if (error.code === '42501') {
     return 'Sem permissão para alterar os dados da empresa (apenas administradores).';
+  }
+  if (error.code === '23505') {
+    return 'Já existe um cadastro da empresa. Atualize a página e tente salvar novamente.';
   }
   return error.message ?? 'Erro ao salvar configurações';
 }
