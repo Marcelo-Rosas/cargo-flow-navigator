@@ -1102,7 +1102,7 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
 
   let gris = round2(input.cargoValue * (grisPercent / 100));
   let tso = round2(input.cargoValue * (tsoPercent / 100));
-  const rctrc = round2(input.cargoValue * (costValuePercent / 100));
+  const rctrc = !isLtl ? 0 : round2(input.cargoValue * (costValuePercent / 100));
 
   // Fracionado: aplicar mínimos NTC
   if (isLtl && input.ltlParams) {
