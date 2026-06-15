@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { LOGO_BASE64 } from '../_shared/logo-base64.ts';
+import { patchPageDrawText } from '../_shared/pdf-sanitize.ts';
 import {
   buildClause52IncludedItems,
   buildPaymentTermsDescription,
@@ -71,7 +72,7 @@ class PdfWriter {
   }
 
   private newPage() {
-    const p = this.doc.addPage([PW, PH]);
+    const p = patchPageDrawText(this.doc.addPage([PW, PH]));
     this.pages.push(p);
     this.page = p;
     this.y = PH - 50;
