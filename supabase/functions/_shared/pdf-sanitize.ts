@@ -54,3 +54,21 @@ export function patchPageDrawText<
     original(typeof text === 'string' ? sanitizeForPdf(text) : text, ...rest)) as typeof original;
   return page;
 }
+
+// Embrulha um PDFFont para interceptar widthOfTextAtSize / encodeText, que
+// tambem rodam o encoder WinAnsi e quebram igual ao drawText quando recebem
+// caracteres Unicode fora da tabela. Cobrir font + page = caminho completo
+// do texto no pipeline do pdf-lib.
+export function patchFont<F extends object>(font: F): F {
+  type Fn = (s: string, ...rest: unknown[]) => unknown;
+  const wrap = <K extends string>(key: K) => {
+    const f = (font as unknown as Record<K, Fn | undefined>)[key];
+    if (typeof f !== 'function') return;
+    const bound = (f as Fn).bind(font);
+    (font as unknown as Record<K, Fn>)[key] = ((text: string, ...rest: unknown[]) =>
+      bound(typeof text === 'string' ? sanitizeForPdf(text) : text, ...rest)) as Fn;
+  };
+  wrap('widthOfTextAtSize');
+  wrap('encodeText');
+  return font;
+}

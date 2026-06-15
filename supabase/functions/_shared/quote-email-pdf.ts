@@ -1,6 +1,6 @@
 import { PDFDocument, rgb, StandardFonts, type PDFPage, type PDFFont } from 'pdf-lib';
 import { LOGO_BASE64 } from './logo-base64.ts';
-import { patchPageDrawText } from './pdf-sanitize.ts';
+import { patchFont, patchPageDrawText } from './pdf-sanitize.ts';
 import type { EmailRow, QuoteEmailContent } from './quote-email-types.ts';
 
 const PAGE_W = 595.28;
@@ -464,8 +464,8 @@ function drawFooter(page: PDFPage, font: PDFFont): void {
 
 export async function renderQuoteEmailPdf(content: QuoteEmailContent): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const font = patchFont(await doc.embedFont(StandardFonts.Helvetica));
+  const fontBold = patchFont(await doc.embedFont(StandardFonts.HelveticaBold));
   const ctx: PdfCtx = {
     doc,
     page: patchPageDrawText(doc.addPage([PAGE_W, PAGE_H])),
