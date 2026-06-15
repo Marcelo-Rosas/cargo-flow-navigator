@@ -446,13 +446,10 @@ export function QuoteDetailModal({
     targetMargin,
     margemBrutaView
   );
-  /** Lotação: lucro alvo % sobre custos diretos; fracionado: % sobre faturamento */
+  /** Lucro alvo % sobre custos diretos para ambas modalidades — bate com a meta
+   * `profit_margin_target` (Edge calcula `resultado_liquido = custos_diretos × target%`). */
   const margemPercentView =
-    priceTableModality === 'lotacao' && custosDiretosScaled > 0
-      ? round2((resultadoLiquidoView / custosDiretosScaled) * 100)
-      : totalClienteView > 0
-        ? round2((resultadoLiquidoView / totalClienteView) * 100)
-        : 0;
+    custosDiretosScaled > 0 ? round2((resultadoLiquidoView / custosDiretosScaled) * 100) : 0;
   const isBelowTarget = isMarginBelowTarget(margemPercentView, targetMargin) || margemBrutaView < 0;
 
   const financialStripModel = buildQuoteFinancialStripFromBreakdown(breakdown, {
