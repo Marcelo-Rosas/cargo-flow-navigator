@@ -16,14 +16,16 @@
 --
 -- Lotacao FICA inalterada em 30% (FTL nao apresentou o mesmo sintoma).
 --
--- IMPORTANTE: este SQL eh idempotente. Funciona em qualquer ordem:
---   - antes do merge do PR #150 (cria as chaves)
---   - depois do merge (so atualiza values seedadas pela migration anterior)
+-- Schema nota: pricing_rules_config NAO tem coluna `description`; descricao livre
+-- vive em metadata.description (jsonb).
+--
+-- IMPORTANTE: este SQL eh idempotente. Funciona em qualquer ordem com a
+-- migration 20260615120000 (segregacao).
 -- =============================================================================
 
 -- 1) profit_margin_fracionado_percent = 18 (alvo competitivo)
 INSERT INTO public.pricing_rules_config
-  (key, label, category, value_type, value, description, is_active, vehicle_type_id)
+  (key, label, category, value_type, value, metadata, is_active, vehicle_type_id)
 VALUES
   (
     'profit_margin_fracionado_percent',
@@ -31,19 +33,19 @@ VALUES
     'markup',
     'percentage',
     18,
-    'Margem alvo de lucro para Fracionado (LTL) — ajustada para preco competitivo de mercado (benchmark COT-2026-06-0007)',
+    jsonb_build_object('description', 'Margem alvo de lucro para Fracionado (LTL) — ajustada para preco competitivo de mercado (benchmark COT-2026-06-0007)'),
     true,
     NULL
   )
 ON CONFLICT (key, vehicle_type_id) DO UPDATE
-SET value       = EXCLUDED.value,
-    description = EXCLUDED.description,
-    is_active   = EXCLUDED.is_active,
-    updated_at  = NOW();
+SET value      = EXCLUDED.value,
+    metadata   = EXCLUDED.metadata,
+    is_active  = EXCLUDED.is_active,
+    updated_at = NOW();
 
 -- 2) profit_margin_lotacao_percent = 30 (mantem o valor legado)
 INSERT INTO public.pricing_rules_config
-  (key, label, category, value_type, value, description, is_active, vehicle_type_id)
+  (key, label, category, value_type, value, metadata, is_active, vehicle_type_id)
 VALUES
   (
     'profit_margin_lotacao_percent',
@@ -51,15 +53,15 @@ VALUES
     'markup',
     'percentage',
     30,
-    'Margem alvo de lucro para Lotacao (FTL) — mantida em 30% (sem ajuste de mercado nesta rodada)',
+    jsonb_build_object('description', 'Margem alvo de lucro para Lotacao (FTL) — mantida em 30% (sem ajuste de mercado nesta rodada)'),
     true,
     NULL
   )
 ON CONFLICT (key, vehicle_type_id) DO UPDATE
-SET value       = EXCLUDED.value,
-    description = EXCLUDED.description,
-    is_active   = EXCLUDED.is_active,
-    updated_at  = NOW();
+SET value      = EXCLUDED.value,
+    metadata   = EXCLUDED.metadata,
+    is_active  = EXCLUDED.is_active,
+    updated_at = NOW();
 
 -- =============================================================================
 -- Validacao pos-aplicacao (rodar manualmente):
