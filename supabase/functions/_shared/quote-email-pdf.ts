@@ -1,5 +1,6 @@
 import { PDFDocument, rgb, StandardFonts, type PDFPage, type PDFFont } from 'pdf-lib';
 import { LOGO_BASE64 } from './logo-base64.ts';
+import { patchPageDrawText } from './pdf-sanitize.ts';
 import type { EmailRow, QuoteEmailContent } from './quote-email-types.ts';
 
 const PAGE_W = 595.28;
@@ -42,7 +43,7 @@ function decodeLogoBytes(): Uint8Array {
 }
 
 function newPage(ctx: PdfCtx): void {
-  ctx.page = ctx.doc.addPage([PAGE_W, PAGE_H]);
+  ctx.page = patchPageDrawText(ctx.doc.addPage([PAGE_W, PAGE_H]));
   ctx.y = PAGE_H - MARGIN;
   ctx.pages.push(ctx.page);
 }
@@ -467,7 +468,7 @@ export async function renderQuoteEmailPdf(content: QuoteEmailContent): Promise<U
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
   const ctx: PdfCtx = {
     doc,
-    page: doc.addPage([PAGE_W, PAGE_H]),
+    page: patchPageDrawText(doc.addPage([PAGE_W, PAGE_H])),
     y: PAGE_H - MARGIN,
     font,
     fontBold,
