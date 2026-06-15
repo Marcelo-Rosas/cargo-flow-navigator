@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { LOGO_BASE64 } from '../_shared/logo-base64.ts';
-import { patchPageDrawText } from '../_shared/pdf-sanitize.ts';
+import { patchFont, patchPageDrawText } from '../_shared/pdf-sanitize.ts';
 import {
   buildClause52IncludedItems,
   buildPaymentTermsDescription,
@@ -64,9 +64,9 @@ class PdfWriter {
   async init() {
     this.doc = await PDFDocument.create();
     this.fonts = {
-      regular: await this.doc.embedFont(StandardFonts.Helvetica),
-      bold: await this.doc.embedFont(StandardFonts.HelveticaBold),
-      italic: await this.doc.embedFont(StandardFonts.HelveticaOblique),
+      regular: patchFont(await this.doc.embedFont(StandardFonts.Helvetica)),
+      bold: patchFont(await this.doc.embedFont(StandardFonts.HelveticaBold)),
+      italic: patchFont(await this.doc.embedFont(StandardFonts.HelveticaOblique)),
     };
     this.newPage();
   }
