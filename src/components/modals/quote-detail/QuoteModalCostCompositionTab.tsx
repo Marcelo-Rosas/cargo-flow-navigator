@@ -123,7 +123,6 @@ export function QuoteModalCostCompositionTab({
   const rctrcValue = breakdown.components?.rctrc ?? 0;
   const tdeValue = breakdown.components?.tde ?? 0;
   const tearValue = breakdown.components?.tear ?? 0;
-  const dispatchFeeValue = breakdown.components?.dispatchFee ?? 0;
   const aluguelMaquinasValue = breakdown.components?.aluguelMaquinas ?? 0;
   const adValoremValue = breakdown.components?.adValorem ?? 0;
 
@@ -177,12 +176,8 @@ export function QuoteModalCostCompositionTab({
         value: breakdown.components.tear ?? 0,
         field: 'tear',
       });
-    if (dispatchFeeValue > 0)
-      composicaoRows.push({
-        label: 'Taxa de Despacho (NTC)',
-        value: dispatchFeeValue,
-        field: 'dispatch_fee',
-      });
+    // DRE v5: Taxa de Despacho (NTC) eh repasse/cobranca do embarcador,
+    // entra so na receita bruta. Nao listar entre os custos diretos.
     if ((breakdown.components.conditionalFeesTotal ?? 0) > 0)
       composicaoRows.push({
         label: 'Taxas condicionais',
@@ -235,7 +230,6 @@ export function QuoteModalCostCompositionTab({
         adValoremValue +
         tdeValue +
         tearValue +
-        dispatchFeeValue +
         aluguelMaquinasValue +
         tacAdjustment +
         paymentAdjustment +
@@ -872,16 +866,6 @@ export function QuoteModalCostCompositionTab({
                     <TableCell className="pl-8 text-muted-foreground">• TEAR (NTC)</TableCell>
                     <TableCell className="text-right tabular-nums text-destructive">
                       -{formatCurrency(tearValue)}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {dispatchFeeValue > 0 && (
-                  <TableRow>
-                    <TableCell className="pl-8 text-muted-foreground">
-                      • Taxa de Despacho (NTC)
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-destructive">
-                      -{formatCurrency(dispatchFeeValue)}
                     </TableCell>
                   </TableRow>
                 )}

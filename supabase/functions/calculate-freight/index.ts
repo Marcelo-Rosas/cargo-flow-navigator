@@ -930,11 +930,14 @@ Deno.serve(async (req) => {
       `[calculate-freight] Lotação frete: tabela=${frete_peso_tabela}, piso=${pisoAnttCarreteiro}, golden=${frete_peso}, pisoAplicado=${lotacaoFreteMeta?.pisoAplicado ?? false}`
     );
     const repasseRisco = roundCurrency(gris + tso + frete_valor + adValorem);
+    // DRE v5 (Asset-Light): Taxa de Despacho (dispatchFee) eh repasse/cobranca
+    // do embarcador, NAO custo direto. Mantida apenas em receitaBrutaPreTac;
+    // removida do custoServicosOperacionais pra nao inflar custosDiretos
+    // (e portanto o "lucro alvo" calculado por custosDiretos x targetPercent).
     const custoServicosOperacionais = roundCurrency(
       toll +
         tde +
         tear +
-        dispatchFee +
         conditionalFeesTotal +
         waitingTimeCost +
         aluguelMaquinasValue +
