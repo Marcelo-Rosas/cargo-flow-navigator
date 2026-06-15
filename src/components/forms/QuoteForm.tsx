@@ -717,8 +717,22 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
       dasPercent: resolvePricingRule(pricingRules, 'das_percent', vtId, 14),
       markupPercent: resolvePricingRule(pricingRules, 'markup_percent', vtId, 30),
       overheadPercent: resolvePricingRule(pricingRules, 'overhead_percent', vtId, 15),
-      profitMarginPercent: resolvePricingRule(pricingRules, 'profit_margin_percent', vtId, 15),
-      targetMarginPercent: resolvePricingRule(pricingRules, 'profit_margin_percent', vtId, 15),
+      profitMarginLotacaoPercent:
+        resolvePricingRule(pricingRules, 'profit_margin_lotacao_percent', vtId) ??
+        resolvePricingRule(pricingRules, 'profit_margin_percent', vtId, 15),
+      profitMarginFracionadoPercent:
+        resolvePricingRule(pricingRules, 'profit_margin_fracionado_percent', vtId) ??
+        resolvePricingRule(pricingRules, 'profit_margin_percent', vtId, 15),
+      get profitMarginPercent() {
+        return debounced.freightModality === 'fracionado'
+          ? this.profitMarginFracionadoPercent
+          : this.profitMarginLotacaoPercent;
+      },
+      get targetMarginPercent() {
+        return debounced.freightModality === 'fracionado'
+          ? this.profitMarginFracionadoPercent
+          : this.profitMarginLotacaoPercent;
+      },
       regimeSimplesNacional,
       excessoSublimite: (excessoVal ?? 0) === 1,
       regimeLucroPresumido,
@@ -742,7 +756,13 @@ export function QuoteForm({ open, onClose, quote }: QuoteFormProps) {
         0.03
       ),
     };
-  }, [pricingRules, debounced.vehicleTypeId, debouncedKmBand, taxRegimeSimples]);
+  }, [
+    pricingRules,
+    debounced.vehicleTypeId,
+    debouncedKmBand,
+    taxRegimeSimples,
+    debounced.freightModality,
+  ]);
 
   // ANTT floor rate (Piso mínimo carreteiro) - Tabela A / Carga Geral
   const selectedVehicle = vehicleTypes?.find((v) => v.id === watchedVehicleTypeId) ?? null;

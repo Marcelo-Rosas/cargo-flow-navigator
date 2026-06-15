@@ -90,6 +90,8 @@ export interface FreightMeta {
   lotacao_over_antt_percent?: number;
   lotacao_piso_com_over?: number;
   lotacao_frete_tabela_com_over_km?: number;
+  lotacao_frete_referencia_max?: number;
+  antt_cost_base_used?: boolean;
   /** Coeficientes ANTT usados no piso (atualizado a cada recálculo via Edge) */
   antt?: {
     operation_table: 'A' | 'B' | 'C' | 'D';

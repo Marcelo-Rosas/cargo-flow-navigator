@@ -1,1 +1,83 @@
-[]
+[
+  {
+    "id": "mock-rule-lucro-presumido",
+    "key": "regime_lucro_presumido",
+    "value": 1,
+    "description": "Ativa o regime de Lucro Presumido no cálculo de frete",
+    "vehicle_type_id": null,
+    "is_active": true,
+    "created_at": "2026-06-15T00:00:00Z"
+  },
+  {
+    "id": "mock-rule-simples-nacional",
+    "key": "regime_simples_nacional",
+    "value": 0,
+    "description": "Desativa o Simples Nacional",
+    "vehicle_type_id": null,
+    "is_active": true,
+    "created_at": "2026-06-15T00:00:00Z"
+  },
+  {
+    "id": "mock-rule-pis",
+    "key": "pis_percent",
+    "value": 0.65,
+    "description": "PIS Lucro Presumido (0,65%)",
+    "vehicle_type_id": null,
+    "is_active": true,
+    "created_at": "2026-06-15T00:00:00Z"
+  },
+  {
+    "id": "mock-rule-cofins",
+    "key": "cofins_percent",
+    "value": 3.0,
+    "description": "COFINS Lucro Presumido (3%)",
+    "vehicle_type_id": null,
+    "is_active": true,
+    "created_at": "2026-06-15T00:00:00Z"
+  },
+  {
+    "id": "mock-rule-irpj",
+    "key": "irpj_effective_percent",
+    "value": 1.2,
+    "description": "IRPJ Efetivo Presumido (1,2%)",
+    "vehicle_type_id": null,
+    "is_active": true,
+    "created_at": "2026-06-15T00:00:00Z"
+  },
+  {
+    "id": "mock-rule-csll",
+    "key": "csll_effective_percent",
+    "value": 1.08,
+    "description": "CSLL Efetivo Presumido (1,08%)",
+    "vehicle_type_id": null,
+    "is_active": true,
+    "created_at": "2026-06-15T00:00:00Z"
+  },
+  {
+    "id": "mock-rule-margin-lotacao",
+    "key": "profit_margin_lotacao_percent",
+    "value": 12,
+    "description": "Margem alvo para Lotação (FTL) — independente do Fracionado",
+    "vehicle_type_id": null,
+    "is_active": true,
+    "created_at": "2026-06-15T00:00:00Z"
+  },
+  {
+    "id": "mock-rule-margin-fracionado",
+    "key": "profit_margin_fracionado_percent",
+    "value": 18,
+    "description": "Margem alvo para Fracionado (LTL) — independente da Lotação",
+    "vehicle_type_id": null,
+    "is_active": true,
+    "created_at": "2026-06-15T00:00:00Z"
+  },
+  {
+    "id": "mock-rule-margin-legacy",
+    "key": "profit_margin_percent",
+    "value": 15,
+    "description": "Margem alvo legada — fallback quando as chaves por modalidade não existirem",
+    "vehicle_type_id": null,
+    "is_active": true,
+    "created_at": "2026-06-15T00:00:00Z"
+  }
+]
