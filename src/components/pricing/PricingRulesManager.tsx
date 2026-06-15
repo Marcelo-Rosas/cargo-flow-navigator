@@ -87,7 +87,8 @@ const PROTECTED_RULE_KEYS = new Set([
   'das_percent',
   'markup_percent',
   'overhead_percent',
-  'profit_margin_percent',
+  'profit_margin_lotacao_percent',
+  'profit_margin_fracionado_percent',
   'regime_simples_nacional',
   'excesso_sublimite',
   'regime_lucro_presumido',
@@ -259,14 +260,20 @@ export function PricingRulesManager() {
     }
   };
 
-  const financeiroKeys = ['overhead_percent', 'das_percent', 'profit_margin_percent'] as const;
+  const financeiroKeys = [
+    'overhead_percent',
+    'das_percent',
+    'profit_margin_lotacao_percent',
+    'profit_margin_fracionado_percent',
+  ] as const;
   const lpKeys = [
     'overhead_percent',
     'pis_percent',
     'cofins_percent',
     'irpj_effective_percent',
     'csll_effective_percent',
-    'profit_margin_percent',
+    'profit_margin_lotacao_percent',
+    'profit_margin_fracionado_percent',
   ] as const;
   const activeFinanceiroKeys = regimeLucroPresumido ? lpKeys : financeiroKeys;
   const financeiroRules = activeFinanceiroKeys

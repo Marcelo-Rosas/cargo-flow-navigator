@@ -202,18 +202,23 @@ Deno.serve(async (req) => {
       input.overhead_percent ??
       resolveRule('overhead_percent', vehicleTypeIdForRules) ??
       FREIGHT_CONSTANTS.DEFAULT_OVERHEAD_PERCENT;
-    const profitMarginPercent =
-      resolveRule('profit_margin_percent', vehicleTypeIdForRules) ??
-      FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
-    const regimeSimplesNacional =
-      (resolveRule('regime_simples_nacional', vehicleTypeIdForRules) ?? 1) === 1;
-    const excessoSublimite = (resolveRule('excesso_sublimite', vehicleTypeIdForRules) ?? 0) === 1;
 
-    const pisPercent = resolveRule('pis_percent', vehicleTypeIdForRules) ?? 0;
-    const cofinsPercent = resolveRule('cofins_percent', vehicleTypeIdForRules) ?? 0;
-    const irpjEffectivePercent = resolveRule('irpj_effective_percent', vehicleTypeIdForRules) ?? 0;
-    const csllEffectivePercent = resolveRule('csll_effective_percent', vehicleTypeIdForRules) ?? 0;
+    const regimeSimplesNacional =
+      input.regime_simples_nacional ??
+      (resolveRule('regime_simples_nacional', vehicleTypeIdForRules) ?? 1) === 1;
+    const excessoSublimite =
+      input.excesso_sublimite ??
+      (resolveRule('excesso_sublimite', vehicleTypeIdForRules) ?? 0) === 1;
+
+    const pisPercent = input.pis_percent ?? resolveRule('pis_percent', vehicleTypeIdForRules) ?? 0;
+    const cofinsPercent =
+      input.cofins_percent ?? resolveRule('cofins_percent', vehicleTypeIdForRules) ?? 0;
+    const irpjEffectivePercent =
+      input.irpj_percent ?? resolveRule('irpj_effective_percent', vehicleTypeIdForRules) ?? 0;
+    const csllEffectivePercent =
+      input.csll_percent ?? resolveRule('csll_effective_percent', vehicleTypeIdForRules) ?? 0;
     let regimeLucroPresumido =
+      input.regime_lucro_presumido ??
       (resolveRule('regime_lucro_presumido', vehicleTypeIdForRules) ?? 0) === 1;
     if (!regimeLucroPresumido && !regimeSimplesNacional && (pisPercent > 0 || cofinsPercent > 0)) {
       regimeLucroPresumido = true;
@@ -306,6 +311,17 @@ Deno.serve(async (req) => {
         );
       }
     }
+
+    // Resolving target margin based on modality
+    const profitMarginPercent =
+      resolveRule(
+        modality === 'fracionado'
+          ? 'profit_margin_fracionado_percent'
+          : 'profit_margin_lotacao_percent',
+        vehicleTypeIdForRules
+      ) ??
+      resolveRule('profit_margin_percent', vehicleTypeIdForRules) ??
+      FREIGHT_CONSTANTS.TARGET_MARGIN_PERCENT;
 
     // =====================================================
     // LTL PARAMETERS (mínimos NTC para fracionado)
