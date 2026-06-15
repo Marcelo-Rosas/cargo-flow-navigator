@@ -403,7 +403,6 @@ export function QuoteDetailModal({
       (c?.adValorem ?? 0) +
       (c?.tde ?? 0) +
       (c?.tear ?? 0) +
-      (c?.dispatchFee ?? 0) +
       (c?.conditionalFeesTotal ?? 0) +
       (c?.waitingTimeCost ?? 0);
   const receitaLiquidaFromBreakdown =

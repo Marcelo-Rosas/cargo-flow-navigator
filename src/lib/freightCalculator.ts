@@ -1155,8 +1155,11 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
   const custoMotorista = !isLtl ? fretePesoGolden : baseCost;
   const aluguelMaquinas = round2(input.aluguelMaquinasValue ?? 0);
   const repasseRisco = sumRiskRepasse({ gris, tso, rctrc, adValorem });
+  // DRE v5 (Asset-Light): dispatchFee eh repasse/cobranca do embarcador,
+  // NAO custo direto. Mantida apenas em receitaBruta; removida do
+  // custoServicosOperacionais pra nao inflar custosDiretos.
   const custoServicosOperacionais = round2(
-    input.tollValue + aluguelMaquinas + dispatchFee + conditionalFeesTotal + waitingTimeCost
+    input.tollValue + aluguelMaquinas + conditionalFeesTotal + waitingTimeCost
   );
   /** Legado/UI: soma operacional + repasse (repasse não entra no gross-up) */
   const custoServicos = round2(custoServicosOperacionais + repasseRisco);
