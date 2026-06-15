@@ -102,16 +102,6 @@ export function buildQuoteFinancialStripFromCalculation(
     margemContribuicao
   );
   const percentCd = custosDiretos > 0 ? round2((lucroAlvo / custosDiretos) * 100) : 0;
-  const isLotacao =
-    options?.modality === 'lotacao' ||
-    (options?.modality !== 'fracionado' &&
-      (m?.anttCostBaseUsed === true || m?.anttFloorApplied === true));
-  const percentDisplay =
-    isLotacao && custosDiretos > 0
-      ? percentCd
-      : totalCliente > 0
-        ? round2((lucroAlvo / totalCliente) * 100)
-        : 0;
 
   return {
     pag: {
@@ -138,10 +128,10 @@ export function buildQuoteFinancialStripFromCalculation(
     },
     lucro: {
       alvo: lucroAlvo,
-      percentCustosDiretos: percentDisplay,
+      percentCustosDiretos: percentCd,
       contribuicao: margemContribuicao,
       targetPercent,
-      isBelowTarget: isMarginBelowTarget(percentDisplay, targetPercent) || margemContribuicao < 0,
+      isBelowTarget: isMarginBelowTarget(percentCd, targetPercent) || margemContribuicao < 0,
     },
   };
 }
@@ -205,16 +195,6 @@ export function buildQuoteFinancialStripFromBreakdown(
     margemContribuicao
   );
   const percentCd = custosDiretos > 0 ? round2((lucroAlvo / custosDiretos) * 100) : 0;
-  const isLotacao =
-    options.modality === 'lotacao' ||
-    (options.modality !== 'fracionado' &&
-      (m?.anttCostBaseUsed === true || m?.anttFloorApplied === true));
-  const percentDisplay =
-    isLotacao && custosDiretos > 0
-      ? percentCd
-      : totalCliente > 0
-        ? round2((lucroAlvo / totalCliente) * 100)
-        : 0;
 
   return {
     pag: {
@@ -236,10 +216,10 @@ export function buildQuoteFinancialStripFromBreakdown(
     },
     lucro: {
       alvo: lucroAlvo,
-      percentCustosDiretos: percentDisplay,
+      percentCustosDiretos: percentCd,
       contribuicao: margemContribuicao,
       targetPercent,
-      isBelowTarget: isMarginBelowTarget(percentDisplay, targetPercent) || margemContribuicao < 0,
+      isBelowTarget: isMarginBelowTarget(percentCd, targetPercent) || margemContribuicao < 0,
     },
   };
 }
