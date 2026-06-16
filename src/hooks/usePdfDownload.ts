@@ -1,17 +1,12 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import { generateLoadCompositionProposalPdf } from '@/lib/generateLoadCompositionProposalPdf';
+import { generateQuotePdf } from '@/lib/generateQuotePdf';
 import type { LoadCompositionSuggestionWithDetails } from '@/types/load-composition';
+import type { StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 type QuotePdfMode = 'simplified' | 'detailed';
-
-type GenerateQuoteEmailPdfResponse = {
-  pdf_base64: string;
-  file_name: string;
-  quote_code?: string;
-};
 
 const triggerBlobDownload = (blob: Blob, fileName: string): void => {
   const objectUrl = URL.createObjectURL(blob);
@@ -26,22 +21,30 @@ const triggerBlobDownload = (blob: Blob, fileName: string): void => {
   setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 };
 
-function base64ToBlob(base64: string, mimeType: string): Blob {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new Blob([bytes], { type: mimeType });
-}
-
 export function usePdfDownload() {
   const [loading, setLoading] = useState<string | false>(false);
 
   const downloadQuotePdf = useCallback(async (quoteId: string, mode: QuotePdfMode) => {
     setLoading(`quote:${mode}`);
     try {
-      const { data: anttCheck } = await supabase.rpc('validate_quote_antt_floor', {
-        p_quote_id: quoteId,
-      });
+      const [{ data: anttCheck }, { data: quoteRow, error: quoteError }] = await Promise.all([
+        supabase.rpc('validate_quote_antt_floor', { p_quote_id: quoteId }),
+        supabase
+          .from('quotes')
+          .select(
+            `id, quote_code, client_name, origin, destination, value, cargo_type, weight, volume,
+             km_distance, estimated_loading_date, validity_date, notes, created_at, updated_at,
+             pricing_breakdown, freight_modality,
+             payment_terms(name)`
+          )
+          .eq('id', quoteId)
+          .single(),
+      ]);
+
+      if (quoteError || !quoteRow) {
+        throw new Error(quoteError?.message || 'Cotação não encontrada.');
+      }
+
       const anttResult = anttCheck as {
         is_below_antt_floor?: boolean;
         piso?: number;
@@ -62,19 +65,37 @@ export function usePdfDownload() {
         );
       }
 
-      const data = await invokeEdgeFunction<GenerateQuoteEmailPdfResponse>(
-        'generate-quote-email-pdf',
-        {
-          body: { quoteId, emailMode: mode },
-        }
-      );
+      const pt = quoteRow.payment_terms as { name: string } | null;
+      const breakdown = quoteRow.pricing_breakdown as StoredPricingBreakdown | null;
 
-      if (!data?.pdf_base64 || !data.file_name) {
-        throw new Error('Resposta inválida ao gerar PDF da cotação.');
-      }
+      const { blob, fileName } = await generateQuotePdf({
+        quote: {
+          id: quoteRow.id,
+          quote_code: quoteRow.quote_code,
+          client_name: quoteRow.client_name ?? '—',
+          origin: quoteRow.origin,
+          destination: quoteRow.destination,
+          value: quoteRow.value,
+          cargo_type: quoteRow.cargo_type,
+          weight: quoteRow.weight,
+          volume: quoteRow.volume,
+          km_distance: quoteRow.km_distance,
+          estimated_loading_date: quoteRow.estimated_loading_date,
+          validity_date: quoteRow.validity_date,
+          notes: quoteRow.notes,
+          created_at: quoteRow.created_at,
+          updated_at: quoteRow.updated_at,
+          payment_term_name: pt?.name ?? null,
+          pricing_breakdown: breakdown,
+          freight_modality: quoteRow.freight_modality as 'lotacao' | 'fracionado' | null,
+          antt_compliance: anttResult?.is_below_antt_floor
+            ? { piso: anttResult.piso ?? 0, below: true, modality: '' }
+            : undefined,
+        },
+        mode,
+      });
 
-      const blob = base64ToBlob(data.pdf_base64, 'application/pdf');
-      triggerBlobDownload(blob, data.file_name);
+      triggerBlobDownload(blob, fileName);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Não foi possível gerar o PDF da cotação.';
