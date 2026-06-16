@@ -308,15 +308,18 @@ function drawPricingBlock(
 
   if (bd?.components) {
     const c = bd.components;
-    if ((c.baseFreight ?? 0) > 0) rows.push(['Frete', formatCurrency(c.baseFreight ?? 0)]);
+    const p = bd.profitability;
     if ((c.toll ?? 0) > 0) rows.push(['Pedágio', formatCurrency(c.toll ?? 0)]);
-    if ((c.insurance ?? 0) > 0) rows.push(['Seguro', formatCurrency(c.insurance ?? 0)]);
     if ((c.aluguelMaquinas ?? 0) > 0)
-      rows.push(['Aluguel de Máquinas', formatCurrency(c.aluguelMaquinas ?? 0)]);
+      rows.push(['Aluguel de Equipamentos', formatCurrency(c.aluguelMaquinas ?? 0)]);
+    if ((p?.custosDescarga ?? 0) > 0)
+      rows.push(['Carga / Descarga', formatCurrency(p?.custosDescarga ?? 0)]);
     if ((c.waitingTimeCost ?? 0) > 0)
       rows.push(['Estadia / Hora Parada', formatCurrency(c.waitingTimeCost ?? 0)]);
+    if ((c.insurance ?? 0) > 0) rows.push(['Seguro', formatCurrency(c.insurance ?? 0)]);
 
     if (mode === 'detailed') {
+      if ((c.baseFreight ?? 0) > 0) rows.push(['Frete Base', formatCurrency(c.baseFreight ?? 0)]);
       if ((c.gris ?? 0) > 0) rows.push(['GRIS', formatCurrency(c.gris ?? 0)]);
       if ((c.tso ?? 0) > 0) rows.push(['TSO', formatCurrency(c.tso ?? 0)]);
       if ((c.rctrc ?? 0) > 0) rows.push(['RCTR-C', formatCurrency(c.rctrc ?? 0)]);
