@@ -146,13 +146,7 @@ function drawInfoGrid(doc: PdfDoc, payload: PodPdfPayload, y: number): number {
     ['Cliente / Destinatário', payload.client_name, 'Embarcador', payload.shipper_name ?? '—'],
     ['Origem', payload.origin, 'Destino', payload.destination],
     ['Motorista', payload.driver_name ?? '—', 'Placa', payload.vehicle_plate ?? '—'],
-    ['Data Coleta', fmtDate(payload.pickup_date), 'ETA / Entrega', fmtDate(payload.eta)],
-    [
-      'Valor Frete (OS)',
-      fmtCurrency(payload.value_cents),
-      'Valor NF-e',
-      fmtCurrency(payload.cargo_value_cents),
-    ],
+    ['Data de Entrega', fmtDate(payload.eta), '', ''],
   ];
 
   if (payload.cte_number || payload.nfe_number) {
