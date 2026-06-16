@@ -660,6 +660,20 @@ export function OrderDetailModal({
   const handleGeneratePodPdf = async (doc: OrderDocument) => {
     try {
       toast.loading('Gerando comprovante de entrega…', { id: 'pod-pdf' });
+
+      // Busca OC para pegar segundo remetente, se houver
+      let shipper2Name: string | null = null;
+      const { data: ocs } = await supabase
+        .from('collection_orders')
+        .select('sender_2_data')
+        .eq('order_id', order.id)
+        .limit(1)
+        .maybeSingle();
+      if (ocs?.sender_2_data) {
+        const s2 = ocs.sender_2_data as { name?: string };
+        shipper2Name = s2.name?.trim() || null;
+      }
+
       const signedUrl = await getDocumentSignedUrl(doc.file_url, 600);
       const res = await fetch(signedUrl);
       if (!res.ok) throw new Error('Falha ao baixar imagem do canhoto');
@@ -676,6 +690,7 @@ export function OrderDetailModal({
         origin: order.origin,
         destination: order.destination,
         shipper_name: order.shipper_name ?? null,
+        shipper_2_name: shipper2Name,
         driver_name: order.driver_name ?? null,
         vehicle_plate: order.vehicle_plate ?? null,
         cargo_value_cents: order.cargo_value ?? null,
