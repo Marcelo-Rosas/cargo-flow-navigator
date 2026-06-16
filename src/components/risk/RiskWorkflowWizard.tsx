@@ -299,7 +299,7 @@ export function RiskWorkflowWizard({
   // Falls back to cross-evaluation evidence when this OS has no Buonny check yet.
   const buonnyEvidence = (() => {
     const localMatch = evidence?.find((e) => {
-      if (e.evidence_type !== 'buonny_check' || e.status !== 'valid') return false;
+      if (e.evidence_type !== 'buonny_check') return false;
       const p = e.payload as Record<string, unknown> | null;
       if (p?.driver_cpf) {
         if (!resolvedDriverCpf || p.driver_cpf !== resolvedDriverCpf) return false;
@@ -312,13 +312,13 @@ export function RiskWorkflowWizard({
     return localMatch ?? crossEvidence ?? undefined;
   })();
   const buonnyValid =
-    !!buonnyEvidence && !!buonnyEvidence.expires_at
+    !!buonnyEvidence && buonnyEvidence.status === 'valid' && !!buonnyEvidence.expires_at
       ? new Date(buonnyEvidence.expires_at) > new Date()
       : false;
 
   const anttEvidence = (() => {
     const localMatch = evidence?.find((e) => {
-      if (e.evidence_type !== 'antt_rntrc_check' || e.status !== 'valid') return false;
+      if (e.evidence_type !== 'antt_rntrc_check') return false;
       const p = e.payload as Record<string, unknown> | null;
       if (p?.cpf_cnpj) {
         if (!resolvedDriverCpf || onlyDigits(String(p.cpf_cnpj)) !== onlyDigits(resolvedDriverCpf))
@@ -337,7 +337,10 @@ export function RiskWorkflowWizard({
   })();
 
   const anttValid =
-    !!anttEvidence && !!anttEvidence.expires_at && new Date(anttEvidence.expires_at) > new Date();
+    !!anttEvidence &&
+    anttEvidence.status === 'valid' &&
+    !!anttEvidence.expires_at &&
+    new Date(anttEvidence.expires_at) > new Date();
 
   useEffect(() => {
     if (currentStep === 'buonny' && !anttValid) {
@@ -543,8 +546,12 @@ export function RiskWorkflowWizard({
           modalidade === 'terceiro' ||
           modalidade === 'indefinido');
 
-      const notes =
-        modalidade === 'tac'
+      const irregularNote = `ANTT: situação irregular — ${
+        firstResp?.situacao_raw ?? firstResp?.situacao ?? 'reprovado'
+      }`;
+      const notes = !overallOk
+        ? irregularNote
+        : modalidade === 'tac'
           ? 'ANTT: TAC — veículo na frota do motorista'
           : modalidade === 'terceiro' && ciotFound
             ? 'ANTT: Terceiro (empresa) — RNTRC regular, CIOT vigente'
@@ -601,7 +608,9 @@ export function RiskWorkflowWizard({
         await supabase.from('drivers').update(rntrcRegistryUpdate).eq('id', resolvedDriverId);
       }
 
-      if (modalidade === 'tac') {
+      if (!overallOk) {
+        toast.error(irregularNote);
+      } else if (modalidade === 'tac') {
         toast.success('ANTT: TAC — veículo na frota do motorista');
       } else if (modalidade === 'terceiro' && ciotFound) {
         toast.success('ANTT: Terceiro (empresa) — RNTRC regular, CIOT vigente');
