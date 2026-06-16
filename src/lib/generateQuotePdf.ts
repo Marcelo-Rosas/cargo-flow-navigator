@@ -1,7 +1,6 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency, formatDate } from '@/lib/formatters';
-import logoUrl from '@/assets/logo_vectra_cargo.jpg?url';
 import type { StoredPricingBreakdown } from '@/lib/freightCalculator';
 
 type QuotePdfMode = 'simplified' | 'detailed';
@@ -23,11 +22,11 @@ export interface QuotePdfPayload {
   created_at: string | null;
   updated_at: string | null;
   payment_term_name?: string | null;
-  /** Preenchido quando value < piso ANTT. Só usado no modo detailed para watermark. */
+  payment_method_label?: string | null;
   antt_compliance?: { piso: number; below: boolean; modality: string };
-  /** Breakdown de precificação. Só usado no modo detailed. */
   pricing_breakdown?: StoredPricingBreakdown | null;
   freight_modality?: 'lotacao' | 'fracionado' | null;
+  freight_type?: string | null;
 }
 
 type PdfDoc = jsPDF & { lastAutoTable?: { finalY?: number } };
@@ -41,18 +40,51 @@ const C = {
   text: [30, 35, 45] as [number, number, number],
   muted: [100, 110, 130] as [number, number, number],
   light: [246, 248, 251] as [number, number, number],
-  border: [218, 222, 230] as [number, number, number],
-  success: [22, 101, 52] as [number, number, number],
+  border: [200, 206, 214] as [number, number, number],
 };
 
 const PW = 210;
-const ML = 14;
-const MR = 14;
+const ML = 12;
+const MR = 12;
 const CW = PW - ML - MR;
+
+const VECTRA = {
+  name: 'VECTRA CARGO',
+  cnpj: '59.650.913/0001-04',
+  ie: '263450562',
+  address: 'AVENIDA PREFEITO CIRINO ADOLFO',
+  number: '495',
+  city: 'NAVEGANTES',
+  uf: 'SC',
+  phone: '(47) 93385-1351',
+  email: 'comercial@vectracargo.com.br',
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const formatWeight = (raw: number | null): string => {
+const safe = (v: string | number | null | undefined): string => {
+  if (v == null || v === '') return '—';
+  return String(v);
+};
+
+const fmtNum = (v: number | null | undefined): string => {
+  if (v == null) return '0,00';
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(v));
+};
+
+const fmtDate = (d: string | null | undefined): string => {
+  if (!d) return '';
+  try {
+    return formatDate(d);
+  } catch {
+    return '';
+  }
+};
+
+const formatWeight = (raw: number | null | undefined): string => {
   if (raw == null) return '—';
   const kg = Number(raw);
   return kg >= 1000
@@ -60,36 +92,21 @@ const formatWeight = (raw: number | null): string => {
     : `${new Intl.NumberFormat('pt-BR').format(kg)} kg`;
 };
 
-const fmtNum = (raw: number | null, unit = ''): string => {
+const fmtUnit = (raw: number | null | undefined, unit: string): string => {
   if (raw == null) return '—';
-  const s = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(Number(raw));
-  return unit ? `${s} ${unit}` : s;
+  return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(Number(raw))} ${unit}`;
 };
 
-const toFilename = (code: string | null, mode: QuotePdfMode): string =>
-  `cotacao-${(code || 'cotacao').replace(/[^\w-]+/g, '-')}-${mode === 'simplified' ? 'cliente' : 'interno'}.pdf`;
-
-const humanizeCargoType = (raw: string | null): string => {
+const humanizeCargoType = (raw: string | null | undefined): string => {
   if (!raw) return '—';
-  return raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return raw.replace(/_/g, ' ').toUpperCase();
 };
-
-// Draws a clean arrow without relying on Unicode → (not in jsPDF Helvetica charset)
-function drawArrow(doc: PdfDoc, cx: number, cy: number): void {
-  const shaft = 7;
-  const head = 3;
-  const x0 = cx - shaft / 2;
-  const x1 = cx + shaft / 2;
-  doc.setDrawColor(...C.orange);
-  doc.setLineWidth(1.3);
-  doc.line(x0, cy, x1 - head * 0.6, cy);
-  doc.setLineWidth(1.1);
-  doc.line(x1 - head, cy - 2, x1, cy);
-  doc.line(x1 - head, cy + 2, x1, cy);
-}
 
 async function loadLogoBase64(): Promise<string | null> {
   try {
+    const mod = (await import('@/assets/logo_vectra_cargo.jpg?url')) as { default?: string };
+    const logoUrl = mod.default;
+    if (!logoUrl) return null;
     const res = await fetch(logoUrl);
     if (!res.ok) return null;
     const blob = await res.blob();
@@ -104,485 +121,328 @@ async function loadLogoBase64(): Promise<string | null> {
   }
 }
 
-// ── Section drawers ────────────────────────────────────────────────────────────
+// ── Drawers (padrão OC/POD) ────────────────────────────────────────────────────
 
-function drawHeader(doc: PdfDoc, mode: QuotePdfMode, logoBase64: string | null): number {
-  const H = 32;
+function drawWatermark(doc: PdfDoc, text: string): void {
+  const ph = doc.internal.pageSize.getHeight();
+  doc.saveGraphicsState();
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(72);
+  doc.setTextColor(220, 38, 38);
+  doc.setGState(
+    new (doc as unknown as { GState: new (o: object) => unknown }).GState({ opacity: 0.15 })
+  );
+  doc.text(text, PW / 2, ph / 2, { align: 'center', angle: 30 });
+  doc.restoreGraphicsState();
+}
 
-  // Background
+function drawHeader(
+  doc: PdfDoc,
+  payload: QuotePdfPayload,
+  mode: QuotePdfMode,
+  logoBase64: string | null
+): number {
+  const H = 28;
   doc.setFillColor(...C.navy);
   doc.rect(0, 0, PW, H, 'F');
-
-  // Subtle right-side accent rectangle
-  doc.setFillColor(...C.navyDark);
-  doc.rect(PW - 70, 0, 70, H, 'F');
-
-  // Orange bottom bar
   doc.setFillColor(...C.orange);
-  doc.rect(0, H, PW, 3, 'F');
+  doc.rect(0, H, PW, 2, 'F');
 
-  // Left side: logo or wordmark
   if (logoBase64) {
-    doc.addImage(logoBase64, 'PNG', ML, 4, 24, 24);
-  } else {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(15);
-    doc.setTextColor(...C.white);
-    doc.text('VECTRA CARGO', ML, 15);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(160, 180, 210);
-    doc.text('Navegantes / Itajai - SC', ML, 23);
+    doc.addImage(logoBase64, 'JPEG', ML, 3, 22, 22);
   }
 
-  // Right side: document type
+  const ix = ML + 26;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
+  doc.setFontSize(11);
   doc.setTextColor(...C.white);
-  doc.text('PROPOSTA COMERCIAL DE FRETE', PW - MR, 15, { align: 'right' });
+  doc.text(VECTRA.name, ix, 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(200, 215, 235);
+  doc.text(`CNPJ: ${VECTRA.cnpj}    IE: ${VECTRA.ie}`, ix, 13);
+  doc.text(`${VECTRA.address}, ${VECTRA.number} - ${VECTRA.city}/${VECTRA.uf}`, ix, 17.5);
+  doc.text(`Fone: ${VECTRA.phone}`, ix, 22);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(...C.white);
+  doc.text('PROPOSTA COMERCIAL DE FRETE', PW - MR, 9, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(...C.orangeLight);
-  doc.text(
-    mode === 'simplified' ? 'Versao Cliente' : 'USO INTERNO - Versao Detalhada',
-    PW - MR,
-    23,
-    { align: 'right' }
-  );
+  doc.text(`No ${payload.quote_code ?? '—'}`, PW - MR, 14.5, { align: 'right' });
 
-  return H + 3; // return Y after the orange bar
-}
+  doc.setTextColor(200, 215, 235);
+  doc.setFontSize(7);
+  doc.text(`Emissao: ${fmtDate(new Date().toISOString())}`, PW - MR, 19, { align: 'right' });
 
-function drawClientBlock(doc: PdfDoc, quote: QuotePdfPayload, y: number): number {
-  const H = 20;
-
-  // Background
-  doc.setFillColor(...C.light);
-  doc.setDrawColor(...C.border);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(ML, y, CW, H, 2, 2, 'FD');
-
-  // Orange left accent
-  doc.setFillColor(...C.orange);
-  doc.roundedRect(ML, y, 3.5, H, 2, 2, 'F');
-  doc.rect(ML + 1.5, y, 2, H, 'F'); // fill the right side of the radius gap
-
-  // "PROPOSTO PARA" label
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...C.muted);
-  doc.text('PROPOSTO PARA', ML + 8, y + 6.5);
-
-  // Client name
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(...C.navy);
-  const clientFit = doc.splitTextToSize(quote.client_name || 'Cliente nao informado', CW / 2 - 10);
-  doc.text(clientFit[0] as string, ML + 8, y + 14);
-
-  // "Nº DA PROPOSTA" label
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...C.muted);
-  doc.text('No DA PROPOSTA', PW - MR - 4, y + 6.5, { align: 'right' });
-
-  // Quote code
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...C.navy);
-  doc.text(quote.quote_code || '—', PW - MR - 4, y + 14, { align: 'right' });
-
-  return y + H + 5;
-}
-
-function drawRoute(doc: PdfDoc, quote: QuotePdfPayload, y: number): number {
-  const half = (CW - 10) / 2;
-  const H = 24;
-
-  // Origin box
-  doc.setFillColor(...C.white);
-  doc.setDrawColor(...C.border);
-  doc.setLineWidth(0.35);
-  doc.roundedRect(ML, y, half, H, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...C.muted);
-  doc.text('ORIGEM', ML + 5, y + 7);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...C.text);
-  const originLines = doc.splitTextToSize(quote.origin || '—', half - 10);
-  doc.text(originLines[0] as string, ML + 5, y + 15);
-  if (originLines[1]) {
-    doc.setFontSize(7.5);
-    doc.text(originLines[1] as string, ML + 5, y + 20.5);
+  if (mode === 'detailed') {
+    doc.text('USO INTERNO', PW - MR, 23, { align: 'right' });
   }
 
-  // Arrow in center gap (draw manually — avoids jsPDF charset issue with →)
-  drawArrow(doc, ML + half + 5, y + H / 2);
-
-  // Destination box
-  const dx = ML + half + 10;
-  doc.setFillColor(...C.white);
-  doc.setDrawColor(...C.border);
-  doc.roundedRect(dx, y, half, H, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...C.muted);
-  doc.text('DESTINO', dx + 5, y + 7);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...C.text);
-  const destLines = doc.splitTextToSize(quote.destination || '—', half - 10);
-  doc.text(destLines[0] as string, dx + 5, y + 15);
-  if (destLines[1]) {
-    doc.setFontSize(7.5);
-    doc.text(destLines[1] as string, dx + 5, y + 20.5);
-  }
-
-  return y + H + 5;
+  return H + 4;
 }
 
-function drawCargoInfo(doc: PdfDoc, quote: QuotePdfPayload, y: number): number {
-  const H = 20;
-  const cols = [
-    { label: 'TIPO DE CARGA', value: humanizeCargoType(quote.cargo_type) },
-    { label: 'PESO', value: formatWeight(quote.weight != null ? Number(quote.weight) : null) },
-    { label: 'VOLUME', value: fmtNum(quote.volume != null ? Number(quote.volume) : null, 'm3') },
-    {
-      label: 'DISTANCIA',
-      value: fmtNum(quote.km_distance != null ? Number(quote.km_distance) : null, 'km'),
-    },
-  ];
-  const colW = CW / cols.length;
+function drawSectionTitle(doc: PdfDoc, label: string, y: number): number {
+  doc.setFillColor(...C.navy);
+  doc.rect(ML, y, CW, 5.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(...C.white);
+  doc.text(label, ML + CW / 2, y + 3.8, { align: 'center' });
+  return y + 5.5;
+}
 
-  doc.setFillColor(...C.light);
+/** Bloco com pares label/value em colunas — padrão CARGA/MOTORISTA do OC */
+function drawFieldsBlock(
+  doc: PdfDoc,
+  cells: { label: string; value: string }[],
+  y: number,
+  height = 14
+): number {
   doc.setDrawColor(...C.border);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(ML, y, CW, H, 2, 2, 'FD');
+  doc.setLineWidth(0.25);
+  doc.rect(ML, y, CW, height);
 
-  // Top orange accent line
-  doc.setFillColor(...C.orange);
-  doc.rect(ML, y, CW, 2, 'F');
-  doc.roundedRect(ML, y, CW, 4, 2, 2, 'F'); // cover corners
-
-  cols.forEach(({ label, value }, i) => {
-    const x = ML + i * colW + 5;
-
-    // Divider (except first)
+  const colW = CW / cells.length;
+  cells.forEach((cell, i) => {
+    const x = ML + i * colW;
     if (i > 0) {
       doc.setDrawColor(...C.border);
-      doc.setLineWidth(0.3);
-      doc.line(ML + i * colW, y + 4, ML + i * colW, y + H - 2);
+      doc.setLineWidth(0.25);
+      doc.line(x, y, x, y + height);
     }
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(...C.muted);
-    doc.text(label, x, y + 9);
+    const innerW = colW - 4;
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
-    doc.setTextColor(...C.text);
-    doc.text(value, x, y + 16.5);
-  });
+    doc.setFontSize(7);
+    doc.setTextColor(...C.muted);
+    doc.text(cell.label, x + 2, y + 4.5);
 
-  return y + H + 5;
-}
-
-function drawPricingSimplified(doc: PdfDoc, quote: QuotePdfPayload, y: number): number {
-  const bd = quote.pricing_breakdown;
-  if (!bd?.components) return y;
-
-  const rows: string[][] = [];
-  const c = bd.components;
-  if ((c.baseFreight ?? 0) > 0) rows.push(['Frete', formatCurrency(c.baseFreight ?? 0)]);
-  if ((c.toll ?? 0) > 0) rows.push(['Pedagio', formatCurrency(c.toll ?? 0)]);
-  if ((c.insurance ?? 0) > 0) rows.push(['Seguro', formatCurrency(c.insurance ?? 0)]);
-  if ((c.aluguelMaquinas ?? 0) > 0)
-    rows.push(['Aluguel de Maquinas', formatCurrency(c.aluguelMaquinas ?? 0)]);
-  if ((c.waitingTimeCost ?? 0) > 0)
-    rows.push(['Estadia / Hora Parada', formatCurrency(c.waitingTimeCost ?? 0)]);
-
-  if (rows.length === 0) return y;
-
-  // Section header
-  doc.setFillColor(...C.navy);
-  doc.roundedRect(ML, y, CW, 10, 2, 2, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...C.white);
-  doc.text('DETALHAMENTO DE CUSTOS', ML + 5, y + 6.5);
-  y += 13;
-
-  autoTable(doc as jsPDF, {
-    startY: y,
-    head: [],
-    body: rows,
-    theme: 'plain',
-    margin: { left: ML, right: MR },
-    styles: {
-      fontSize: 8.5,
-      cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
-      textColor: C.text as number[],
-    },
-    columnStyles: {
-      0: { cellWidth: 68, fontStyle: 'bold', textColor: C.muted as number[] },
-      1: { cellWidth: CW - 68 },
-    },
-  });
-
-  return ((doc as PdfDoc).lastAutoTable?.finalY ?? y) + 5;
-}
-
-function drawValueBlock(doc: PdfDoc, quote: QuotePdfPayload, y: number): number {
-  const H = quote.payment_term_name ? 34 : 28;
-
-  // Main navy background
-  doc.setFillColor(...C.navy);
-  doc.roundedRect(ML, y, CW, H, 3, 3, 'F');
-
-  // Orange left accent bar
-  doc.setFillColor(...C.orange);
-  doc.roundedRect(ML, y, 5, H, 3, 3, 'F');
-  doc.rect(ML + 2, y, 3, H, 'F');
-
-  // Label
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(160, 180, 210);
-  doc.text('VALOR DA PROPOSTA', ML + 11, y + 9);
-
-  // Value — big and bold
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
-  doc.setTextColor(...C.white);
-  doc.text(formatCurrency(Number(quote.value ?? 0)), ML + 11, y + 22);
-
-  // Payment term (if available)
-  if (quote.payment_term_name) {
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(...C.orangeLight);
-    doc.text(`Pagamento: ${quote.payment_term_name}`, ML + 11, y + 30);
-  }
-
-  return y + H + 6;
-}
-
-function drawInfoRows(doc: PdfDoc, quote: QuotePdfPayload, y: number): number {
-  const rows: string[][] = [];
-
-  if (quote.estimated_loading_date) {
-    rows.push(['Data estimada de coleta', formatDate(quote.estimated_loading_date)]);
-  } else {
-    rows.push(['Data estimada de coleta', 'A confirmar']);
-  }
-
-  if (quote.validity_date) {
-    rows.push(['Valida ate', formatDate(quote.validity_date)]);
-  } else {
-    rows.push(['Validade desta proposta', '5 dias uteis a partir da emissao']);
-  }
-
-  rows.push(['Emitida em', formatDate(new Date().toISOString())]);
-
-  if (quote.notes) {
-    rows.push(['Observacoes', quote.notes]);
-  }
-
-  autoTable(doc as jsPDF, {
-    startY: y,
-    head: [],
-    body: rows,
-    theme: 'plain',
-    margin: { left: ML, right: MR },
-    styles: {
-      fontSize: 8.5,
-      cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
-      textColor: C.text as number[],
-    },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 68, textColor: C.muted as number[] },
-      1: { cellWidth: CW - 68 },
-    },
+    doc.setFontSize(9);
+    doc.setTextColor(...C.text);
+    const lines = doc.splitTextToSize(cell.value, innerW) as string[];
+    doc.text(lines[0] ?? '', x + 2, y + 10.5);
   });
 
-  return ((doc as PdfDoc).lastAutoTable?.finalY ?? y) + 6;
+  return y + height + 1;
 }
 
-function drawDetailedSection(doc: PdfDoc, quote: QuotePdfPayload, y: number): number {
-  // Section header
-  doc.setFillColor(...C.navy);
-  doc.roundedRect(ML, y, CW, 10, 2, 2, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...C.white);
-  doc.text('DETALHES OPERACIONAIS', ML + 5, y + 6.5);
-  y += 13;
-
-  autoTable(doc as jsPDF, {
-    startY: y,
-    head: [['Campo', 'Valor']],
-    body: [
-      ['Tipo de carga', humanizeCargoType(quote.cargo_type)],
-      ['Peso bruto', formatWeight(quote.weight != null ? Number(quote.weight) : null)],
-      ['Volume', fmtNum(quote.volume != null ? Number(quote.volume) : null, 'm3')],
-      [
-        'Distancia estimada',
-        fmtNum(quote.km_distance != null ? Number(quote.km_distance) : null, 'km'),
-      ],
-      ['Valor cotado', formatCurrency(Number(quote.value ?? 0))],
-      [
-        'Data estimada de coleta',
-        quote.estimated_loading_date ? formatDate(quote.estimated_loading_date) : '—',
-      ],
-      ['Criada em', quote.created_at ? formatDate(quote.created_at) : '—'],
-      ['Ultima atualizacao', quote.updated_at ? formatDate(quote.updated_at) : '—'],
-      ['ID interno', quote.id],
-    ],
-    theme: 'striped',
-    margin: { left: ML, right: MR },
-    headStyles: {
-      fillColor: C.navy as number[],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      fontSize: 8,
-    },
-    bodyStyles: { fontSize: 8.5, textColor: C.text as number[] },
-    alternateRowStyles: { fillColor: C.light as number[] },
-    columnStyles: {
-      0: { cellWidth: 60, fontStyle: 'bold', textColor: C.muted as number[] },
-      1: { cellWidth: CW - 60 },
-    },
-  });
-
-  return ((doc as PdfDoc).lastAutoTable?.finalY ?? y) + 6;
-}
-
-function drawPageFooter(doc: PdfDoc): void {
-  const h = doc.internal.pageSize.getHeight();
-  const footerH = 13;
-
-  doc.setFillColor(...C.navy);
-  doc.rect(0, h - footerH, PW, footerH, 'F');
-
-  // Orange accent line on top of footer
-  doc.setFillColor(...C.orange);
-  doc.rect(0, h - footerH, PW, 1.5, 'F');
+function drawClientBlock(doc: PdfDoc, payload: QuotePdfPayload, y: number): number {
+  const H = 14;
+  doc.setDrawColor(...C.border);
+  doc.setLineWidth(0.25);
+  doc.rect(ML, y, CW, H);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.setTextColor(...C.white);
-  doc.text('Vectra Cargo', ML, h - 7);
+  doc.setTextColor(...C.muted);
+  doc.text('CLIENTE / EMBARCADOR', ML + 2, y + 4.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(150, 170, 200);
-  doc.text('Navegantes / Itajai, SC', ML, h - 3);
+  doc.setFontSize(10);
+  doc.setTextColor(...C.text);
+  const lines = doc.splitTextToSize(payload.client_name || '—', CW - 6) as string[];
+  doc.text(lines[0] ?? '', ML + 2, y + 11);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(150, 170, 200);
-  doc.text('(47) 93385-1351 | comercial@vectracargo.com.br', PW - MR, h - 5, { align: 'right' });
+  return y + H + 1;
 }
 
-// ── Pricing Breakdown (detailed / internal only) ───────────────────────────────
+function drawRouteBlock(doc: PdfDoc, payload: QuotePdfPayload, y: number): number {
+  const modality = payload.freight_modality;
+  const modalityLabel =
+    modality === 'lotacao' ? 'LOTAÇÃO' : modality === 'fracionado' ? 'FRACIONADO' : '—';
+  const freightTypeLabel = (payload.freight_type ?? '').toUpperCase() || '—';
+  const tipoFrete =
+    freightTypeLabel === '—'
+      ? modalityLabel
+      : modalityLabel === '—'
+        ? freightTypeLabel
+        : `${freightTypeLabel} - ${modalityLabel}`;
 
-function drawPricingBreakdown(doc: PdfDoc, bd: StoredPricingBreakdown, y: number): number {
-  const c = bd.components;
-  const t = bd.totals;
-  const p = bd.profitability;
-  const discount = t.discount ?? 0;
-
-  const sectionHeader = (label: string) => {
-    doc.setFillColor(...C.navy);
-    doc.roundedRect(ML, y, CW, 10, 2, 2, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...C.white);
-    doc.text(label, ML + 5, y + 6.5);
-    y += 13;
-  };
-
-  // ── MEMORIA DE CALCULO ─────────────────────────────────────────────────────
-  sectionHeader('MEMORIA DE CALCULO');
-
-  const memRows: string[][] = [];
-  if ((c.baseFreight ?? 0) > 0) memRows.push(['Frete Peso (Base)', formatCurrency(c.baseFreight)]);
-  if ((c.toll ?? 0) > 0) memRows.push(['Pedagio', formatCurrency(c.toll)]);
-  if ((c.aluguelMaquinas ?? 0) > 0)
-    memRows.push(['Aluguel de Maquinas', formatCurrency(c.aluguelMaquinas)]);
-  if ((c.gris ?? 0) > 0) memRows.push(['GRIS', formatCurrency(c.gris)]);
-  if ((c.tso ?? 0) > 0) memRows.push(['TSO', formatCurrency(c.tso)]);
-  if ((c.rctrc ?? 0) > 0) memRows.push(['RCTR-C', formatCurrency(c.rctrc)]);
-  if ((c.adValorem ?? 0) > 0) memRows.push(['Ad Valorem', formatCurrency(c.adValorem)]);
-  if ((c.tde ?? 0) + (c.tear ?? 0) > 0)
-    memRows.push(['TDE / TEAR', formatCurrency((c.tde ?? 0) + (c.tear ?? 0))]);
-  if ((c.dispatchFee ?? 0) > 0) memRows.push(['Taxa de Expedicao', formatCurrency(c.dispatchFee)]);
-  if ((c.conditionalFeesTotal ?? 0) > 0)
-    memRows.push(['Taxas Condicionais', formatCurrency(c.conditionalFeesTotal)]);
-  if ((c.waitingTimeCost ?? 0) > 0)
-    memRows.push(['Estadia / Hora Parada', formatCurrency(c.waitingTimeCost)]);
-  // custosDescarga está em profitability, não em components — precisa ser incluído aqui
-  // para que os itens visiveis somem ao custosDiretos (base do gross-up)
-  if ((p?.custosDescarga ?? 0) > 0)
-    memRows.push(['Carga / Descarga', formatCurrency(p?.custosDescarga ?? 0)]);
-
-  if (memRows.length > 0) {
-    autoTable(doc as jsPDF, {
-      startY: y,
-      head: [],
-      body: memRows,
-      theme: 'plain',
-      margin: { left: ML, right: MR },
-      styles: {
-        fontSize: 8.5,
-        cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
-        textColor: C.text as number[],
+  return drawFieldsBlock(
+    doc,
+    [
+      { label: 'ORIGEM', value: payload.origin ?? '—' },
+      { label: 'DESTINO', value: payload.destination ?? '—' },
+      { label: 'TIPO FRETE', value: tipoFrete },
+      {
+        label: 'DISTÂNCIA',
+        value: payload.km_distance != null ? fmtUnit(payload.km_distance, 'km') : '—',
       },
-      columnStyles: {
-        0: { cellWidth: 68, fontStyle: 'bold', textColor: C.muted as number[] },
-        1: { cellWidth: CW - 68 },
+    ],
+    y
+  );
+}
+
+function drawCargoBlock(doc: PdfDoc, payload: QuotePdfPayload, y: number): number {
+  return drawFieldsBlock(
+    doc,
+    [
+      { label: 'TIPO DE CARGA', value: humanizeCargoType(payload.cargo_type) },
+      { label: 'PESO', value: formatWeight(payload.weight) },
+      { label: 'VOLUME', value: payload.volume != null ? fmtUnit(payload.volume, 'm³') : '—' },
+      {
+        label: 'COLETA ESTIMADA',
+        value: payload.estimated_loading_date
+          ? fmtDate(payload.estimated_loading_date)
+          : 'A CONFIRMAR',
       },
-    });
-    y = ((doc as PdfDoc).lastAutoTable?.finalY ?? y) + 2;
+    ],
+    y
+  );
+}
+
+function drawPricingBlock(
+  doc: PdfDoc,
+  payload: QuotePdfPayload,
+  mode: QuotePdfMode,
+  y: number
+): number {
+  const bd = payload.pricing_breakdown;
+  const rows: string[][] = [];
+
+  if (bd?.components) {
+    const c = bd.components;
+    if ((c.baseFreight ?? 0) > 0) rows.push(['Frete', formatCurrency(c.baseFreight ?? 0)]);
+    if ((c.toll ?? 0) > 0) rows.push(['Pedágio', formatCurrency(c.toll ?? 0)]);
+    if ((c.insurance ?? 0) > 0) rows.push(['Seguro', formatCurrency(c.insurance ?? 0)]);
+    if ((c.aluguelMaquinas ?? 0) > 0)
+      rows.push(['Aluguel de Máquinas', formatCurrency(c.aluguelMaquinas ?? 0)]);
+    if ((c.waitingTimeCost ?? 0) > 0)
+      rows.push(['Estadia / Hora Parada', formatCurrency(c.waitingTimeCost ?? 0)]);
+
+    if (mode === 'detailed') {
+      if ((c.gris ?? 0) > 0) rows.push(['GRIS', formatCurrency(c.gris ?? 0)]);
+      if ((c.tso ?? 0) > 0) rows.push(['TSO', formatCurrency(c.tso ?? 0)]);
+      if ((c.rctrc ?? 0) > 0) rows.push(['RCTR-C', formatCurrency(c.rctrc ?? 0)]);
+      if ((c.adValorem ?? 0) > 0) rows.push(['Ad Valorem', formatCurrency(c.adValorem ?? 0)]);
+      if ((c.tde ?? 0) > 0) rows.push(['TDE', formatCurrency(c.tde ?? 0)]);
+      if ((c.tear ?? 0) > 0) rows.push(['TEAR', formatCurrency(c.tear ?? 0)]);
+      if ((c.dispatchFee ?? 0) > 0)
+        rows.push(['Taxa de Despacho', formatCurrency(c.dispatchFee ?? 0)]);
+      if ((c.conditionalFeesTotal ?? 0) > 0)
+        rows.push(['Taxas Condicionais', formatCurrency(c.conditionalFeesTotal ?? 0)]);
+    }
   }
 
-  if (discount > 0) {
-    doc.setFillColor(...C.light);
-    doc.setDrawColor(...C.border);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(ML, y, CW, 8, 2, 2, 'FD');
-    doc.setFont('helvetica', 'normal');
+  if (rows.length === 0) return y;
+
+  const rowH = 6;
+  const totalH = rows.length * rowH;
+  doc.setDrawColor(...C.border);
+  doc.setLineWidth(0.25);
+  doc.rect(ML, y, CW, totalH);
+
+  rows.forEach((row, i) => {
+    const ry = y + i * rowH;
+    if (i % 2 === 0) {
+      doc.setFillColor(...C.light);
+      doc.rect(ML + 0.25, ry + 0.25, CW - 0.5, rowH - 0.5, 'F');
+    }
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(...C.muted);
-    doc.text('Desconto comercial', ML + 5, y + 5.5);
-    doc.setTextColor(220, 38, 38);
-    doc.text(`-${formatCurrency(discount)}`, PW - MR - 5, y + 5.5, { align: 'right' });
-    y += 10;
-  }
+    doc.text(row[0], ML + 3, ry + 4);
 
-  const totalFinal = Math.max(0, t.totalCliente - discount);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.text);
+    doc.text(row[1], PW - MR - 3, ry + 4, { align: 'right' });
+  });
+
+  return y + totalH + 1;
+}
+
+function drawTotalBlock(doc: PdfDoc, payload: QuotePdfPayload, y: number): number {
+  const H = 13;
   doc.setFillColor(...C.navy);
-  doc.roundedRect(ML, y, CW, 10, 2, 2, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...C.white);
-  doc.text(discount > 0 ? 'Total Final (com desconto)' : 'Total Cliente', ML + 5, y + 6.5);
-  doc.text(formatCurrency(totalFinal), PW - MR - 5, y + 6.5, { align: 'right' });
-  y += 14;
+  doc.rect(ML, y, CW, H, 'F');
+  doc.setFillColor(...C.orange);
+  doc.rect(ML, y, 3, H, 'F');
 
-  return y;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...C.white);
+  doc.text('VALOR TOTAL DA PROPOSTA', ML + 7, y + 8);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(...C.orangeLight);
+  doc.text(formatCurrency(Number(payload.value ?? 0)), PW - MR - 3, y + 9, { align: 'right' });
+
+  return y + H + 1;
+}
+
+function drawPaymentBlock(doc: PdfDoc, payload: QuotePdfPayload, y: number): number {
+  if (!payload.payment_term_name && !payload.payment_method_label) return y;
+  return drawFieldsBlock(
+    doc,
+    [
+      { label: 'CONDIÇÃO', value: payload.payment_term_name ?? '—' },
+      { label: 'FORMA DE PAGAMENTO', value: payload.payment_method_label ?? '—' },
+    ],
+    y
+  );
+}
+
+function drawValidityBlock(doc: PdfDoc, payload: QuotePdfPayload, y: number): number {
+  const validity = payload.validity_date
+    ? `VÁLIDA ATÉ ${fmtDate(payload.validity_date)}`
+    : '5 DIAS ÚTEIS A PARTIR DA EMISSÃO';
+
+  return drawFieldsBlock(
+    doc,
+    [
+      { label: 'EMITIDA EM', value: fmtDate(new Date().toISOString()) },
+      { label: 'VALIDADE', value: validity },
+    ],
+    y
+  );
+}
+
+function drawTextBlock(
+  doc: PdfDoc,
+  text: string | null | undefined,
+  y: number,
+  height = 18
+): number {
+  doc.setDrawColor(...C.border);
+  doc.setLineWidth(0.25);
+  doc.rect(ML, y, CW, height);
+  if (text) {
+    const lines = doc.splitTextToSize(text, CW - 6);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.text);
+    doc.text(lines.slice(0, 6) as string[], ML + 3, y + 5);
+  }
+  return y + height + 1;
+}
+
+function drawFooter(doc: PdfDoc): void {
+  const ph = doc.internal.pageSize.getHeight();
+  const fh = 9;
+  doc.setFillColor(...C.navy);
+  doc.rect(0, ph - fh, PW, fh, 'F');
+  doc.setFillColor(...C.orange);
+  doc.rect(0, ph - fh, PW, 1, 'F');
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(180, 195, 215);
+  doc.text(`VECTRA CARGO - ${VECTRA.phone} | ${VECTRA.email}`, ML, ph - 3);
+  doc.text('Pagina 1/1', PW - MR, ph - 3, { align: 'right' });
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
+
+const toFilename = (code: string | null, mode: QuotePdfMode): string =>
+  `cotacao-${(code || 'cotacao').replace(/[^\w-]+/g, '-')}-${mode === 'simplified' ? 'cliente' : 'interno'}.pdf`;
 
 export async function generateQuotePdf({
   quote,
@@ -592,43 +452,44 @@ export async function generateQuotePdf({
   mode: QuotePdfMode;
 }): Promise<{ blob: Blob; fileName: string }> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as PdfDoc;
-  const logoBase64 = await loadLogoBase64();
+  const logo = await loadLogoBase64();
 
-  let y = drawHeader(doc, mode, logoBase64);
-  y += 7;
+  let y = drawHeader(doc, quote, mode, logo);
+  y += 2;
 
-  // Banner de compliance ANTT para PDF interno (modo detailed)
   if (mode === 'detailed' && quote.antt_compliance?.below) {
-    const { piso } = quote.antt_compliance;
-    const banner = `ATENCAO: VALOR ABAIXO DO PISO ANTT (${formatCurrency(piso)}). NAO ENVIAR AO CLIENTE.`;
-    doc.setFillColor(220, 38, 38); // vermelho
-    doc.rect(ML, y, CW, 10, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(...C.white);
-    doc.text(banner, ML + CW / 2, y + 6.5, { align: 'center' });
-    y += 14;
+    drawWatermark(doc, 'ABAIXO DO PISO ANTT');
   }
 
+  y = drawSectionTitle(doc, 'CLIENTE', y);
   y = drawClientBlock(doc, quote, y);
-  y = drawRoute(doc, quote, y);
-  y = drawCargoInfo(doc, quote, y);
-  if (mode === 'simplified') y = drawPricingSimplified(doc, quote, y);
-  y = drawValueBlock(doc, quote, y);
-  y = drawInfoRows(doc, quote, y);
 
-  if (mode === 'detailed') {
-    y = drawDetailedSection(doc, quote, y);
-    if (quote.pricing_breakdown?.components) {
-      y = drawPricingBreakdown(doc, quote.pricing_breakdown, y);
-    }
+  y = drawSectionTitle(doc, 'ROTA', y);
+  y = drawRouteBlock(doc, quote, y);
+
+  y = drawSectionTitle(doc, 'CARGA', y);
+  y = drawCargoBlock(doc, quote, y);
+
+  y = drawSectionTitle(doc, 'DETALHAMENTO DE CUSTOS', y);
+  y = drawPricingBlock(doc, quote, mode, y);
+
+  y = drawTotalBlock(doc, quote, y);
+
+  if (quote.payment_term_name || quote.payment_method_label) {
+    y = drawSectionTitle(doc, 'CONDIÇÃO DE PAGAMENTO', y);
+    y = drawPaymentBlock(doc, quote, y);
   }
 
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    drawPageFooter(doc);
+  y = drawSectionTitle(doc, 'VALIDADE', y);
+  y = drawValidityBlock(doc, quote, y);
+
+  if (quote.notes?.trim()) {
+    y = drawSectionTitle(doc, 'OBSERVAÇÕES', y);
+    y = drawTextBlock(doc, quote.notes, y, 18);
   }
+
+  drawFooter(doc);
+  void autoTable;
 
   return { blob: doc.output('blob'), fileName: toFilename(quote.quote_code, mode) };
 }

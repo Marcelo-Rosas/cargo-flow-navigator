@@ -34,7 +34,7 @@ export function usePdfDownload() {
           .select(
             `id, quote_code, client_name, origin, destination, value, cargo_type, weight, volume,
              km_distance, estimated_loading_date, validity_date, notes, created_at, updated_at,
-             pricing_breakdown, freight_modality,
+             pricing_breakdown, freight_modality, freight_type, payment_method,
              payment_terms(name)`
           )
           .eq('id', quoteId)
@@ -86,8 +86,19 @@ export function usePdfDownload() {
           created_at: quoteRow.created_at,
           updated_at: quoteRow.updated_at,
           payment_term_name: pt?.name ?? null,
+          payment_method_label: (() => {
+            const m = (quoteRow.payment_method ?? '').toString().toLowerCase();
+            if (!m) return null;
+            if (m === 'pix') return 'PIX';
+            if (m === 'boleto') return 'Boleto';
+            if (m === 'transferencia' || m === 'transferência') return 'Transferência';
+            if (m === 'dinheiro') return 'Dinheiro';
+            if (m === 'cartao' || m === 'cartão') return 'Cartão';
+            return m.replace(/\b\w/g, (c) => c.toUpperCase());
+          })(),
           pricing_breakdown: breakdown,
           freight_modality: quoteRow.freight_modality as 'lotacao' | 'fracionado' | null,
+          freight_type: quoteRow.freight_type ?? null,
           antt_compliance: anttResult?.is_below_antt_floor
             ? { piso: anttResult.piso ?? 0, below: true, modality: '' }
             : undefined,
