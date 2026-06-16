@@ -67,7 +67,7 @@ const fmtNum = (raw: number | null, unit = ''): string => {
 };
 
 const toFilename = (code: string | null, mode: QuotePdfMode): string =>
-  `${(code || 'cotacao').replace(/[^\w-]+/g, '_')}_${mode === 'simplified' ? 'cliente' : 'interno'}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  `cotacao-${(code || 'cotacao').replace(/[^\w-]+/g, '-')}-${mode === 'simplified' ? 'cliente' : 'interno'}.pdf`;
 
 const humanizeCargoType = (raw: string | null): string => {
   if (!raw) return '—';
@@ -296,6 +296,51 @@ function drawCargoInfo(doc: PdfDoc, quote: QuotePdfPayload, y: number): number {
   return y + H + 5;
 }
 
+function drawPricingSimplified(doc: PdfDoc, quote: QuotePdfPayload, y: number): number {
+  const bd = quote.pricing_breakdown;
+  if (!bd?.components) return y;
+
+  const rows: string[][] = [];
+  const c = bd.components;
+  if ((c.baseFreight ?? 0) > 0) rows.push(['Frete', formatCurrency(c.baseFreight ?? 0)]);
+  if ((c.toll ?? 0) > 0) rows.push(['Pedagio', formatCurrency(c.toll ?? 0)]);
+  if ((c.insurance ?? 0) > 0) rows.push(['Seguro', formatCurrency(c.insurance ?? 0)]);
+  if ((c.aluguelMaquinas ?? 0) > 0)
+    rows.push(['Aluguel de Maquinas', formatCurrency(c.aluguelMaquinas ?? 0)]);
+  if ((c.waitingTimeCost ?? 0) > 0)
+    rows.push(['Estadia / Hora Parada', formatCurrency(c.waitingTimeCost ?? 0)]);
+
+  if (rows.length === 0) return y;
+
+  // Section header
+  doc.setFillColor(...C.navy);
+  doc.roundedRect(ML, y, CW, 10, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...C.white);
+  doc.text('DETALHAMENTO DE CUSTOS', ML + 5, y + 6.5);
+  y += 13;
+
+  autoTable(doc as jsPDF, {
+    startY: y,
+    head: [],
+    body: rows,
+    theme: 'plain',
+    margin: { left: ML, right: MR },
+    styles: {
+      fontSize: 8.5,
+      cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
+      textColor: C.text as number[],
+    },
+    columnStyles: {
+      0: { cellWidth: 68, fontStyle: 'bold', textColor: C.muted as number[] },
+      1: { cellWidth: CW - 68 },
+    },
+  });
+
+  return ((doc as PdfDoc).lastAutoTable?.finalY ?? y) + 5;
+}
+
 function drawValueBlock(doc: PdfDoc, quote: QuotePdfPayload, y: number): number {
   const H = quote.payment_term_name ? 34 : 28;
 
@@ -445,7 +490,7 @@ function drawPageFooter(doc: PdfDoc): void {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(150, 170, 200);
-  doc.text('Proposta comercial - nao constitui contrato.', PW - MR, h - 5, { align: 'right' });
+  doc.text('(47) 93385-1351 | comercial@vectracargo.com.br', PW - MR, h - 5, { align: 'right' });
 }
 
 // ── Pricing Breakdown (detailed / internal only) ───────────────────────────────
@@ -568,6 +613,7 @@ export async function generateQuotePdf({
   y = drawClientBlock(doc, quote, y);
   y = drawRoute(doc, quote, y);
   y = drawCargoInfo(doc, quote, y);
+  if (mode === 'simplified') y = drawPricingSimplified(doc, quote, y);
   y = drawValueBlock(doc, quote, y);
   y = drawInfoRows(doc, quote, y);
 
