@@ -1,4 +1,4 @@
-import { FileText, Download, Trash2, ExternalLink, Loader2 } from 'lucide-react';
+import { FileText, Download, Trash2, ExternalLink, Loader2, FileCheck2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDocumentsByOrder, useDocumentsByQuote, useDeleteDocument } from '@/hooks/useDocuments';
@@ -35,6 +35,8 @@ interface DocumentListProps {
   /** Quando true, exibe apenas docs Doc-Mot (CNH, CRLV, etc.) */
   docMotFilter?: boolean;
   dedupeByType?: boolean;
+  /** Chamado ao clicar "Gerar Comprovante" em docs do tipo POD */
+  onGeneratePodPdf?: (doc: Document) => void;
 }
 
 const TYPE_LABELS: Record<DocumentType, { label: string; color: string }> = {
@@ -67,6 +69,7 @@ export function DocumentList({
   quoteId,
   docMotFilter,
   dedupeByType = false,
+  onGeneratePodPdf,
 }: DocumentListProps) {
   const byOrder = useDocumentsByOrder(orderId || '');
   const byQuote = useDocumentsByQuote(quoteId || '');
@@ -170,6 +173,17 @@ export function DocumentList({
             </div>
 
             <div className="flex items-center gap-1">
+              {doc.type === 'pod' && onGeneratePodPdf && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-green-600 hover:text-green-700"
+                  onClick={() => onGeneratePodPdf(doc)}
+                  title="Gerar Comprovante de Entrega PDF"
+                >
+                  <FileCheck2 className="w-4 h-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

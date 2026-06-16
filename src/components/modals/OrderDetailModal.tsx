@@ -84,8 +84,12 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
+import { generatePodPdf } from '@/lib/generatePodPdf';
+import { getDocumentSignedUrl } from '@/lib/storage';
+import type { Database as _DB } from '@/integrations/supabase/types';
 
 type DocumentType = Database['public']['Enums']['document_type'];
+type OrderDocument = _DB['public']['Tables']['documents']['Row'];
 
 /** Maps document types to risk requirement keys */
 const DOC_TYPE_TO_RISK_REQUIREMENT: Partial<Record<DocumentType, string>> = {
@@ -650,6 +654,42 @@ export function OrderDetailModal({
       toast.success('OS vinculada à viagem');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao vincular viagem');
+    }
+  };
+
+  const handleGeneratePodPdf = async (doc: OrderDocument) => {
+    try {
+      toast.loading('Gerando comprovante de entrega…', { id: 'pod-pdf' });
+      const signedUrl = await getDocumentSignedUrl(doc.file_url, 600);
+      const res = await fetch(signedUrl);
+      if (!res.ok) throw new Error('Falha ao baixar imagem do canhoto');
+      const blob = await res.blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      await generatePodPdf({
+        os_number: order.os_number,
+        client_name: order.client_name,
+        origin: order.origin,
+        destination: order.destination,
+        shipper_name: order.shipper_name ?? null,
+        driver_name: order.driver_name ?? null,
+        vehicle_plate: order.vehicle_plate ?? null,
+        cargo_value_cents: order.cargo_value ?? null,
+        value_cents: order.value,
+        pickup_date: order.pickup_date ?? null,
+        eta: order.eta ?? null,
+        pod_image_data_url: dataUrl,
+        pod_uploaded_at: doc.created_at,
+      });
+      toast.success('Comprovante gerado com sucesso', { id: 'pod-pdf' });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao gerar comprovante', {
+        id: 'pod-pdf',
+      });
     }
   };
 
@@ -1583,6 +1623,7 @@ export function OrderDetailModal({
                   <DocumentList
                     orderId={order.id}
                     dedupeByType={order.stage === 'em_transito' || order.stage === 'entregue'}
+                    onGeneratePodPdf={handleGeneratePodPdf}
                   />
                 </TabsContent>
               )}
