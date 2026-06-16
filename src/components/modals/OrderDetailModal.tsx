@@ -32,6 +32,7 @@ import {
   ShieldAlert,
   ShieldQuestion,
   UserX,
+  Unlink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,7 +67,7 @@ import { useVehicleByPlate } from '@/hooks/useVehicles';
 import { useUpdateOrder, type OrderWithOccurrences } from '@/hooks/useOrders';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEnsureFinancialDocument } from '@/hooks/useEnsureFinancialDocument';
-import { useTripsForOrder, useLinkOrderToTrip } from '@/hooks/useTrips';
+import { useTripsForOrder, useLinkOrderToTrip, useUnlinkOrderFromTrip } from '@/hooks/useTrips';
 import { useOrderReconciliation } from '@/hooks/useReconciliation';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -229,6 +230,7 @@ export function OrderDetailModal({
   const ensureFinancialDocumentMutation = useEnsureFinancialDocument();
   const { data: tripForOrder } = useTripsForOrder(order?.id);
   const linkOrderToTripMutation = useLinkOrderToTrip();
+  const unlinkOrderFromTripMutation = useUnlinkOrderFromTrip();
   const { data: riskStatus } = useOrderRiskStatus(order?.id);
   const updateRiskEvaluation = useUpdateRiskEvaluation();
   const tripId = order?.trip_id ?? (tripForOrder as { id?: string } | null)?.id ?? undefined;
@@ -657,6 +659,28 @@ export function OrderDetailModal({
     }
   };
 
+  const linkedTripNumber =
+    tripForOrder && !Array.isArray(tripForOrder) && 'trip_number' in tripForOrder
+      ? tripForOrder.trip_number
+      : null;
+  const handleUnlinkFromTrip = async () => {
+    if (!tripId) return;
+    if (
+      !window.confirm(
+        `Desvincular a OS ${order.os_number} da viagem ${linkedTripNumber ?? ''}? ` +
+          'Os custos da viagem serão recalculados.'
+      )
+    ) {
+      return;
+    }
+    try {
+      await unlinkOrderFromTripMutation.mutateAsync({ orderId: order.id, tripId });
+      toast.success('OS desvinculada da viagem');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao desvincular viagem');
+    }
+  };
+
   const handleGeneratePodPdf = async (doc: OrderDocument) => {
     try {
       toast.loading('Gerando comprovante de entrega…', { id: 'pod-pdf' });
@@ -791,6 +815,24 @@ export function OrderDetailModal({
                     <Truck className="w-3 h-3" />
                     {tripForOrder.trip_number}
                   </Badge>
+                )}
+                {canManage && tripId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUnlinkFromTrip}
+                    disabled={unlinkOrderFromTripMutation.isPending}
+                    className="gap-2"
+                    aria-label="Desvincular OS da viagem"
+                  >
+                    {unlinkOrderFromTripMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Unlink className="w-4 h-4" />
+                    )}
+                    Desvincular Viagem
+                  </Button>
                 )}
                 {canConvertToPAG && (
                   <Button

@@ -308,6 +308,65 @@ export function useRemoveOrderFromTrip() {
   });
 }
 
+/**
+ * Desvincula uma OS de viagem a partir do lado da OS (sem precisar do
+ * trip_orders.id). Remove TODAS as linhas trip_orders da OS — cobre o caso de
+ * vínculos duplicados em trips diferentes deixados por religações antigas —,
+ * zera orders.trip_id e recalcula os custos de cada viagem afetada.
+ */
+export function useUnlinkOrderFromTrip() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ orderId }: { orderId: string; tripId?: string }) => {
+      // Descobre todas as viagens em que a OS está vinculada (pode haver mais
+      // de uma por causa do bug de duplicação no auto-group)
+      const { data: rows, error: selError } = await supabase
+        .from('trip_orders')
+        .select('trip_id')
+        .eq('order_id', asDb(orderId));
+      if (selError) throw selError;
+      const affectedTripIds = Array.from(
+        new Set((rows ?? []).map((r) => (r as { trip_id: string }).trip_id).filter(Boolean))
+      );
+
+      const { error: deleteError } = await supabase
+        .from('trip_orders')
+        .delete()
+        .eq('order_id', asDb(orderId));
+      if (deleteError) throw deleteError;
+
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({ trip_id: null })
+        .eq('id', asDb(orderId));
+      if (orderError) throw orderError;
+
+      // Recalcula itens de custo de cada viagem que perdeu a OS
+      for (const tripId of affectedTripIds) {
+        const { error: syncError } = await supabase.rpc('sync_cost_items_from_breakdown', {
+          p_trip_id: tripId,
+        });
+        if (syncError) throw syncError;
+      }
+
+      return affectedTripIds;
+    },
+    onSuccess: (affectedTripIds) => {
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-kanban'] });
+      for (const tripId of affectedTripIds ?? []) {
+        queryClient.invalidateQueries({ queryKey: ['trip_orders', tripId] });
+        queryClient.invalidateQueries({ queryKey: ['trip_financial_summary', tripId] });
+        queryClient.invalidateQueries({ queryKey: ['v_trip_financial_details', tripId] });
+        queryClient.invalidateQueries({ queryKey: ['trip_cost_items', tripId] });
+      }
+    },
+  });
+}
+
 export function useUpdateOrderDriverForTrip() {
   const queryClient = useQueryClient();
 
