@@ -672,12 +672,15 @@ export function OrderDetailModal({
       });
       // Busca OC para pegar segundo remetente, se houver
       let shipper2Name: string | null = null;
-      const { data: oc } = await supabase
+      const { data: oc, error: ocErr } = await supabase
         .from('collection_orders')
         .select('sender_2_data')
         .eq('order_id', order.id)
         .limit(1)
         .maybeSingle();
+      if (ocErr)
+        console.error('[POD PDF] collection_orders query error:', ocErr, 'order.id:', order.id);
+      console.log('[POD PDF] oc result:', oc, 'order.id:', order.id);
       if (oc?.sender_2_data) {
         const s2 = oc.sender_2_data as { name?: string };
         shipper2Name = s2.name?.trim() || null;
