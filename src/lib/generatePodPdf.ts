@@ -8,6 +8,7 @@ export interface PodPdfPayload {
   origin: string;
   destination: string;
   shipper_name: string | null;
+  shipper_2_name?: string | null;
   driver_name: string | null;
   vehicle_plate: string | null;
   cargo_value_cents: number | null;
@@ -142,18 +143,19 @@ function drawStatusBadge(doc: PdfDoc, y: number): number {
 }
 
 function drawInfoGrid(doc: PdfDoc, payload: PodPdfPayload, y: number): number {
-  const rows = [
+  const rows: string[][] = [
     ['Cliente / Destinatário', payload.client_name, 'Embarcador', payload.shipper_name ?? '—'],
+  ];
+
+  if (payload.shipper_2_name?.trim()) {
+    rows.push(['', '', 'Embarcador 2', payload.shipper_2_name]);
+  }
+
+  rows.push(
     ['Origem', payload.origin, 'Destino', payload.destination],
     ['Motorista', payload.driver_name ?? '—', 'Placa', payload.vehicle_plate ?? '—'],
-    ['Data Coleta', fmtDate(payload.pickup_date), 'ETA / Entrega', fmtDate(payload.eta)],
-    [
-      'Valor Frete (OS)',
-      fmtCurrency(payload.value_cents),
-      'Valor NF-e',
-      fmtCurrency(payload.cargo_value_cents),
-    ],
-  ];
+    ['Data de Entrega', fmtDate(payload.eta), '', '']
+  );
 
   if (payload.cte_number || payload.nfe_number) {
     rows.push(['CT-e', payload.cte_number ?? '—', 'NF-e', payload.nfe_number ?? '—']);

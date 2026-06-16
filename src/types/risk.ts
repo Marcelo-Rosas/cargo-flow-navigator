@@ -76,7 +76,7 @@ export interface RiskEvidence {
     | 'manual_note';
   document_id: string | null;
   payload: Record<string, unknown>;
-  status: 'valid' | 'expired' | 'rejected';
+  status: 'valid' | 'expired' | 'rejected' | 'pending' | 'invalid';
   expires_at: string | null;
   notes: string | null;
   created_by: string | null;
