@@ -25,10 +25,10 @@ export default defineConfig({
           if (id.includes('node_modules')) {
             if (id.includes('react-dom')) return 'vendor-react';
             if (id.includes('react-router')) return 'vendor-react';
+            if (id.includes('@dnd-kit')) return 'vendor-react';
             if (id.includes('@supabase')) return 'vendor-supabase';
             if (id.includes('@radix-ui')) return 'vendor-ui';
             if (id.includes('leaflet')) return 'vendor-map';
-            if (id.includes('@dnd-kit')) return 'vendor-dnd';
             if (id.includes('@tanstack')) return 'vendor-query';
             if (id.includes('framer-motion')) return 'vendor-motion';
             if (id.includes('date-fns')) return 'vendor-date';
