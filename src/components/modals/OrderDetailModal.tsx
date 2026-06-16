@@ -670,12 +670,26 @@ export function OrderDetailModal({
         reader.onerror = reject;
         reader.readAsDataURL(blob);
       });
+      // Busca OC para pegar segundo remetente, se houver
+      let shipper2Name: string | null = null;
+      const { data: ocRows } = await supabase
+        .from('collection_orders')
+        .select('sender_2_data')
+        .eq('order_id', order.id)
+        .not('sender_2_data', 'is', null)
+        .limit(1);
+      const ocSender2 = ocRows?.[0]?.sender_2_data;
+      if (ocSender2) {
+        const s2 = ocSender2 as { name?: string };
+        shipper2Name = s2.name?.trim() || null;
+      }
       await generatePodPdf({
         os_number: order.os_number,
         client_name: order.client_name,
         origin: order.origin,
         destination: order.destination,
         shipper_name: order.shipper_name ?? null,
+        shipper_2_name: shipper2Name,
         driver_name: order.driver_name ?? null,
         vehicle_plate: order.vehicle_plate ?? null,
         cargo_value_cents: order.cargo_value ?? null,
