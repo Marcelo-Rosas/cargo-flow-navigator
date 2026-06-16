@@ -75,8 +75,11 @@ export function buildQuoteEmailContent(
   const isDetailed = emailMode === 'detailed';
   const pricingRows: EmailRow[] = [];
 
-  if (isDetailed && baseFreight != null && baseFreight > 0) {
-    pricingRows.push({ label: 'Frete Base', value: formatQuoteBRL(baseFreight) });
+  if (baseFreight != null && baseFreight > 0) {
+    pricingRows.push({
+      label: isDetailed ? 'Frete Base' : 'Frete',
+      value: formatQuoteBRL(baseFreight),
+    });
   }
   if (toll != null && toll > 0) {
     pricingRows.push({ label: 'Pedágio', value: formatQuoteBRL(toll) });
@@ -159,8 +162,8 @@ export function buildQuoteEmailContent(
     routeRows.push({ label: `Parada ${i + 1}`, value: val });
   });
   routeRows.push({ label: 'Destino', value: destination });
-  if (routeUf) routeRows.push({ label: 'Rota UF', value: routeUf });
-  if (kmBand) routeRows.push({ label: 'Faixa KM', value: `${kmBand} km` });
+  if (isDetailed && routeUf) routeRows.push({ label: 'Rota UF', value: routeUf });
+  if (isDetailed && kmBand) routeRows.push({ label: 'Faixa KM', value: `${kmBand} km` });
   if (freightType) {
     routeRows.push({
       label: 'Tipo Frete',
@@ -199,16 +202,59 @@ export function buildQuoteEmailContent(
   if (bankAccount) bankRows.push({ label: 'Conta', value: bankAccount });
   if (bankPixKey) bankRows.push({ label: 'Chave Pix', value: bankPixKey });
 
+  const cargoRows: EmailRow[] = [];
+  const cargoType = quote.cargo_type as string | null;
+  const weight = quote.weight as number | null;
+  const volume = quote.volume as number | null;
+  const kmDistance = quote.km_distance as number | null;
+  if (cargoType) {
+    cargoRows.push({
+      label: 'Tipo de Carga',
+      value: cargoType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    });
+  }
+  if (weight != null && weight > 0) {
+    const kg = Number(weight);
+    cargoRows.push({
+      label: 'Peso',
+      value:
+        kg >= 1000
+          ? `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(kg / 1000)} t`
+          : `${new Intl.NumberFormat('pt-BR').format(kg)} kg`,
+    });
+  }
+  if (volume != null && volume > 0) {
+    cargoRows.push({
+      label: 'Volume',
+      value: `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(Number(volume))} m³`,
+    });
+  }
+  if (kmDistance != null && kmDistance > 0) {
+    cargoRows.push({
+      label: 'Distância Estimada',
+      value: `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(Number(kmDistance))} km`,
+    });
+  }
+
+  const now = new Date();
+  const emittedAt = now.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+
   return {
     quoteCode,
     value,
     valueFormatted: formatQuoteBRL(value),
     clientRows,
     routeRows,
+    cargoRows,
     pricingRows,
     taxRow,
     payment,
     bankRows: bankRows.length ? bankRows : undefined,
     notes: notes || undefined,
+    emittedAt,
   };
 }

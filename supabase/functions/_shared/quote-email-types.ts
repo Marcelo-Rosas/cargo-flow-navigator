@@ -33,11 +33,13 @@ export interface QuoteEmailContent {
   valueFormatted: string;
   clientRows: EmailRow[];
   routeRows: EmailRow[];
+  cargoRows: EmailRow[];
   pricingRows: EmailRow[];
   taxRow?: EmailRow;
   payment?: QuoteEmailPaymentInfo;
   bankRows?: EmailRow[];
   notes?: string;
+  emittedAt?: string;
 }
 
 export type QuoteEmailMode = 'simplified' | 'detailed';

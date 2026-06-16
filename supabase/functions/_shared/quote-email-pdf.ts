@@ -121,6 +121,16 @@ async function drawHeader(ctx: PdfCtx, content: QuoteEmailContent): Promise<void
     color: palette.orange,
   });
 
+  if (content.emittedAt) {
+    ctx.page.drawText(`Emitida em ${content.emittedAt}`, {
+      x: PAGE_W - MARGIN - 72,
+      y: ctx.y - logoH + 4,
+      size: 7,
+      font: ctx.font,
+      color: palette.gray,
+    });
+  }
+
   ctx.y -= logoH + 16;
   ctx.page.drawLine({
     start: { x: MARGIN, y: ctx.y },
@@ -318,14 +328,22 @@ function drawPaymentBlock(ctx: PdfCtx, content: QuoteEmailContent): void {
   lineY -= 18;
 
   if (payment.termName) {
-    ctx.page.drawText(payment.termName, {
+    ctx.page.drawText('Condição', {
       x: MARGIN + 14,
       y: lineY - 10,
-      size: 10,
+      size: 9,
+      font: ctx.font,
+      color: palette.gray,
+    });
+    const termW = ctx.fontBold.widthOfTextAtSize(payment.termName, 9);
+    ctx.page.drawText(payment.termName, {
+      x: PAGE_W - MARGIN - 14 - termW,
+      y: lineY - 10,
+      size: 9,
       font: ctx.fontBold,
       color: palette.navy,
     });
-    lineY -= 16;
+    lineY -= 14;
   }
 
   if (payment.methodLabel) {
@@ -446,7 +464,7 @@ function drawFooter(page: PDFPage, font: PDFFont): void {
   });
   const footerLines = [
     'Esta cotação é válida por 10 dias a partir da data de envio.',
-    'Para dúvidas, responda este e-mail ou entre em contato com a Vectra Cargo.',
+    'Dúvidas? Fale conosco: (47) 93385-1351 | comercial@vectracargo.com.br',
   ];
   let y = MARGIN + 16;
   for (const line of footerLines) {
@@ -484,6 +502,11 @@ export async function renderQuoteEmailPdf(content: QuoteEmailContent): Promise<U
 
   drawSectionHeader(ctx, 'Informações da Rota');
   drawKeyValueRows(ctx, content.routeRows);
+
+  if (content.cargoRows.length > 0) {
+    drawSectionHeader(ctx, 'Informações da Carga');
+    drawKeyValueRows(ctx, content.cargoRows);
+  }
 
   drawSectionHeader(ctx, 'Detalhamento de Custos');
   drawPricingTable(ctx, content.pricingRows);
