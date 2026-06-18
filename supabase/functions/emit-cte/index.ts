@@ -127,6 +127,20 @@ serve(async (req) => {
   if (shipErr || !shipper) return json({ error: 'shipper_not_found' }, 404, cors);
   if (clientErr || !client) return json({ error: 'client_not_found' }, 404, cors);
 
+  // F2.3 Gate: route by shipper.emit_cte_via — prevents double-issuance with Active
+  const shipperRoute = (shipper as { emit_cte_via?: string }).emit_cte_via ?? 'active';
+  if (shipperRoute !== 'cfn') {
+    return json(
+      {
+        error: 'shipper_not_routed_to_cfn',
+        detail: `Shipper ${shipper.name} routed to '${shipperRoute}' — emit via that system or migrate router to 'cfn'.`,
+        emit_cte_via: shipperRoute,
+      },
+      422,
+      cors
+    );
+  }
+
   // Resolve missing IBGE for shipper/client via BrasilAPI/ViaCEP
   const shipperPatched = await resolveIbge(shipper);
   const clientPatched = await resolveIbge(client);

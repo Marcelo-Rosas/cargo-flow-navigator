@@ -28,6 +28,13 @@ export interface VehicleRow {
   tipo_rodado?: string | null; // '01'..'06' (truck/cavalo/etc)
   tipo_carroceria?: string | null; // '00'..'09'
   uf_licenciamento?: string | null;
+  // Proprietário (when vehicle is third-party — TAC Agregado/Independente)
+  rntrc_proprietario?: string | null;
+  cpf_cnpj_proprietario?: string | null;
+  nome_proprietario?: string | null;
+  ie_proprietario?: string | null;
+  uf_proprietario?: string | null;
+  tipo_proprietario?: number | null; // 0=TAC Agregado, 1=TAC Independente, 2=Outros
 }
 
 export interface DriverRow {
@@ -75,6 +82,40 @@ export interface BuildMdfeResult {
 
 function digits(s: string | null | undefined): string {
   return (s ?? '').replace(/\D/g, '');
+}
+
+/**
+ * Build veiculo_tracao.proprietario block. If vehicle has explicit proprietario
+ * fields (rntrc_proprietario, etc), use them — third-party vehicle (TAC).
+ * Otherwise treat as Vectra-owned (omit proprietario block; some integrations
+ * still expect proprietario=Vectra so we mirror Active's behaviour and include
+ * Vectra as proprietario when not specified).
+ */
+function buildProprietario(vehicle: VehicleRow, vectra: VectraConfig): Record<string, unknown> {
+  const isThirdParty = Boolean(vehicle.rntrc_proprietario || vehicle.cpf_cnpj_proprietario);
+  if (!isThirdParty) {
+    // Própria Vectra
+    return {
+      cnpj: vectra.cnpj,
+      rntrc: vectra.rntrc,
+      nome: vectra.nome,
+      ie: vectra.ie,
+      uf: vectra.uf,
+      tipo_proprietario: null,
+    };
+  }
+
+  const doc = digits(vehicle.cpf_cnpj_proprietario);
+  const docField = doc.length === 14 ? { cnpj: doc } : doc.length === 11 ? { cpf: doc } : {};
+
+  return {
+    ...docField,
+    rntrc: digits(vehicle.rntrc_proprietario),
+    nome: vehicle.nome_proprietario ?? '',
+    ...(vehicle.ie_proprietario ? { ie: vehicle.ie_proprietario } : {}),
+    uf: vehicle.uf_proprietario ?? vectra.uf,
+    tipo_proprietario: vehicle.tipo_proprietario ?? 0, // 0 = TAC Agregado fallback
+  };
 }
 
 function uniqByCode<T extends { codigo: number }>(arr: T[]): T[] {
@@ -183,14 +224,7 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
           cpf: cpfMotorista,
         },
       ],
-      proprietario: {
-        cnpj: vectra.cnpj,
-        rntrc: vectra.rntrc,
-        nome: vectra.nome,
-        ie: vectra.ie,
-        uf: vectra.uf,
-        tipo_proprietario: 0, // 0 = TAC Agregado / 1 = TAC Independente / 2 = Outros / null = próprio
-      },
+      proprietario: buildProprietario(vehicle, vectra),
     },
     ...(vehicle.plate_2
       ? {

@@ -2,21 +2,31 @@
 /**
  * CFOP resolver for CT-e (transporte rodoviário de cargas, regime Normal/LP).
  *
- * Decision matrix (transportadora prestadora — CT-e modelo 57):
+ * Decision tree (transportadora emitente — CT-e modelo 57):
  *
- *   Tomador contribuinte ICMS (indIE=1):
- *     mesma UF  → 5353   (prestação intraestadual)
- *     UF distinta → 6353 (prestação interestadual)
+ * Step 1 — Is prestation starting in the UF where the carrier is registered?
+ *   - YES (ufOrigem == ufEmitente):
+ *       intraestadual (ufOrigem == ufDestino):
+ *         contribuinte (indIE=1)        → 5353
+ *         não-contribuinte (indIE=2|9)  → 5357
+ *       interestadual (ufOrigem != ufDestino):
+ *         contribuinte                  → 6353
+ *         não-contribuinte              → 6357
+ *   - NO (ufOrigem != ufEmitente — Vectra registered in SC but cargo picked
+ *         up elsewhere, e.g. SP → GO):
+ *       always interestadual (origin ≠ Vectra UF):
+ *         contribuinte                  → 6932 (transporte iniciado em UF
+ *                                          diversa do estabelecimento inscrito)
+ *         não-contribuinte              → 6932 (Brazilian states accept 6932
+ *                                          for both; some prefer 6359 for
+ *                                          não-contribuinte but 6932 is the
+ *                                          safe default — Active uses 6932)
  *
- *   Tomador contribuinte isento ou não-contribuinte (indIE=2 ou 9):
- *     mesma UF  → 5357
- *     UF distinta → 6357
+ * Out of scope (até serem necessários): 5403/6403 (ST), 5949/6949 (outras
+ * saídas), 7353/7949 (exportação), retorno (1353/2353), 5359 (não-contribuinte
+ * intraestadual específico).
  *
- * Out of scope (caso entrem depois): 5359/6359 (não-contribuinte específico),
- * 5403/6403 (substituição tributária), 5949/6949 (outras saídas), 7353/7949
- * (exportação), retorno (1353/2353).
- *
- * Reference: Convênio SINIEF 06/89 + RICMS/SC.
+ * Reference: Convênio SINIEF 06/89 + RICMS/SC + caso CT-e 577 Vectra (6932 SP→GO).
  */
 
 export type IndicadorIE = 1 | 2 | 9;
@@ -24,11 +34,20 @@ export type IndicadorIE = 1 | 2 | 9;
 export interface CfopInput {
   ufOrigem: string;
   ufDestino: string;
+  /** UF where the carrier (emitente) is registered (e.g. Vectra=SC). */
+  ufEmitente: string;
   tomadorIndicadorIE: IndicadorIE;
 }
 
 export function resolveCfopCte(input: CfopInput): number {
-  const intraestadual = input.ufOrigem.toUpperCase() === input.ufDestino.toUpperCase();
+  const ufOrigem = input.ufOrigem.toUpperCase();
+  const ufDestino = input.ufDestino.toUpperCase();
+  const ufEmitente = input.ufEmitente.toUpperCase();
+
+  // Origin outside carrier's UF — always 6932 regardless of destination
+  if (ufOrigem !== ufEmitente) return 6932;
+
+  const intraestadual = ufOrigem === ufDestino;
   const contribuinte = input.tomadorIndicadorIE === 1;
 
   if (contribuinte) return intraestadual ? 5353 : 6353;
@@ -48,6 +67,8 @@ export function describeCfop(cfop: number): string {
       return 'Prestação de serviço de transporte a não-contribuinte (intraestadual)';
     case 6357:
       return 'Prestação de serviço de transporte a não-contribuinte (interestadual)';
+    case 6932:
+      return 'Prestação de serviço iniciada em UF diversa do estabelecimento inscrito';
     default:
       return `CFOP ${cfop}`;
   }

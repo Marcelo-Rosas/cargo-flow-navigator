@@ -200,6 +200,7 @@ export function buildCtePayload(input: BuildCteInput): BuildCteResult {
   const cfop = resolveCfopCte({
     ufOrigem,
     ufDestino,
+    ufEmitente: vectra.uf,
     tomadorIndicadorIE,
   });
 
