@@ -254,9 +254,12 @@ export function buildCtePayload(input: BuildCteInput): BuildCteResult {
     ...(vectra.telefone ? { telefone_emitente: vectra.telefone } : {}),
 
     // === remetente ===
-    ...(partyDoc(shipper) as Record<string, unknown>),
+    ...(shipper.cnpj ? { cnpj_remetente: digits(shipper.cnpj) } : {}),
+    ...(shipper.cpf ? { cpf_remetente: digits(shipper.cpf) } : {}),
     nome_remetente: requireField(shipper.name, 'remetente.name', warnings),
-    inscricao_estadual_remetente: shipper.state_registration ?? '',
+    ...(shipper.state_registration && shipper.state_registration.trim() !== ''
+      ? { inscricao_estadual_remetente: shipper.state_registration }
+      : {}),
     telefone_remetente: digits(shipper.phone) || undefined,
     ...buildEnderecoFields('remetente', shipper),
 
@@ -278,7 +281,9 @@ export function buildCtePayload(input: BuildCteInput): BuildCteResult {
     nome_destinatario: requireField(client.name, 'destinatario.name', warnings),
     ...(client.cnpj ? { cnpj_destinatario: digits(client.cnpj) } : {}),
     ...(client.cpf ? { cpf_destinatario: digits(client.cpf) } : {}),
-    inscricao_estadual_destinatario: client.state_registration ?? '',
+    ...(client.state_registration && client.state_registration.trim() !== ''
+      ? { inscricao_estadual_destinatario: client.state_registration }
+      : {}),
     telefone_destinatario: digits(client.phone) || undefined,
     ...buildEnderecoFields('destinatario', client),
 
@@ -309,7 +314,9 @@ export function buildCtePayload(input: BuildCteInput): BuildCteResult {
     ],
 
     // === modal rodoviário ===
-    rntrc: vectra.rntrc,
+    modal_rodoviario: {
+      rntrc: vectra.rntrc,
+    },
 
     // === documentos vinculados ===
     ...(quote.nfe_keys && quote.nfe_keys.length > 0
@@ -317,7 +324,7 @@ export function buildCtePayload(input: BuildCteInput): BuildCteResult {
       : {
           outros_documentos: [
             {
-              tipo_documento: 0,
+              tipo_documento: '99',
               descricao: 'DECLARACAO DE CARGA',
               numero: quote.quote_code ?? quote.id.slice(0, 8),
               data_emissao: new Date().toISOString().slice(0, 10),
