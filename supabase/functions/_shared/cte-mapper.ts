@@ -219,7 +219,10 @@ export function buildCtePayload(input: BuildCteInput): BuildCteResult {
     // === ide ===
     cfop,
     natureza_operacao: input.naturezaOperacao ?? 'PRESTACAO DE SERVICO DE TRANSPORTE',
-    data_emissao: new Date().toISOString().slice(0, 19),
+    // SEFAZ exige horário local. Brasil é UTC-3 fixo (sem DST desde 2019).
+    // toISOString() é UTC → SEFAZ lê 3h no futuro (rejeição 212 "data posterior
+    // ao recebimento"). Subtrai 3h e anexa o offset -03:00 explícito.
+    data_emissao: new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 19) + '-03:00',
     tipo_documento: 0, // 0 = Normal
     modal: '01', // 01 = Rodoviário
     tipo_servico: 0, // 0 = Normal

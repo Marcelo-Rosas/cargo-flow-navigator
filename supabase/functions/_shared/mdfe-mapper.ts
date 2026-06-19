@@ -185,7 +185,8 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
     serie,
     numero,
     modal: 1, // 1 = Rodoviário
-    data_emissao: new Date().toISOString().slice(0, 19),
+    // Horário local Brasil (UTC-3 fixo). UTC puro → SEFAZ rejeita 212. Ver cte-mapper.
+    data_emissao: new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 19) + '-03:00',
     uf_inicio: ufInicio,
     uf_fim: ufFim,
     tipo_emitente: 1, // 1 = Prestador
@@ -277,7 +278,8 @@ export interface EncerrarMdfeInput {
 export function buildEncerramentoPayload(input: EncerrarMdfeInput): Record<string, unknown> {
   return {
     protocolo: input.protocolo,
-    data_encerramento: new Date().toISOString().slice(0, 19),
+    // Horário local Brasil (UTC-3 fixo) — mesmo motivo do data_emissao (rejeição 212).
+    data_encerramento: new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 19) + '-03:00',
     uf: input.uf,
     codigo_municipio: input.municipio_descarga_ibge,
   };
