@@ -1102,7 +1102,11 @@ export function calculateFreight(input: FreightCalculationInput): FreightCalcula
 
   let gris = round2(input.cargoValue * (grisPercent / 100));
   let tso = round2(input.cargoValue * (tsoPercent / 100));
-  const rctrc = !isLtl ? 0 : round2(input.cargoValue * (costValuePercent / 100));
+  // RCTR-C cobrado em AMBAS modalidades. `costValuePercent` (linhas ~1069-1075) já
+  // resolve a precedência B.2 (Central > tabela; Central=0 → tabela) para lotação.
+  // Zerar em lotação reintroduzia o incidente B — ver docs/NTC_DIVERGENCIAS_LOTACAO.md
+  // e paridade com o edge calculate-freight/index.ts:509.
+  const rctrc = round2(input.cargoValue * (costValuePercent / 100));
 
   // Fracionado: aplicar mínimos NTC
   if (isLtl && input.ltlParams) {
