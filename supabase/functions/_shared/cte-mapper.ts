@@ -187,6 +187,21 @@ export function buildCteRef(quoteCode: string, retry = 0): string {
   return retry > 0 ? `CFN-CTE-${code}-r${retry}` : `CFN-CTE-${code}`;
 }
 
+/**
+ * Extrai o nome do município de strings compostas tipo "Itajaí - SC, 88317100"
+ * ou " Itanhaém- SP, 11746-160". SEFAZ (xMunInic/xMunFim) exige só o nome da cidade,
+ * sem UF/CEP e sem espaço nas pontas (rejeição schema 422 facet 'pattern').
+ * Remove o sufixo "- UF[, CEP]" e normaliza espaços; preserva hífen no nome
+ * (ex.: "Biritiba-Mirim"). Cai no fallback (cidade limpa do cadastro) se vazio.
+ */
+function municipioNome(
+  composite: string | null | undefined,
+  fallback: string | null | undefined
+): string {
+  const stripped = (composite ?? '').replace(/\s*-\s*[A-Z]{2}\s*(?:,.*)?$/, '').trim();
+  return stripped || (fallback ?? '').trim();
+}
+
 export function buildCtePayload(input: BuildCteInput): BuildCteResult {
   const { quote, shipper, client, serie, numero, vectra } = input;
   const expedidor = input.expedidor ?? shipper;
@@ -232,10 +247,10 @@ export function buildCtePayload(input: BuildCteInput): BuildCteResult {
     municipio_envio: shipper.city ?? '',
     uf_envio: ufOrigem,
     codigo_municipio_inicio: quote.origin_ibge ?? shipper.ibge_code ?? null,
-    municipio_inicio: quote.origin ?? shipper.city ?? '',
+    municipio_inicio: municipioNome(quote.origin, shipper.city),
     uf_inicio: ufOrigem,
     codigo_municipio_fim: quote.destination_ibge ?? client.ibge_code ?? null,
-    municipio_fim: quote.destination ?? client.city ?? '',
+    municipio_fim: municipioNome(quote.destination, client.city),
     uf_fim: ufDestino,
     retirar_mercadoria: 0,
     detalhes_retirar: nz(quote.cargo_type, 'CARGA GERAL'),
