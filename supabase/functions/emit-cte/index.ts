@@ -149,7 +149,15 @@ serve(async (req) => {
   }
   if (!quote.client_id) return json({ error: 'quote_missing_client_id' }, 422, cors);
   if (!quote.shipper_id) return json({ error: 'quote_missing_shipper_id' }, 422, cors);
-  if (quote.tomador_tipo == null) return json({ error: 'quote_missing_tomador_tipo' }, 422, cors);
+  // F2.6: tomador_tipo derivado de freight_type quando ausente, e persistido.
+  // FOB = frete por conta do destinatário → tomador 3 (Destinatário).
+  // CIF = frete por conta do remetente   → tomador 0 (Remetente).
+  let tomadorTipo = quote.tomador_tipo;
+  if (tomadorTipo == null) {
+    const ft = String(quote.freight_type ?? 'FOB').toUpperCase();
+    tomadorTipo = ft === 'CIF' ? 0 : 3;
+    await supabase.from('quotes').update({ tomador_tipo: tomadorTipo }).eq('id', quote.id);
+  }
 
   // Load shipper + client
   const [{ data: shipper, error: shipErr }, { data: client, error: clientErr }] = await Promise.all(
@@ -201,6 +209,7 @@ serve(async (req) => {
   }
   const quotePatched: QuoteRow = {
     ...quote,
+    tomador_tipo: tomadorTipo,
     origin_ibge: originIbge,
     origin_uf: originUf,
     destination_ibge: destinationIbge,
