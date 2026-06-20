@@ -38,9 +38,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-/** ie_indicator existe no DB (migration F1.2) mas ainda não nos tipos gerados. */
-type ClientWithIe = { ie_indicator?: number | null };
-
 type Client = Database['public']['Tables']['clients']['Row'];
 
 const digits = (v: string) => v.replace(/\D/g, '');
@@ -140,7 +137,7 @@ export function ClientForm({ open, onClose, client, onSelectExisting }: ClientFo
         zip_code: client.zip_code || '',
         notes: client.notes || '',
         state_registration: client.state_registration || '',
-        ie_indicator: (client as ClientWithIe).ie_indicator ?? 1,
+        ie_indicator: client.ie_indicator ?? 1,
         legal_representative_name: client.legal_representative_name || '',
         legal_representative_cpf: client.legal_representative_cpf || '',
         legal_representative_role: client.legal_representative_role || '',

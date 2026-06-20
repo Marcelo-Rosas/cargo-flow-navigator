@@ -38,9 +38,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-/** ie_indicator existe no DB (migration F1.2) mas ainda não nos tipos gerados. */
-type ShipperWithIe = { ie_indicator?: number | null };
-
 type Shipper = Database['public']['Tables']['shippers']['Row'];
 
 const digits = (v: string) => v.replace(/\D/g, '');
@@ -137,7 +134,7 @@ export function ShipperForm({ open, onClose, shipper, onSelectExisting }: Shippe
         zip_code: shipper.zip_code || '',
         notes: shipper.notes || '',
         state_registration: shipper.state_registration || '',
-        ie_indicator: (shipper as ShipperWithIe).ie_indicator ?? 1,
+        ie_indicator: shipper.ie_indicator ?? 1,
         legal_representative_name: shipper.legal_representative_name || '',
         legal_representative_cpf: shipper.legal_representative_cpf || '',
         legal_representative_role: shipper.legal_representative_role || '',
