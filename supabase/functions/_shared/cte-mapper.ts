@@ -286,6 +286,10 @@ export function buildCtePayload(input: BuildCteInput): BuildCteResult {
     nome_expedidor: expedidor.name,
     ...(expedidor.cnpj ? { cnpj_expedidor: digits(expedidor.cnpj) } : {}),
     ...(expedidor.cpf ? { cpf_expedidor: digits(expedidor.cpf) } : {}),
+    // SEFAZ exige IE do expedidor contribuinte (rejeição 717). Só envia se não-vazia.
+    ...(expedidor.state_registration && expedidor.state_registration.trim() !== ''
+      ? { inscricao_estadual_expedidor: expedidor.state_registration }
+      : {}),
     telefone_expedidor: digits(expedidor.phone) || undefined,
     ...buildEnderecoFields('expedidor', expedidor),
 
@@ -293,6 +297,10 @@ export function buildCtePayload(input: BuildCteInput): BuildCteResult {
     nome_recebedor: recebedor.name,
     ...(recebedor.cnpj ? { cnpj_recebedor: digits(recebedor.cnpj) } : {}),
     ...(recebedor.cpf ? { cpf_recebedor: digits(recebedor.cpf) } : {}),
+    // SEFAZ exige IE do recebedor contribuinte (rejeição 718). Só envia se não-vazia.
+    ...(recebedor.state_registration && recebedor.state_registration.trim() !== ''
+      ? { inscricao_estadual_recebedor: recebedor.state_registration }
+      : {}),
     telefone_recebedor: digits(recebedor.phone) || undefined,
     ...buildEnderecoFields('recebedor', recebedor),
 
