@@ -23,6 +23,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { FocusClient, type FocusAmbiente } from '../_shared/focus-client.ts';
 import { lookupIbgeByCep } from '../_shared/ibge-lookup.ts';
+import { lookupIeByCnpj } from '../_shared/ie-lookup.ts';
 import {
   buildCtePayload,
   type VectraConfig,
@@ -55,6 +56,39 @@ function buildVectraConfig(): VectraConfig {
     telefone: Deno.env.get('VECTRA_TELEFONE'),
     crt: Number(envOrThrow('VECTRA_CRT')),
   };
+}
+
+/**
+ * Resolve a IE de uma parte (shipper/client) marcada contribuinte (ie_indicator=1)
+ * mas sem state_registration, via SintegrAPI, e persiste no cadastro (self-healing).
+ * Se a API diz não-contribuinte (sem IE ativa na UF) → corrige ie_indicator=9.
+ * Degrada sem erro: se a consulta falha, devolve a parte inalterada.
+ */
+async function ensurePartyIe(
+  supabase: ReturnType<typeof createClient>,
+  party: Record<string, unknown> | null,
+  table: 'shippers' | 'clients'
+): Promise<Record<string, unknown> | null> {
+  if (!party) return party;
+  const indicator = Number(party.ie_indicator ?? 0);
+  const hasIe = party.state_registration && String(party.state_registration).trim() !== '';
+  const cnpj = String(party.cnpj ?? '').replace(/\D/g, '');
+  const uf = String(party.state ?? '')
+    .toUpperCase()
+    .slice(0, 2);
+  if (indicator !== 1 || hasIe || cnpj.length !== 14 || uf.length !== 2) return party;
+
+  const r = await lookupIeByCnpj(cnpj, uf);
+  if (!r) return party;
+  if (r.ie) {
+    await supabase.from(table).update({ state_registration: r.ie }).eq('id', party.id);
+    return { ...party, state_registration: r.ie };
+  }
+  if (r.naoContribuinte) {
+    await supabase.from(table).update({ ie_indicator: 9 }).eq('id', party.id);
+    return { ...party, ie_indicator: 9 };
+  }
+  return party;
 }
 
 function json(body: unknown, status = 200, cors: Record<string, string> = {}): Response {
@@ -142,8 +176,9 @@ serve(async (req) => {
   }
 
   // Resolve missing IBGE for shipper/client via BrasilAPI/ViaCEP
-  const shipperPatched = await resolveIbge(shipper);
-  const clientPatched = await resolveIbge(client);
+  // + resolve/persist IE faltante (contribuinte sem state_registration) via SintegrAPI.
+  const shipperPatched = await ensurePartyIe(supabase, await resolveIbge(shipper), 'shippers');
+  const clientPatched = await ensurePartyIe(supabase, await resolveIbge(client), 'clients');
 
   // Resolve missing IBGE for origin/destination CEPs
   let originIbge = quote.origin_ibge;
