@@ -58,6 +58,16 @@ export interface MunicipioCarregamento {
   nome: string;
 }
 
+/** Seguro da carga (grupo seguros_carga do MDF-e). responsavel_seguro: 1=emitente, 2=contratante. */
+export interface MdfeSeguro {
+  responsavel_seguro: '1' | '2';
+  cnpj_responsavel?: string;
+  nome_seguradora?: string;
+  cnpj_seguradora?: string;
+  numero_apolice?: string;
+  numero_averbacao?: string;
+}
+
 export interface BuildMdfeInput {
   ctes: CteRowForMdfe[];
   vehicle: VehicleRow;
@@ -67,6 +77,8 @@ export interface BuildMdfeInput {
   vectra: VectraConfig;
   municipiosCarregamento: MunicipioCarregamento[]; // 1..50 (where cargo was picked up)
   percursoUfs?: string[]; // intermediate UFs between uf_inicio and uf_fim
+  /** Apólices ativas (RCTR-C / RC-DC). Responsável = emitente (Vectra). */
+  seguros?: MdfeSeguro[];
   produtoPredominante?: {
     descricao: string;
     ncm?: string;
@@ -260,8 +272,13 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
       ...(input.produtoPredominante?.cean ? { cean: input.produtoPredominante.cean } : {}),
     },
 
+    // === seguro da carga (RCTR-C / RC-DC) ===
+    ...(input.seguros && input.seguros.length > 0 ? { seguros_carga: input.seguros } : {}),
+
     informacoes_adicionais_contribuinte: `MDF-e CFN — ${ctes.length} CT-e(s) agregados`,
   };
+  if (!input.seguros || input.seguros.length === 0)
+    warnings.push('seguros vazio — MDF-e sem apólice (RCTR-C/RC-DC). Verificar risk_policies.');
 
   return { ref, payload, warnings };
 }

@@ -198,6 +198,31 @@ serve(async (req) => {
   if (vErr || !vehicle) return json({ error: 'vehicle_not_found' }, 404, cors);
   if (dErr || !driver) return json({ error: 'driver_not_found' }, 404, cors);
 
+  // Seguro da carga: apólices ativas (RCTR-C / RC-DC). Responsável = emitente (Vectra).
+  // nApol vem do `code` (dígitos); CNPJ da seguradora do metadata.insurer_cnpj
+  // (fallback Berkley quando ausente — as 2 apólices emitidas não têm no metadata).
+  const BERKLEY_CNPJ = '07021544000189';
+  const { data: policies } = await supabase
+    .from('risk_policies')
+    .select('code, insurer, metadata')
+    .eq('is_active', true);
+  const seguros = (policies ?? [])
+    .filter((pol: any) => (pol.metadata?.status ?? '') !== 'em_emissao')
+    .map((pol: any) => {
+      const apolice = String(pol.code ?? '').replace(/\D/g, '');
+      const insurer = String(pol.insurer ?? '');
+      const cnpjSeg =
+        String(pol.metadata?.insurer_cnpj ?? '').replace(/\D/g, '') ||
+        (/berkley/i.test(insurer) ? BERKLEY_CNPJ : '');
+      return {
+        responsavel_seguro: '1',
+        nome_seguradora: insurer.slice(0, 30),
+        ...(cnpjSeg ? { cnpj_seguradora: cnpjSeg } : {}),
+        numero_apolice: apolice,
+      };
+    })
+    .filter((s: any) => s.numero_apolice);
+
   // Vectra config + ambiente
   const ambiente = (Deno.env.get('FOCUS_NFE_AMBIENTE') as FocusAmbiente) ?? 'homolog';
   let vectra: VectraConfig;
@@ -229,6 +254,7 @@ serve(async (req) => {
       numero,
       vectra,
       municipiosCarregamento,
+      seguros,
       percursoUfs: Array.isArray(body.percurso_ufs) ? (body.percurso_ufs as string[]) : undefined,
       produtoPredominante:
         typeof body.produto_predominante === 'object' && body.produto_predominante
