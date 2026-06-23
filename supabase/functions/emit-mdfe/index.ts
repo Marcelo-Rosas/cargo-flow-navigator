@@ -198,6 +198,26 @@ serve(async (req) => {
   if (vErr || !vehicle) return json({ error: 'vehicle_not_found' }, 404, cors);
   if (dErr || !driver) return json({ error: 'driver_not_found' }, 404, cors);
 
+  // Proprietário (terceiro/TAC) vem do owner vinculado ao veículo. Sem owner_id
+  // = veículo próprio Vectra (mapper usa os dados da Vectra).
+  let proprietario: Record<string, unknown> | undefined;
+  if ((vehicle as any).owner_id) {
+    const { data: owner } = await supabase
+      .from('owners')
+      .select('name, cpf_cnpj, rntrc, uf, tipo_proprietario')
+      .eq('id', (vehicle as any).owner_id)
+      .single();
+    if (owner) {
+      proprietario = {
+        nome: (owner as any).name ?? '',
+        cpf_cnpj: (owner as any).cpf_cnpj ?? '',
+        rntrc: (owner as any).rntrc ?? '',
+        uf: (owner as any).uf ?? '',
+        tipo_proprietario: (owner as any).tipo_proprietario ?? 0,
+      };
+    }
+  }
+
   // Seguro da carga: apólices ativas (RCTR-C / RC-DC). Responsável = emitente (Vectra).
   // nApol vem do `code` (dígitos); CNPJ da seguradora do metadata.insurer_cnpj
   // (fallback Berkley quando ausente — as 2 apólices emitidas não têm no metadata).
@@ -255,6 +275,7 @@ serve(async (req) => {
       vectra,
       municipiosCarregamento,
       seguros,
+      proprietario,
       percursoUfs: Array.isArray(body.percurso_ufs) ? (body.percurso_ufs as string[]) : undefined,
       produtoPredominante:
         typeof body.produto_predominante === 'object' && body.produto_predominante
