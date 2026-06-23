@@ -34,6 +34,8 @@ export interface CteEmissionRow {
   justificativa_cancelamento: string | null;
   /** Resposta crua do Focus (inclui caminho_dacte / caminho_xml S3 enquanto o storage não é espelhado). */
   response_received: Record<string, unknown> | null;
+  /** Payload enviado ao Focus (partes, valores, componentes) — fonte do espelho Vectra. */
+  payload_sent: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

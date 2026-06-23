@@ -1,9 +1,14 @@
-import { Download, FileCheck2, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Download, FileCheck2, FileDown, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CteEmissionInline } from '@/components/boards/CteEmissionInline';
 import { useCteEmissionByQuote, describeCteStatus } from '@/hooks/useCteEmission';
+import { generateCtePdf, type CtePdfParty, type CtePdfPayload } from '@/lib/generateCtePdf';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+
+const TOMADOR_LABELS = ['Remetente', 'Expedidor', 'Recebedor', 'Destinatário', 'Outros'];
 
 interface OrderCteTabProps {
   quoteId: string | null | undefined;
@@ -21,6 +26,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export function OrderCteTab({ quoteId, canManage }: OrderCteTabProps) {
   const { data: emission, isLoading } = useCteEmissionByQuote(quoteId);
+  const [generating, setGenerating] = useState(false);
 
   // Focus expõe o DACTE numa URL S3 (em response_received) enquanto o webhook não
   // espelha o PDF para o storage próprio (TODO F1.9). Usa o storage quando houver,
@@ -58,6 +64,77 @@ export function OrderCteTab({ quoteId, canManage }: OrderCteTabProps) {
     ? new Date(emission.data_autorizacao).toLocaleString('pt-BR')
     : null;
 
+  /** Espelho Vectra: PDF próprio com os mesmos campos do CT-e (do payload enviado). */
+  async function handleVectraPdf() {
+    if (!emission?.payload_sent) {
+      toast({ title: 'Sem dados do CT-e para gerar o espelho', variant: 'destructive' });
+      return;
+    }
+    setGenerating(true);
+    try {
+      const ps = emission.payload_sent as Record<string, unknown>;
+      const str = (k: string) => (ps[k] == null ? null : String(ps[k]));
+      const party = (prefix: string): CtePdfParty => ({
+        name: str(`nome_${prefix}`),
+        cnpj: str(`cnpj_${prefix}`),
+        cpf: str(`cpf_${prefix}`),
+        ie: str(`inscricao_estadual_${prefix}`),
+        address: str(`logradouro_${prefix}`),
+        address_number: str(`numero_${prefix}`),
+        neighborhood: str(`bairro_${prefix}`),
+        city: str(`municipio_${prefix}`),
+        state: str(`uf_${prefix}`),
+        zip_code: str(`cep_${prefix}`),
+        phone: str(`telefone_${prefix}`),
+      });
+      const comps = Array.isArray(ps.componentes_valor_servico)
+        ? (ps.componentes_valor_servico as Array<{ nome?: string; valor?: number }>).map((c) => ({
+            nome: String(c.nome ?? ''),
+            valor: Number(c.valor ?? 0),
+          }))
+        : [];
+      const payload: CtePdfPayload = {
+        numero: emission.numero,
+        serie: emission.serie,
+        chave: emission.chave_cte,
+        protocolo: emission.protocolo,
+        status_label: label,
+        status_sefaz: emission.status_sefaz,
+        ambiente: emission.ambiente,
+        cfop: emission.cfop ?? (ps.cfop as number | undefined) ?? null,
+        natureza_operacao: str('natureza_operacao'),
+        data_autorizacao: emission.data_autorizacao,
+        tomador_label: TOMADOR_LABELS[Number(ps.tomador)] ?? null,
+        remetente: party('remetente'),
+        destinatario: party('destinatario'),
+        valor_total: Number(ps.valor_total) || null,
+        valor_receber: Number(ps.valor_receber) || null,
+        componentes: comps,
+        valor_carga: Number(ps.valor_carga) || null,
+        produto_predominante: str('produto_predominante'),
+        municipio_inicio: str('municipio_inicio'),
+        uf_inicio: str('uf_inicio'),
+        municipio_fim: str('municipio_fim'),
+        uf_fim: str('uf_fim'),
+      };
+      const { blob, fileName } = await generateCtePdf(payload);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast({
+        title: 'Falha ao gerar PDF Vectra',
+        description: (e as Error).message,
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -92,11 +169,29 @@ export function OrderCteTab({ quoteId, canManage }: OrderCteTabProps) {
             </p>
           )}
 
-          {isAuthorized && (emission.dacte_storage_path || focusDacteUrl) && (
-            <Button onClick={() => void downloadDacte()} className="gap-2">
-              <Download className="w-4 h-4" />
-              Baixar PDF (DACTE)
-            </Button>
+          {isAuthorized && (
+            <div className="flex flex-wrap gap-2">
+              {(emission.dacte_storage_path || focusDacteUrl) && (
+                <Button variant="outline" onClick={() => void downloadDacte()} className="gap-2">
+                  <Download className="w-4 h-4" />
+                  DACTE oficial (PDF)
+                </Button>
+              )}
+              {emission.payload_sent && (
+                <Button
+                  onClick={() => void handleVectraPdf()}
+                  disabled={generating}
+                  className="gap-2"
+                >
+                  {generating ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileDown className="w-4 h-4" />
+                  )}
+                  Baixar PDF (Vectra)
+                </Button>
+              )}
+            </div>
           )}
         </>
       ) : (
