@@ -29,6 +29,9 @@ additional_redirect_urls = [
 [functions.import-price-table]
 verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente
 
+[functions.focus-webhook]
+verify_jwt = false  # Recebe POST do Focus NFe (header X-Focus-Auth); Focus não envia JWT Supabase
+
 [functions.calculate-freight]
 verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente
 

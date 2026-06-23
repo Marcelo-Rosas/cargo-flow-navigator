@@ -54,13 +54,21 @@ export function CteEmissionInline({ quoteId, readOnly = false }: CteEmissionInli
   const isRejected = emission?.status === 'rejected';
   const isDraftLike = !emission || isRejected;
 
+  // Fallback para a URL S3 do Focus (response_received) enquanto o webhook não
+  // espelha o DACTE para o storage próprio (TODO F1.9 em focus-webhook).
+  const focusDacteUrl = (emission?.response_received as { caminho_dacte?: string } | null)
+    ?.caminho_dacte;
+
   async function downloadDacte() {
-    if (!emission?.dacte_storage_path) return;
-    const [bucket, ...rest] = emission.dacte_storage_path.split('/');
-    const path = rest.join('/');
-    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 300);
-    if (error || !data?.signedUrl) return;
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    if (emission?.dacte_storage_path) {
+      const [bucket, ...rest] = emission.dacte_storage_path.split('/');
+      const { data } = await supabase.storage.from(bucket).createSignedUrl(rest.join('/'), 300);
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+    }
+    if (focusDacteUrl) window.open(focusDacteUrl, '_blank', 'noopener,noreferrer');
   }
 
   function handleEmit() {
@@ -139,7 +147,7 @@ export function CteEmissionInline({ quoteId, readOnly = false }: CteEmissionInli
       {/* Botões pós autorização */}
       {isAuthorized && (
         <>
-          {emission?.dacte_storage_path && (
+          {(emission?.dacte_storage_path || focusDacteUrl) && (
             <Button
               variant="ghost"
               size="sm"

@@ -56,6 +56,7 @@ import { ComplianceWidget } from '@/components/operational/ComplianceWidget';
 import { CollectionOrderSection } from '@/components/operational/CollectionOrderSection';
 import { CiotPanel } from '@/components/operational/CiotPanel';
 import { RiskWorkflowWizard } from '@/components/risk/RiskWorkflowWizard';
+import { OrderCteTab } from '@/components/modals/order-detail/OrderCteTab';
 import {
   useOrderRiskStatus,
   useRiskEvaluationByEntity,
@@ -921,6 +922,10 @@ export function OrderDetailModal({
                   Docs
                 </TabsTrigger>
               )}
+              <TabsTrigger value="cte" className="gap-1.5">
+                <Truck className="w-3.5 h-3.5" />
+                CT-e
+              </TabsTrigger>
               <TabsTrigger value="risco" className="gap-1.5">
                 <Shield className="w-3.5 h-3.5" />
                 Risco
@@ -1701,6 +1706,10 @@ export function OrderDetailModal({
               {/* Risco Tab */}
               <TabsContent value="ciot" className="m-0 space-y-4">
                 <CiotPanel order={order} canManage={canManage} />
+              </TabsContent>
+
+              <TabsContent value="cte" className="m-0 space-y-4">
+                <OrderCteTab quoteId={order.quote_id ?? order.quote?.id} canManage={canManage} />
               </TabsContent>
 
               <TabsContent value="risco" className="m-0 space-y-4">

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const FOCUS_WEBHOOK_SECRET = Deno.env.get('FOCUS_WEBHOOK_SECRET') ?? '';
 const FOCUS_WEBHOOK_HEADER = Deno.env.get('FOCUS_WEBHOOK_HEADER') ?? 'X-Focus-Auth';
@@ -19,6 +20,49 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+/** Horário local Brasil (UTC-3 fixo) para timestamps de auditoria. */
+function nowBrasilia(): string {
+  return new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+}
+
+/**
+ * Baixa um documento (XML/PDF) da URL do Focus e espelha para o bucket de storage.
+ * Retorna `<bucket>/<filename>` (formato lido pela UI ao gerar signed URL) ou null.
+ * Degrada sem lançar: falha de mirror não pode derrubar o webhook.
+ */
+async function mirror(
+  supabase: ReturnType<typeof createClient>,
+  url: string | undefined | null,
+  bucket: string,
+  filename: string,
+  contentType: string
+): Promise<string | null> {
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error('[focus-webhook] mirror fetch failed', {
+        bucket,
+        filename,
+        status: res.status,
+      });
+      return null;
+    }
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(filename, bytes, { contentType, upsert: true });
+    if (error) {
+      console.error('[focus-webhook] upload failed', { bucket, filename, error: error.message });
+      return null;
+    }
+    return `${bucket}/${filename}`;
+  } catch (e) {
+    console.error('[focus-webhook] mirror error', { bucket, filename, error: String(e) });
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'GET') {
     return json({
@@ -30,9 +74,7 @@ serve(async (req) => {
     });
   }
 
-  if (req.method !== 'POST') {
-    return json({ error: 'method_not_allowed' }, 405);
-  }
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   if (!FOCUS_WEBHOOK_SECRET) {
     console.error('[focus-webhook] FOCUS_WEBHOOK_SECRET not configured');
@@ -72,30 +114,84 @@ serve(async (req) => {
           ? 'inutilizacao'
           : 'unknown';
 
-  console.log('[focus-webhook] received', {
-    docType,
-    modelo,
-    ref: p.ref,
-    status: p.status,
-    status_sefaz: p.status_sefaz,
-    chave: p.chave?.slice(0, 8) + '...',
-    numero_inicial: p.numero_inicial,
-    numero_final: p.numero_final,
-    focus_id: p.id,
-  });
+  // Inutilização e desconhecidos: só loga (sem linha em *_emissions para atualizar).
+  if (docType !== 'cte' && docType !== 'mdfe') {
+    console.log('[focus-webhook] ignored', { docType, ref: p.ref, status: p.status });
+    return json({ ok: true, docType, ignored: true });
+  }
 
-  // TODO F1.9 (pós F1.1 migration): upsert cte_emissions/mdfe_emissions + mirror XML/PDF para storage.
-  // Stub atual apenas valida auth + CNPJ + loga payload.
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) {
+    console.error('[focus-webhook] supabase env missing');
+    return json({ error: 'server_misconfigured' }, 500);
+  }
+  const supabase = createClient(supabaseUrl, serviceKey);
 
-  return json({
-    ok: true,
+  const ref = p.ref;
+  if (!ref) return json({ error: 'ref_missing' }, 400);
+
+  const isCte = docType === 'cte';
+  const table = isCte ? 'cte_emissions' : 'mdfe_emissions';
+
+  const focusStatus = String(p.status ?? '');
+  const newStatus =
+    focusStatus === 'autorizado'
+      ? 'authorized'
+      : focusStatus === 'cancelado'
+        ? 'cancelled'
+        : focusStatus === 'erro_autorizacao'
+          ? 'rejected'
+          : focusStatus === 'processando_autorizacao'
+            ? 'processing'
+            : null;
+
+  const update: Record<string, unknown> = {
+    status_sefaz: p.status_sefaz ?? null,
+    protocolo: p.protocolo ?? p.numero_protocolo ?? null,
+    response_received: payload,
+  };
+  if (newStatus) update.status = newStatus;
+  if (p.chave) update[isCte ? 'chave_cte' : 'chave_mdfe'] = p.chave;
+
+  if (newStatus === 'authorized') {
+    update.data_autorizacao = nowBrasilia();
+    // Arquivamento fiscal: espelhar XML autorizado + DACTE/DAMDFE no storage próprio.
+    const chave = String(p.chave ?? ref).replace(/\W/g, '');
+    const xmlPath = await mirror(
+      supabase,
+      p.caminho_xml,
+      isCte ? 'cte-documents' : 'mdfe-documents',
+      `${chave}.xml`,
+      'application/xml'
+    );
+    const pdfPath = await mirror(
+      supabase,
+      p.caminho_dacte ?? p.caminho_damdfe ?? p.caminho_pdf,
+      isCte ? 'dacte-pdfs' : 'damdfe-pdfs',
+      `${chave}.pdf`,
+      'application/pdf'
+    );
+    if (xmlPath) update.xml_storage_path = xmlPath;
+    if (pdfPath) update[isCte ? 'dacte_storage_path' : 'damdfe_storage_path'] = pdfPath;
+  } else if (newStatus === 'rejected') {
+    update.rejection_code = p.status_sefaz ?? null;
+    update.rejection_msg = p.mensagem_sefaz ?? null;
+  } else if (newStatus === 'cancelled') {
+    update[isCte ? 'data_cancelamento' : 'cancelled_at'] = nowBrasilia();
+  }
+
+  const { error: upErr } = await supabase.from(table).update(update).eq('ref', ref);
+  if (upErr) {
+    console.error('[focus-webhook] db update failed', { ref, table, error: upErr.message });
+    return json({ error: 'db_update_failed', detail: upErr.message }, 500);
+  }
+
+  console.log('[focus-webhook] persisted', {
     docType,
-    received: {
-      ref: p.ref,
-      modelo,
-      status: p.status,
-      numero_inicial: p.numero_inicial,
-      numero_final: p.numero_final,
-    },
+    ref,
+    newStatus,
+    mirrored: newStatus === 'authorized',
   });
+  return json({ ok: true, docType, ref, status: newStatus ?? 'unchanged' });
 });
