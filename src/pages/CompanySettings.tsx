@@ -65,6 +65,8 @@ const schema = z.object({
   bank_pix_key: z.string().optional().default(''),
   default_jurisdiction: z.string().optional().default('Navegantes/SC'),
   signature_city: z.string().optional().default('Navegantes'),
+  phone: z.string().optional().default(''),
+  email: z.string().email('E-mail inválido').optional().or(z.literal('')),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -101,6 +103,8 @@ export default function CompanySettings() {
       bank_pix_key: '',
       default_jurisdiction: 'Navegantes/SC',
       signature_city: 'Navegantes',
+      phone: '',
+      email: '',
     },
   });
 
@@ -129,6 +133,8 @@ export default function CompanySettings() {
         bank_pix_key: settings.bank_pix_key ?? '',
         default_jurisdiction: settings.default_jurisdiction ?? 'Navegantes/SC',
         signature_city: settings.signature_city ?? 'Navegantes',
+        phone: (settings as { phone?: string | null }).phone ?? '',
+        email: (settings as { email?: string | null }).email ?? '',
       });
     }
   }, [settings, form]);
@@ -157,6 +163,8 @@ export default function CompanySettings() {
       safeSet('address_city', result.city);
       safeSet('address_state', result.state);
       safeSet('address_zip', result.zip_code);
+      safeSet('phone', result.phone);
+      safeSet('email', result.email);
 
       const rep = pickLegalRepresentative(result.partners);
       if (rep) {
@@ -367,6 +375,46 @@ export default function CompanySettings() {
                     )}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Contato</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telefone</FormLabel>
+                        <FormControl>
+                          <Input placeholder="(47) 9XXXX-XXXX" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>E-mail</FormLabel>
+                        <FormControl>
+                          <Input placeholder="fiscal@empresa.com.br" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Usado como contato do emitente nos documentos (CT-e e espelho). Não fica mais
+                  hardcoded.
+                </p>
               </CardContent>
             </Card>
 

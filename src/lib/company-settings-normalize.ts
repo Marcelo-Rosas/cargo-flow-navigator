@@ -57,6 +57,8 @@ export function normalizeCompanySettingsPayload(
     bank_pix_key: text(rest.bank_pix_key) || null,
     default_jurisdiction: text(rest.default_jurisdiction) || 'Navegantes/SC',
     signature_city: text(rest.signature_city) || 'Navegantes',
+    phone: text((rest as { phone?: string | null }).phone) || '',
+    email: text((rest as { email?: string | null }).email) || '',
   };
 }
 
