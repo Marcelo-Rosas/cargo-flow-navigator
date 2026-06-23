@@ -4,7 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CteEmissionInline } from '@/components/boards/CteEmissionInline';
 import { useCteEmissionByQuote, describeCteStatus } from '@/hooks/useCteEmission';
-import { generateCtePdf, type CtePdfParty, type CtePdfPayload } from '@/lib/generateCtePdf';
+import {
+  generateCtePdf,
+  type CtePdfEmitente,
+  type CtePdfParty,
+  type CtePdfPayload,
+} from '@/lib/generateCtePdf';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -26,6 +32,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export function OrderCteTab({ quoteId, canManage }: OrderCteTabProps) {
   const { data: emission, isLoading } = useCteEmissionByQuote(quoteId);
+  const { data: company } = useCompanySettings();
   const [generating, setGenerating] = useState(false);
 
   // Focus expõe o DACTE numa URL S3 (em response_received) enquanto o webhook não
@@ -93,7 +100,26 @@ export function OrderCteTab({ quoteId, canManage }: OrderCteTabProps) {
             valor: Number(c.valor ?? 0),
           }))
         : [];
+      // Emitente vem de company_settings (/empresa); phone/email via cast até a
+      // migration 20260801000000 deployar e os tipos serem regerados.
+      const cs = company as
+        | (typeof company & { phone?: string | null; email?: string | null })
+        | null;
+      const emitente: CtePdfEmitente | undefined = cs
+        ? {
+            name: cs.trade_name || cs.legal_name,
+            cnpj: cs.cnpj,
+            ie: cs.state_registration,
+            address: cs.address_street,
+            number: cs.address_number,
+            city: cs.address_city,
+            uf: cs.address_state,
+            phone: cs.phone,
+            email: cs.email,
+          }
+        : undefined;
       const payload: CtePdfPayload = {
+        emitente,
         numero: emission.numero,
         serie: emission.serie,
         chave: emission.chave_cte,

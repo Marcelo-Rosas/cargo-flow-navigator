@@ -28,7 +28,22 @@ export interface CtePdfComponente {
   valor: number;
 }
 
+/** Emitente (Vectra) — vem de company_settings (/empresa); não hardcoded. */
+export interface CtePdfEmitente {
+  name?: string | null;
+  cnpj?: string | null;
+  ie?: string | null;
+  address?: string | null;
+  number?: string | null;
+  city?: string | null;
+  uf?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
 export interface CtePdfPayload {
+  /** Emitente; se ausente/campo vazio, cai no default Vectra. */
+  emitente?: CtePdfEmitente;
   numero: number | string;
   serie: number | string;
   chave?: string | null;
@@ -75,7 +90,8 @@ const ML = 12;
 const MR = 12;
 const CW = PW - ML - MR;
 
-const VECTRA = {
+// Fallback do emitente — usado só quando company_settings (/empresa) não traz o campo.
+const VECTRA_DEFAULT = {
   name: 'VECTRA CARGO',
   cnpj: '59.650.913/0001-04',
   ie: '263450562',
@@ -84,7 +100,25 @@ const VECTRA = {
   city: 'NAVEGANTES',
   uf: 'SC',
   phone: '(47) 93385-1351',
+  email: '',
 };
+
+/** Resolve cada campo do emitente: usa company_settings se não-vazio, senão default. */
+function resolveEmitente(e?: CtePdfEmitente): typeof VECTRA_DEFAULT {
+  const pick = (v: string | null | undefined, def: string) =>
+    v != null && String(v).trim() !== '' ? String(v) : def;
+  return {
+    name: pick(e?.name, VECTRA_DEFAULT.name),
+    cnpj: pick(e?.cnpj, VECTRA_DEFAULT.cnpj),
+    ie: pick(e?.ie, VECTRA_DEFAULT.ie),
+    address: pick(e?.address, VECTRA_DEFAULT.address),
+    number: pick(e?.number, VECTRA_DEFAULT.number),
+    city: pick(e?.city, VECTRA_DEFAULT.city),
+    uf: pick(e?.uf, VECTRA_DEFAULT.uf),
+    phone: pick(e?.phone, VECTRA_DEFAULT.phone),
+    email: pick(e?.email, VECTRA_DEFAULT.email),
+  };
+}
 
 const safe = (v: string | number | null | undefined): string =>
   v == null || v === '' ? '' : String(v);
@@ -153,17 +187,19 @@ function drawHeader(doc: PdfDoc, p: CtePdfPayload, logo: string | null): number 
 
   if (logo) doc.addImage(logo, 'PNG', ML, 3, 22, 22);
 
+  const v = resolveEmitente(p.emitente);
   const ix = ML + 26;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...C.white);
-  doc.text(VECTRA.name, ix, 8);
+  doc.text(v.name, ix, 8);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(200, 215, 235);
-  doc.text(`CNPJ: ${VECTRA.cnpj}    IE: ${VECTRA.ie}`, ix, 13);
-  doc.text(`${VECTRA.address}, ${VECTRA.number} - ${VECTRA.city}/${VECTRA.uf}`, ix, 17.5);
-  doc.text(`Fone: ${VECTRA.phone}`, ix, 22);
+  doc.text(`CNPJ: ${v.cnpj}    IE: ${v.ie}`, ix, 12.5);
+  doc.text(`${v.address}, ${v.number} - ${v.city}/${v.uf}`, ix, 16.5);
+  const contato = [v.phone ? `Fone: ${v.phone}` : '', v.email].filter(Boolean).join('    ');
+  doc.text(contato, ix, 20.5);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
