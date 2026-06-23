@@ -50,11 +50,18 @@ describe('gross-up lotação com repasse fora do divisor', () => {
     expect(repasse).toBeGreaterThan(0);
 
     const cd = out.profitability.custosDiretos;
-    const taxa = (15 + 14 + 15) / 100;
-    const totalSemRepasseNoDivisor = Math.round((cd / (1 - taxa) + repasse) * 100) / 100;
-    expect(out.totals.totalCliente).toBeCloseTo(totalSemRepasseNoDivisor, 0);
+    // taxaBruta = overhead + DAS + margem (repasse NÃO recebe essa cascata).
+    const taxaBruta = (15 + 14 + 15) / 100;
+    // v5 (calculateGrossUpHibrido:798-808): repasse recebe gross-up SÓ de imposto.
+    // Simples Nacional → taxaImpostos = DAS apenas (ICMS fora do divisor).
+    const taxaImpostos = 14 / 100;
+    const totalEsperado =
+      Math.round((cd / (1 - taxaBruta) + repasse / (1 - taxaImpostos)) * 100) / 100;
+    expect(out.totals.totalCliente).toBeCloseTo(totalEsperado, 0);
 
-    const totalSeRepasseEntrasseNoDivisor = Math.round(((cd + repasse) / (1 - taxa)) * 100) / 100;
+    // Garante que o repasse NÃO entrou no divisor cheio (overhead+margem+imposto).
+    const totalSeRepasseEntrasseNoDivisor =
+      Math.round(((cd + repasse) / (1 - taxaBruta)) * 100) / 100;
     expect(out.totals.totalCliente).toBeLessThan(totalSeRepasseEntrasseNoDivisor - 100);
   });
 });
