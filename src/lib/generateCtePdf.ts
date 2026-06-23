@@ -206,7 +206,7 @@ function kv(doc: PdfDoc, label: string, value: string, x: number, y: number, lab
 }
 
 function drawIdentBlock(doc: PdfDoc, p: CtePdfPayload, y: number): number {
-  const H = 22;
+  const H = 27;
   doc.setDrawColor(...C.border);
   doc.setLineWidth(0.25);
   doc.rect(ML, y, CW, H);
@@ -217,15 +217,18 @@ function drawIdentBlock(doc: PdfDoc, p: CtePdfPayload, y: number): number {
     doc,
     'STATUS SEFAZ:',
     `${p.status_label}${p.status_sefaz ? ` (${p.status_sefaz})` : ''}`,
-    ML + 70,
+    ML + 90,
     y + 10,
     24
   );
   kv(doc, 'CFOP:', safe(p.cfop) || '—', ML + 2, y + 15, 12);
   kv(doc, 'NATUREZA:', safe(p.natureza_operacao) || '—', ML + 40, y + 15, 20);
   kv(doc, 'TOMADOR:', safe(p.tomador_label) || '—', ML + 2, y + 20, 18);
-  const rota = `${safe(p.municipio_inicio)}/${safe(p.uf_inicio)}  →  ${safe(p.municipio_fim)}/${safe(p.uf_fim)}`;
-  kv(doc, 'ROTA:', rota, ML + 70, y + 20, 12);
+  // Seta unicode (→) não existe na fonte helvetica do jsPDF — usa ASCII. Linha
+  // própria, largura cheia, para não estourar a margem direita.
+  const origem = `${safe(p.municipio_inicio)}/${safe(p.uf_inicio)}`;
+  const destino = `${safe(p.municipio_fim)}/${safe(p.uf_fim)}`;
+  kv(doc, 'ROTA:', `${origem}  ->  ${destino}`, ML + 2, y + 25, 12);
   return y + H + 1;
 }
 
