@@ -1,0 +1,9 @@
+-- RECONCILIAÇÃO DE LEDGER — ref Supabase COMPARTILHADO (epgedaiukjippepujuzc).
+-- Migration EXTERNA do projeto GymSite/vectraclip ("cache_geocode"), aplicada ao
+-- remoto via apply_migration. Este placeholder existe SÓ para o `supabase db push`
+-- do cargo-flow-navigator ver local == remoto e não falhar com
+-- "Remote migration versions not found in local migrations directory".
+-- A versão já consta em supabase_migrations.schema_migrations no remoto, então
+-- db push NÃO executa este conteúdo. NÃO adicionar DDL aqui — o schema real
+-- pertence ao repositório do GymSite. Não tocar no ledger remoto (não usar
+-- migration repair) para não dessincronizar o GymSite.
