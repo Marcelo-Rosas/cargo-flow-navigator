@@ -35,6 +35,7 @@ import {
   groupDocumentsByCategory,
 } from '@/lib/order-documents';
 import { DriverContractBadge } from '@/components/drivers/DriverContractBadge';
+import { CteEmissionInline } from '@/components/boards/CteEmissionInline';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 type Occurrence = Database['public']['Tables']['occurrences']['Row'];
@@ -311,6 +312,19 @@ export function OrderCard({
             <AlertTriangle className="w-3 h-3" />
             {occurrences.length} ocorrência{occurrences.length !== 1 ? 's' : ''}
           </Badge>
+        </div>
+      )}
+
+      {/* CT-e inline — stage documentacao em diante */}
+      {(order.stage === 'documentacao' ||
+        order.stage === 'coleta_realizada' ||
+        order.stage === 'em_transito' ||
+        order.stage === 'entregue') && (
+        <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+          <CteEmissionInline
+            quoteId={(order as unknown as { quote_id?: string | null }).quote_id ?? null}
+            readOnly={!canManageActions}
+          />
         </div>
       )}
 

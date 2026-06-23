@@ -29,6 +29,14 @@ import { Database } from '@/integrations/supabase/types';
 import { zodCnpj, zodPhone, zodCep, validateCpf } from '@/lib/validators';
 import { MaskedInput } from '@/components/ui/masked-input';
 import { CnpjLookupError, lookupCnpj, pickLegalRepresentative } from '@/lib/cnpjLookup';
+import { lookupIe } from '@/lib/ieLookup';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Client = Database['public']['Tables']['clients']['Row'];
 
@@ -55,6 +63,7 @@ const clientSchema = z.object({
   notes: z.string().max(500, 'Observações muito longas').optional(),
   // Dados para contrato
   state_registration: z.string().max(30).optional(),
+  ie_indicator: z.coerce.number().int().optional(),
   legal_representative_name: z.string().max(200).optional(),
   legal_representative_cpf: z.string().max(20).optional(),
   legal_representative_role: z.string().max(100).optional(),
@@ -78,6 +87,7 @@ export function ClientForm({ open, onClose, client, onSelectExisting }: ClientFo
   const updateClientMutation = useUpdateClient();
   const isEditing = !!client;
   const [isLookingUp, setIsLookingUp] = useState(false);
+  const [isLookingUpIe, setIsLookingUpIe] = useState(false);
 
   // Name autocomplete (only in "Novo Cliente"). Helps prevent re-cadastro of an
   // existing client by suggesting matches as the user types.
@@ -105,6 +115,7 @@ export function ClientForm({ open, onClose, client, onSelectExisting }: ClientFo
       zip_code: '',
       notes: '',
       state_registration: '',
+      ie_indicator: 1,
       legal_representative_name: '',
       legal_representative_cpf: '',
       legal_representative_role: '',
@@ -126,6 +137,7 @@ export function ClientForm({ open, onClose, client, onSelectExisting }: ClientFo
         zip_code: client.zip_code || '',
         notes: client.notes || '',
         state_registration: client.state_registration || '',
+        ie_indicator: client.ie_indicator ?? 1,
         legal_representative_name: client.legal_representative_name || '',
         legal_representative_cpf: client.legal_representative_cpf || '',
         legal_representative_role: client.legal_representative_role || '',
@@ -144,6 +156,7 @@ export function ClientForm({ open, onClose, client, onSelectExisting }: ClientFo
         zip_code: '',
         notes: '',
         state_registration: '',
+        ie_indicator: 1,
         legal_representative_name: '',
         legal_representative_cpf: '',
         legal_representative_role: '',
@@ -160,8 +173,37 @@ export function ClientForm({ open, onClose, client, onSelectExisting }: ClientFo
     const str = value != null ? String(value).trim() : '';
     if (!str) return;
     const current = form.getValues(key);
-    if (current && current.trim().length > 0) return; // nao sobrescreve se usuario ja preencheu
+    if (typeof current === 'string' && current.trim().length > 0) return; // nao sobrescreve se usuario ja preencheu
     form.setValue(key, str, { shouldValidate: true, shouldDirty: true });
+  };
+
+  /** Resolve a Inscrição Estadual via SintegrAPI (CNPJ + UF). Funciona em novo e edição. */
+  const handleIeLookup = async (cnpjArg?: string, ufArg?: string) => {
+    const cnpj = (cnpjArg ?? form.getValues('cnpj') ?? '').replace(/\D/g, '');
+    const uf = (ufArg ?? form.getValues('state') ?? '').toUpperCase().slice(0, 2);
+    if (cnpj.length !== 14 || uf.length !== 2) {
+      toast.error('Preencha CNPJ e UF para buscar a Inscrição Estadual');
+      return;
+    }
+    setIsLookingUpIe(true);
+    try {
+      const r = await lookupIe(cnpj, uf);
+      if (!r) {
+        toast.error('IE não encontrada (verifique CNPJ/UF ou a configuração da API)');
+        return;
+      }
+      if (r.ie) {
+        form.setValue('state_registration', r.ie, { shouldDirty: true, shouldValidate: true });
+        form.setValue('ie_indicator', 1, { shouldDirty: true });
+        toast.success(`IE encontrada: ${r.ie}`);
+      } else if (r.naoContribuinte) {
+        form.setValue('ie_indicator', 9, { shouldDirty: true });
+        form.setValue('state_registration', '', { shouldDirty: true });
+        toast.success('Não contribuinte de ICMS — sem IE');
+      }
+    } finally {
+      setIsLookingUpIe(false);
+    }
   };
 
   const handleCnpjLookup = async (rawValue?: string) => {
@@ -183,6 +225,9 @@ export function ClientForm({ open, onClose, client, onSelectExisting }: ClientFo
       safeSet('city', result.city);
       safeSet('state', result.state);
       safeSet('zip_code', result.zip_code);
+
+      // Resolve IE automaticamente pela UF do CNPJ (SintegrAPI)
+      await handleIeLookup(raw, result.state ?? undefined);
 
       // Auto-sugestao de representante legal a partir do QSA
       const rep = pickLegalRepresentative(result.partners);
@@ -255,6 +300,7 @@ export function ClientForm({ open, onClose, client, onSelectExisting }: ClientFo
         zip_code: data.zip_code || null,
         notes: data.notes || null,
         state_registration: data.state_registration || null,
+        ie_indicator: data.ie_indicator ?? null,
         legal_representative_name: data.legal_representative_name || null,
         legal_representative_cpf: data.legal_representative_cpf || null,
         legal_representative_role: data.legal_representative_role || null,
@@ -544,13 +590,54 @@ export function ClientForm({ open, onClose, client, onSelectExisting }: ClientFo
               <div className="mt-3 space-y-3">
                 <FormField
                   control={form.control}
+                  name="ie_indicator"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Indicador de Inscrição Estadual</FormLabel>
+                      <Select
+                        value={String(field.value ?? 1)}
+                        onValueChange={(v) => field.onChange(Number(v))}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="1">1 — Contribuinte ICMS</SelectItem>
+                          <SelectItem value="2">2 — Contribuinte Isento</SelectItem>
+                          <SelectItem value="9">9 — Não Contribuinte</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="state_registration"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Inscrição Estadual</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Isento" {...field} />
-                      </FormControl>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input placeholder="Isento" {...field} />
+                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleIeLookup()}
+                          disabled={isLookingUpIe}
+                          title="Buscar Inscrição Estadual na SEFAZ (SintegrAPI) pelo CNPJ + UF"
+                        >
+                          {isLookingUpIe ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Search className="h-4 w-4" />
+                          )}
+                          <span className="ml-1">Buscar IE</span>
+                        </Button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
