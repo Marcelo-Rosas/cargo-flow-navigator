@@ -22,13 +22,22 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 export function OrderCteTab({ quoteId, canManage }: OrderCteTabProps) {
   const { data: emission, isLoading } = useCteEmissionByQuote(quoteId);
 
+  // Focus expõe o DACTE numa URL S3 (em response_received) enquanto o webhook não
+  // espelha o PDF para o storage próprio (TODO F1.9). Usa o storage quando houver,
+  // senão cai para a URL do Focus.
+  const focusDacteUrl = (emission?.response_received as { caminho_dacte?: string } | null)
+    ?.caminho_dacte;
+
   async function downloadDacte() {
-    if (!emission?.dacte_storage_path) return;
-    const [bucket, ...rest] = emission.dacte_storage_path.split('/');
-    const path = rest.join('/');
-    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 300);
-    if (error || !data?.signedUrl) return;
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    if (emission?.dacte_storage_path) {
+      const [bucket, ...rest] = emission.dacte_storage_path.split('/');
+      const { data } = await supabase.storage.from(bucket).createSignedUrl(rest.join('/'), 300);
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+    }
+    if (focusDacteUrl) window.open(focusDacteUrl, '_blank', 'noopener,noreferrer');
   }
 
   if (!quoteId) {
@@ -83,7 +92,7 @@ export function OrderCteTab({ quoteId, canManage }: OrderCteTabProps) {
             </p>
           )}
 
-          {isAuthorized && emission.dacte_storage_path && (
+          {isAuthorized && (emission.dacte_storage_path || focusDacteUrl) && (
             <Button onClick={() => void downloadDacte()} className="gap-2">
               <Download className="w-4 h-4" />
               Baixar PDF (DACTE)
