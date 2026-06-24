@@ -69,6 +69,7 @@ import { useUpdateOrder, type OrderWithOccurrences } from '@/hooks/useOrders';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEnsureFinancialDocument } from '@/hooks/useEnsureFinancialDocument';
 import { useTripsForOrder, useLinkOrderToTrip, useUnlinkOrderFromTrip } from '@/hooks/useTrips';
+import { useDocumentsByOrder } from '@/hooks/useDocuments';
 import { useOrderReconciliation } from '@/hooks/useReconciliation';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -87,6 +88,8 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { generatePodPdf } from '@/lib/generatePodPdf';
+import { generateNfItemsReportPdf } from '@/lib/generateNfItemsReportPdf';
+import { parseNfeXml } from '@/lib/parseNfeXml';
 import { getDocumentSignedUrl } from '@/lib/storage';
 import type { Database as _DB } from '@/integrations/supabase/types';
 
@@ -230,6 +233,7 @@ export function OrderDetailModal({
   const updateOrderMutation = useUpdateOrder();
   const ensureFinancialDocumentMutation = useEnsureFinancialDocument();
   const { data: tripForOrder } = useTripsForOrder(order?.id);
+  const { data: orderDocuments } = useDocumentsByOrder(order?.id ?? '');
   const linkOrderToTripMutation = useLinkOrderToTrip();
   const unlinkOrderFromTripMutation = useUnlinkOrderFromTrip();
   const { data: riskStatus } = useOrderRiskStatus(order?.id);
@@ -742,6 +746,42 @@ export function OrderDetailModal({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao gerar comprovante', {
         id: 'pod-pdf',
+      });
+    }
+  };
+
+  /** Documento XML da NF-e anexado à OS (fonte dos itens). */
+  const nfeXmlDoc =
+    (orderDocuments ?? []).find((d) => /\.xml$/i.test(d.file_name) && /nfe/i.test(d.file_name)) ??
+    (orderDocuments ?? []).find((d) => /\.xml$/i.test(d.file_name));
+
+  const handleGenerateNfItemsReport = async () => {
+    if (!nfeXmlDoc) {
+      toast.error('Nenhum XML de NF-e anexado a esta OS.');
+      return;
+    }
+    try {
+      toast.loading('Gerando relatório de itens da NF…', { id: 'nf-items-pdf' });
+      const signedUrl = await getDocumentSignedUrl(nfeXmlDoc.file_url, 600);
+      const res = await fetch(signedUrl);
+      if (!res.ok) throw new Error('Falha ao baixar o XML da NF-e');
+      const xml = await res.text();
+      const nfe = parseNfeXml(xml);
+      if (nfe.items.length === 0) throw new Error('NF-e sem itens (det) no XML.');
+      await generateNfItemsReportPdf({
+        os_number: order.os_number,
+        nf_number: nfe.nf_number,
+        serie: nfe.serie,
+        issued_at: nfe.issued_at,
+        access_key: nfe.access_key,
+        emit: nfe.emit,
+        dest: nfe.dest,
+        items: nfe.items,
+      });
+      toast.success('Relatório de itens gerado', { id: 'nf-items-pdf' });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao gerar relatório de itens', {
+        id: 'nf-items-pdf',
       });
     }
   };
@@ -1695,6 +1735,19 @@ export function OrderDetailModal({
                     <OrderReconciliationSummary orderId={order.id} />
                   )}
                   <Separator />
+                  {nfeXmlDoc && (
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateNfItemsReport}
+                        className="gap-2"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Relatório de itens da NF
+                      </Button>
+                    </div>
+                  )}
                   <DocumentList
                     orderId={order.id}
                     dedupeByType={order.stage === 'em_transito' || order.stage === 'entregue'}
