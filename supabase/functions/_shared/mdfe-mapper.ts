@@ -177,7 +177,9 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
   const municipios_descarregamento = Array.from(grupos.entries()).map(([codigo, g]) => ({
     codigo,
     nome: g.nome,
-    documentos: g.ctes.map((c) => ({ chave_cte: c.chave_cte })),
+    // Focus NFe: a lista de CT-es por município é `conhecimentos_transporte`
+    // (não `documentos`); sem isso SEFAZ rejeita 616 (município sem documento).
+    conhecimentos_transporte: g.ctes.map((c) => ({ chave_cte: c.chave_cte })),
   }));
 
   // Totalizadores
