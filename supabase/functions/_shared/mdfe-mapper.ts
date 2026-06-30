@@ -179,7 +179,9 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
     nome: g.nome,
     // Focus NFe: a lista de CT-es por município é `conhecimentos_transporte`
     // (não `documentos`); sem isso SEFAZ rejeita 616 (município sem documento).
-    conhecimentos_transporte: g.ctes.map((c) => ({ chave_cte: c.chave_cte })),
+    // chave_cte = só os 44 dígitos (a coluna guarda com prefixo "CTe..." → 47
+    // chars; SEFAZ rejeita por maxLength/pattern). `digits` remove o prefixo.
+    conhecimentos_transporte: g.ctes.map((c) => ({ chave_cte: digits(c.chave_cte) })),
   }));
 
   // Totalizadores
