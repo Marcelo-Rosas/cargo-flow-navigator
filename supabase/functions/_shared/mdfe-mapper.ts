@@ -94,6 +94,7 @@ export interface BuildMdfeInput {
   proprietario?: MdfeProprietario;
   produtoPredominante?: {
     descricao: string;
+    tipoCarga?: string; // tpCarga: 01..14 (default 05 = Carga Geral)
     ncm?: string;
     cean?: string; // GTIN if available
   };
@@ -278,15 +279,21 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
     // === documentos vinculados (CT-es agrupados por município descarga) ===
     municipios_descarregamento,
 
-    // === produto predominante (informação carga) ===
-    informacoes_carga: {
-      valor_total_carga: Number(vCarga.toFixed(2)),
-      codigo_unidade_medida_peso_bruto: '01', // 01 = KG, 02 = TON
-      peso_bruto_total: Number(pesoBruto.toFixed(3)),
-      produto_predominante: input.produtoPredominante?.descricao ?? 'CARGA GERAL',
-      ...(input.produtoPredominante?.ncm ? { ncm: input.produtoPredominante.ncm } : {}),
-      ...(input.produtoPredominante?.cean ? { cean: input.produtoPredominante.cean } : {}),
-    },
+    // === totalizadores (tot) — chaves FLAT no root (Focus NFe) ===
+    quantidade_total_cte: ctes.length,
+    valor_total_carga: Number(vCarga.toFixed(2)),
+    peso_bruto: Number(pesoBruto.toFixed(3)),
+    codigo_unidade_medida_peso_bruto: '01', // 01 = KG, 02 = TON
+
+    // === produto predominante (prodPred) — chaves FLAT no root ===
+    tipo_carga: input.produtoPredominante?.tipoCarga ?? '05', // 05 = Carga Geral (obrigatório)
+    descricao_produto: input.produtoPredominante?.descricao ?? 'CARGA GERAL',
+    ...(input.produtoPredominante?.ncm
+      ? { codigo_ncm_produto: input.produtoPredominante.ncm }
+      : {}),
+    ...(input.produtoPredominante?.cean
+      ? { codigo_barras_produto: input.produtoPredominante.cean }
+      : {}),
 
     // === seguro da carga (RCTR-C / RC-DC) ===
     ...(input.seguros && input.seguros.length > 0 ? { seguros_carga: input.seguros } : {}),
