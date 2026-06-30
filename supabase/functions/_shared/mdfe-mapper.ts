@@ -213,8 +213,10 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
     data_emissao: new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 19) + '-03:00',
     uf_inicio: ufInicio,
     uf_fim: ufFim,
-    tipo_emitente: 1, // 1 = Prestador
-    tipo_transportador: 1, // 1 = ETC (Empresa Transporte Cargas)
+    // tpTransp — chave Focus é `tipo_transporte` (não `tipo_transportador`).
+    // 1=ETC, 2=TAC, 3=CTC. Sem isto, CNPJ de proprietário gera rejeição 744.
+    // tpEmit já vai no campo `emitente` acima; não há `tipo_emitente` no Focus.
+    tipo_transporte: 1, // 1 = ETC (Empresa Transporte Cargas)
     ...(input.percursoUfs && input.percursoUfs.length > 0
       ? { percursos: input.percursoUfs.map((uf_percurso) => ({ uf_percurso })) }
       : {}),
