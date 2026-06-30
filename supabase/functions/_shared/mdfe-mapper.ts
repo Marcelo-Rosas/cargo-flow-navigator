@@ -111,6 +111,15 @@ function digits(s: string | null | undefined): string {
 }
 
 /**
+ * Remove o sufixo " - UF" do nome do município (ex.: "Rio de Janeiro - RJ" →
+ * "Rio de Janeiro"). O xMunDescarga/xMunCarrega deve ser só o nome do município
+ * — o CT-e autorizado usa nome limpo.
+ */
+function cleanMunicipioNome(s: string | null | undefined): string {
+  return (s ?? '').replace(/\s*-\s*[A-Za-z]{2}\s*$/, '').trim();
+}
+
+/**
  * Campos do proprietário do veículo de tração, no formato FLAT do
  * modal_rodoviário Focus (sufixo `_proprietario_veiculo`). Só preenche quando o
  * veículo é de terceiro (TAC) — há rntrc ou cpf_cnpj do owner. Veículo próprio
@@ -176,7 +185,7 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
 
   const municipios_descarregamento = Array.from(grupos.entries()).map(([codigo, g]) => ({
     codigo,
-    nome: g.nome,
+    nome: cleanMunicipioNome(g.nome),
     // Focus NFe: a lista de CT-es por município é `conhecimentos_transporte`
     // (não `documentos`); sem isso SEFAZ rejeita 616 (município sem documento).
     // chave_cte = só os 44 dígitos (a coluna guarda com prefixo "CTe..." → 47
@@ -289,7 +298,7 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
     // === municípios carregamento ===
     municipios_carregamento: municipiosCarregamento.map((m) => ({
       codigo: m.codigo,
-      nome: m.nome,
+      nome: cleanMunicipioNome(m.nome),
     })),
 
     // === documentos vinculados (CT-es agrupados por município descarga) ===
