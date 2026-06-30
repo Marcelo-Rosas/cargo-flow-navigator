@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Truck, User, Building2, Phone } from 'lucide-react';
+import { Loader2, Truck, User, Building2, Phone, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -36,8 +36,12 @@ import { useOwners } from '@/hooks/useOwners';
 import { useVehicleTypesFleetForm } from '@/hooks/useVehicleTypes';
 import { toast } from 'sonner';
 import type { VehicleWithRelations } from '@/hooks/useVehicles';
+import type { Database } from '@/integrations/supabase/types';
 import { validatePlate, zodPlate } from '@/lib/validators';
 import { calculatePalletsFromVolume } from '@/lib/pallets';
+
+type VehicleInsert = Database['public']['Tables']['vehicles']['Insert'];
+type VehicleUpdate = Database['public']['Tables']['vehicles']['Update'];
 
 const vehicleSchema = z.object({
   plate: zodPlate,
@@ -63,9 +67,91 @@ const vehicleSchema = z.object({
   driver_id: z.string().optional(),
   owner_id: z.string().optional(),
   active: z.boolean(),
+  // ── Dados físicos/fiscais para emissão de MDF-e (modal rodoviário) ──
+  tara_kg: z.string().optional(),
+  tipo_rodado: z.string().optional(),
+  tipo_carroceria: z.string().optional(),
+  uf_licenciamento: z
+    .string()
+    .max(2, 'Use a sigla da UF (ex: SC)')
+    .optional()
+    .transform((v) => v?.toUpperCase()),
+  reboque_tara_kg: z.string().optional(),
+  reboque_capacity_kg: z.string().optional(),
+  reboque_tipo_carroceria: z.string().optional(),
+  reboque_uf_licenciamento: z
+    .string()
+    .max(2, 'Use a sigla da UF (ex: SC)')
+    .optional()
+    .transform((v) => v?.toUpperCase()),
 });
 
 type VehicleFormData = z.infer<typeof vehicleSchema>;
+
+// Tabelas SEFAZ (MDF-e / modal rodoviário)
+const TIPO_RODADO_OPTIONS = [
+  { value: '01', label: '01 — Truck' },
+  { value: '02', label: '02 — Toco' },
+  { value: '03', label: '03 — Cavalo Mecânico' },
+  { value: '04', label: '04 — VAN' },
+  { value: '05', label: '05 — Utilitário' },
+  { value: '06', label: '06 — Outros' },
+] as const;
+
+const TIPO_CARROCERIA_OPTIONS = [
+  { value: '00', label: '00 — Não aplicável' },
+  { value: '01', label: '01 — Aberta' },
+  { value: '02', label: '02 — Fechada / Baú' },
+  { value: '03', label: '03 — Granelera' },
+  { value: '04', label: '04 — Porta Container' },
+  { value: '05', label: '05 — Sider' },
+] as const;
+
+/** Campos MDF-e ainda não presentes nos tipos gerados — acesso via cast. */
+type VehicleMdfeColumns = {
+  tara_kg?: number | null;
+  tipo_rodado?: string | null;
+  tipo_carroceria?: string | null;
+  uf_licenciamento?: string | null;
+  reboque_tara_kg?: number | null;
+  reboque_capacity_kg?: number | null;
+  reboque_tipo_carroceria?: string | null;
+  reboque_uf_licenciamento?: string | null;
+};
+
+const numToStr = (v: number | null | undefined) => (v != null ? String(v) : '');
+const strToNum = (v: string | undefined) => (v && v.trim() ? parseFloat(v) : null);
+
+/** Lê as colunas MDF-e de um veículo (cast) para popular o form na edição. */
+function mdfeFieldsFromVehicle(vehicle: VehicleWithRelations) {
+  const v = vehicle as unknown as VehicleMdfeColumns;
+  return {
+    tara_kg: numToStr(v.tara_kg),
+    tipo_rodado: v.tipo_rodado || '',
+    tipo_carroceria: v.tipo_carroceria || '',
+    uf_licenciamento: v.uf_licenciamento || '',
+    reboque_tara_kg: numToStr(v.reboque_tara_kg),
+    reboque_capacity_kg: numToStr(v.reboque_capacity_kg),
+    reboque_tipo_carroceria: v.reboque_tipo_carroceria || '',
+    reboque_uf_licenciamento: v.reboque_uf_licenciamento || '',
+  };
+}
+
+/** Converte os campos MDF-e do form para o payload do banco (numéricos + null). */
+function mdfePayloadFromForm(data: VehicleFormData): VehicleMdfeColumns {
+  const hasReboque = !!data.plate_2?.trim();
+  return {
+    tara_kg: strToNum(data.tara_kg),
+    tipo_rodado: data.tipo_rodado || null,
+    tipo_carroceria: data.tipo_carroceria || null,
+    uf_licenciamento: data.uf_licenciamento || null,
+    // Reboque só faz sentido com placa de carreta; sem ela, zera.
+    reboque_tara_kg: hasReboque ? strToNum(data.reboque_tara_kg) : null,
+    reboque_capacity_kg: hasReboque ? strToNum(data.reboque_capacity_kg) : null,
+    reboque_tipo_carroceria: hasReboque ? data.reboque_tipo_carroceria || null : null,
+    reboque_uf_licenciamento: hasReboque ? data.reboque_uf_licenciamento || null : null,
+  };
+}
 
 interface VehicleFormProps {
   open: boolean;
@@ -98,6 +184,14 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
       driver_id: '',
       owner_id: '',
       active: true,
+      tara_kg: '',
+      tipo_rodado: '',
+      tipo_carroceria: '',
+      uf_licenciamento: '',
+      reboque_tara_kg: '',
+      reboque_capacity_kg: '',
+      reboque_tipo_carroceria: '',
+      reboque_uf_licenciamento: '',
     },
   });
 
@@ -124,6 +218,7 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
         driver_id: vehicle.driver_id || '',
         owner_id: vehicle.owner_id || '',
         active: vehicle.active,
+        ...mdfeFieldsFromVehicle(vehicle),
       });
     } else {
       form.reset({
@@ -141,6 +236,14 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
         driver_id: '',
         owner_id: '',
         active: true,
+        tara_kg: '',
+        tipo_rodado: '',
+        tipo_carroceria: '',
+        uf_licenciamento: '',
+        reboque_tara_kg: '',
+        reboque_capacity_kg: '',
+        reboque_tipo_carroceria: '',
+        reboque_uf_licenciamento: '',
       });
     }
   }, [vehicle, form]);
@@ -167,7 +270,8 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
             driver_id: data.driver_id || null,
             owner_id: data.owner_id || null,
             active: data.active,
-          },
+            ...mdfePayloadFromForm(data),
+          } as unknown as VehicleUpdate,
         });
         toast.success('Veículo atualizado com sucesso');
       } else {
@@ -183,7 +287,8 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
           driver_id: data.driver_id || null,
           owner_id: data.owner_id || null,
           active: data.active,
-        });
+          ...mdfePayloadFromForm(data),
+        } as unknown as VehicleInsert);
         toast.success('Veículo criado com sucesso');
       }
       onClose();
@@ -609,6 +714,213 @@ export function VehicleForm({ open, onClose, vehicle }: VehicleFormProps) {
                   </FormItem>
                 )}
               />
+            </div>
+
+            <Separator />
+
+            {/* ── Dados Fiscais (MDF-e) ── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" />
+                Dados Fiscais (MDF-e)
+              </p>
+              <p className="text-[10px] text-muted-foreground -mt-1">
+                Obrigatórios para emissão de MDF-e do veículo de tração.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="tipo_rodado"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de rodado</FormLabel>
+                      <Select
+                        onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+                        value={field.value || '__none__'}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecionar..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            <span className="text-muted-foreground">Nenhum</span>
+                          </SelectItem>
+                          {TIPO_RODADO_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="tipo_carroceria"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de carroceria</FormLabel>
+                      <Select
+                        onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+                        value={field.value || '__none__'}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecionar..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            <span className="text-muted-foreground">Nenhum</span>
+                          </SelectItem>
+                          {TIPO_CARROCERIA_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="tara_kg"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tara (kg)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="100" placeholder="8500" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="uf_licenciamento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>UF de licenciamento</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="SC"
+                          maxLength={2}
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Reboque/semirreboque — só quando há placa de carreta */}
+              {!!form.watch('plate_2')?.trim() && (
+                <div className="space-y-3 rounded-md border border-dashed p-3">
+                  <p className="text-[11px] font-medium text-muted-foreground">
+                    Reboque / semirreboque ({form.watch('plate_2')})
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name="reboque_tara_kg"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tara reboque (kg)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" step="100" placeholder="6000" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="reboque_capacity_kg"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Capacidade reboque (kg)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="100"
+                              placeholder="25000"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name="reboque_tipo_carroceria"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Carroceria reboque</FormLabel>
+                          <Select
+                            onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+                            value={field.value || '__none__'}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="__none__">
+                                <span className="text-muted-foreground">Nenhum</span>
+                              </SelectItem>
+                              {TIPO_CARROCERIA_OPTIONS.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="reboque_uf_licenciamento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>UF licenc. reboque</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="SC"
+                              maxLength={2}
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 pt-2">

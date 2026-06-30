@@ -22,6 +22,14 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { useCreateOwner, useUpdateOwner } from '@/hooks/useOwners';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
@@ -46,9 +54,46 @@ const ownerSchema = z.object({
   zip_code: zodCep,
   notes: z.string().max(500, 'Observações muito longas').optional(),
   active: z.boolean(),
+  // ── Dados ANTT / MDF-e (proprietário do veículo) ──
+  rntrc: z.string().optional(),
+  uf: z
+    .string()
+    .max(2, 'Use a sigla da UF (ex: SC)')
+    .optional()
+    .transform((v) => v?.toUpperCase()),
+  tipo_proprietario: z.string().optional(),
 });
 
 type OwnerFormData = z.infer<typeof ownerSchema>;
+
+// Tabela ANTT — tipo de proprietário (MDF-e)
+const TIPO_PROPRIETARIO_OPTIONS = [
+  { value: '0', label: '0 — TAC Agregado' },
+  { value: '1', label: '1 — TAC Independente' },
+  { value: '2', label: '2 — Outros' },
+] as const;
+
+/** Colunas ANTT/MDF-e ainda não presentes nos tipos gerados — acesso via cast. */
+type OwnerMdfeColumns = {
+  rntrc?: string | null;
+  uf?: string | null;
+  tipo_proprietario?: number | null;
+};
+
+type OwnerInsert = Database['public']['Tables']['owners']['Insert'];
+type OwnerUpdate = Database['public']['Tables']['owners']['Update'];
+
+/** Campos ANTT/MDF-e do form → payload do banco (tipo_proprietario numérico). */
+function ownerMdfePayload(data: OwnerFormData): OwnerMdfeColumns {
+  return {
+    rntrc: data.rntrc?.trim() || null,
+    uf: data.uf?.trim() || null,
+    tipo_proprietario:
+      data.tipo_proprietario && data.tipo_proprietario.trim() !== ''
+        ? parseInt(data.tipo_proprietario, 10)
+        : null,
+  };
+}
 
 /** Form keys that hold string values (excludes `active`), for safeSet from CNPJ lookup. */
 type OwnerFormStringKey = Exclude<keyof OwnerFormData, 'active'>;
@@ -80,6 +125,9 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
       zip_code: '',
       notes: '',
       active: true,
+      rntrc: '',
+      uf: '',
+      tipo_proprietario: '',
     },
   });
 
@@ -98,6 +146,12 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
         zip_code: owner.zip_code || '',
         notes: owner.notes || '',
         active: owner.active,
+        rntrc: (owner as unknown as OwnerMdfeColumns).rntrc || '',
+        uf: (owner as unknown as OwnerMdfeColumns).uf || '',
+        tipo_proprietario:
+          (owner as unknown as OwnerMdfeColumns).tipo_proprietario != null
+            ? String((owner as unknown as OwnerMdfeColumns).tipo_proprietario)
+            : '',
       });
     } else {
       form.reset({
@@ -113,6 +167,9 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
         zip_code: '',
         notes: '',
         active: true,
+        rntrc: '',
+        uf: '',
+        tipo_proprietario: '',
       });
     }
   }, [owner, form]);
@@ -185,7 +242,8 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
             zip_code: data.zip_code || null,
             notes: data.notes || null,
             active: data.active,
-          },
+            ...ownerMdfePayload(data),
+          } as unknown as OwnerUpdate,
         });
         toast.success('Proprietário atualizado com sucesso');
       } else {
@@ -202,7 +260,8 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
           zip_code: data.zip_code || null,
           notes: data.notes || null,
           active: data.active,
-        });
+          ...ownerMdfePayload(data),
+        } as unknown as OwnerInsert);
         toast.success('Proprietário criado com sucesso');
       }
       onClose();
@@ -405,6 +464,91 @@ export function OwnerForm({ open, onClose, owner }: OwnerFormProps) {
                 </FormItem>
               )}
             />
+
+            <Separator />
+
+            {/* ── Dados ANTT / MDF-e ── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Dados ANTT / MDF-e
+              </p>
+              <p className="text-[10px] text-muted-foreground -mt-1">
+                Usados na emissão de MDF-e quando este proprietário é o dono do veículo
+                (terceiro/TAC).
+              </p>
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="rntrc"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>RNTRC</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="8 dígitos"
+                          maxLength={8}
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(e.target.value.replace(/\D/g, '').slice(0, 8))
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="uf"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>UF (ANTT)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="SC"
+                          maxLength={2}
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="tipo_proprietario"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo</FormLabel>
+                      <Select
+                        onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
+                        value={field.value || '__none__'}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            <span className="text-muted-foreground">Nenhum</span>
+                          </SelectItem>
+                          {TIPO_PROPRIETARIO_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
 
             <FormField
               control={form.control}
