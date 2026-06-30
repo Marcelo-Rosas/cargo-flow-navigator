@@ -116,10 +116,7 @@ function digits(s: string | null | undefined): string {
  * Vectra → retorna {} (sem grupo proprietário; Vectra é o transportador via
  * registro_nacional_transporte).
  */
-function buildProprietarioFields(
-  prop: MdfeProprietario | undefined,
-  vectra: VectraConfig
-): Record<string, unknown> {
+function buildProprietarioFields(prop: MdfeProprietario | undefined): Record<string, unknown> {
   const isThirdParty = Boolean(prop && (prop.rntrc || prop.cpf_cnpj));
   if (!isThirdParty) return {};
 
@@ -131,12 +128,14 @@ function buildProprietarioFields(
         ? { cpf_proprietario_veiculo: doc }
         : {};
 
+  // Ordem do grupo `prop` (XSD MDF-e): CPF|CNPJ, RNTRC, xNome, IE?, tpProp.
+  // NÃO há `UF` neste grupo — SEFAZ rejeita (erro_validacao_schema:
+  // "Element 'UF' not expected. Expected is one of (IE, tpProp)").
   return {
     ...docField,
     rntrc_proprietario_veiculo: digits(prop!.rntrc),
     razao_social_proprietario_veiculo: prop!.nome ?? '',
     ...(prop!.ie ? { inscricao_estadual_proprietario_veiculo: prop!.ie } : {}),
-    uf_proprietario_veiculo: prop!.uf ?? vectra.uf,
     tipo_proprietario_veiculo: prop!.tipo_proprietario ?? 2, // 2 = Outros (fallback ETC)
   };
 }
@@ -254,7 +253,7 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
         },
       ],
       // Proprietário (terceiro/TAC) — campos flat; vazio = veículo próprio Vectra.
-      ...buildProprietarioFields(input.proprietario, vectra),
+      ...buildProprietarioFields(input.proprietario),
       ...(vehicle.plate_2
         ? {
             veiculos_reboque: [
