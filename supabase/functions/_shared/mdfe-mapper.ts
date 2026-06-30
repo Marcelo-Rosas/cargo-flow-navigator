@@ -323,7 +323,9 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
     // === seguro da carga (RCTR-C / RC-DC) ===
     ...(input.seguros && input.seguros.length > 0 ? { seguros_carga: input.seguros } : {}),
 
-    informacoes_adicionais_contribuinte: `MDF-e CFN — ${ctes.length} CT-e(s) agregados`,
+    // Focus MDF-e: a obs do contribuinte é `informacao_complementar` (tag infCpl) —
+    // diferente do CT-e (`informacoes_adicionais_contribuinte`).
+    informacao_complementar: `MDF-e CFN — ${ctes.length} CT-e(s) agregados`,
   };
   if (!input.seguros || input.seguros.length === 0)
     warnings.push('seguros vazio — MDF-e sem apólice (RCTR-C/RC-DC). Verificar risk_policies.');
