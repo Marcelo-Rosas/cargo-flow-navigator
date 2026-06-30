@@ -28,12 +28,23 @@ export interface VehicleRow {
   tipo_rodado?: string | null; // '01'..'06' (truck/cavalo/etc)
   tipo_carroceria?: string | null; // '00'..'09'
   uf_licenciamento?: string | null;
-  // Proprietário (when vehicle is third-party — TAC Agregado/Independente)
-  rntrc_proprietario?: string | null;
-  cpf_cnpj_proprietario?: string | null;
-  nome_proprietario?: string | null;
-  ie_proprietario?: string | null;
-  uf_proprietario?: string | null;
+  // Capacidade (nomes reais da tabela vehicles)
+  capacity_kg?: number | null;
+  capacity_m3?: number | null;
+  // Reboque/complemento (quando plate_2 presente)
+  reboque_tara_kg?: number | null;
+  reboque_capacity_kg?: number | null;
+  reboque_tipo_carroceria?: string | null;
+  reboque_uf_licenciamento?: string | null;
+}
+
+/** Proprietário do veículo (terceiro/TAC) — vem do owner vinculado (owner_id). */
+export interface MdfeProprietario {
+  rntrc?: string | null;
+  cpf_cnpj?: string | null;
+  nome?: string | null;
+  ie?: string | null;
+  uf?: string | null;
   tipo_proprietario?: number | null; // 0=TAC Agregado, 1=TAC Independente, 2=Outros
 }
 
@@ -79,6 +90,8 @@ export interface BuildMdfeInput {
   percursoUfs?: string[]; // intermediate UFs between uf_inicio and uf_fim
   /** Apólices ativas (RCTR-C / RC-DC). Responsável = emitente (Vectra). */
   seguros?: MdfeSeguro[];
+  /** Proprietário do veículo (do owner vinculado). Ausente = veículo próprio Vectra. */
+  proprietario?: MdfeProprietario;
   produtoPredominante?: {
     descricao: string;
     ncm?: string;
@@ -103,10 +116,13 @@ function digits(s: string | null | undefined): string {
  * still expect proprietario=Vectra so we mirror Active's behaviour and include
  * Vectra as proprietario when not specified).
  */
-function buildProprietario(vehicle: VehicleRow, vectra: VectraConfig): Record<string, unknown> {
-  const isThirdParty = Boolean(vehicle.rntrc_proprietario || vehicle.cpf_cnpj_proprietario);
+function buildProprietario(
+  prop: MdfeProprietario | undefined,
+  vectra: VectraConfig
+): Record<string, unknown> {
+  const isThirdParty = Boolean(prop && (prop.rntrc || prop.cpf_cnpj));
   if (!isThirdParty) {
-    // Própria Vectra
+    // Veículo próprio Vectra
     return {
       cnpj: vectra.cnpj,
       rntrc: vectra.rntrc,
@@ -117,16 +133,16 @@ function buildProprietario(vehicle: VehicleRow, vectra: VectraConfig): Record<st
     };
   }
 
-  const doc = digits(vehicle.cpf_cnpj_proprietario);
+  const doc = digits(prop!.cpf_cnpj);
   const docField = doc.length === 14 ? { cnpj: doc } : doc.length === 11 ? { cpf: doc } : {};
 
   return {
     ...docField,
-    rntrc: digits(vehicle.rntrc_proprietario),
-    nome: vehicle.nome_proprietario ?? '',
-    ...(vehicle.ie_proprietario ? { ie: vehicle.ie_proprietario } : {}),
-    uf: vehicle.uf_proprietario ?? vectra.uf,
-    tipo_proprietario: vehicle.tipo_proprietario ?? 0, // 0 = TAC Agregado fallback
+    rntrc: digits(prop!.rntrc),
+    nome: prop!.nome ?? '',
+    ...(prop!.ie ? { ie: prop!.ie } : {}),
+    uf: prop!.uf ?? vectra.uf,
+    tipo_proprietario: prop!.tipo_proprietario ?? 0, // 0 = TAC Agregado fallback
   };
 }
 
@@ -226,10 +242,10 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
       placa: vehicle.plate.toUpperCase(),
       renavam: digits(vehicle.renavam),
       tara: vehicle.tara_kg ?? 0,
-      capacidade_kg: vehicle.capacidade_kg ?? 0,
-      ...(vehicle.capacidade_m3 ? { capacidade_m3: vehicle.capacidade_m3 } : {}),
+      capacidade_kg: vehicle.capacity_kg ?? 0,
+      ...(vehicle.capacity_m3 ? { capacidade_m3: vehicle.capacity_m3 } : {}),
       tipo_rodado: vehicle.tipo_rodado ?? '02', // 02 = Toco fallback
-      tipo_carroceria: vehicle.tipo_carroceria ?? '02', // 02 = Aberta fallback
+      tipo_carroceria: vehicle.tipo_carroceria ?? '02', // 02 = Fechada/Baú fallback
       uf_licenciamento: vehicle.uf_licenciamento ?? vectra.uf,
       condutor: [
         {
@@ -237,17 +253,17 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
           cpf: cpfMotorista,
         },
       ],
-      proprietario: buildProprietario(vehicle, vectra),
+      proprietario: buildProprietario(input.proprietario, vectra),
     },
     ...(vehicle.plate_2
       ? {
           veiculos_reboque: [
             {
               placa: vehicle.plate_2.toUpperCase(),
-              tara: 0,
-              capacidade_kg: 0,
-              tipo_carroceria: '02',
-              uf_licenciamento: vectra.uf,
+              tara: vehicle.reboque_tara_kg ?? 0,
+              capacidade_kg: vehicle.reboque_capacity_kg ?? 0,
+              tipo_carroceria: vehicle.reboque_tipo_carroceria ?? '02',
+              uf_licenciamento: vehicle.reboque_uf_licenciamento ?? vectra.uf,
             },
           ],
         }
