@@ -234,11 +234,17 @@ serve(async (req) => {
       const cnpjSeg =
         String(pol.metadata?.insurer_cnpj ?? '').replace(/\D/g, '') ||
         (/berkley/i.test(insurer) ? BERKLEY_CNPJ : '');
+      // nAver — averbação é OBRIGATÓRIA no modal rodoviário (SEFAZ rejeita 699
+      // sem ela). Vem do metadata da apólice (numero_averbacao | averbacao).
+      const averbacao = String(pol.metadata?.numero_averbacao ?? pol.metadata?.averbacao ?? '')
+        .replace(/\s/g, '')
+        .slice(0, 40);
       return {
         responsavel_seguro: '1',
         nome_seguradora: insurer.slice(0, 30),
         ...(cnpjSeg ? { cnpj_seguradora: cnpjSeg } : {}),
         numero_apolice: apolice,
+        ...(averbacao ? { numero_averbacao: averbacao } : {}),
       };
     })
     .filter((s: any) => s.numero_apolice);
