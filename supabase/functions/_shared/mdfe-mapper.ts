@@ -202,6 +202,11 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
 
   const ref = buildMdfeRef(serie, numero);
 
+  // Veículo de terceiro (TAC) → exige grupo proprietário + contratante (578).
+  const isTerceiro = Boolean(
+    input.proprietario && (input.proprietario.rntrc || input.proprietario.cpf_cnpj)
+  );
+
   const payload: Record<string, unknown> = {
     // === ide ===
     emitente: 1, // 1 = Prestador serviço transporte (transportadora)
@@ -257,6 +262,11 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
       ],
       // Proprietário (terceiro/TAC) — campos flat; vazio = veículo próprio Vectra.
       ...buildProprietarioFields(input.proprietario),
+      // Contratante do frete (Vectra/ETC) — obrigatório quando o veículo é de
+      // terceiro (TAC); SEFAZ rejeita 578 sem isto. Veículo próprio → omite.
+      ...(isTerceiro
+        ? { contratantes: [{ nome: vectra.nome.slice(0, 60), cnpj: digits(vectra.cnpj) }] }
+        : {}),
       ...(vehicle.plate_2
         ? {
             veiculos_reboque: [
