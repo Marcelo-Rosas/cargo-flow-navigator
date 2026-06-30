@@ -110,39 +110,34 @@ function digits(s: string | null | undefined): string {
 }
 
 /**
- * Build veiculo_tracao.proprietario block. If vehicle has explicit proprietario
- * fields (rntrc_proprietario, etc), use them — third-party vehicle (TAC).
- * Otherwise treat as Vectra-owned (omit proprietario block; some integrations
- * still expect proprietario=Vectra so we mirror Active's behaviour and include
- * Vectra as proprietario when not specified).
+ * Campos do proprietário do veículo de tração, no formato FLAT do
+ * modal_rodoviário Focus (sufixo `_proprietario_veiculo`). Só preenche quando o
+ * veículo é de terceiro (TAC) — há rntrc ou cpf_cnpj do owner. Veículo próprio
+ * Vectra → retorna {} (sem grupo proprietário; Vectra é o transportador via
+ * registro_nacional_transporte).
  */
-function buildProprietario(
+function buildProprietarioFields(
   prop: MdfeProprietario | undefined,
   vectra: VectraConfig
 ): Record<string, unknown> {
   const isThirdParty = Boolean(prop && (prop.rntrc || prop.cpf_cnpj));
-  if (!isThirdParty) {
-    // Veículo próprio Vectra
-    return {
-      cnpj: vectra.cnpj,
-      rntrc: vectra.rntrc,
-      nome: vectra.nome,
-      ie: vectra.ie,
-      uf: vectra.uf,
-      tipo_proprietario: null,
-    };
-  }
+  if (!isThirdParty) return {};
 
   const doc = digits(prop!.cpf_cnpj);
-  const docField = doc.length === 14 ? { cnpj: doc } : doc.length === 11 ? { cpf: doc } : {};
+  const docField =
+    doc.length === 14
+      ? { cnpj_proprietario_veiculo: doc }
+      : doc.length === 11
+        ? { cpf_proprietario_veiculo: doc }
+        : {};
 
   return {
     ...docField,
-    rntrc: digits(prop!.rntrc),
-    nome: prop!.nome ?? '',
-    ...(prop!.ie ? { ie: prop!.ie } : {}),
-    uf: prop!.uf ?? vectra.uf,
-    tipo_proprietario: prop!.tipo_proprietario ?? 0, // 0 = TAC Agregado fallback
+    rntrc_proprietario_veiculo: digits(prop!.rntrc),
+    razao_social_proprietario_veiculo: prop!.nome ?? '',
+    ...(prop!.ie ? { inscricao_estadual_proprietario_veiculo: prop!.ie } : {}),
+    uf_proprietario_veiculo: prop!.uf ?? vectra.uf,
+    tipo_proprietario_veiculo: prop!.tipo_proprietario ?? 2, // 2 = Outros (fallback ETC)
   };
 }
 
@@ -212,7 +207,8 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
     emitente: 1, // 1 = Prestador serviço transporte (transportadora)
     serie,
     numero,
-    modal: 1, // 1 = Rodoviário
+    // Modal é sinalizado pela presença da chave `modal_rodoviario` (Focus NFe),
+    // não por um campo `modal` numérico — ver bloco abaixo.
     // Horário local Brasil (UTC-3 fixo). UTC puro → SEFAZ rejeita 212. Ver cte-mapper.
     data_emissao: new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 19) + '-03:00',
     uf_inicio: ufInicio,
@@ -238,36 +234,41 @@ export function buildMdfePayload(input: BuildMdfeInput): BuildMdfeResult {
     uf_emitente: vectra.uf,
 
     // === modal rodoviário ===
-    veiculo_tracao: {
-      placa: vehicle.plate.toUpperCase(),
-      renavam: digits(vehicle.renavam),
-      tara: vehicle.tara_kg ?? 0,
-      capacidade_kg: vehicle.capacity_kg ?? 0,
-      ...(vehicle.capacity_m3 ? { capacidade_m3: vehicle.capacity_m3 } : {}),
-      tipo_rodado: vehicle.tipo_rodado ?? '02', // 02 = Toco fallback
-      tipo_carroceria: vehicle.tipo_carroceria ?? '02', // 02 = Fechada/Baú fallback
-      uf_licenciamento: vehicle.uf_licenciamento ?? vectra.uf,
-      condutor: [
+    // Focus NFe: bloco do modal vai sob a chave `modal_rodoviario`, com campos
+    // FLAT (sufixo `_veiculo`). Sem esse wrapper → erro
+    // `parametros_modal_nao_informados`.
+    modal_rodoviario: {
+      registro_nacional_transporte: digits(vectra.rntrc), // RNTRC do transportador (Vectra)
+      placa_veiculo: vehicle.plate.toUpperCase(),
+      renavam_veiculo: digits(vehicle.renavam),
+      tara_veiculo: vehicle.tara_kg ?? 0,
+      capacidade_kg_veiculo: vehicle.capacity_kg ?? 0,
+      ...(vehicle.capacity_m3 ? { capacidade_m3_veiculo: vehicle.capacity_m3 } : {}),
+      tipo_rodado_veiculo: vehicle.tipo_rodado ?? '02', // 02 = Toco fallback
+      tipo_carroceria_veiculo: vehicle.tipo_carroceria ?? '02', // 02 = Fechada/Baú fallback
+      uf_licenciamento_veiculo: vehicle.uf_licenciamento ?? vectra.uf,
+      condutores: [
         {
           nome: driver.name,
           cpf: cpfMotorista,
         },
       ],
-      proprietario: buildProprietario(input.proprietario, vectra),
+      // Proprietário (terceiro/TAC) — campos flat; vazio = veículo próprio Vectra.
+      ...buildProprietarioFields(input.proprietario, vectra),
+      ...(vehicle.plate_2
+        ? {
+            veiculos_reboque: [
+              {
+                placa: vehicle.plate_2.toUpperCase(),
+                tara: vehicle.reboque_tara_kg ?? 0,
+                capacidade_kg: vehicle.reboque_capacity_kg ?? 0,
+                tipo_carroceria: vehicle.reboque_tipo_carroceria ?? '02',
+                uf_licenciamento: vehicle.reboque_uf_licenciamento ?? vectra.uf,
+              },
+            ],
+          }
+        : {}),
     },
-    ...(vehicle.plate_2
-      ? {
-          veiculos_reboque: [
-            {
-              placa: vehicle.plate_2.toUpperCase(),
-              tara: vehicle.reboque_tara_kg ?? 0,
-              capacidade_kg: vehicle.reboque_capacity_kg ?? 0,
-              tipo_carroceria: vehicle.reboque_tipo_carroceria ?? '02',
-              uf_licenciamento: vehicle.reboque_uf_licenciamento ?? vectra.uf,
-            },
-          ],
-        }
-      : {}),
 
     // === municípios carregamento ===
     municipios_carregamento: municipiosCarregamento.map((m) => ({

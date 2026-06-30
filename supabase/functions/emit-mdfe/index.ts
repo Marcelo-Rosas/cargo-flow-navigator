@@ -333,27 +333,30 @@ serve(async (req) => {
   }
 
   const focusStatus = String(focusResp.body.status ?? '');
+  const isError = focusResp.status >= 400 && focusResp.status !== 409 && focusResp.status !== 422;
   let newStatus = 'processing';
   if (focusResp.status === 202 || focusStatus === 'processando_autorizacao')
     newStatus = 'processing';
   else if (focusStatus === 'autorizado') newStatus = 'authorized';
   else if (focusStatus === 'cancelado') newStatus = 'cancelled';
   else if (focusStatus === 'erro_autorizacao' || focusResp.status === 422) newStatus = 'rejected';
+  // Pré-validação Focus (ex.: parametros_modal_nao_informados) volta {codigo,
+  // mensagem} sem `status` e HTTP >= 400 — sem isto a row ficava 'processing'.
+  else if (isError || focusResp.body.codigo) newStatus = 'rejected';
 
-  const isError = focusResp.status >= 400 && focusResp.status !== 409 && focusResp.status !== 422;
-
+  const isRejected = newStatus === 'rejected';
   await supabase
     .from('mdfe_emissions')
     .update({
       status: newStatus,
       response_received: focusResp.body,
       status_sefaz: focusResp.body.status_sefaz ?? null,
-      rejection_code:
-        newStatus === 'rejected' ? String(focusResp.body.codigo_status ?? focusResp.status) : null,
-      rejection_msg:
-        newStatus === 'rejected'
-          ? String(focusResp.body.mensagem_sefaz ?? focusResp.body.mensagem ?? '')
-          : null,
+      rejection_code: isRejected
+        ? String(focusResp.body.codigo_status ?? focusResp.body.codigo ?? focusResp.status)
+        : null,
+      rejection_msg: isRejected
+        ? String(focusResp.body.mensagem_sefaz ?? focusResp.body.mensagem ?? '')
+        : null,
     })
     .eq('id', emission.id);
 
