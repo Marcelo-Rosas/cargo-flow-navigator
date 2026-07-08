@@ -32,6 +32,9 @@ verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization man
 [functions.focus-webhook]
 verify_jwt = false  # Recebe POST do Focus NFe (header X-Focus-Auth); Focus não envia JWT Supabase
 
+[functions.averba-cte]
+verify_jwt = false  # Valida Authorization (JWT) ou x-internal-token manualmente
+
 [functions.calculate-freight]
 verify_jwt = false  # Gateway 401 Invalid JWT; função valida Authorization manualmente
 
