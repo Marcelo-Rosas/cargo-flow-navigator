@@ -1,0 +1,7 @@
+-- Placeholder de paridade de ledger (drift reconciliation).
+-- Migration APLICADA DIRETAMENTE no remoto via apply_migration em 2026-07-04,
+-- fora do fluxo de arquivo — o `supabase db push` reclamava
+-- "Remote migration versions not found in local migrations directory".
+-- db push casa por versao (nao conteudo) e PULA versoes ja aplicadas no remoto,
+-- entao este arquivo nao executa la; existe so para reconciliar o historico.
+-- Conteudo real nao versionado. Ver: feedback_avoid_apply_migration_mcp.
