@@ -187,6 +187,38 @@ serve(async (req) => {
     return json({ error: 'db_update_failed', detail: upErr.message }, 500);
   }
 
+  // Gatilho: averbação de seguro do CT-e autorizado (fire-and-forget).
+  // Falha de averbação NUNCA derruba o webhook (Focus reentrega em erro).
+  if (isCte && newStatus === 'authorized' && update.xml_storage_path) {
+    const internalToken = Deno.env.get('INTERNAL_AVERBA_TOKEN');
+    if (internalToken) {
+      try {
+        const { data: cteRow } = await supabase
+          .from('cte_emissions')
+          .select('id')
+          .eq('ref', ref)
+          .maybeSingle();
+        if (cteRow?.id) {
+          const resp = await fetch(`${supabaseUrl}/functions/v1/averba-cte`, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-internal-token': internalToken,
+              apikey: serviceKey,
+              Authorization: `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({ cte_emission_id: cteRow.id }),
+          });
+          console.log('[focus-webhook] averba-cte disparado', { ref, status: resp.status });
+        }
+      } catch (e) {
+        console.error('[focus-webhook] averba-cte falhou (ignorado)', { ref, error: String(e) });
+      }
+    } else {
+      console.log('[focus-webhook] averba pulado: INTERNAL_AVERBA_TOKEN ausente', { ref });
+    }
+  }
+
   console.log('[focus-webhook] persisted', {
     docType,
     ref,
